@@ -1,1 +1,18 @@
-/target
+# Ignore Rust build artifacts
+/target/
+**/*.rs.bk
+
+# Editor backups and swap files
+*~
+*.swp
+*.swo
+
+# Logs and temp files
+*.log
+*.tmp
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
