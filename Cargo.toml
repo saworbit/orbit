@@ -1,0 +1,31 @@
+[package]
+name = "orbit"
+version = "0.2.0"
+edition = "2021"
+authors = ["Your Name <your@email.com>"]
+description = "Intelligent file copy with checksum, optional compression, resume capability, and audit logging"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/yourusername/orbit"
+keywords = ["file-copy", "resume", "compression", "checksum", "backup"]
+categories = ["command-line-utilities", "filesystem"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+lz4 = "1.28"
+sha2 = "0.10"
+sysinfo = "0.35.1"
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+# Optimize for performance since this is a file transfer tool
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+# Faster compilation during development
+opt-level = 0
+debug = true
