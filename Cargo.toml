@@ -6,7 +6,7 @@ authors = ["Your Name <your@email.com>"]
 description = "Intelligent file copy with checksum, optional compression, resume capability, and audit logging"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/yourusername/orbit"
+repository = "https://github.com/saworbit/orbit"
 keywords = ["file-copy", "resume", "compression", "checksum", "backup"]
 categories = ["command-line-utilities", "filesystem"]
 
@@ -17,6 +17,8 @@ sha2 = "0.10"
 sysinfo = "0.35.1"
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+walkdir = "2.4"
+filetime = "0.2"
 
 [profile.release]
 # Optimize for performance since this is a file transfer tool
