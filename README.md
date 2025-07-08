@@ -135,11 +135,13 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) to get started.
 
 ---
 
-## 📜 License
+## 📜 Licence
+Orbit uses a dual-licence model:
 
-This project is licensed under the MIT License — see [`LICENSE`](./LICENSE).
+Use case	Licence
+Community, research or educational use	Creative Commons Attribution NonCommercial ShareAlike 4.0 (CC BY-NC-SA 4.0)
+Commercial use	Requires a commercial licence. See COMMERCIAL_LICENSE.md and contact shaneawall@gmail.com
 
-Orbit is and will remain open-source. A separate commercial edition with advanced capabilities may be introduced in future.
 
 ---
 
