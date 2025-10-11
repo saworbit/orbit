@@ -1,21 +1,31 @@
-MIT License
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
 
-Copyright (c) 2025 Shane Wall
+Orbit and its associated modules are made available under a dual-license model:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the “Software”), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. **Non-Commercial Use**
+   You are free to:
+   - Use, copy, and redistribute the material in any medium or format
+   - Adapt, remix, transform, and build upon the material
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+   Under the following terms:
+   - **Attribution**: You must give appropriate credit to the original author (Shane Wall), link to the licence, and indicate if changes were made.
+   - **Non-Commercial**: You may not use the material for commercial purposes.
+   - **ShareAlike**: If you remix, transform, or build upon the material, you must distribute your contributions under the same licence.
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. **Commercial Use**
+   Any use of Orbit, its modules, or derivatives in a commercial context requires a separate commercial licence.
+
+   This includes but is not limited to:
+   - Use in a commercial product or service (free or paid)
+   - Integration into commercial workflows
+   - Use by a for-profit entity beyond internal evaluation or prototyping
+
+   For commercial licensing, contact:
+   **Shane Wall**
+   📧 shaneawall@gmail.com
+
+---
+
+This licensing model supports open innovation while ensuring that commercial entities contribute back to sustain development.
+
+Full licence text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
