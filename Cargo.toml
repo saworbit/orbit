@@ -1,9 +1,9 @@
 [package]
 name = "orbit"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-authors = ["Your Name <your@email.com>"]
-description = "Intelligent file copy with checksum, optional compression, resume capability, and audit logging"
+authors = ["Shane Wall <shaneawall@gmail.com>"]
+description = "Intelligent file transfer with checksum, compression, resume capability, and protocol abstraction"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/saworbit/orbit"
@@ -11,23 +11,62 @@ keywords = ["file-copy", "resume", "compression", "checksum", "backup"]
 categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
+# CLI & Configuration
 clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+
+# Compression
 lz4 = "1.28"
+zstd = "0.13"
+
+# Hashing & Security
 sha2 = "0.10"
-sysinfo = "0.35.1"
-anyhow = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
+
+# File System Operations
 walkdir = "2.4"
 filetime = "0.2"
+glob = "0.3"
+
+# System Information
+sysinfo = "0.35.1"
+
+# Error Handling & Logging
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time & Dates
+chrono = { version = "0.4", features = ["serde"] }
+
+# Progress & UI
+indicatif = "0.17"
+
+# Parallelization
+rayon = "1.10"
+
+# JSON for audit logs
+serde_json = "1.0"
+
+[dev-dependencies]
+tempfile = "3.10"
+assert_fs = "1.1"
+predicates = "3.1"
 
 [profile.release]
-# Optimize for performance since this is a file transfer tool
 opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
+strip = true  # Strip symbols for smaller binary
 
 [profile.dev]
-# Faster compilation during development
 opt-level = 0
 debug = true
+
+[lib]
+name = "orbit"
+path = "src/lib.rs"
+
+[[bin]]
+name = "orbit"
+path = "src/main.rs"
