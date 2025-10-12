@@ -5,7 +5,6 @@
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -176,6 +175,7 @@ fn parse_csv_line(line: &str) -> Option<AuditEntry> {
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
+    use std::time::Duration;
 
     #[test]
     fn test_write_and_read_json_audit() {
