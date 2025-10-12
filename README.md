@@ -91,6 +91,7 @@ orbit -s bigfile.iso -d /mnt/server/bigfile.iso \
 - **CSV logs** - Excel-compatible option
 - **Progress bars** - Real-time visual feedback
 - **Detailed statistics** - Bytes copied, duration, compression ratio
+- **Statistics command** - Analyze audit logs with `orbit stats`
 
 ### ⚙️ **Configuration**
 - **TOML config files** - Project or user defaults
@@ -177,6 +178,24 @@ orbit -s ./project -d /backup/project \
   --exclude ".git/*" \
   --parallel 8
 ```
+### View Transfer Statistics
+```bash
+# Show statistics from audit log
+orbit stats
+
+# Use custom log file
+orbit stats --log /path/to/audit.log
+
+# Analyze CSV format logs
+orbit stats --format csv
+
+What you'll see:
+
+Total operations and success rate
+Total data transferred
+Average transfer speeds
+Compression statistics
+Most recent transfer
 
 ---
 
