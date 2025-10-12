@@ -19,11 +19,13 @@ pub mod core;
 pub mod compression;
 pub mod audit;
 pub mod error;
+pub mod stats;
 
 // Re-export commonly used types
 pub use config::{CopyConfig, CompressionType, SymlinkMode, CopyMode, AuditFormat};
 pub use core::{copy_file, copy_directory, CopyStats};
 pub use error::{OrbitError, Result};
+pub use stats::TransferStats;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

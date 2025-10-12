@@ -14,12 +14,9 @@ use std::time::{Duration, Instant};
 use std::thread;
 
 use indicatif::{ProgressBar, ProgressStyle};
-use sha2::Digest;
-
-use crate::config::{CopyConfig, CopyMode, SymlinkMode};
+use crate::config::{CopyConfig, SymlinkMode};
 use crate::error::{OrbitError, Result};
 use crate::compression;
-use crate::audit;
 
 use checksum::StreamingHasher;
 use resume::ResumeInfo;
