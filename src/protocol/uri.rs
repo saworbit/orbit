@@ -1,0 +1,129 @@
+/*!
+ * URI parsing for protocol detection
+ */
+
+use std::path::PathBuf;
+use crate::error::{OrbitError, Result};
+use super::Protocol;
+
+pub fn parse_uri(uri: &str) -> Result<(Protocol, PathBuf)> {
+    if uri.contains("://") {
+        parse_protocol_uri(uri)
+    } else {
+        Ok((Protocol::Local, PathBuf::from(uri)))
+    }
+}
+
+fn parse_protocol_uri(uri: &str) -> Result<(Protocol, PathBuf)> {
+    let parts: Vec<&str> = uri.splitn(2, "://").collect();
+    if parts.len() != 2 {
+        return Err(OrbitError::Config(format!("Invalid URI format: {}", uri)));
+    }
+    
+    let protocol = parts[0];
+    let rest = parts[1];
+    
+    match protocol {
+        "smb" | "cifs" => parse_smb_uri(rest),
+        "file" => Ok((Protocol::Local, PathBuf::from(rest))),
+        _ => Err(OrbitError::Config(format!("Unsupported protocol: {}", protocol))),
+    }
+}
+
+fn parse_smb_uri(rest: &str) -> Result<(Protocol, PathBuf)> {
+    let (auth, server_share_path) = if rest.contains('@') {
+        let parts: Vec<&str> = rest.splitn(2, '@').collect();
+        (Some(parts[0]), parts[1])
+    } else {
+        (None, rest)
+    };
+    
+    let (username, password) = if let Some(auth_str) = auth {
+        if auth_str.contains(':') {
+            let parts: Vec<&str> = auth_str.splitn(2, ':').collect();
+            (Some(parts[0].to_string()), Some(parts[1].to_string()))
+        } else {
+            (Some(auth_str.to_string()), None)
+        }
+    } else {
+        (None, None)
+    };
+    
+    let parts: Vec<&str> = server_share_path.splitn(3, '/').collect();
+    if parts.len() < 2 {
+        return Err(OrbitError::Config(
+            "SMB URI must include server and share: smb://server/share/path".to_string()
+        ));
+    }
+    
+    let server = parts[0].to_string();
+    let share = parts[1].to_string();
+    let path = if parts.len() > 2 {
+        format!("/{}", parts[2])
+    } else {
+        "/".to_string()
+    };
+    
+    Ok((
+        Protocol::Smb {
+            server,
+            share,
+            username,
+            password,
+            domain: None,
+        },
+        PathBuf::from(path),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_local_path() {
+        let (protocol, path) = parse_uri("/tmp/file.txt").unwrap();
+        assert!(matches!(protocol, Protocol::Local));
+        assert_eq!(path, PathBuf::from("/tmp/file.txt"));
+    }
+
+    #[test]
+    fn test_parse_smb_simple() {
+        let (protocol, path) = parse_uri("smb://server/share/path/file.txt").unwrap();
+        
+        match protocol {
+            Protocol::Smb { server, share, username, password, .. } => {
+                assert_eq!(server, "server");
+                assert_eq!(share, "share");
+                assert!(username.is_none());
+                assert!(password.is_none());
+            }
+            _ => panic!("Expected SMB protocol"),
+        }
+        
+        assert_eq!(path, PathBuf::from("/path/file.txt"));
+    }
+
+    #[test]
+    fn test_parse_smb_with_auth() {
+        let (protocol, path) = parse_uri("smb://user:pass@server/share/file.txt").unwrap();
+        
+        match protocol {
+            Protocol::Smb { server, share, username, password, .. } => {
+                assert_eq!(server, "server");
+                assert_eq!(share, "share");
+                assert_eq!(username, Some("user".to_string()));
+                assert_eq!(password, Some("pass".to_string()));
+            }
+            _ => panic!("Expected SMB protocol"),
+        }
+        
+        assert_eq!(path, PathBuf::from("/file.txt"));
+    }
+
+    #[test]
+    fn test_parse_invalid_smb() {
+        let result = parse_uri("smb://server");
+        assert!(result.is_err());
+    }
+}

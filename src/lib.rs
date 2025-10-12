@@ -20,12 +20,14 @@ pub mod compression;
 pub mod audit;
 pub mod error;
 pub mod stats;
+pub mod protocol;
 
 // Re-export commonly used types
 pub use config::{CopyConfig, CompressionType, SymlinkMode, CopyMode, AuditFormat};
 pub use core::{copy_file, copy_directory, CopyStats};
 pub use error::{OrbitError, Result};
 pub use stats::TransferStats;
+pub use protocol::{Protocol, StorageBackend};
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -36,6 +38,6 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert_eq!(VERSION, "0.3.0");
+        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
     }
 }
