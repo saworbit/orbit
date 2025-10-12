@@ -1,4 +1,4 @@
-# 🌌 Orbit v0.3.0
+# 🌌 Orbit v0.3.1
 
 **Open Resilient Bulk Information Transfer**
 
@@ -6,7 +6,7 @@ A modern, production-ready file transfer engine built in Rust. Think `rsync` + `
 
 [![License: MIT/Apache-2.0](https://img.shields.io/badge/License-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.3.0-green.svg)](https://github.com/saworbit/orbit)
+[![Version](https://img.shields.io/badge/version-0.3.1-green.svg)](https://github.com/saworbit/orbit)
 
 > *Because data has gravity — and gravity shapes architecture.*
 
@@ -114,7 +114,7 @@ cargo install --path .
 ### Verify Installation
 ```bash
 orbit --version
-# Output: orbit 0.3.0
+# Output: orbit 0.3.1
 ```
 
 ---
@@ -227,7 +227,7 @@ Settings priority: **CLI args > Project config > User config > Defaults**
 
 ### Benchmarks (8-core CPU, SSD)
 
-| Operation | Files | Size | Time (v0.3.0) | Throughput |
+| Operation | Files | Size | Time (v0.3.1) | Throughput |
 |-----------|-------|------|---------------|------------|
 | 1000 small files | 1K | 100 MB | 12s | 8.3 MB/s |
 | Single large file | 1 | 10 GB | 115s | 89 MB/s |
@@ -306,7 +306,7 @@ orbit --help
 
 ## 🔮 Roadmap
 
-### ✅ v0.3.0 (Current)
+### ✅ v0.3.1 (Current)
 - [x] Modular architecture
 - [x] Streaming checksums
 - [x] Parallel file copying
@@ -415,7 +415,7 @@ If you find Orbit useful, please consider starring the repository!
 
 ## 📈 Project Status
 
-- **Current Version**: 0.3.0
+- **Current Version**: 0.3.1
 - **Stability**: Beta (production-ready for most use cases)
 - **Active Development**: Yes
 - **Breaking Changes**: Possible until v1.0.0
@@ -599,7 +599,7 @@ Orbit aims to become the **universal data movement layer** for modern infrastruc
 
 ## 📅 Release History
 
-### v0.3.0 (2025-10-11) - "The Refactor"
+### v0.3.1 (2025-10-11) - "The Refactor"
 - 🏗️ Complete modular rewrite
 - ✨ Zstd compression with 22 levels
 - ⚡ Parallel file copying

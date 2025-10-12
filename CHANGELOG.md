@@ -2,6 +2,22 @@
 
 All notable changes to Orbit will be documented in this file.
 
+## [0.3.1] - 2025-10-12
+
+### Added
+- **`orbit stats` command** - Analyze audit logs with detailed statistics
+  - Show total operations (successful/failed/skipped)
+  - Display data volume transferred with averages
+  - Calculate transfer speeds (min/max/average)
+  - Show compression ratios and space saved
+  - Display most recent transfer details
+  - Support both JSON and CSV audit log formats
+
+### Fixed
+- Removed unused import warnings in stats module
+
+---
+
 ## [0.3.0] - 2025-10-12
 
 ### Added
