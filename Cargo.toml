@@ -1,6 +1,6 @@
 [package]
 name = "orbit"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
 description = "Intelligent file transfer with checksum, compression, resume capability, and protocol abstraction"
