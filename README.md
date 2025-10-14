@@ -6,7 +6,7 @@ A modern, production-ready file transfer engine built in Rust. Think `rsync` + `
 
 [![License: MIT/Apache-2.0](https://img.shields.io/badge/License-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.3.1-green.svg)](https://github.com/saworbit/orbit)
+[![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](https://github.com/saworbit/orbit)
 
 > *Because data has gravity — and gravity shapes architecture.*
 
