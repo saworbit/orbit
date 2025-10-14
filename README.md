@@ -1,10 +1,11 @@
-# 🌌 Orbit v0.3.1
+# 🌌 Orbit v0.4.0
 
 **Open Resilient Bulk Information Transfer**
 
 A modern, production-ready file transfer engine built in Rust. Think `rsync` + `robocopy` + `rclone`, but designed from the ground up for reliability, performance, and extensibility.
 
-[![License: MIT/Apache-2.0](https://img.shields.io/badge/License-MIT%2FApache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/saworbit/orbit/workflows/CI/badge.svg)](https://github.com/saworbit/orbit/actions)
+[![License](https://img.shields.io/badge/License-Dual-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![Version](https://img.shields.io/badge/version-0.4.0-green.svg)](https://github.com/saworbit/orbit)
 
@@ -90,8 +91,8 @@ orbit -s bigfile.iso -d /mnt/server/bigfile.iso \
 - **JSON Lines logs** - Machine-parseable, one entry per line
 - **CSV logs** - Excel-compatible option
 - **Progress bars** - Real-time visual feedback
-- **Detailed statistics** - Bytes copied, duration, compression ratio
 - **Statistics command** - Analyze audit logs with `orbit stats`
+- **Detailed metrics** - Success rates, transfer speeds, compression ratios
 
 ### ⚙️ **Configuration**
 - **TOML config files** - Project or user defaults
@@ -306,7 +307,7 @@ orbit --help
 
 ## 🔮 Roadmap
 
-### ✅ v0.3.1 (Current)
+### ✅ v0.4.0 (Current)
 - [x] Modular architecture
 - [x] Streaming checksums
 - [x] Parallel file copying
@@ -317,9 +318,13 @@ orbit --help
 - [x] Copy modes (Sync/Update/Mirror)
 - [x] Exclude patterns
 - [x] Bandwidth limiting
+- [x] Protocol abstraction layer
+- [x] Local filesystem backend
+- [x] Statistics command (`orbit stats`)
+- [~] SMB/CIFS support (experimental stub)
 
-### 🚧 v0.4.0 (Planned - Q1 2026)
-- [ ] SMB/network share support (`smb://server/share`)
+### 🚧 v0.4.1 (Planned - Q1 2026)
+- [ ] Complete SMB/CIFS implementation
 - [ ] Cloud protocols (S3, Azure Blob)
 - [ ] Watch mode (auto-sync on file changes)
 - [ ] Chunk-level parallelism (for single large files)
@@ -415,12 +420,13 @@ If you find Orbit useful, please consider starring the repository!
 
 ## 📈 Project Status
 
-- **Current Version**: 0.3.1
+- **Current Version**: 0.4.0
 - **Stability**: Beta (production-ready for most use cases)
 - **Active Development**: Yes
 - **Breaking Changes**: Possible until v1.0.0
 - **Test Coverage**: ~60%
 - **Documentation**: Comprehensive
+- **Protocol Support**: Local (stable), SMB (experimental)
 
 ---
 

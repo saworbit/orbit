@@ -2,6 +2,28 @@
 
 All notable changes to Orbit will be documented in this file.
 
+## [0.4.0] - 2025-10-14
+
+### Added
+- **Protocol abstraction layer** - Unified interface for multiple storage backends
+  - New `src/protocol/` module with `StorageBackend` trait
+  - URI parsing support for protocol detection (e.g., `smb://server/share/path`)
+  - Local filesystem backend fully implemented
+  - SMB/CIFS backend (experimental/stub implementation)
+- **Protocol module exports** - `Protocol` and `StorageBackend` now public API
+- **URI support** - Parse URIs like `smb://user:pass@server/share/path`
+
+### Changed
+- Project structure now includes `src/protocol/` directory
+- Library API extended with protocol support
+
+### Experimental
+- SMB/CIFS support added but not production-ready
+  - Stub implementation for testing architecture
+  - Full implementation planned for v0.4.1
+
+---
+
 ## [0.3.1] - 2025-10-12
 
 ### Added

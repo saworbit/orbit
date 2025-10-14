@@ -16,3 +16,19 @@
 
 # Windows
 Thumbs.db
+
+# Orbit-specific test files and artifacts
+test.txt
+test_backup.txt
+test_compressed.txt
+test_stats.txt
+test_stats_backup.txt
+orbit_audit.log
+*.orbit_resume
+*.orbit_resume_compressed
+*.tmp.lz4
+*.tmp.zst
+
+# Orbit audit logs (unless specifically tracked)
+orbit_audit.log
+audit.log

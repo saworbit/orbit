@@ -139,7 +139,7 @@ pub fn read_audit_log(log_path: &Path, format: AuditFormat) -> Result<Vec<AuditE
             let entries: Vec<AuditEntry> = content
                 .lines()
                 .skip(1)
-                .filter_map(|line| parse_csv_line(line))
+                .filter_map(parse_csv_line)
                 .collect();
             Ok(entries)
         }

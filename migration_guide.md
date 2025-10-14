@@ -1,3 +1,60 @@
+# Migration Guide
+
+---
+
+## Latest: v0.3.x → v0.4.0
+
+### Overview
+
+Version 0.4.0 introduces the **protocol abstraction layer**, enabling support for multiple storage backends beyond local filesystems. This is primarily an internal architectural change with minimal impact on existing CLI users.
+
+### Breaking Changes
+
+**None for CLI users.** All existing commands and flags work exactly as before.
+
+### New Features for CLI Users
+
+#### Protocol URI Support (Experimental)
+
+You can now use URI syntax for source and destination (experimental):
+```bash
+# Local filesystem (works as before)
+orbit -s /tmp/file.txt -d /backup/file.txt
+
+# SMB share (experimental - stub implementation)
+orbit -s smb://server/share/file.txt -d /local/file.txt
+orbit -s smb://user:pass@server/share/file.txt -d /local/file.txt
+
+Note: SMB support in v0.4.0 is experimental/stub only. Full implementation coming in v0.4.1.
+For Library Users
+If you're using Orbit as a Rust library:
+
+New modules available:
+use orbit::protocol::{Protocol, StorageBackend};
+
+// Parse a URI
+let (protocol, path) = Protocol::from_uri("smb://server/share/file.txt")?;
+
+// Create a backend
+let backend = protocol.create_backend()?;
+
+Existing code continues to work:
+
+// This still works exactly as before
+use orbit::core::copy_file;
+use orbit::config::CopyConfig;
+
+let config = CopyConfig::default();
+copy_file(&source, &dest, &config)?;
+
+Upgrade Checklist
+
+ No changes needed for CLI usage
+ If using as library, review new protocol module
+ If interested in SMB, wait for v0.4.1 for production use
+ Run cargo update to get latest version
+ Run tests: cargo test
+
 # Migration Guide: Orbit v0.2.0 → v0.3.0
 
 ## Overview

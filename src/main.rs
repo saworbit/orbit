@@ -1,7 +1,7 @@
 /*!
  * Orbit CLI - Command Line Interface
  * 
- * Version: 0.3.0
+ * Version: 0.4.0
  * Author: Shane Wall <shaneawall@gmail.com>
  */
 

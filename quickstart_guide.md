@@ -1,4 +1,4 @@
-# Orbit v0.3.0 - Quick Start Guide
+# Orbit v0.4.0 - Quick Start Guide
 
 Get up and running with Orbit in 5 minutes!
 
@@ -17,7 +17,7 @@ cargo install --path .
 
 # Verify installation
 orbit --version
-# Should output: orbit 0.3.0
+# Should output: orbit 0.4.0
 ```
 
 ---

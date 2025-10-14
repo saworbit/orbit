@@ -10,7 +10,7 @@
  * - Protocol abstraction (local, SMB, future: S3, etc.)
  * - Comprehensive audit logging
  * 
- * Version: 0.3.0
+ * Version: 0.4.0
  * Author: Shane Wall <shaneawall@gmail.com>
  */
 

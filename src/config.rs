@@ -188,6 +188,7 @@ impl Default for CopyConfig {
 
 /// Configuration file structure (loaded from TOML)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ConfigFile {
     #[serde(default)]
     pub defaults: ConfigDefaults,
@@ -200,6 +201,7 @@ pub struct ConfigFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ConfigDefaults {
     pub compress: Option<String>,
     pub chunk_size: Option<usize>,
@@ -208,46 +210,22 @@ pub struct ConfigDefaults {
     pub parallel: Option<usize>,
 }
 
-impl Default for ConfigDefaults {
-    fn default() -> Self {
-        Self {
-            compress: None,
-            chunk_size: None,
-            retry_attempts: None,
-            preserve_metadata: None,
-            parallel: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ExcludeConfig {
     #[serde(default)]
     pub patterns: Vec<String>,
 }
 
-impl Default for ExcludeConfig {
-    fn default() -> Self {
-        Self {
-            patterns: Vec::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct AuditConfig {
     pub format: Option<AuditFormat>,
     pub path: Option<PathBuf>,
 }
 
-impl Default for AuditConfig {
-    fn default() -> Self {
-        Self {
-            format: None,
-            path: None,
-        }
-    }
-}
 
 impl ConfigFile {
     /// Load configuration from a TOML file
@@ -317,15 +295,6 @@ impl ConfigFile {
     }
 }
 
-impl Default for ConfigFile {
-    fn default() -> Self {
-        Self {
-            defaults: ConfigDefaults::default(),
-            exclude: ExcludeConfig::default(),
-            audit: AuditConfig::default(),
-        }
-    }
-}
 
 // Add dirs dependency for home directory detection
 mod dirs {
