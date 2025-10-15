@@ -70,16 +70,33 @@ fn test_sync_mode_skips_unchanged() {
     let source = dir.path().join("source.txt");
     let dest = dir.path().join("dest.txt");
     
-    std::fs::write(&source, b"original content").unwrap();
-    std::fs::write(&dest, b"original content").unwrap();
+    let content = b"original content";
+    std::fs::write(&source, content).unwrap();
+    std::fs::write(&dest, content).unwrap();
+    
+    // Record the destination's original modification time
+    let dest_metadata_before = std::fs::metadata(&dest).unwrap();
+    let mtime_before = dest_metadata_before.modified().unwrap();
+    
+    // Small delay to ensure modification time would change if file were rewritten
+    std::thread::sleep(std::time::Duration::from_millis(10));
     
     let mut config = CopyConfig::default();
     config.copy_mode = CopyMode::Sync;
     
     let stats = copy_file(&source, &dest, &config).unwrap();
     
-    // Should skip if content matches (simplified test)
-    assert!(stats.files_skipped == 1 || stats.files_copied == 1);
+    // Strong assertions: verify skip behavior
+    assert_eq!(stats.files_skipped, 1, "File should have been skipped");
+    assert_eq!(stats.files_copied, 0, "File should NOT have been copied");
+    
+    // Verify destination wasn't modified
+    let dest_metadata_after = std::fs::metadata(&dest).unwrap();
+    let mtime_after = dest_metadata_after.modified().unwrap();
+    assert_eq!(mtime_before, mtime_after, "Destination file should not have been modified");
+    
+    // Verify content is still correct
+    assert_eq!(std::fs::read(&dest).unwrap(), content, "File content should remain unchanged");
 }
 
 #[test]

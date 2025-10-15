@@ -465,7 +465,7 @@ fn process_entry_sequential(
     let dest_path = dest_dir.join(relative_path);
     
     if entry.file_type().is_symlink() {
-        handle_symlink(source_path, &dest_path, config.symlink_mode)?;
+        handle_symlink(source_path, &dest_path, config.symlink_mode, config)?;
         Ok(CopyStats {
             bytes_copied: 0,
             duration: Duration::ZERO,
@@ -483,7 +483,7 @@ fn process_entry_sequential(
 }
 
 /// Handle symbolic link based on mode
-fn handle_symlink(source_path: &Path, dest_path: &Path, mode: SymlinkMode) -> Result<()> {
+fn handle_symlink(source_path: &Path, dest_path: &Path, mode: SymlinkMode, config: &CopyConfig) -> Result<()> {
     match mode {
         SymlinkMode::Skip => {
             println!("Skipping symlink: {:?}", source_path);
@@ -500,8 +500,7 @@ fn handle_symlink(source_path: &Path, dest_path: &Path, mode: SymlinkMode) -> Re
             };
             
             if resolved.is_file() {
-                let config = CopyConfig::default();
-                copy_file(&resolved, dest_path, &config)?;
+                copy_file(&resolved, dest_path, config)?;
             }
             Ok(())
         }

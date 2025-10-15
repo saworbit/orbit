@@ -115,7 +115,7 @@ cargo install --path .
 ### Verify Installation
 ```bash
 orbit --version
-# Output: orbit 0.3.1
+# Output: orbit 0.4.0
 ```
 
 ---
