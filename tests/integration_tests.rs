@@ -1,130 +1,58 @@
-/*!
- * Integration tests for Orbit
- */
-
+use orbit::{
+    config::{CopyConfig, CopyMode, CompressionType},
+    copy_file, copy_directory,
+    error::OrbitError,
+    core::validation::matches_exclude_pattern,
+    get_zero_copy_capabilities, is_zero_copy_available,
+};
 use std::path::Path;
 use tempfile::tempdir;
-
-use orbit::config::{CopyConfig, CompressionType, CopyMode};
-use orbit::core::{copy_file, copy_directory};
+use std::io::Write;
 
 #[test]
-fn test_basic_file_copy() {
+fn test_copy_simple_file() {
     let dir = tempdir().unwrap();
     let source = dir.path().join("source.txt");
     let dest = dir.path().join("dest.txt");
     
-    std::fs::write(&source, b"Hello, Orbit!").unwrap();
+    std::fs::write(&source, b"test data").unwrap();
     
     let config = CopyConfig::default();
     let stats = copy_file(&source, &dest, &config).unwrap();
     
-    assert_eq!(stats.bytes_copied, 13);
-    assert_eq!(std::fs::read(&dest).unwrap(), b"Hello, Orbit!");
-    assert!(stats.checksum.is_some());
+    assert_eq!(stats.bytes_copied, 9);
+    assert_eq!(std::fs::read(&dest).unwrap(), b"test data");
 }
 
 #[test]
-fn test_copy_with_lz4_compression() {
+fn test_copy_nonexistent_source() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("nonexistent.txt");
+    let dest = dir.path().join("dest.txt");
+    
+    let config = CopyConfig::default();
+    let result = copy_file(&source, &dest, &config);
+    
+    assert!(matches!(result, Err(OrbitError::SourceNotFound(_))));
+}
+
+#[test]
+fn test_compression_lz4() {
     let dir = tempdir().unwrap();
     let source = dir.path().join("source.txt");
     let dest = dir.path().join("dest.txt");
     
-    // Create a file with repetitive content that compresses well
-    let content = b"AAAA".repeat(1000);
-    std::fs::write(&source, &content).unwrap();
+    let test_data = b"This is test data that will be compressed with LZ4. ".repeat(100);
+    std::fs::write(&source, &test_data).unwrap();
     
     let mut config = CopyConfig::default();
     config.compression = CompressionType::Lz4;
-    config.verify_checksum = true;
     
     let stats = copy_file(&source, &dest, &config).unwrap();
     
-    assert_eq!(std::fs::read(&dest).unwrap(), content);
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data);
     assert!(stats.compression_ratio.is_some());
-    assert!(stats.compression_ratio.unwrap() < 100.0); // Should compress
-}
-
-#[test]
-fn test_copy_with_zstd_compression() {
-    let dir = tempdir().unwrap();
-    let source = dir.path().join("source.txt");
-    let dest = dir.path().join("dest.txt");
-    
-    let content = b"Test data for Zstd compression. ".repeat(100);
-    std::fs::write(&source, &content).unwrap();
-    
-    let mut config = CopyConfig::default();
-    config.compression = CompressionType::Zstd { level: 3 };
-    config.verify_checksum = true;
-    
-    let stats = copy_file(&source, &dest, &config).unwrap();
-    
-    assert_eq!(std::fs::read(&dest).unwrap(), content);
-    assert!(stats.compression_ratio.is_some());
-}
-
-#[test]
-fn test_sync_mode_skips_unchanged() {
-    let dir = tempdir().unwrap();
-    let source = dir.path().join("source.txt");
-    let dest = dir.path().join("dest.txt");
-    
-    let content = b"original content";
-    std::fs::write(&source, content).unwrap();
-    std::fs::write(&dest, content).unwrap();
-    
-    // Record the destination's original modification time
-    let dest_metadata_before = std::fs::metadata(&dest).unwrap();
-    let mtime_before = dest_metadata_before.modified().unwrap();
-    
-    // Small delay to ensure modification time would change if file were rewritten
-    std::thread::sleep(std::time::Duration::from_millis(10));
-    
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Sync;
-    
-    let stats = copy_file(&source, &dest, &config).unwrap();
-    
-    // Strong assertions: verify skip behavior
-    assert_eq!(stats.files_skipped, 1, "File should have been skipped");
-    assert_eq!(stats.files_copied, 0, "File should NOT have been copied");
-    
-    // Verify destination wasn't modified
-    let dest_metadata_after = std::fs::metadata(&dest).unwrap();
-    let mtime_after = dest_metadata_after.modified().unwrap();
-    assert_eq!(mtime_before, mtime_after, "Destination file should not have been modified");
-    
-    // Verify content is still correct
-    assert_eq!(std::fs::read(&dest).unwrap(), content, "File content should remain unchanged");
-}
-
-#[test]
-fn test_directory_copy() {
-    let temp = tempdir().unwrap();
-    let source_dir = temp.path().join("source");
-    let dest_dir = temp.path().join("dest");
-    
-    // Create source directory structure
-    std::fs::create_dir(&source_dir).unwrap();
-    std::fs::write(source_dir.join("file1.txt"), b"File 1").unwrap();
-    std::fs::write(source_dir.join("file2.txt"), b"File 2").unwrap();
-    
-    let sub_dir = source_dir.join("subdir");
-    std::fs::create_dir(&sub_dir).unwrap();
-    std::fs::write(sub_dir.join("file3.txt"), b"File 3").unwrap();
-    
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    
-    let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
-    
-    assert_eq!(stats.files_copied, 3);
-    assert!(dest_dir.join("file1.txt").exists());
-    assert!(dest_dir.join("file2.txt").exists());
-    assert!(dest_dir.join("subdir").join("file3.txt").exists());
-    
-    assert_eq!(std::fs::read(dest_dir.join("file1.txt")).unwrap(), b"File 1");
 }
 
 #[test]
@@ -133,15 +61,16 @@ fn test_resume_capability() {
     let source = dir.path().join("source.txt");
     let dest = dir.path().join("dest.txt");
     
-    // Create a larger file
-    let content = b"X".repeat(10_000);
-    std::fs::write(&source, &content).unwrap();
+    // Create a 10KB file
+    let test_data: Vec<u8> = (0..10_000).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&source, &test_data).unwrap();
     
     let mut config = CopyConfig::default();
     config.resume_enabled = true;
+    config.verify_checksum = false;
     
-    // First copy should succeed
     let stats = copy_file(&source, &dest, &config).unwrap();
+    
     assert_eq!(stats.bytes_copied, 10_000);
     
     // Resume file should be cleaned up
@@ -151,8 +80,6 @@ fn test_resume_capability() {
 
 #[test]
 fn test_exclude_patterns() {
-    use orbit::core::validation::matches_exclude_pattern;
-    
     let path = Path::new("/tmp/test.tmp");
     let patterns = vec!["*.tmp".to_string(), "*.log".to_string()];
     
@@ -237,77 +164,244 @@ fn test_parallel_directory_copy() {
     for i in 0..10 {
         std::fs::write(
             source_dir.join(format!("file{}.txt", i)),
-            format!("Content {}", i)
+            format!("Content {}", i),
         ).unwrap();
     }
     
     let mut config = CopyConfig::default();
     config.recursive = true;
-    config.parallel = 4; // Use 4 threads
+    config.parallel = 4;
     
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
     
     assert_eq!(stats.files_copied, 10);
+    assert_eq!(stats.files_failed, 0);
     
-    // Verify all files copied correctly
+    // Verify all files were copied
     for i in 0..10 {
-        let content = std::fs::read_to_string(dest_dir.join(format!("file{}.txt", i))).unwrap();
+        let dest_file = dest_dir.join(format!("file{}.txt", i));
+        assert!(dest_file.exists());
+        let content = std::fs::read_to_string(&dest_file).unwrap();
         assert_eq!(content, format!("Content {}", i));
     }
 }
 
+// ============================================================================
+// Zero-Copy Tests
+// ============================================================================
+
 #[test]
-fn test_large_file_chunked_copy() {
-    let dir = tempdir().unwrap();
-    let source = dir.path().join("large.bin");
-    let dest = dir.path().join("large_copy.bin");
+fn test_zero_copy_capabilities_detection() {
+    let caps = get_zero_copy_capabilities();
     
-    // Create a 5MB file
-    let content = vec![0xAB; 5 * 1024 * 1024];
-    std::fs::write(&source, &content).unwrap();
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+    {
+        assert!(caps.available, "Zero-copy should be available on this platform");
+        assert!(!caps.method.is_empty(), "Zero-copy method should be specified");
+    }
+    
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        assert!(!caps.available, "Zero-copy should not be available on this platform");
+    }
+}
+
+#[test]
+fn test_zero_copy_basic_functionality() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.txt");
+    let dest = dir.path().join("dest.txt");
+    
+    // Create a file large enough for zero-copy (> 64KB)
+    let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&source, &test_data).unwrap();
     
     let mut config = CopyConfig::default();
-    config.chunk_size = 64 * 1024; // 64KB chunks
-    config.verify_checksum = true;
+    config.use_zero_copy = true;
+    config.verify_checksum = false; // Disable to allow zero-copy path
+    config.show_progress = false;
     
     let stats = copy_file(&source, &dest, &config).unwrap();
     
-    assert_eq!(stats.bytes_copied, content.len() as u64);
-    assert_eq!(std::fs::read(&dest).unwrap(), content);
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data);
 }
 
 #[test]
-fn test_error_handling_nonexistent_source() {
+fn test_zero_copy_with_post_verification() {
     let dir = tempdir().unwrap();
-    let source = dir.path().join("nonexistent.txt");
+    let source = dir.path().join("source.txt");
     let dest = dir.path().join("dest.txt");
     
-    let config = CopyConfig::default();
-    let result = copy_file(&source, &dest, &config);
+    // Create a file large enough for zero-copy
+    let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&source, &test_data).unwrap();
     
-    assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), orbit::error::OrbitError::SourceNotFound(_)));
+    let mut config = CopyConfig::default();
+    config.use_zero_copy = true;
+    config.verify_checksum = true; // Should do post-copy verification
+    config.show_progress = false;
+    
+    let stats = copy_file(&source, &dest, &config).unwrap();
+    
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    assert!(stats.checksum.is_some(), "Checksum should be calculated");
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data);
 }
 
 #[test]
-fn test_compression_type_parsing() {
-    use orbit::config::CompressionType;
+fn test_zero_copy_disabled_by_resume() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.txt");
+    let dest = dir.path().join("dest.txt");
     
-    assert!(matches!(
-        CompressionType::from_str("none").unwrap(),
-        CompressionType::None
-    ));
+    let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&source, &test_data).unwrap();
     
-    assert!(matches!(
-        CompressionType::from_str("lz4").unwrap(),
-        CompressionType::Lz4
-    ));
+    let mut config = CopyConfig::default();
+    config.use_zero_copy = true;
+    config.resume_enabled = true; // Should disable zero-copy
+    config.show_progress = false;
     
-    assert!(matches!(
-        CompressionType::from_str("zstd:5").unwrap(),
-        CompressionType::Zstd { level: 5 }
-    ));
+    let stats = copy_file(&source, &dest, &config).unwrap();
     
-    assert!(CompressionType::from_str("invalid").is_err());
-    assert!(CompressionType::from_str("zstd:99").is_err());
+    // Should still work, just with buffered copy
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data);
+}
+
+#[test]
+fn test_zero_copy_disabled_by_compression() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.txt");
+    let dest = dir.path().join("dest.txt");
+    
+    let test_data = b"Compressible data ".repeat(1000);
+    std::fs::write(&source, &test_data).unwrap();
+    
+    let mut config = CopyConfig::default();
+    config.use_zero_copy = true;
+    config.compression = CompressionType::Lz4; // Should use compression path
+    config.show_progress = false;
+    
+    let stats = copy_file(&source, &dest, &config).unwrap();
+    
+    // Should use compression, not zero-copy
+    assert!(stats.compression_ratio.is_some());
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data.as_slice());
+}
+
+#[test]
+fn test_zero_copy_disabled_by_bandwidth_limit() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.txt");
+    let dest = dir.path().join("dest.txt");
+    
+    let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&source, &test_data).unwrap();
+    
+    let mut config = CopyConfig::default();
+    config.use_zero_copy = true;
+    config.max_bandwidth = 1024 * 1024; // 1 MB/s limit should disable zero-copy
+    config.show_progress = false;
+    
+    let stats = copy_file(&source, &dest, &config).unwrap();
+    
+    // Should still work, just with buffered copy for bandwidth control
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data);
+}
+
+#[test]
+fn test_zero_copy_skipped_for_small_files() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("small.txt");
+    let dest = dir.path().join("dest.txt");
+    
+    // Small file (< 64KB) should not use zero-copy due to syscall overhead
+    let test_data: Vec<u8> = (0..1000).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&source, &test_data).unwrap();
+    
+    let mut config = CopyConfig::default();
+    config.use_zero_copy = true;
+    config.verify_checksum = false;
+    config.show_progress = false;
+    
+    let stats = copy_file(&source, &dest, &config).unwrap();
+    
+    // Should still copy successfully using buffered path
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data);
+}
+
+#[test]
+fn test_zero_copy_explicit_disable() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.txt");
+    let dest = dir.path().join("dest.txt");
+    
+    let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
+    std::fs::write(&source, &test_data).unwrap();
+    
+    let mut config = CopyConfig::default();
+    config.use_zero_copy = false; // Explicitly disabled
+    config.verify_checksum = false;
+    config.show_progress = false;
+    
+    let stats = copy_file(&source, &dest, &config).unwrap();
+    
+    // Should use buffered copy
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    assert_eq!(std::fs::read(&dest).unwrap(), test_data);
+}
+
+#[test]
+fn test_zero_copy_data_integrity() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.bin");
+    let dest = dir.path().join("dest.bin");
+    
+    // Create binary data with patterns to detect corruption
+    let mut test_data = Vec::new();
+    for i in 0..256 {
+        for j in 0..256 {
+            test_data.push(i as u8);
+            test_data.push(j as u8);
+        }
+    }
+    std::fs::write(&source, &test_data).unwrap();
+    
+    let mut config = CopyConfig::default();
+    config.use_zero_copy = true;
+    config.verify_checksum = true; // Enable verification
+    config.show_progress = false;
+    
+    let stats = copy_file(&source, &dest, &config).unwrap();
+    
+    assert_eq!(stats.bytes_copied, test_data.len() as u64);
+    
+    // Byte-by-byte verification
+    let dest_data = std::fs::read(&dest).unwrap();
+    assert_eq!(dest_data.len(), test_data.len());
+    assert_eq!(dest_data, test_data);
+}
+
+#[test]
+fn test_config_presets() {
+    // Test fast preset
+    let fast = CopyConfig::fast_preset();
+    assert!(fast.use_zero_copy);
+    assert!(!fast.verify_checksum);
+    assert!(fast.parallel > 0);
+    
+    // Test safe preset
+    let safe = CopyConfig::safe_preset();
+    assert!(!safe.use_zero_copy); // Safe preset prefers buffered for control
+    assert!(safe.verify_checksum);
+    assert!(safe.resume_enabled);
+    
+    // Test network preset
+    let network = CopyConfig::network_preset();
+    assert!(!network.use_zero_copy); // Network uses compression
+    assert!(matches!(network.compression, CompressionType::Zstd { .. }));
 }

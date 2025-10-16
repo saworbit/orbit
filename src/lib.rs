@@ -1,36 +1,63 @@
 /*!
- * Orbit - Open Resilient Bulk Information Transfer
+ * Orbit - Intelligent file transfer library
  * 
- * A robust, cross-platform file transfer library with:
- * - SHA-256 checksum verification
- * - LZ4 and Zstd compression
+ * Provides high-performance file copying with features including:
+ * - Zero-copy system calls for maximum performance
+ * - Compression (LZ4, Zstd)
  * - Resume capability for interrupted transfers
- * - Configurable retry logic with exponential backoff
- * - Parallel file copying
- * - Protocol abstraction (local, SMB, future: S3, etc.)
- * - Comprehensive audit logging
- * 
- * Version: 0.4.0
- * Author: Shane Wall <shaneawall@gmail.com>
+ * - Checksum verification
+ * - Protocol abstraction (Local, SMB, S3, etc.)
+ * - Parallel directory copying
+ * - Bandwidth throttling
+ * - Progress tracking
  */
 
 pub mod config;
 pub mod core;
-pub mod compression;
-pub mod audit;
 pub mod error;
+pub mod compression;
 pub mod stats;
+pub mod audit;
 pub mod protocol;
 
-// Re-export commonly used types
-pub use config::{CopyConfig, CompressionType, SymlinkMode, CopyMode, AuditFormat};
-pub use core::{copy_file, copy_directory, CopyStats};
+// Re-export commonly used types for convenience
+pub use config::{CopyConfig, CopyMode, CompressionType, SymlinkMode};
 pub use error::{OrbitError, Result};
+pub use core::{CopyStats, copy_file, copy_directory};
+pub use core::zero_copy::{ZeroCopyCapabilities, ZeroCopyResult};
 pub use stats::TransferStats;
-pub use protocol::{Protocol, StorageBackend};
+pub use protocol::Protocol;
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Check if zero-copy is available on this platform
+/// 
+/// # Example
+/// ```
+/// use orbit::is_zero_copy_available;
+/// 
+/// if is_zero_copy_available() {
+///     println!("Zero-copy transfers available for maximum performance!");
+/// }
+/// ```
+pub fn is_zero_copy_available() -> bool {
+    ZeroCopyCapabilities::detect().available
+}
+
+/// Get detailed zero-copy capabilities for this platform
+/// 
+/// # Example
+/// ```
+/// use orbit::get_zero_copy_capabilities;
+/// 
+/// let caps = get_zero_copy_capabilities();
+/// println!("Zero-copy method: {}", caps.method);
+/// println!("Cross-filesystem: {}", caps.cross_filesystem);
+/// ```
+pub fn get_zero_copy_capabilities() -> ZeroCopyCapabilities {
+    ZeroCopyCapabilities::detect()
+}
 
 #[cfg(test)]
 mod tests {
@@ -38,6 +65,16 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
+        assert!(!VERSION.is_empty());
+        assert_eq!(VERSION, "0.4.0");
+    }
+
+    #[test]
+    fn test_zero_copy_detection() {
+        // Should not panic
+        let available = is_zero_copy_available();
+        let caps = get_zero_copy_capabilities();
+        
+        assert_eq!(available, caps.available);
     }
 }

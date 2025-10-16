@@ -1,309 +1,256 @@
 /*!
- * Configuration structures and defaults for Orbit
+ * Configuration types for Orbit
  */
 
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use crate::error::{OrbitError, Result};
-
-/// How to handle symbolic links during copy operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SymlinkMode {
-    /// Copy the symbolic link itself (preserve as symlink)
-    Preserve,
-    /// Follow the link and copy the target file/directory
-    Follow,
-    /// Skip symbolic links entirely
-    Skip,
-}
-
-impl Default for SymlinkMode {
-    fn default() -> Self {
-        Self::Preserve
-    }
-}
-
-/// Copy operation modes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum CopyMode {
-    /// Always copy files
-    Copy,
-    /// Only copy files that don't exist or are newer
-    Sync,
-    /// Only copy newer files
-    Update,
-    /// Mirror source to destination (delete extra files)
-    Mirror,
-}
-
-impl Default for CopyMode {
-    fn default() -> Self {
-        Self::Copy
-    }
-}
-
-/// Compression algorithm and level
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum CompressionType {
-    /// No compression
-    None,
-    /// LZ4 compression (fast)
-    Lz4,
-    /// Zstd compression with level (1-22, higher = better compression but slower)
-    Zstd { level: i32 },
-}
-
-impl Default for CompressionType {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-impl CompressionType {
-    /// Parse compression type from string (e.g., "zstd:3", "lz4", "none")
-    pub fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "none" => Ok(Self::None),
-            "lz4" => Ok(Self::Lz4),
-            s if s.starts_with("zstd:") => {
-                let level_str = s.strip_prefix("zstd:").unwrap();
-                let level = level_str.parse::<i32>()
-                    .map_err(|_| OrbitError::Config(format!("Invalid zstd level: {}", level_str)))?;
-                
-                if !(1..=22).contains(&level) {
-                    return Err(OrbitError::Config(
-                        format!("Zstd level must be 1-22, got {}", level)
-                    ));
-                }
-                
-                Ok(Self::Zstd { level })
-            }
-            "zstd" => Ok(Self::Zstd { level: 3 }), // Default zstd level
-            _ => Err(OrbitError::Config(format!("Unknown compression type: {}", s))),
-        }
-    }
-}
-
-/// Audit log format
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum AuditFormat {
-    /// JSON Lines format (one JSON object per line)
-    Json,
-    /// CSV format
-    Csv,
-}
-
-impl Default for AuditFormat {
-    fn default() -> Self {
-        Self::Json
-    }
-}
+use std::path::PathBuf;
 
 /// Main configuration for copy operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CopyConfig {
-    /// Compression type to use
-    pub compression: CompressionType,
-    
-    /// Whether resume functionality is enabled
-    pub resume_enabled: bool,
-    
-    /// Size of chunks for buffered I/O operations (in bytes)
-    pub chunk_size: usize,
-    
-    /// Whether to preserve file metadata (timestamps, permissions)
-    pub preserve_metadata: bool,
-    
-    /// How to handle symbolic links
-    pub symlink_mode: SymlinkMode,
-    
-    /// Whether to copy directories recursively
-    pub recursive: bool,
-    
     /// Copy mode (copy, sync, update, mirror)
+    #[serde(default)]
     pub copy_mode: CopyMode,
     
+    /// Enable recursive directory copying
+    #[serde(default)]
+    pub recursive: bool,
+    
+    /// Preserve file metadata (timestamps, permissions)
+    #[serde(default)]
+    pub preserve_metadata: bool,
+    
+    /// Enable resume capability for interrupted transfers
+    #[serde(default)]
+    pub resume_enabled: bool,
+    
+    /// Enable checksum verification
+    #[serde(default = "default_true")]
+    pub verify_checksum: bool,
+    
+    /// Compression type
+    #[serde(default)]
+    pub compression: CompressionType,
+    
+    /// Show progress bar
+    #[serde(default = "default_true")]
+    pub show_progress: bool,
+    
+    /// Chunk size in bytes for buffered I/O
+    #[serde(default = "default_chunk_size")]
+    pub chunk_size: usize,
+    
     /// Number of retry attempts on failure
+    #[serde(default = "default_retry_attempts")]
     pub retry_attempts: u32,
     
-    /// Initial delay between retry attempts in seconds
+    /// Retry delay in seconds
+    #[serde(default = "default_retry_delay")]
     pub retry_delay_secs: u64,
     
-    /// Whether to use exponential backoff for retries
+    /// Use exponential backoff for retries
+    #[serde(default)]
     pub exponential_backoff: bool,
     
     /// Maximum bandwidth in bytes per second (0 = unlimited)
+    #[serde(default)]
     pub max_bandwidth: u64,
     
-    /// Number of parallel file operations (0 = auto, based on CPU count)
+    /// Number of parallel operations (0 = sequential)
+    #[serde(default)]
     pub parallel: usize,
     
-    /// Patterns to exclude (glob patterns)
+    /// Symbolic link handling mode
+    #[serde(default)]
+    pub symlink_mode: SymlinkMode,
+    
+    /// Exclude patterns (glob patterns)
+    #[serde(default)]
     pub exclude_patterns: Vec<String>,
     
     /// Dry run mode (don't actually copy)
+    #[serde(default)]
     pub dry_run: bool,
     
-    /// Audit log format
-    pub audit_format: AuditFormat,
-    
-    /// Path to audit log file (None = default location)
-    pub audit_log_path: Option<PathBuf>,
-    
-    /// Show progress bar
-    pub show_progress: bool,
-    
-    /// Verify checksums after copy
-    pub verify_checksum: bool,
+    /// Use zero-copy system calls when available
+    /// 
+    /// When enabled, Orbit will attempt to use platform-specific zero-copy
+    /// mechanisms (copy_file_range on Linux, CopyFileExW on Windows) for
+    /// maximum performance. Falls back to buffered copy if unsupported.
+    /// 
+    /// Zero-copy is automatically disabled when:
+    /// - Resume is enabled (requires granular control)
+    /// - Bandwidth throttling is active
+    /// - Files are on different filesystems (Linux limitation)
+    /// - File size is very small (< 64KB, syscall overhead not worth it)
+    #[serde(default = "default_true")]
+    pub use_zero_copy: bool,
 }
 
 impl Default for CopyConfig {
     fn default() -> Self {
         Self {
-            compression: CompressionType::None,
-            resume_enabled: false,
-            chunk_size: 1024 * 1024, // 1MB default
-            preserve_metadata: true,
-            symlink_mode: SymlinkMode::Preserve,
-            recursive: false,
             copy_mode: CopyMode::Copy,
-            retry_attempts: 3,
-            retry_delay_secs: 5,
-            exponential_backoff: true,
-            max_bandwidth: 0, // Unlimited
-            parallel: 0, // Auto-detect
+            recursive: false,
+            preserve_metadata: false,
+            resume_enabled: false,
+            verify_checksum: true,
+            compression: CompressionType::None,
+            show_progress: true,
+            chunk_size: default_chunk_size(),
+            retry_attempts: default_retry_attempts(),
+            retry_delay_secs: default_retry_delay(),
+            exponential_backoff: false,
+            max_bandwidth: 0,
+            parallel: 0,
+            symlink_mode: SymlinkMode::Skip,
             exclude_patterns: Vec::new(),
             dry_run: false,
-            audit_format: AuditFormat::Json,
-            audit_log_path: None,
-            show_progress: true,
-            verify_checksum: true,
+            use_zero_copy: true,
         }
     }
 }
 
-/// Configuration file structure (loaded from TOML)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
-pub struct ConfigFile {
-    #[serde(default)]
-    pub defaults: ConfigDefaults,
+/// Copy mode determines how files are copied
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CopyMode {
+    /// Copy all files unconditionally
+    Copy,
     
-    #[serde(default)]
-    pub exclude: ExcludeConfig,
+    /// Only copy if source is newer or different size
+    Sync,
     
-    #[serde(default)]
-    pub audit: AuditConfig,
+    /// Only copy if source is newer
+    Update,
+    
+    /// Copy and delete files in destination that don't exist in source
+    Mirror,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
-pub struct ConfigDefaults {
-    pub compress: Option<String>,
-    pub chunk_size: Option<usize>,
-    pub retry_attempts: Option<u32>,
-    pub preserve_metadata: Option<bool>,
-    pub parallel: Option<usize>,
+impl Default for CopyMode {
+    fn default() -> Self {
+        CopyMode::Copy
+    }
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
-pub struct ExcludeConfig {
-    #[serde(default)]
-    pub patterns: Vec<String>,
+/// Compression type for file transfers
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CompressionType {
+    /// No compression
+    None,
+    
+    /// LZ4 compression (fast)
+    Lz4,
+    
+    /// Zstd compression with level (1-22)
+    #[serde(rename = "zstd")]
+    Zstd { level: i32 },
 }
 
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
-pub struct AuditConfig {
-    pub format: Option<AuditFormat>,
-    pub path: Option<PathBuf>,
+impl Default for CompressionType {
+    fn default() -> Self {
+        CompressionType::None
+    }
 }
 
+/// Symbolic link handling mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SymlinkMode {
+    /// Skip symbolic links
+    Skip,
+    
+    /// Follow symbolic links and copy target
+    Follow,
+    
+    /// Preserve symbolic links as-is
+    Preserve,
+}
 
-impl ConfigFile {
+impl Default for SymlinkMode {
+    fn default() -> Self {
+        SymlinkMode::Skip
+    }
+}
+
+// Default value functions for serde
+fn default_true() -> bool {
+    true
+}
+
+fn default_chunk_size() -> usize {
+    1024 * 1024 // 1 MB
+}
+
+fn default_retry_attempts() -> u32 {
+    3
+}
+
+fn default_retry_delay() -> u64 {
+    5
+}
+
+impl CopyConfig {
     /// Load configuration from a TOML file
-    pub fn load(path: &Path) -> Result<Self> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| OrbitError::Config(format!("Failed to read config file: {}", e)))?;
-        
-        toml::from_str(&content)
-            .map_err(|e| OrbitError::Config(format!("Failed to parse config file: {}", e)))
+    pub fn from_file(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        let contents = std::fs::read_to_string(path)?;
+        let config: CopyConfig = toml::from_str(&contents)?;
+        Ok(config)
     }
     
-    /// Load configuration with fallback priority:
-    /// 1. ./orbit.toml (project-specific)
-    /// 2. ~/.orbit/orbit.toml (user defaults)
-    /// 3. Built-in defaults
-    pub fn load_with_fallback() -> Self {
-        // Try project-local config
-        if let Ok(config) = Self::load(Path::new("orbit.toml")) {
-            return config;
-        }
-        
-        // Try user config
-        if let Some(home) = dirs::home_dir() {
-            let user_config = home.join(".orbit").join("orbit.toml");
-            if let Ok(config) = Self::load(&user_config) {
-                return config;
-            }
-        }
-        
-        // Fall back to defaults
-        Self::default()
+    /// Save configuration to a TOML file
+    pub fn to_file(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+        let contents = toml::to_string_pretty(self)?;
+        std::fs::write(path, contents)?;
+        Ok(())
     }
     
-    /// Apply this config file to a CopyConfig
-    pub fn apply_to(&self, config: &mut CopyConfig) {
-        if let Some(ref compress) = self.defaults.compress {
-            if let Ok(compression) = CompressionType::from_str(compress) {
-                config.compression = compression;
-            }
+    /// Create a configuration optimized for maximum speed
+    pub fn fast_preset() -> Self {
+        Self {
+            verify_checksum: false,
+            resume_enabled: false,
+            compression: CompressionType::None,
+            use_zero_copy: true,
+            parallel: num_cpus::get(),
+            ..Default::default()
         }
-        
-        if let Some(chunk_size) = self.defaults.chunk_size {
-            config.chunk_size = chunk_size * 1024; // Config file is in KB
+    }
+    
+    /// Create a configuration optimized for reliability
+    pub fn safe_preset() -> Self {
+        Self {
+            verify_checksum: true,
+            resume_enabled: true,
+            retry_attempts: 5,
+            exponential_backoff: true,
+            use_zero_copy: false, // Prefer buffered for maximum control
+            ..Default::default()
         }
-        
-        if let Some(retry_attempts) = self.defaults.retry_attempts {
-            config.retry_attempts = retry_attempts;
-        }
-        
-        if let Some(preserve_metadata) = self.defaults.preserve_metadata {
-            config.preserve_metadata = preserve_metadata;
-        }
-        
-        if let Some(parallel) = self.defaults.parallel {
-            config.parallel = parallel;
-        }
-        
-        config.exclude_patterns.extend(self.exclude.patterns.clone());
-        
-        if let Some(format) = self.audit.format {
-            config.audit_format = format;
-        }
-        
-        if let Some(ref path) = self.audit.path {
-            config.audit_log_path = Some(path.clone());
+    }
+    
+    /// Create a configuration optimized for network transfers
+    pub fn network_preset() -> Self {
+        Self {
+            verify_checksum: true,
+            resume_enabled: true,
+            compression: CompressionType::Zstd { level: 3 },
+            retry_attempts: 10,
+            exponential_backoff: true,
+            use_zero_copy: false, // Network transfers benefit from compression
+            ..Default::default()
         }
     }
 }
 
-
-// Add dirs dependency for home directory detection
-mod dirs {
-    use std::path::PathBuf;
-    
-    pub fn home_dir() -> Option<PathBuf> {
-        std::env::var_os("HOME")
-            .or_else(|| std::env::var_os("USERPROFILE"))
-            .map(PathBuf::from)
+// Helper for num_cpus
+mod num_cpus {
+    pub fn get() -> usize {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
     }
 }
 
@@ -312,37 +259,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_compression_type_parsing() {
-        assert_eq!(
-            CompressionType::from_str("none").unwrap(),
-            CompressionType::None
-        );
-        assert_eq!(
-            CompressionType::from_str("lz4").unwrap(),
-            CompressionType::Lz4
-        );
-        assert_eq!(
-            CompressionType::from_str("zstd:3").unwrap(),
-            CompressionType::Zstd { level: 3 }
-        );
-        assert_eq!(
-            CompressionType::from_str("zstd").unwrap(),
-            CompressionType::Zstd { level: 3 }
-        );
-    }
-
-    #[test]
-    fn test_invalid_compression() {
-        assert!(CompressionType::from_str("invalid").is_err());
-        assert!(CompressionType::from_str("zstd:99").is_err());
-        assert!(CompressionType::from_str("zstd:0").is_err());
-    }
-
-    #[test]
     fn test_default_config() {
         let config = CopyConfig::default();
-        assert_eq!(config.chunk_size, 1024 * 1024);
-        assert_eq!(config.retry_attempts, 3);
+        assert_eq!(config.copy_mode, CopyMode::Copy);
         assert!(config.verify_checksum);
+        assert!(config.use_zero_copy);
+        assert!(!config.resume_enabled);
+    }
+
+    #[test]
+    fn test_fast_preset() {
+        let config = CopyConfig::fast_preset();
+        assert!(!config.verify_checksum);
+        assert!(config.use_zero_copy);
+        assert!(config.parallel > 0);
+    }
+
+    #[test]
+    fn test_safe_preset() {
+        let config = CopyConfig::safe_preset();
+        assert!(config.verify_checksum);
+        assert!(config.resume_enabled);
+        assert!(!config.use_zero_copy); // Safe preset prefers buffered
+    }
+
+    #[test]
+    fn test_network_preset() {
+        let config = CopyConfig::network_preset();
+        assert!(config.verify_checksum);
+        assert!(config.resume_enabled);
+        assert!(matches!(config.compression, CompressionType::Zstd { .. }));
+        assert!(!config.use_zero_copy); // Network benefits from compression
+    }
+
+    #[test]
+    fn test_serialization() {
+        let config = CopyConfig::default();
+        let toml = toml::to_string(&config).unwrap();
+        let deserialized: CopyConfig = toml::from_str(&toml).unwrap();
+        assert_eq!(config.use_zero_copy, deserialized.use_zero_copy);
     }
 }

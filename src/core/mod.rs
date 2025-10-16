@@ -6,6 +6,7 @@ pub mod checksum;
 pub mod resume;
 pub mod metadata;
 pub mod validation;
+pub mod zero_copy;
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write, Seek, SeekFrom};
@@ -22,6 +23,7 @@ use checksum::StreamingHasher;
 use resume::ResumeInfo;
 use metadata::preserve_metadata;
 use validation::should_copy_file;
+use zero_copy::{ZeroCopyResult, ZeroCopyCapabilities};
 
 /// Statistics about a copy operation
 #[derive(Debug, Clone)]
@@ -163,8 +165,161 @@ fn perform_copy_internal(
     }
 }
 
-/// Direct copy without compression (with streaming checksum)
+/// Direct copy without compression (with optional zero-copy optimization)
 fn copy_direct(
+    source_path: &Path,
+    dest_path: &Path,
+    source_size: u64,
+    config: &CopyConfig,
+) -> Result<CopyStats> {
+    // Determine if we should attempt zero-copy
+    let use_zero_copy = should_use_zero_copy(source_path, dest_path, config)?;
+    
+    if use_zero_copy {
+        // Try zero-copy first
+        match try_zero_copy_direct(source_path, dest_path, source_size, config) {
+            Ok(stats) => {
+                if config.show_progress {
+                    println!("✓ Zero-copy transfer completed");
+                }
+                return Ok(stats);
+            }
+            Err(OrbitError::ZeroCopyUnsupported) => {
+                if config.show_progress {
+                    println!("Zero-copy not supported, using buffered copy");
+                }
+                // Fall through to buffered copy
+            }
+            Err(e) => {
+                // Other errors should be returned
+                return Err(e);
+            }
+        }
+    }
+    
+    // Use buffered copy (either as fallback or by default)
+    copy_buffered(source_path, dest_path, source_size, config)
+}
+
+/// Determine if zero-copy should be attempted
+fn should_use_zero_copy(
+    source_path: &Path,
+    dest_path: &Path,
+    config: &CopyConfig,
+) -> Result<bool> {
+    // Check if zero-copy is available on this platform
+    let caps = ZeroCopyCapabilities::detect();
+    if !caps.available {
+        return Ok(false);
+    }
+    
+    // Don't use zero-copy if:
+    // 1. Resume is enabled (complex offset handling works better with buffered)
+    // 2. Bandwidth throttling is active (need granular control)
+    if config.resume_enabled || config.max_bandwidth > 0 {
+        return Ok(false);
+    }
+    
+    // Check if files are on the same filesystem (required for Linux copy_file_range)
+    if !caps.cross_filesystem {
+        let same_fs = zero_copy::same_filesystem(source_path, dest_path)?;
+        if !same_fs {
+            return Ok(false);
+        }
+    }
+    
+    // For very small files (< 64KB), buffered copy is often faster due to syscall overhead
+    if source_path.metadata()?.len() < 64 * 1024 {
+        return Ok(false);
+    }
+    
+    Ok(true)
+}
+
+/// Attempt zero-copy transfer
+fn try_zero_copy_direct(
+    source_path: &Path,
+    dest_path: &Path,
+    source_size: u64,
+    config: &CopyConfig,
+) -> Result<CopyStats> {
+    let start_time = Instant::now();
+    
+    // Open files
+    let source_file = File::open(source_path)?;
+    let dest_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(dest_path)?;
+    
+    // Setup progress bar
+    let progress = if config.show_progress {
+        let pb = ProgressBar::new(source_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .unwrap()
+                .progress_chars("#>-")
+        );
+        Some(pb)
+    } else {
+        None
+    };
+    
+    // Attempt zero-copy
+    let result = zero_copy::try_zero_copy(&source_file, &dest_file, 0, source_size);
+    
+    let bytes_copied = match result {
+        ZeroCopyResult::Success(n) => n,
+        ZeroCopyResult::Unsupported => {
+            return Err(OrbitError::ZeroCopyUnsupported);
+        }
+        ZeroCopyResult::Failed(e) => {
+            return Err(OrbitError::Io(e));
+        }
+    };
+    
+    // Flush to ensure data is written
+    dest_file.sync_all()?;
+    
+    if let Some(pb) = progress {
+        pb.set_position(bytes_copied);
+        pb.finish_with_message("Complete");
+    }
+    
+    // If checksum verification is enabled, calculate it post-copy
+    let checksum = if config.verify_checksum {
+        if config.show_progress {
+            println!("Calculating checksum...");
+        }
+        let source_checksum = checksum::calculate_checksum(source_path)?;
+        let dest_checksum = checksum::calculate_checksum(dest_path)?;
+        
+        if source_checksum != dest_checksum {
+            return Err(OrbitError::ChecksumMismatch {
+                expected: source_checksum,
+                actual: dest_checksum,
+            });
+        }
+        Some(source_checksum)
+    } else {
+        None
+    };
+    
+    Ok(CopyStats {
+        bytes_copied,
+        duration: start_time.elapsed(),
+        checksum,
+        compression_ratio: None,
+        files_copied: 1,
+        files_skipped: 0,
+        files_failed: 0,
+    })
+}
+
+/// Buffered copy with streaming checksum (original implementation)
+fn copy_buffered(
     source_path: &Path,
     dest_path: &Path,
     source_size: u64,
@@ -366,38 +521,31 @@ pub fn copy_directory(
         .filter(|e| e.file_type().is_file() || e.file_type().is_symlink())
         .collect();
     
-    println!("Found {} files to process", files_to_copy.len());
-    
-    // Determine parallelism level
-    let parallel_level = if config.parallel == 0 {
-        num_cpus::get().min(8) // Auto: use CPU count, max 8
-    } else {
-        config.parallel
-    };
+    println!("Copying {} files...", files_to_copy.len());
     
     // Process files
-    if parallel_level > 1 && !config.dry_run {
+    if config.parallel > 0 {
         // Parallel processing
         use std::sync::Mutex;
-        let stats_mutex = Mutex::new(total_stats.clone());
+        let stats_mutex = Mutex::new(CopyStats::new());
         
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(parallel_level)
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(config.parallel)
             .build()
-            .map_err(|e| OrbitError::Parallel(e.to_string()))?
-            .install(|| {
-                files_to_copy.par_iter().for_each(|entry| {
-                    if let Err(e) = process_entry(entry, source_dir, dest_dir, config, &stats_mutex) {
-                        eprintln!("Error processing {:?}: {}", entry.path(), e);
-                        if let Ok(mut stats) = stats_mutex.lock() {
-                            stats.files_failed += 1;
-                        }
-                    }
-                });
-            });
+            .map_err(|e| OrbitError::Parallel(e.to_string()))?;
         
-        total_stats = stats_mutex.into_inner()
-            .map_err(|_| OrbitError::Parallel("Failed to get final stats".to_string()))?;
+        pool.install(|| {
+            files_to_copy.par_iter().for_each(|entry| {
+                if let Err(e) = process_entry(entry, source_dir, dest_dir, config, &stats_mutex) {
+                    eprintln!("Error copying {:?}: {}", entry.path(), e);
+                    if let Ok(mut stats) = stats_mutex.lock() {
+                        stats.files_failed += 1;
+                    }
+                }
+            });
+        });
+        
+        total_stats = stats_mutex.into_inner().unwrap();
     } else {
         // Sequential processing
         for entry in files_to_copy {
@@ -408,7 +556,7 @@ pub fn copy_directory(
                     total_stats.files_skipped += stats.files_skipped;
                 }
                 Err(e) => {
-                    eprintln!("Error processing {:?}: {}", entry.path(), e);
+                    eprintln!("Error copying {:?}: {}", entry.path(), e);
                     total_stats.files_failed += 1;
                 }
             }
@@ -568,5 +716,21 @@ mod tests {
         let result = copy_file(&source, &dest, &config);
         
         assert!(matches!(result, Err(OrbitError::SourceNotFound(_))));
+    }
+    
+    #[test]
+    fn test_zero_copy_small_file_skipped() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("small.txt");
+        let dest = dir.path().join("dest.txt");
+        
+        // Small file (< 64KB) should not use zero-copy
+        std::fs::write(&source, b"small").unwrap();
+        
+        let config = CopyConfig::default();
+        let use_zc = should_use_zero_copy(&source, &dest, &config).unwrap();
+        
+        // Small files should skip zero-copy
+        assert!(!use_zc);
     }
 }

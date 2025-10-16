@@ -11,57 +11,49 @@ keywords = ["file-copy", "resume", "compression", "checksum", "backup"]
 categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
-# CLI & Configuration
-clap = { version = "4.5", features = ["derive"] }
+# Core dependencies
+clap = { version = "4.5", features = ["derive", "cargo"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 toml = "0.8"
 
+# File I/O and progress
+indicatif = "0.17"
+walkdir = "2.5"
+
 # Compression
-lz4 = "1.28"
+lz4 = "1.25"
 zstd = "0.13"
 
-# Hashing & Security
+# Checksums
 sha2 = "0.10"
 
-# File System Operations
-walkdir = "2.4"
-filetime = "0.2"
-glob = "0.3"
-
-# System Information
-sysinfo = "0.35.1"
-
-# Error Handling & Logging
-anyhow = "1.0"
-thiserror = "1.0"
-
-# Time & Dates
-chrono = { version = "0.4", features = ["serde"] }
-
-# Progress & UI
-indicatif = "0.17"
-
-# Parallelization
+# Parallel processing
 rayon = "1.10"
 
-# JSON for audit logs
-serde_json = "1.0"
+# System information
+sysinfo = "0.30"
+
+# Pattern matching
+glob = "0.3"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Zero-copy support (Linux)
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "0.38", features = ["fs"] }
+libc = "0.2"
+
+# Zero-copy support (macOS/BSD)
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+# Zero-copy support (Windows) - uses std library, no extra deps needed
 
 [dev-dependencies]
 tempfile = "3.10"
-assert_fs = "1.1"
-predicates = "3.1"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true  # Strip symbols for smaller binary
-
-[profile.dev]
-opt-level = 0
-debug = true
+criterion = "0.5"
 
 [lib]
 name = "orbit"
@@ -70,3 +62,28 @@ path = "src/lib.rs"
 [[bin]]
 name = "orbit"
 path = "src/main.rs"
+
+[[bench]]
+name = "copy_benchmark"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.bench]
+inherits = "release"
+
+[features]
+default = ["zero-copy"]
+
+# Zero-copy system calls for maximum performance
+zero-copy = []
+
+# Protocol support (experimental)
+protocols = []
+
+# Full feature set
+full = ["zero-copy", "protocols"]
