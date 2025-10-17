@@ -124,7 +124,7 @@ pub enum CopyMode {
     /// Only copy if source is newer
     Update,
     
-    /// Copy and delete files in destination that don't exist in source
+    /// Mirror copy and delete files in destination that don't exist in source
     Mirror,
 }
 
@@ -175,6 +175,22 @@ impl Default for SymlinkMode {
     }
 }
 
+/// Format for audit logs
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditFormat {
+    /// JSON Lines format (one JSON object per line)
+    Json,
+    /// CSV format with header
+    Csv,
+}
+
+impl Default for AuditFormat {
+    fn default() -> Self {
+        Self::Json
+    }
+}
+
 // Default value functions for serde
 fn default_true() -> bool {
     true
@@ -214,7 +230,7 @@ impl CopyConfig {
             resume_enabled: false,
             compression: CompressionType::None,
             use_zero_copy: true,
-            parallel: num_cpus::get(),
+            parallel: get_cpu_count(),
             ..Default::default()
         }
     }
@@ -245,13 +261,11 @@ impl CopyConfig {
     }
 }
 
-// Helper for num_cpus
-mod num_cpus {
-    pub fn get() -> usize {
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-    }
+/// Get the number of available CPU cores
+fn get_cpu_count() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
 }
 
 #[cfg(test)]
@@ -298,5 +312,20 @@ mod tests {
         let toml = toml::to_string(&config).unwrap();
         let deserialized: CopyConfig = toml::from_str(&toml).unwrap();
         assert_eq!(config.use_zero_copy, deserialized.use_zero_copy);
+    }
+    
+    #[test]
+    fn test_cpu_count() {
+        let count = get_cpu_count();
+        assert!(count > 0, "CPU count should be greater than 0");
+        assert!(count <= 256, "CPU count seems unreasonably high");
+    }
+    
+    #[test]
+    fn test_default_values() {
+        assert_eq!(default_chunk_size(), 1024 * 1024);
+        assert_eq!(default_retry_attempts(), 3);
+        assert_eq!(default_retry_delay(), 5);
+        assert!(default_true());
     }
 }

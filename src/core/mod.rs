@@ -10,11 +10,14 @@ pub mod zero_copy;
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Write, Seek, SeekFrom};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::thread;
+use std::sync::{Arc, Mutex};
 
 use indicatif::{ProgressBar, ProgressStyle};
+use walkdir::WalkDir;
+
 use crate::config::{CopyConfig, SymlinkMode};
 use crate::error::{OrbitError, Result};
 use crate::compression;
@@ -466,14 +469,13 @@ fn apply_bandwidth_limit(bytes_written: u64, max_bandwidth: u64, last_check: &mu
     }
 }
 
-/// Copy a directory recursively
+/// Copy a directory recursively with streaming iteration to reduce memory usage
 pub fn copy_directory(
     source_dir: &Path,
     dest_dir: &Path,
     config: &CopyConfig,
 ) -> Result<CopyStats> {
-    use walkdir::WalkDir;
-    use rayon::prelude::*;
+    use crossbeam_channel::bounded;
     
     if !config.recursive {
         return Err(OrbitError::Config(
@@ -482,115 +484,283 @@ pub fn copy_directory(
     }
     
     let start_time = Instant::now();
-    let mut total_stats = CopyStats::new();
-    
-    println!("Scanning directory tree...");
     
     // Create destination directory
     if !dest_dir.exists() {
         std::fs::create_dir_all(dest_dir)?;
     }
     
-    // Collect all entries
-    let entries: Vec<_> = WalkDir::new(source_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .collect();
+    // Bounded channel prevents scanner from overwhelming copiers
+    // Buffer size: use parallel threads as baseline, bounded between 16-1000
+    let buffer_size = if config.parallel > 0 {
+        config.parallel.max(16).min(1000)
+    } else {
+        100
+    };
     
-    // Process directories first (sequentially)
-    for entry in &entries {
-        if entry.file_type().is_dir() {
-            let relative_path = entry.path().strip_prefix(source_dir)
-                .map_err(|_| OrbitError::InvalidPath(entry.path().to_path_buf()))?;
-            let dest_path = dest_dir.join(relative_path);
-            
-            if !dest_path.exists() {
-                std::fs::create_dir_all(&dest_path)?;
+    let (tx, rx) = bounded::<WorkItem>(buffer_size);
+    
+    let source_dir = source_dir.to_path_buf();
+    let dest_dir = dest_dir.to_path_buf();
+    let total_stats = Arc::new(Mutex::new(CopyStats::new()));
+    
+    println!("Scanning and copying directory tree...");
+    
+    // Producer thread: walks directory tree and sends work items
+    let producer_handle = {
+        let source_dir = source_dir.clone();
+        let dest_dir = dest_dir.clone();
+        let config = config.clone();
+        
+        thread::spawn(move || -> Result<()> {
+            produce_work_items(&source_dir, &dest_dir, &config, tx)
+        })
+    };
+    
+    // Consumer: process work items (files) in parallel or sequentially
+    consume_work_items(
+        &source_dir,
+        &dest_dir,
+        config,
+        rx,
+        total_stats.clone(),
+    )?;
+    
+    // Wait for producer to finish and check for errors
+    match producer_handle.join() {
+        Ok(Ok(())) => {
+            // Producer finished successfully
+        }
+        Ok(Err(e)) => {
+            eprintln!("Producer thread error: {}", e);
+        }
+        Err(e) => {
+            eprintln!("Producer thread panicked: {:?}", e);
+        }
+    }
+    
+    let mut final_stats = match Arc::try_unwrap(total_stats) {
+        Ok(mutex) => mutex.into_inner().unwrap(),
+        Err(arc) => arc.lock().unwrap().clone(),
+    };
+    
+    final_stats.duration = start_time.elapsed();
+    
+    println!("\nDirectory copy completed:");
+    println!("  Files copied: {}", final_stats.files_copied);
+    println!("  Files skipped: {}", final_stats.files_skipped);
+    println!("  Files failed: {}", final_stats.files_failed);
+    println!("  Total bytes: {}", final_stats.bytes_copied);
+    println!("  Duration: {:?}", final_stats.duration);
+    
+    if final_stats.files_failed > 0 {
+        return Err(OrbitError::Parallel(
+            format!("{} files failed to copy", final_stats.files_failed)
+        ));
+    }
+    
+    Ok(final_stats)
+}
+
+/// Work item for parallel processing
+#[derive(Clone)]
+struct WorkItem {
+    source_path: PathBuf,
+    dest_path: PathBuf,
+    entry_type: EntryType,
+}
+
+#[derive(Clone)]
+enum EntryType {
+    Directory,
+    File,
+    Symlink,
+}
+
+/// Producer: walks directory tree and sends work items via bounded channel
+fn produce_work_items(
+    source_dir: &Path,
+    dest_dir: &Path,
+    config: &CopyConfig,
+    tx: crossbeam_channel::Sender<WorkItem>,
+) -> Result<()> {
+    let walker = WalkDir::new(source_dir)
+        .follow_links(false)
+        .same_file_system(true);
+    
+    // Process in batches for better cache locality and reduced syscalls
+    let mut dir_batch = Vec::with_capacity(100);
+    let mut file_batch = Vec::with_capacity(100);
+    
+    for entry in walker {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("Warning: Failed to read entry: {}", e);
+                continue;
             }
-            
-            if config.preserve_metadata {
-                if let Err(e) = preserve_metadata(entry.path(), &dest_path) {
-                    eprintln!("Warning: Failed to preserve directory metadata: {}", e);
+        };
+        
+        let relative_path = match entry.path().strip_prefix(source_dir) {
+            Ok(p) => p,
+            Err(_) => {
+                eprintln!("Warning: Failed to compute relative path for {:?}", entry.path());
+                continue;
+            }
+        };
+        
+        let dest_path = dest_dir.join(relative_path);
+        let source_path = entry.path().to_path_buf();
+        
+        let entry_type = if entry.file_type().is_dir() {
+            EntryType::Directory
+        } else if entry.file_type().is_symlink() {
+            EntryType::Symlink
+        } else if entry.file_type().is_file() {
+            EntryType::File
+        } else {
+            continue; // Skip special files
+        };
+        
+        let work_item = WorkItem {
+            source_path,
+            dest_path,
+            entry_type: entry_type.clone(),
+        };
+        
+        // Batch directories and files separately
+        match entry_type {
+            EntryType::Directory => {
+                dir_batch.push(work_item);
+                if dir_batch.len() >= 100 {
+                    flush_directory_batch(&mut dir_batch, config)?;
+                }
+            }
+            EntryType::File | EntryType::Symlink => {
+                file_batch.push(work_item);
+                if file_batch.len() >= 100 {
+                    flush_file_batch(&mut file_batch, &tx)?;
                 }
             }
         }
     }
     
-    // Collect files to copy
-    let files_to_copy: Vec<_> = entries.iter()
-        .filter(|e| e.file_type().is_file() || e.file_type().is_symlink())
-        .collect();
+    // Flush remaining batches
+    flush_directory_batch(&mut dir_batch, config)?;
+    flush_file_batch(&mut file_batch, &tx)?;
     
-    println!("Copying {} files...", files_to_copy.len());
-    
-    // Process files
-    if config.parallel > 0 {
-        // Parallel processing
-        use std::sync::Mutex;
-        let stats_mutex = Mutex::new(CopyStats::new());
+    // Channel will be dropped here, signaling consumers to finish
+    Ok(())
+}
+
+/// Flush directory batch - create directories sequentially before files
+fn flush_directory_batch(
+    batch: &mut Vec<WorkItem>,
+    config: &CopyConfig,
+) -> Result<()> {
+    for item in batch.drain(..) {
+        if !item.dest_path.exists() {
+            std::fs::create_dir_all(&item.dest_path)?;
+        }
         
+        if config.preserve_metadata {
+            if let Err(e) = preserve_metadata(&item.source_path, &item.dest_path) {
+                eprintln!("Warning: Failed to preserve directory metadata for {:?}: {}", 
+                    item.dest_path, e);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Flush file batch - send to workers via channel (blocks if channel full = backpressure)
+fn flush_file_batch(
+    batch: &mut Vec<WorkItem>,
+    tx: &crossbeam_channel::Sender<WorkItem>,
+) -> Result<()> {
+    for item in batch.drain(..) {
+        // This will block if channel is full, providing natural backpressure
+        if tx.send(item).is_err() {
+            // Channel closed, stop sending
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Consumer: process work items in parallel or sequentially
+fn consume_work_items(
+    source_dir: &Path,
+    dest_dir: &Path,
+    config: &CopyConfig,
+    rx: crossbeam_channel::Receiver<WorkItem>,
+    total_stats: Arc<Mutex<CopyStats>>,
+) -> Result<()> {
+    use rayon::prelude::*;
+    
+    if config.parallel > 0 {
+        // Parallel processing with thread pool
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(config.parallel)
             .build()
             .map_err(|e| OrbitError::Parallel(e.to_string()))?;
         
         pool.install(|| {
-            files_to_copy.par_iter().for_each(|entry| {
-                if let Err(e) = process_entry(entry, source_dir, dest_dir, config, &stats_mutex) {
-                    eprintln!("Error copying {:?}: {}", entry.path(), e);
-                    if let Ok(mut stats) = stats_mutex.lock() {
+            rx.into_iter().par_bridge().for_each(|item| {
+                if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats) {
+                    eprintln!("Error copying {:?}: {}", item.source_path, e);
+                    if let Ok(mut stats) = total_stats.lock() {
                         stats.files_failed += 1;
                     }
                 }
             });
         });
-        
-        total_stats = stats_mutex.into_inner().unwrap();
     } else {
         // Sequential processing
-        for entry in files_to_copy {
-            match process_entry_sequential(entry, source_dir, dest_dir, config) {
-                Ok(stats) => {
-                    total_stats.bytes_copied += stats.bytes_copied;
-                    total_stats.files_copied += stats.files_copied;
-                    total_stats.files_skipped += stats.files_skipped;
-                }
-                Err(e) => {
-                    eprintln!("Error copying {:?}: {}", entry.path(), e);
-                    total_stats.files_failed += 1;
+        for item in rx {
+            if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats) {
+                eprintln!("Error copying {:?}: {}", item.source_path, e);
+                if let Ok(mut stats) = total_stats.lock() {
+                    stats.files_failed += 1;
                 }
             }
         }
     }
     
-    total_stats.duration = start_time.elapsed();
-    
-    println!("\nDirectory copy completed:");
-    println!("  Files copied: {}", total_stats.files_copied);
-    println!("  Files skipped: {}", total_stats.files_skipped);
-    println!("  Files failed: {}", total_stats.files_failed);
-    println!("  Total bytes: {}", total_stats.bytes_copied);
-    println!("  Duration: {:?}", total_stats.duration);
-    
-    if total_stats.files_failed > 0 {
-        return Err(OrbitError::Parallel(
-            format!("{} files failed to copy", total_stats.files_failed)
-        ));
-    }
-    
-    Ok(total_stats)
+    Ok(())
 }
 
-/// Process a single entry (for parallel execution)
-fn process_entry(
-    entry: &walkdir::DirEntry,
-    source_dir: &Path,
-    dest_dir: &Path,
+/// Process a single work item (file or symlink)
+fn process_work_item(
+    item: &WorkItem,
+    _source_dir: &Path,
+    _dest_dir: &Path,
     config: &CopyConfig,
-    stats_mutex: &std::sync::Mutex<CopyStats>,
+    stats_mutex: &Arc<Mutex<CopyStats>>,
 ) -> Result<()> {
-    let stats = process_entry_sequential(entry, source_dir, dest_dir, config)?;
+    let stats = match item.entry_type {
+        EntryType::Directory => {
+            // Directories already handled in producer
+            return Ok(());
+        }
+        EntryType::Symlink => {
+            handle_symlink(&item.source_path, &item.dest_path, config.symlink_mode, config)?;
+            CopyStats {
+                bytes_copied: 0,
+                duration: Duration::ZERO,
+                checksum: None,
+                compression_ratio: None,
+                files_copied: 1,
+                files_skipped: 0,
+                files_failed: 0,
+            }
+        }
+        EntryType::File => {
+            copy_file(&item.source_path, &item.dest_path, config)?
+        }
+    };
     
+    // Update total stats atomically
     if let Ok(mut total_stats) = stats_mutex.lock() {
         total_stats.bytes_copied += stats.bytes_copied;
         total_stats.files_copied += stats.files_copied;
@@ -598,36 +768,6 @@ fn process_entry(
     }
     
     Ok(())
-}
-
-/// Process a single entry sequentially
-fn process_entry_sequential(
-    entry: &walkdir::DirEntry,
-    source_dir: &Path,
-    dest_dir: &Path,
-    config: &CopyConfig,
-) -> Result<CopyStats> {
-    let source_path = entry.path();
-    let relative_path = source_path.strip_prefix(source_dir)
-        .map_err(|_| OrbitError::InvalidPath(source_path.to_path_buf()))?;
-    let dest_path = dest_dir.join(relative_path);
-    
-    if entry.file_type().is_symlink() {
-        handle_symlink(source_path, &dest_path, config.symlink_mode, config)?;
-        Ok(CopyStats {
-            bytes_copied: 0,
-            duration: Duration::ZERO,
-            checksum: None,
-            compression_ratio: None,
-            files_copied: 1,
-            files_skipped: 0,
-            files_failed: 0,
-        })
-    } else if entry.file_type().is_file() {
-        copy_file(source_path, &dest_path, config)
-    } else {
-        Ok(CopyStats::default())
-    }
 }
 
 /// Handle symbolic link based on mode
@@ -677,18 +817,10 @@ fn create_symlink(target: &Path, link_path: &Path) -> Result<()> {
     }
 }
 
-// Add num_cpus for auto-detection
-mod num_cpus {
-    pub fn get() -> usize {
-        std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossbeam_channel::bounded;
     use tempfile::tempdir;
 
     #[test]

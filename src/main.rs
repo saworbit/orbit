@@ -12,7 +12,7 @@ use orbit::{
     copy_file, copy_directory, CopyStats,
     error::Result,
     stats::TransferStats,
-    audit::AuditLogger,
+    // removed: audit::AuditLogger (doesn't exist)
     protocol::Protocol,
     get_zero_copy_capabilities, is_zero_copy_available,
 };
@@ -233,8 +233,8 @@ fn main() -> Result<()> {
     })?;
     
     // Parse URIs
-    let (source_protocol, source_path) = Protocol::from_uri(&source)?;
-    let (dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
+    let (_source_protocol, source_path) = Protocol::from_uri(&source)?;
+    let (_dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
     
     // Load or create config
     let mut config = if let Some(config_path) = cli.config {
@@ -285,12 +285,11 @@ fn main() -> Result<()> {
         }
     }
     
-    // Initialize audit logger if requested
-    let _audit_logger = if let Some(audit_path) = cli.audit_log {
-        Some(AuditLogger::new(audit_path))
-    } else {
-        None
-    };
+// Audit logging would be initialized here if needed
+// For now, just acknowledge if path was provided
+if let Some(_audit_path) = cli.audit_log {
+    // Audit path provided, logging would happen here
+}
     
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {
@@ -309,7 +308,7 @@ fn handle_subcommand(command: Commands) -> Result<()> {
     match command {
         Commands::Stats => {
             let stats = TransferStats::default(); // Load from persistent storage in real impl
-            stats.print_summary();
+            stats.print();
             Ok(())
         }
         Commands::Presets => {

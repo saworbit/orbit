@@ -62,6 +62,12 @@ pub enum OrbitError {
     
     /// Authentication error
     Authentication(String),
+
+    /// Metadata operation failed
+    MetadataFailed(String),
+    
+    /// Audit log error
+    AuditLog(String),
 }
 
 impl OrbitError {
@@ -86,6 +92,8 @@ impl OrbitError {
             OrbitError::ZeroCopyUnsupported => false, // Not fatal, triggers fallback
             OrbitError::Protocol(_) => false,
             OrbitError::Authentication(_) => true,
+            OrbitError::MetadataFailed(_) => false,
+            OrbitError::AuditLog(_) => false,
         }
     }
     
@@ -150,6 +158,12 @@ impl fmt::Display for OrbitError {
             }
             OrbitError::Authentication(msg) => {
                 write!(f, "Authentication error: {}", msg)
+            }
+            OrbitError::MetadataFailed(msg) => {
+                write!(f, "Metadata operation failed: {}", msg)
+            }
+            OrbitError::AuditLog(msg) => {
+                write!(f, "Audit log error: {}", msg)
             }
         }
     }

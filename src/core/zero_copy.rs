@@ -222,7 +222,6 @@ mod linux {
 mod windows {
     use super::ZeroCopyResult;
     use std::fs::File;
-    use std::io;
     
     pub fn copy_file_ex(
         _source: &File,
