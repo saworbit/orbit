@@ -877,7 +877,7 @@ Special thanks to all contributors who make Orbit better every day! 🌟
 - 💬 **GitHub Discussions**: [Ask questions, share tips](https://github.com/saworbit/orbit/discussions)
 - 🐛 **GitHub Issues**: [Report bugs, request features](https://github.com/saworbit/orbit/issues)
 - 📧 **Email**: shaneawall@gmail.com
-- 💼 **LinkedIn**: [Shane Wall](https://linkedin.com/in/shanewall)
+- 💼 **LinkedIn**: [Shane Wall](https://www.linkedin.com/in/shane-wall/)
 
 ### Stay Updated
 
