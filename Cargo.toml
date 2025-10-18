@@ -1,3 +1,11 @@
+[workspace]
+members = [
+    ".",
+    "crates/core-manifest",
+    "crates/core-starmap",
+    "crates/core-audit",
+]
+
 [package]
 name = "orbit"
 version = "0.4.0"
@@ -8,7 +16,6 @@ license-file = "LICENSE"
 readme = "README.md"
 repository = "https://github.com/saworbit/orbit"
 keywords = ["file-copy", "resume", "compression", "checksum", "backup"]
-categories = ["command-line-utilities", "filesystem"]
 
 [dependencies]
 # Core dependencies
@@ -27,6 +34,7 @@ zstd = "0.13"
 
 # Checksums
 sha2 = "0.10"
+blake3 = "1.5"
 
 # Parallel processing
 rayon = "1.10"
@@ -48,6 +56,14 @@ anyhow = "1.0"
 # File metadata utilities
 filetime = "0.2"
 clap_complete = "4.5"
+
+# Encoding
+hex = "0.4"
+
+# Manifest system
+orbit-core-manifest = { path = "crates/core-manifest" }
+orbit-core-starmap = { path = "crates/core-starmap" }
+orbit-core-audit = { path = "crates/core-audit" }
 
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]

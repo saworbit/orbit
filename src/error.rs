@@ -68,6 +68,9 @@ pub enum OrbitError {
     
     /// Audit log error
     AuditLog(String),
+    
+    /// Generic error with message
+    Other(String),
 }
 
 impl OrbitError {
@@ -94,6 +97,7 @@ impl OrbitError {
             OrbitError::Authentication(_) => true,
             OrbitError::MetadataFailed(_) => false,
             OrbitError::AuditLog(_) => false,
+            OrbitError::Other(_) => false,
         }
     }
     
@@ -165,6 +169,9 @@ impl fmt::Display for OrbitError {
             OrbitError::AuditLog(msg) => {
                 write!(f, "Audit log error: {}", msg)
             }
+            OrbitError::Other(msg) => {
+                write!(f, "{}", msg)
+            }
         }
     }
 }
@@ -209,6 +216,7 @@ mod tests {
         assert!(!OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test")).is_fatal());
         assert!(!OrbitError::Compression("test".to_string()).is_fatal());
         assert!(!OrbitError::ZeroCopyUnsupported.is_fatal());
+        assert!(!OrbitError::Other("test".to_string()).is_fatal());
     }
 
     #[test]
@@ -236,5 +244,12 @@ mod tests {
             err.to_string(),
             "Zero-copy not supported on this platform/filesystem"
         );
+    }
+    
+    #[test]
+    fn test_other_error() {
+        let err = OrbitError::Other("custom error message".to_string());
+        assert_eq!(err.to_string(), "custom error message");
+        assert!(!err.is_fatal());
     }
 }

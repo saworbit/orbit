@@ -19,14 +19,46 @@ pub mod compression;
 pub mod stats;
 pub mod audit;
 pub mod protocol;
+pub mod manifest_integration;
+
+// Manifest system modules (re-exported from workspace crates)
+pub use orbit_core_manifest as manifest;
+pub use orbit_core_starmap as starmap;
+pub use orbit_core_audit as manifest_audit;
 
 // Re-export commonly used types for convenience
-pub use config::{CopyConfig, CopyMode, CompressionType, SymlinkMode};
+pub use config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy};
 pub use error::{OrbitError, Result};
 pub use core::{CopyStats, copy_file, copy_directory};
 pub use core::zero_copy::{ZeroCopyCapabilities, ZeroCopyResult};
 pub use stats::TransferStats;
 pub use protocol::Protocol;
+
+// Manifest system convenience exports
+pub mod manifests {
+    //! Manifest system for transfer planning, verification, and audit
+    //!
+    //! Provides Flight Plans, Cargo Manifests, Star Maps, and audit logging.
+    
+    pub use orbit_core_manifest::{
+        FlightPlan, CargoManifest, Endpoint, Policy, Encryption,
+        WindowMeta, Chunking, Digests, FileRef,
+        validate_flight_plan, validate_cargo_manifest,
+    };
+    
+    pub use orbit_core_starmap::{
+        StarMapBuilder, StarMapReader, 
+        ChunkMeta, BloomFilter, RankSelectBitmap,
+    };
+    
+    pub use orbit_core_audit::{
+        TelemetryLogger, TelemetryEvent, EventType, 
+        Beacon, BeaconBuilder,
+    };
+    
+    // Re-export integration helpers
+    pub use crate::manifest_integration::{ManifestGenerator, should_generate_manifest};
+}
 
 /// Library version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

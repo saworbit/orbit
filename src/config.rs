@@ -5,6 +5,25 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Chunking strategy for manifest generation
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ChunkingStrategy {
+    /// Content-defined chunking with average size in KiB
+    Cdc { avg_kib: u32, algo: String },
+    /// Fixed-size chunks in KiB
+    Fixed { size_kib: u32 },
+}
+
+impl Default for ChunkingStrategy {
+    fn default() -> Self {
+        ChunkingStrategy::Cdc {
+            avg_kib: 256,
+            algo: "gear".to_string(),
+        }
+    }
+}
+
 /// Main configuration for copy operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CopyConfig {
@@ -73,18 +92,20 @@ pub struct CopyConfig {
     pub dry_run: bool,
     
     /// Use zero-copy system calls when available
-    /// 
-    /// When enabled, Orbit will attempt to use platform-specific zero-copy
-    /// mechanisms (copy_file_range on Linux, CopyFileExW on Windows) for
-    /// maximum performance. Falls back to buffered copy if unsupported.
-    /// 
-    /// Zero-copy is automatically disabled when:
-    /// - Resume is enabled (requires granular control)
-    /// - Bandwidth throttling is active
-    /// - Files are on different filesystems (Linux limitation)
-    /// - File size is very small (< 64KB, syscall overhead not worth it)
     #[serde(default = "default_true")]
     pub use_zero_copy: bool,
+    
+    /// Generate manifests for transfers
+    #[serde(default)]
+    pub generate_manifest: bool,
+    
+    /// Output directory for manifests
+    #[serde(default)]
+    pub manifest_output_dir: Option<PathBuf>,
+    
+    /// Chunking strategy for manifest generation
+    #[serde(default)]
+    pub chunking_strategy: ChunkingStrategy,
 }
 
 impl Default for CopyConfig {
@@ -107,6 +128,9 @@ impl Default for CopyConfig {
             exclude_patterns: Vec::new(),
             dry_run: false,
             use_zero_copy: true,
+            generate_manifest: false,
+            manifest_output_dir: None,
+            chunking_strategy: ChunkingStrategy::default(),
         }
     }
 }
@@ -231,6 +255,9 @@ impl CopyConfig {
             compression: CompressionType::None,
             use_zero_copy: true,
             parallel: get_cpu_count(),
+            generate_manifest: false,
+            manifest_output_dir: None,
+            chunking_strategy: ChunkingStrategy::default(),
             ..Default::default()
         }
     }
@@ -242,7 +269,10 @@ impl CopyConfig {
             resume_enabled: true,
             retry_attempts: 5,
             exponential_backoff: true,
-            use_zero_copy: false, // Prefer buffered for maximum control
+            use_zero_copy: false,
+            generate_manifest: false,
+            manifest_output_dir: None,
+            chunking_strategy: ChunkingStrategy::default(),
             ..Default::default()
         }
     }
@@ -255,7 +285,10 @@ impl CopyConfig {
             compression: CompressionType::Zstd { level: 3 },
             retry_attempts: 10,
             exponential_backoff: true,
-            use_zero_copy: false, // Network transfers benefit from compression
+            use_zero_copy: false,
+            generate_manifest: false,
+            manifest_output_dir: None,
+            chunking_strategy: ChunkingStrategy::default(),
             ..Default::default()
         }
     }
@@ -279,6 +312,7 @@ mod tests {
         assert!(config.verify_checksum);
         assert!(config.use_zero_copy);
         assert!(!config.resume_enabled);
+        assert!(!config.generate_manifest);
     }
 
     #[test]
@@ -287,6 +321,7 @@ mod tests {
         assert!(!config.verify_checksum);
         assert!(config.use_zero_copy);
         assert!(config.parallel > 0);
+        assert!(!config.generate_manifest);
     }
 
     #[test]
@@ -294,7 +329,7 @@ mod tests {
         let config = CopyConfig::safe_preset();
         assert!(config.verify_checksum);
         assert!(config.resume_enabled);
-        assert!(!config.use_zero_copy); // Safe preset prefers buffered
+        assert!(!config.use_zero_copy);
     }
 
     #[test]
@@ -303,7 +338,7 @@ mod tests {
         assert!(config.verify_checksum);
         assert!(config.resume_enabled);
         assert!(matches!(config.compression, CompressionType::Zstd { .. }));
-        assert!(!config.use_zero_copy); // Network benefits from compression
+        assert!(!config.use_zero_copy);
     }
 
     #[test]
@@ -327,5 +362,11 @@ mod tests {
         assert_eq!(default_retry_attempts(), 3);
         assert_eq!(default_retry_delay(), 5);
         assert!(default_true());
+    }
+    
+    #[test]
+    fn test_chunking_strategy_default() {
+        let strategy = ChunkingStrategy::default();
+        assert!(matches!(strategy, ChunkingStrategy::Cdc { .. }));
     }
 }

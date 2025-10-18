@@ -1,0 +1,28 @@
+[package]
+name = "orbit-core-starmap"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shane Wall <shaneawall@gmail.com>"]
+description = "Binary index (Star Map) for efficient chunk and window queries in Orbit"
+license-file = "../../LICENSE"
+
+[dependencies]
+# Binary serialization (replaces Cap'n Proto)
+bincode = "1.3"
+serde = { version = "1.0", features = ["derive"] }
+
+# Memory-mapped file access
+memmap2 = "0.9"
+
+# Efficient bitmap operations
+bitvec = "1.0"
+
+# Fast hashing for bloom filter
+siphasher = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+[dev-dependencies]
+tempfile = "3.10"
+rand = "0.8"
