@@ -19,21 +19,20 @@ Whether you're backing up terabytes of data, syncing files across continents, or
 
 ## 🧠 The Next Evolution of Orbit
 
-Orbit has grown beyond a single binary copy utility.  
-It is now a **modular, intelligent transfer framework** built around performance, reliability, and observability.
+Orbit has evolved into a **modular transfer framework** designed around performance, reliability, and observability.
 
 ### 🌌 Core Additions
 
 | Feature | Description |
 |----------|--------------|
-| 🗂 **Manifest System** | Define multi-job transfers in TOML and run declaratively |
-| 🧩 **Modular Crates** | Core logic split into focused Rust crates for reuse and clarity |
-| 🕵️ **Watcher / Beacon** | Lightweight monitor that checks Orbit’s health and uptime |
-| 📊 **Enhanced Audit Logs** | JSON Lines with throughput, duration, compression ratio, and checksum status |
-| 🧠 **Telemetry Engine** | Structured runtime metrics for dashboards or automation |
-| 🔄 **Improved Resume Logic** | Chunk-level resume tracking and alerting |
-| ⚙️ **Configurable Defaults** | Global options via `orbit.toml` or environment variables |
-| 🧪 **Wormhole Module (Experimental)** | Forward-error correction and erasure coding for lossy networks |
+| 🗂 **Manifest System** | Declarative multi-job transfer engine built on Starmap and Audit |
+| 🌌 **Starmap Planner** | Validates, orders, and maps manifest jobs before execution |
+| 📊 **Audit Integration** | Structured telemetry for every file, job, and transfer |
+| 🧩 **Modular Crates** | Core logic separated into clean, testable modules |
+| 🕵️ **Watcher / Beacon** | Lightweight process to monitor Orbit health |
+| 🔄 **Improved Resume Logic** | Chunk-level recovery and validation |
+| ⚙️ **Configurable Defaults** | Persistent settings via `orbit.toml` or environment variables |
+| 🧪 **Wormhole Module (Experimental)** | Forward-error correction for lossy networks |
 
 ---
 
@@ -42,16 +41,16 @@ It is now a **modular, intelligent transfer framework** built around performance
 - 🚄 **3× Faster** — zero-copy transfers at device speed  
 - 🛡️ **Bulletproof** — resume, checksums, retries  
 - 🧠 **Smart** — automatic strategy selection (zero-copy, compression, or buffered)  
-- 📊 **Auditable** — detailed per-file logs  
+- 📊 **Auditable** — Starmap-aware logging for every job  
 - 🧩 **Modular** — clean crate boundaries for contributors  
 - 🌍 **Cross-Platform** — Linux, macOS, Windows
 
 ---
 
-## 🗂 Manifest System
+## 🗂 Manifest System + Starmap
 
-Orbit can run complex transfer jobs from a single manifest file.  
-Perfect for backups, migrations, or repeatable batch jobs.
+The Manifest System defines repeatable transfer jobs in TOML and hands them to **Starmap**, Orbit’s execution planner.  
+Starmap builds a dependency graph, validates all jobs, then executes them through the Audit layer for full traceability.
 
 Example `orbit.manifest.toml`:
 
@@ -62,13 +61,12 @@ compression = "zstd:6"
 resume = true
 concurrency = 4
 audit_log = "audit.log"
+plan_visualisation = true
 
 [[job]]
-name = "project-backup"
-source = "/data/projects/"
-destination = "/mnt/backup/projects/"
-include = ["**/*.rs", "**/*.toml"]
-exclude = ["target/**", ".git/**"]
+name = "source-sync"
+source = "/data/source/"
+destination = "/mnt/backup/source/"
 
 [[job]]
 name = "media-archive"
@@ -76,7 +74,7 @@ source = "/media/camera/"
 destination = "/tank/archive/"
 compression = "zstd:1"
 checksum = "sha256"
-resume = true
+depends_on = ["source-sync"]
 ```
 
 Run it:
@@ -84,21 +82,23 @@ Run it:
 orbit run --manifest orbit.manifest.toml
 ```
 
-✅ Multiple jobs per file  
-✅ Per-job overrides  
-✅ Glob include/exclude  
-✅ Validation and audit integration  
+### 🔭 Starmap Highlights
+- Builds an execution plan (directed graph of jobs)  
+- Validates dependencies and resources before transfer  
+- Optimises concurrency for independent jobs  
+- Visualises job order when `plan_visualisation = true`
+
+### 📋 Audit Highlights
+- Records structured JSON events for every job and file  
+- Logs duration, throughput, compression ratio, checksum, and retries  
+- Tags each record with its Starmap node for easy correlation  
 
 ---
 
 ## 🕵️ Watcher / Beacon
 
-A small companion process that keeps an eye on Orbit jobs.  
-
-- Monitors process status and log freshness  
-- Emits JSON telemetry for monitoring tools  
-- Can alert, restart, or record incidents  
-- Designed to evolve into a self-healing component  
+A companion service that observes Orbit runtime health.  
+It can report stalled transfers, track telemetry, and trigger recovery actions.
 
 Example:
 ```bash
@@ -109,18 +109,25 @@ orbit watcher --status
 
 ## 📊 Audit and Telemetry
 
-Orbit produces structured audit entries like:
+Every operation emits structured audit events via the **core-audit** crate.  
+Example:
 ```json
-{"job":"project-backup","file":"src/main.rs","bytes":1048576,"status":"ok","checksum_match":true,"duration_ms":1184,"compression":"zstd:6"}
+{
+  "timestamp": "2025-10-18T16:42:19Z",
+  "job": "media-archive",
+  "source": "/media/camera/",
+  "destination": "/tank/archive/",
+  "bytes": 104857600,
+  "duration_ms": 2341,
+  "compression": "zstd:1",
+  "checksum": "sha256",
+  "checksum_match": true,
+  "status": "ok",
+  "starmap_node": "orbit.node.media-archive"
+}
 ```
 
-**Now includes:**
-- Duration and throughput  
-- Compression ratio  
-- Retry count and resume state  
-- Resource snapshots  
-
-Audit files are line-delimited JSON and ingestible by ELK, Loki, Datadog, etc.
+Audit logs are JSON Lines, timestamped, and ingestion-ready for ELK, Loki, or Datadog.
 
 ---
 
@@ -129,14 +136,15 @@ Audit files are line-delimited JSON and ingestible by ELK, Loki, Datadog, etc.
 | Crate | Purpose |
 |-------|----------|
 | 🧩 `core-manifest` | Manifest parsing and orchestration |
-| 🧩 `core-audit` | Structured telemetry and logging |
-| 🧩 `core-checksum` | File hashing and verification |
-| 🧩 `core-zero-copy` | OS-level optimised copy paths |
-| 🧩 `core-compress` | Compression and decompression logic |
-| 🧩 `core-watcher` *(planned)* | Beacon monitoring service |
-| 🧩 `wormhole` *(dev)* | Forward-error correction for harsh networks |
+| 🌌 `core-starmap` | Job planner and dependency graph builder |
+| 📊 `core-audit` | Structured logging and telemetry |
+| 🔐 `core-checksum` | File hashing and verification |
+| ⚡ `core-zero-copy` | OS-level optimised I/O |
+| 🗜️ `core-compress` | Compression and decompression |
+| 🕵️ `core-watcher` *(planned)* | Monitoring beacon |
+| 🧪 `wormhole` *(dev)* | Forward-error correction module |
 
-This structure improves reliability and allows external crates to reuse modules independently.
+This structure ensures isolation, clarity, and reusability across future projects.
 
 ---
 
@@ -148,9 +156,8 @@ This structure improves reliability and allows external crates to reuse modules 
 | 1 GB | 980 ms | 340 ms | 2.9× | ↓ 78 % |
 | 10 GB | 9.8 s | 3.4 s | 2.9× | ↓ 80 % |
 
-**Compression:**  
-Zstd 3 → 2.3× faster over network  
-LZ4 → near-realtime stream speed  
+Zstd 3 → 2.3× faster over networks  
+LZ4 → near-realtime local copies  
 
 ---
 
@@ -168,12 +175,12 @@ cargo build --release
 sudo cp target/release/orbit /usr/local/bin/
 ```
 
-### Transfer Example
+### Simple Transfer
 ```bash
 orbit -s /data/source -d /backup/target --resume --checksum sha256
 ```
 
-### Run a Manifest
+### Manifest Run
 ```bash
 orbit run -m orbit.manifest.toml
 ```
@@ -189,24 +196,23 @@ Unreliable network    → Resume + retry
 Critical data         → Checksum + audit
 ```
 
-Orbit analyses file size, path, and environment to decide automatically.
+Orbit analyses environment and adapts automatically.
 
 ---
 
 ## 🔐 Security
 
-- Safe path and permission handling  
-- Optional checksum verification for tamper detection  
-- Planned FIPS-compliant crypto library  
-- No telemetry phone-home or hidden data collection  
+- Safe path handling  
+- Checksum verification for integrity  
+- Future FIPS-compliant crypto support  
+- No telemetry phone-home  
 
 ---
 
 ## 🧩 Configuration
 
-Global defaults can be set in `orbit.toml` or via environment variables.
+Defaults via `orbit.toml` or environment variables:
 
-Example:
 ```toml
 compression = "zstd:5"
 checksum = "sha256"
@@ -221,30 +227,29 @@ telemetry = true
 ## 🧪 Roadmap
 
 ### ✅ Implemented
-- Zero-copy engine  
-- Compression and checksum modules  
-- Manifest system  
-- Structured audit logs  
-- Modular crate structure  
+- Zero-copy and compression engines  
+- Manifest + Starmap + Audit integration  
+- Structured telemetry  
+- Modular crate system  
 - Resume and retry improvements  
 
 ### 🧠 In Progress
-- Watcher and telemetry service  
-- Object storage connectors (S3, Azure, GCS)  
-- Wormhole error-correction module  
+- Watcher beacon service  
+- Object-storage connectors (S3, Azure, GCS)  
+- Wormhole FEC module  
 
 ### 🚧 Planned
-- REST API for orchestration  
-- Scheduler for timed jobs  
-- Disk-space pre-check before compression  
-- Plugin framework for external protocols  
+- REST orchestration API  
+- Scheduler and conditionals  
+- Disk-space pre-check  
+- Plugin framework for custom protocols  
 
 ---
 
 ## 🦀 Contributing
 
-We welcome pull requests!  
-Read `CONTRIBUTING.md` for coding style and branch flow.
+Pull requests welcome!  
+See `CONTRIBUTING.md` for code style and guidelines.
 
 Build and test:
 ```bash
