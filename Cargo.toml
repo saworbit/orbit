@@ -76,6 +76,11 @@ async-trait = { version = "0.1", optional = true }
 bitflags = { version = "2", optional = true }
 zeroize = { version = "1", optional = true }
 
+# S3 native dependencies (optional, feature-gated)
+aws-config = { version = "1.5", default-features = false, features = ["behavior-version-latest", "rustls"], optional = true }
+aws-sdk-s3 = { version = "1.50", default-features = false, features = ["rt-tokio", "rustls"], optional = true }
+url = { version = "2.5", optional = true }
+
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "0.38", features = ["fs"] }
@@ -126,5 +131,8 @@ protocols = []
 # Native SMB2/3 client (pure Rust, async) - disabled by default
 smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes"]
 
+# Native S3 client (pure Rust, async) - disabled by default
+s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes"]
+
 # Full feature set
-full = ["zero-copy", "protocols", "smb-native"]
+full = ["zero-copy", "protocols", "smb-native", "s3-native"]

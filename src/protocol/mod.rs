@@ -4,11 +4,15 @@
  * Supports multiple storage backends:
  * - Local filesystem
  * - SMB/CIFS network shares (via native implementation in protocols::smb)
- * - Future: S3, Azure Blob, GCS
+ * - Amazon S3 and S3-compatible storage (MinIO, etc.)
+ * - Future: Azure Blob, GCS
  */
 
 pub mod local;
 pub mod uri;
+
+#[cfg(feature = "s3-native")]
+pub mod s3;
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -65,6 +69,13 @@ pub enum Protocol {
         password: Option<String>,
         domain: Option<String>,
     },
+    S3 {
+        bucket: String,
+        region: Option<String>,
+        endpoint: Option<String>,
+        access_key: Option<String>,
+        secret_key: Option<String>,
+    },
 }
 
 impl Protocol {
@@ -78,6 +89,22 @@ impl Protocol {
                 Err(crate::error::OrbitError::Config(
                     "SMB protocol requires smb-native feature. Use protocols::smb module directly.".to_string()
                 ))
+            }
+            Protocol::S3 { .. } => {
+                #[cfg(feature = "s3-native")]
+                {
+                    // S3 native implementation requires async context
+                    // For now, return an error directing to the s3 module
+                    Err(crate::error::OrbitError::Config(
+                        "S3 protocol requires s3-native feature and async context. Use protocols::s3 module directly.".to_string()
+                    ))
+                }
+                #[cfg(not(feature = "s3-native"))]
+                {
+                    Err(crate::error::OrbitError::Config(
+                        "S3 protocol requires s3-native feature. Rebuild with --features s3-native".to_string()
+                    ))
+                }
             }
         }
     }
@@ -117,5 +144,32 @@ mod tests {
         let protocol = Protocol::Local;
         let backend = protocol.create_backend();
         assert!(backend.is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "s3-native")]
+    fn test_s3_protocol_parsing() {
+        let (protocol, path) = Protocol::from_uri("s3://my-bucket/path/to/file.txt").unwrap();
+        match protocol {
+            Protocol::S3 { bucket, .. } => {
+                assert_eq!(bucket, "my-bucket");
+            }
+            _ => panic!("Expected S3 protocol"),
+        }
+        assert_eq!(path, PathBuf::from("/path/to/file.txt"));
+    }
+
+    #[test]
+    #[cfg(feature = "s3-native")]
+    fn test_s3_protocol_with_region() {
+        let (protocol, path) = Protocol::from_uri("s3://my-bucket/file.txt?region=us-west-2").unwrap();
+        match protocol {
+            Protocol::S3 { bucket, region, .. } => {
+                assert_eq!(bucket, "my-bucket");
+                assert_eq!(region, Some("us-west-2".to_string()));
+            }
+            _ => panic!("Expected S3 protocol"),
+        }
+        assert_eq!(path, PathBuf::from("/file.txt"));
     }
 }
