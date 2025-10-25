@@ -21,6 +21,10 @@ pub mod audit;
 pub mod protocol;
 pub mod manifest_integration;
 
+// Native SMB protocol support (feature-gated)
+#[cfg(feature = "smb-native")]
+pub mod protocols;
+
 // Manifest system modules (re-exported from workspace crates)
 pub use orbit_core_manifest as manifest;
 pub use orbit_core_starmap as starmap;
@@ -58,6 +62,46 @@ pub mod manifests {
     
     // Re-export integration helpers
     pub use crate::manifest_integration::{ManifestGenerator, should_generate_manifest};
+}
+
+// Native SMB protocol convenience exports (feature-gated)
+#[cfg(feature = "smb-native")]
+pub mod smb {
+    //! Native SMB2/3 protocol support
+    //!
+    //! Pure Rust, async SMB client for direct network share access without OS mounts.
+    //!
+    //! # Example
+    //!
+    //! ```no_run
+    //! # #[cfg(feature = "smb-native")]
+    //! # {
+    //! use orbit::smb::{SmbTarget, SmbAuth, SmbSecurity, client_for, Secret};
+    //!
+    //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    //! let target = SmbTarget {
+    //!     host: "fileserver".to_string(),
+    //!     share: "data".to_string(),
+    //!     subpath: "reports".to_string(),
+    //!     port: None,
+    //!     auth: SmbAuth::Ntlmv2 {
+    //!         username: "user".to_string(),
+    //!         password: Secret("pass".to_string()),
+    //!     },
+    //!     security: SmbSecurity::RequireEncryption,
+    //! };
+    //!
+    //! let mut client = client_for(&target).await?;
+    //! let data = client.read_file("Q4/report.pdf", None).await?;
+    //! # Ok(())
+    //! # }
+    //! # }
+    //! ```
+    
+    pub use crate::protocols::smb::{
+        SmbTarget, SmbAuth, SmbSecurity, SmbMetadata, SmbCapability,
+        SmbClient, SmbError, Secret, client_for,
+    };
 }
 
 /// Library version
@@ -108,5 +152,13 @@ mod tests {
         let caps = get_zero_copy_capabilities();
         
         assert_eq!(available, caps.available);
+    }
+    
+    #[cfg(feature = "smb-native")]
+    #[test]
+    fn test_smb_module_available() {
+        // Just verify the module is accessible when feature is enabled
+        use crate::smb::SmbSecurity;
+        let _ = SmbSecurity::Opportunistic;
     }
 }

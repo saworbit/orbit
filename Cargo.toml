@@ -60,10 +60,21 @@ clap_complete = "4.5"
 # Encoding
 hex = "0.4"
 
+# Logging/tracing
+tracing = "0.1"
+
 # Manifest system
 orbit-core-manifest = { path = "crates/core-manifest" }
 orbit-core-starmap = { path = "crates/core-starmap" }
 orbit-core-audit = { path = "crates/core-audit" }
+
+# SMB native dependencies (optional, feature-gated)
+bytes = { version = "1", optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"], optional = true }
+smb = { version = "0.10.2", optional = true, default-features = false, features = ["async", "encrypt_aesgcm", "encrypt_aesccm", "sign_hmac", "sign_gmac", "sign_cmac", "compress_lz4", "compress_pattern_v1", "std-fs-impls", "netbios-transport"] }
+async-trait = { version = "0.1", optional = true }
+bitflags = { version = "2", optional = true }
+zeroize = { version = "1", optional = true }
 
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -112,5 +123,8 @@ zero-copy = []
 # Protocol support (experimental)
 protocols = []
 
+# Native SMB2/3 client (pure Rust, async) - disabled by default
+smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes"]
+
 # Full feature set
-full = ["zero-copy", "protocols"]
+full = ["zero-copy", "protocols", "smb-native"]

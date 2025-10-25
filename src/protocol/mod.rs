@@ -3,12 +3,11 @@
  * 
  * Supports multiple storage backends:
  * - Local filesystem
- * - SMB/CIFS network shares
+ * - SMB/CIFS network shares (via native implementation in protocols::smb)
  * - Future: S3, Azure Blob, GCS
  */
 
 pub mod local;
-pub mod smb;
 pub mod uri;
 
 use std::io::{Read, Write};
@@ -73,14 +72,12 @@ impl Protocol {
     pub fn create_backend(&self) -> Result<Box<dyn StorageBackend>> {
         match self {
             Protocol::Local => Ok(Box::new(local::LocalBackend::new())),
-            Protocol::Smb { server, share, username, password, domain } => {
-                Ok(Box::new(smb::SmbBackend::new(
-                    server.clone(),
-                    share.clone(),
-                    username.clone(),
-                    password.clone(),
-                    domain.clone(),
-                )?))
+            Protocol::Smb { .. } => {
+                // SMB native implementation is in protocols::smb module
+                // This requires the smb-native feature flag
+                Err(crate::error::OrbitError::Config(
+                    "SMB protocol requires smb-native feature. Use protocols::smb module directly.".to_string()
+                ))
             }
         }
     }
@@ -103,7 +100,7 @@ mod tests {
     }
 
     #[test]
-    fn test_smb_protocol() {
+    fn test_smb_protocol_parsing() {
         let (protocol, path) = Protocol::from_uri("smb://server/share/path/file.txt").unwrap();
         match protocol {
             Protocol::Smb { server, share, .. } => {
@@ -113,5 +110,12 @@ mod tests {
             _ => panic!("Expected SMB protocol"),
         }
         assert_eq!(path, PathBuf::from("/path/file.txt"));
+    }
+    
+    #[test]
+    fn test_local_backend_creation() {
+        let protocol = Protocol::Local;
+        let backend = protocol.create_backend();
+        assert!(backend.is_ok());
     }
 }
