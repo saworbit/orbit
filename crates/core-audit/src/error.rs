@@ -20,15 +20,11 @@ pub enum Error {
 
     /// Invalid log path
     #[error("Invalid log path: {path}")]
-    InvalidPath {
-        path: PathBuf,
-    },
+    InvalidPath { path: PathBuf },
 
     /// Failed to create log file
     #[error("Failed to create log file: {path}")]
-    CreateFailed {
-        path: PathBuf,
-    },
+    CreateFailed { path: PathBuf },
 
     /// Failed to append to log
     #[error("Failed to append to log: {0}")]
@@ -36,16 +32,11 @@ pub enum Error {
 
     /// Log entry is invalid or corrupted
     #[error("Invalid log entry at line {line}: {reason}")]
-    InvalidEntry {
-        line: usize,
-        reason: String,
-    },
+    InvalidEntry { line: usize, reason: String },
 
     /// Missing required field in event
     #[error("Missing required field: {field}")]
-    MissingField {
-        field: String,
-    },
+    MissingField { field: String },
 
     /// Invalid event type
     #[error("Invalid event type: {0}")]
@@ -67,16 +58,12 @@ pub enum Error {
 impl Error {
     /// Create an invalid path error
     pub fn invalid_path<P: Into<PathBuf>>(path: P) -> Self {
-        Error::InvalidPath {
-            path: path.into(),
-        }
+        Error::InvalidPath { path: path.into() }
     }
 
     /// Create a create failed error
     pub fn create_failed<P: Into<PathBuf>>(path: P) -> Self {
-        Error::CreateFailed {
-            path: path.into(),
-        }
+        Error::CreateFailed { path: path.into() }
     }
 
     /// Create an append failed error

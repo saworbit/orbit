@@ -151,7 +151,7 @@ impl TelemetryLogger {
     /// Log a generic event
     pub fn log_event(&mut self, event: TelemetryEvent) -> Result<()> {
         let json = serde_json::to_string(&event)?;
-        
+
         let mut writer = self.writer.lock().unwrap();
         writeln!(writer, "{}", json)?;
         writer.flush()?; // Always flush for durability
@@ -315,7 +315,7 @@ pub fn parse_telemetry_log<P: AsRef<Path>>(path: P) -> Result<Vec<TelemetryEvent
 
         let event: TelemetryEvent = serde_json::from_str(line)
             .map_err(|e| Error::invalid_entry(line_num + 1, &e.to_string()))?;
-        
+
         events.push(event);
     }
 
@@ -344,8 +344,14 @@ mod tests {
     #[test]
     fn test_event_type_from_str() {
         assert_eq!(EventType::from_str("plan").unwrap(), EventType::Plan);
-        assert_eq!(EventType::from_str("job_start").unwrap(), EventType::JobStart);
-        assert_eq!(EventType::from_str("window_ok").unwrap(), EventType::WindowOk);
+        assert_eq!(
+            EventType::from_str("job_start").unwrap(),
+            EventType::JobStart
+        );
+        assert_eq!(
+            EventType::from_str("window_ok").unwrap(),
+            EventType::WindowOk
+        );
 
         let result = EventType::from_str("invalid");
         assert!(result.is_err());
@@ -379,7 +385,9 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         let mut logger = TelemetryLogger::new(temp_file.path()).unwrap();
 
-        logger.log_window_ok("job-123", "file.bin", 0, 16777216, 2).unwrap();
+        logger
+            .log_window_ok("job-123", "file.bin", 0, 16777216, 2)
+            .unwrap();
         logger.flush().unwrap();
 
         let events = parse_telemetry_log(temp_file.path()).unwrap();
@@ -396,7 +404,9 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         let mut logger = TelemetryLogger::new(temp_file.path()).unwrap();
 
-        logger.log_job_complete("job-123", "sha256:abc123", 5, 1024000).unwrap();
+        logger
+            .log_job_complete("job-123", "sha256:abc123", 5, 1024000)
+            .unwrap();
         logger.flush().unwrap();
 
         let events = parse_telemetry_log(temp_file.path()).unwrap();
@@ -413,8 +423,12 @@ mod tests {
 
         logger.log_job_start("job-123", 2, 8192).unwrap();
         logger.log_file_start("job-123", "file1.bin", 4096).unwrap();
-        logger.log_window_ok("job-123", "file1.bin", 0, 4096, 0).unwrap();
-        logger.log_job_complete("job-123", "sha256:final", 2, 8192).unwrap();
+        logger
+            .log_window_ok("job-123", "file1.bin", 0, 4096, 0)
+            .unwrap();
+        logger
+            .log_job_complete("job-123", "sha256:final", 2, 8192)
+            .unwrap();
         logger.flush().unwrap();
 
         let events = parse_telemetry_log(temp_file.path()).unwrap();
@@ -439,12 +453,17 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         let mut logger = TelemetryLogger::new(temp_file.path()).unwrap();
 
-        logger.log_custom("job-123", "Custom checkpoint reached").unwrap();
+        logger
+            .log_custom("job-123", "Custom checkpoint reached")
+            .unwrap();
         logger.flush().unwrap();
 
         let events = parse_telemetry_log(temp_file.path()).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].event, EventType::Custom);
-        assert_eq!(events[0].message, Some("Custom checkpoint reached".to_string()));
+        assert_eq!(
+            events[0].message,
+            Some("Custom checkpoint reached".to_string())
+        );
     }
 }

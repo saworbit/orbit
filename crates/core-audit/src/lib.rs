@@ -49,14 +49,14 @@
 //! logger.log_job_complete("job-123", "sha256:abc123", 3, 1024000).unwrap();
 //! ```
 
+pub mod beacon;
 pub mod error;
 pub mod telemetry;
-pub mod beacon;
 
 // Re-export main types
-pub use error::{Error, Result};
-pub use telemetry::{TelemetryLogger, TelemetryEvent, EventType};
 pub use beacon::{Beacon, BeaconBuilder};
+pub use error::{Error, Result};
+pub use telemetry::{EventType, TelemetryEvent, TelemetryLogger};
 
 #[cfg(test)]
 mod tests {
