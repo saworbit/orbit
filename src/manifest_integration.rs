@@ -26,6 +26,8 @@ pub struct ManifestGenerator {
     flight_plan: FlightPlan,
     /// Telemetry logger
     telemetry: TelemetryLogger,
+    /// Total bytes processed across all files
+    total_bytes: u64,
 }
 
 impl ManifestGenerator {
@@ -72,6 +74,7 @@ impl ManifestGenerator {
             chunking_strategy: config.chunking_strategy.clone(),
             flight_plan,
             telemetry,
+            total_bytes: 0,
         })
     }
 
@@ -89,6 +92,9 @@ impl ManifestGenerator {
         let metadata = file.metadata()
             .map_err(|e| OrbitError::Io(e))?;
         let file_size = metadata.len();
+
+        // Accumulate total bytes
+        self.total_bytes += file_size;
 
         // Log file start
         self.telemetry
@@ -180,11 +186,10 @@ impl ManifestGenerator {
         self.flight_plan.save(&flight_plan_path)
             .map_err(|e| OrbitError::Other(format!("Failed to save flight plan: {}", e)))?;
 
-        // Log job completion
+        // Log job completion with accumulated total bytes
         let file_count = self.flight_plan.files.len() as u32;
-        let total_bytes: u64 = 0; // TODO: Calculate from manifests
         self.telemetry
-            .log_job_complete(&self.job_id, job_digest, file_count, total_bytes)
+            .log_job_complete(&self.job_id, job_digest, file_count, self.total_bytes)
             .map_err(|e| OrbitError::Other(format!("Telemetry error: {}", e)))?;
 
         Ok(())
@@ -194,7 +199,7 @@ impl ManifestGenerator {
     fn chunk_file(
         &self,
         file: &mut File,
-        _file_size: u64,
+        file_size: u64,
     ) -> Result<(Vec<ChunkMeta>, Vec<InternalWindowMeta>)> {
         let chunk_size = match &self.chunking_strategy {
             ChunkingStrategy::Cdc { avg_kib, .. } => (*avg_kib as usize) * 1024,
@@ -228,6 +233,14 @@ impl ManifestGenerator {
             });
 
             offset += bytes_read as u64;
+        }
+
+        // Validate that we read the expected amount
+        if offset != file_size {
+            return Err(OrbitError::Other(format!(
+                "File size mismatch: expected {} bytes, read {} bytes",
+                file_size, offset
+            )));
         }
 
         // Create windows (64 chunks per window, 4 chunk overlap)
