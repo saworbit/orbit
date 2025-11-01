@@ -20,6 +20,8 @@ pub mod stats;
 pub mod audit;
 pub mod protocol;
 pub mod manifest_integration;
+pub mod telemetry;
+pub mod cli_progress;
 
 // Native SMB protocol support (feature-gated)
 #[cfg(feature = "smb-native")]
