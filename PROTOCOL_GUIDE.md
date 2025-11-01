@@ -15,7 +15,7 @@ protocol://[credentials@]location/path
 This enables seamless copying between:
 - Local filesystems
 - Network shares (SMB/CIFS)
-- Cloud storage (coming soon: S3, Azure Blob, GCS)
+- Cloud storage (S3 available now, Azure Blob and GCS coming soon)
 
 ---
 
@@ -93,24 +93,58 @@ orbit -s smb://server/projects/data -d /backup/data -R
 
 ---
 
-### 🔮 Cloud Protocols (Planned)
+### ✅ Amazon S3 (Available in v0.4.0)
 
-#### Amazon S3 (v0.4.1)
-```bash
-orbit -s s3://bucket/key -d ./local-file.txt
-orbit -s ./file.txt -d s3://bucket/prefix/file.txt
+**Protocol:** `s3://`
+
+**Status:** Production-ready (feature flag: `s3-native`)
+
+**URI Format:**
+```
+s3://bucket/path/to/object
 ```
 
-#### Azure Blob Storage (v0.4.1)
+**Examples:**
 ```bash
-orbit -s azure://account/container/blob -d ./file.txt
-orbit -s ./file.txt -d azure://account/container/blob
+# Upload to S3
+orbit --source ./local-file.txt --dest s3://my-bucket/backups/file.txt
+
+# Download from S3
+orbit --source s3://my-bucket/data/report.pdf --dest ./report.pdf
+
+# Sync directory to S3
+orbit --source /local/photos --dest s3://my-bucket/photos/ \
+  --mode sync --recursive --compress zstd:5
+
+# Use with MinIO or S3-compatible storage
+export S3_ENDPOINT=http://localhost:9000
+orbit --source file.txt --dest s3://my-bucket/file.txt
+```
+
+**Features:**
+- ✅ Multipart upload/download for large files
+- ✅ Resumable transfers with checkpoints
+- ✅ Parallel chunk transfers
+- ✅ S3-compatible services (MinIO, LocalStack, DigitalOcean Spaces)
+- ✅ Flexible authentication (env vars, credentials file, IAM roles)
+- ✅ Server-side encryption support
+
+**Configuration:** See [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md) for complete setup guide.
+
+---
+
+### 🔮 Cloud Protocols (Planned)
+
+#### Azure Blob Storage (v0.5.0)
+```bash
+orbit --source azure://account/container/blob --dest ./file.txt
+orbit --source ./file.txt --dest azure://account/container/blob
 ```
 
 #### Google Cloud Storage (v0.5.0)
 ```bash
-orbit -s gs://bucket/object -d ./file.txt
-orbit -s ./file.txt -d gs://bucket/object
+orbit --source gs://bucket/object --dest ./file.txt
+orbit --source ./file.txt --dest gs://bucket/object
 ```
 
 ---

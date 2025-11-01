@@ -74,7 +74,9 @@ protocol = "smb-native"
 
 ### Execute
 ```bash
-orbit run --manifest orbit.manifest.toml
+# Manifest execution via subcommand
+orbit manifest plan --source /data/source --dest /mnt/backup --output ./manifests
+orbit manifest verify --manifest-dir ./manifests
 ```
 
 ### 🔭 Starmap Features
@@ -102,29 +104,27 @@ Orbit supports multiple storage backends through a unified protocol abstraction 
 
 **\*SMB Status:** Implementation complete (~1,900 lines) but blocked by upstream dependency conflict. See [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md) for details.
 
-### 🆕 S3 Cloud Storage (v0.5.0)
+### 🆕 S3 Cloud Storage (v0.4.0)
 
 Transfer files seamlessly to AWS S3 and S3-compatible storage services:
 
 ```bash
 # Upload to S3
-orbit cp /local/dataset.tar.gz s3://my-bucket/backups/dataset.tar.gz
+orbit --source /local/dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz
 
 # Download from S3
-orbit cp s3://my-bucket/data/report.pdf ./report.pdf
+orbit --source s3://my-bucket/data/report.pdf --dest ./report.pdf
 
 # Sync directory to S3 with compression
-orbit sync /local/photos s3://my-bucket/photos/ --compress zstd:5
+orbit --source /local/photos --dest s3://my-bucket/photos/ \
+  --mode sync --compress zstd:5 --recursive
 
 # Use with MinIO
 export S3_ENDPOINT=http://localhost:9000
-orbit cp file.txt s3://my-bucket/file.txt
-
-# With specific region and storage class
-orbit cp large-archive.tar s3://archive-bucket/2025/backup.tar \
-  --region us-west-2 \
-  --storage-class GLACIER_FLEXIBLE_RETRIEVAL
+orbit --source file.txt --dest s3://my-bucket/file.txt
 ```
+
+**Note:** S3-specific flags (`--region`, `--storage-class`) are planned for v0.6.0. Currently configure via environment variables or configuration file.
 
 **S3 Features:**
 - ✅ Pure Rust (no AWS CLI dependency)
@@ -163,16 +163,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### SMB/CIFS Network Shares
 ```bash
 # Copy to SMB share (when available)
-orbit cp /local/file.txt smb://user:pass@server/share/file.txt
+orbit --source /local/file.txt --dest smb://user:pass@server/share/file.txt
 
 # Sync directories over SMB
-orbit sync /local/data smb://server/backup --resume --parallel 4
-
-# With authentication
-orbit cp file.txt smb://fileserver/projects/ \
-  --smb-user admin \
-  --smb-domain CORP
+orbit --source /local/data --dest smb://server/backup \
+  --mode sync --resume --parallel 4 --recursive
 ```
+
+**Note:** SMB-specific flags (`--smb-user`, `--smb-domain`) are planned for future releases. Currently embed credentials in URI or use configuration file.
 
 **SMB Features:**
 - Pure Rust (no libsmbclient dependency)
@@ -241,6 +239,26 @@ Every operation emits structured audit events for full observability.
 
 ---
 
+## 📖 CLI Quick Reference
+
+**Current syntax (v0.4.0):**
+```bash
+orbit --source <PATH> --dest <PATH> [FLAGS]
+orbit manifest <plan|verify|diff|info> [OPTIONS]
+orbit <stats|presets|capabilities>
+```
+
+**Planned syntax (v0.6.0+):**
+```bash
+orbit cp <SOURCE> <DEST> [FLAGS]          # Friendly alias
+orbit sync <SOURCE> <DEST> [FLAGS]        # Sync mode alias
+orbit run --manifest <FILE>               # Execute manifest
+```
+
+> **Note:** The current release uses flag-based syntax. User-friendly subcommands like `cp` and `sync` are planned for v0.6.0.
+
+---
+
 ## 🚀 Quick Start
 
 ### Install
@@ -261,22 +279,22 @@ sudo cp target/release/orbit /usr/local/bin/
 ### Basic Usage
 ```bash
 # Simple copy
-orbit cp source.txt destination.txt
+orbit --source source.txt --dest destination.txt
 
-# Copy with resume and checksum
-orbit cp large-file.iso /backup/ --resume --checksum sha256
+# Copy with resume and checksum verification (checksum is enabled by default)
+orbit --source large-file.iso --dest /backup/large-file.iso --resume
 
 # Recursive directory copy with compression
-orbit cp /data/photos /backup/photos -R --compress zstd:5
+orbit --source /data/photos --dest /backup/photos --recursive --compress zstd:5
 
 # Sync with parallel transfers
-orbit sync /source /destination --parallel 8 --mode sync
+orbit --source /source --dest /destination --mode sync --parallel 8 --recursive
 
 # Upload to S3
-orbit cp dataset.tar.gz s3://my-bucket/backups/
+orbit --source dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz
 
-# Run manifest
-orbit run --manifest my-jobs.toml
+# Create flight plan manifest
+orbit manifest plan --source /data --dest /backup --output ./manifests
 ```
 
 ---
@@ -318,23 +336,17 @@ This structure ensures isolation, testability, and reusability.
 
 ## 🕵️ Watcher / Beacon
 
-A companion service that monitors Orbit runtime health:
-```bash
-# Check transfer status
-orbit watcher --status
+**Status:** 🚧 Planned for v0.6.0+
 
-# Monitor for stalls
-orbit watcher --alert-on-stall 300s
+A companion service that will monitor Orbit runtime health:
 
-# Export metrics
-orbit watcher --metrics-port 9090
-```
+**Planned Features:**
+- Detect stalled transfers
+- Track telemetry and throughput
+- Trigger recovery actions
+- Prometheus-compatible metrics export
 
-Features:
-- Detects stalled transfers
-- Tracks telemetry and throughput
-- Triggers recovery actions
-- Prometheus-compatible metrics
+This feature is currently in the design phase. See the [roadmap](#-roadmap) for details.
 
 ---
 
@@ -398,17 +410,19 @@ max_retries = 5
 ### Cloud Data Lake Ingestion
 ```bash
 # Upload analytics data to S3
-orbit cp /data/analytics/*.parquet s3://data-lake/raw/2025/ \
-  --storage-class INTELLIGENT_TIERING \
+orbit --source /data/analytics --dest s3://data-lake/raw/2025/ \
+  --recursive \
   --parallel 16 \
   --compress zstd:3
 ```
 
-Benefits: Cost optimization, parallel uploads, compression, checksums
+Benefits: Parallel uploads, compression, checksums (storage class via config file)
 
 ### Enterprise Backup
 ```bash
-orbit run --manifest backup.toml --audit /var/log/backup_audit.log
+# Use manifest system for complex backup jobs
+orbit manifest plan --source /data --dest /backup --output ./manifests
+orbit manifest verify --manifest-dir ./manifests
 ```
 
 Benefits: Resume, checksums, parallel jobs, full audit trail
@@ -416,31 +430,32 @@ Benefits: Resume, checksums, parallel jobs, full audit trail
 ### Hybrid Cloud Migration
 ```bash
 # Migrate local storage to S3
-orbit sync /on-prem/data s3://migration-bucket/data \
+orbit --source /on-prem/data --dest s3://migration-bucket/data \
+  --mode sync \
+  --recursive \
   --resume \
-  --parallel 12 \
-  --storage-class STANDARD_IA
+  --parallel 12
 ```
 
-Benefits: Resumable, parallel, cost-optimized storage class
-
-### Remote Development
-```bash
-orbit sync ./local-project user@remote:/project --watch --compress lz4
-```
-
-Benefits: Fast incremental sync, compression, file watching
+Benefits: Resumable, parallel transfers (storage class via config file)
 
 ### Data Migration
 ```bash
-orbit cp /old-storage /new-storage -R --parallel 16 --verify
+orbit --source /old-storage --dest /new-storage \
+  --recursive \
+  --parallel 16 \
+  --show-progress
 ```
 
-Benefits: Parallel streams, verification, progress tracking
+Benefits: Parallel streams, verification enabled by default, progress tracking
 
 ### Network Shares
 ```bash
-orbit sync /local/files smb://nas/backup --resume --retry 10
+orbit --source /local/files --dest smb://nas/backup \
+  --mode sync \
+  --recursive \
+  --resume \
+  --retry-attempts 10
 ```
 
 Benefits: Native SMB, automatic resume, exponential backoff
@@ -449,7 +464,7 @@ Benefits: Native SMB, automatic resume, exponential backoff
 
 ## 🧪 Roadmap
 
-### ✅ Completed (v0.5.0)
+### ✅ Completed (v0.4.0)
 
 - Zero-copy and compression engines
 - Manifest + Starmap + Audit integration
@@ -460,7 +475,7 @@ Benefits: Native SMB, automatic resume, exponential backoff
 - S3-compatible storage (MinIO, LocalStack)
 - SMB2/3 native implementation (awaiting upstream fix)
 
-### 🧠 In Progress (v0.5.1)
+### 🧠 In Progress (v0.4.1)
 
 - S3 object versioning support
 - S3 batch operations
@@ -470,9 +485,18 @@ Benefits: Native SMB, automatic resume, exponential backoff
 
 ### 🚧 Planned (v0.6.0+)
 
+#### CLI Improvements
+- Friendly subcommands (`orbit cp`, `orbit sync`, `orbit run`) as aliases
+- Protocol-specific flags (`--smb-user`, `--region`, `--storage-class`)
+- File watching mode (`--watch`)
+- Watcher component for monitoring transfer health
+
+#### New Protocols
 - Azure Blob Storage connector
 - Google Cloud Storage (GCS)
 - WebDAV protocol support
+
+#### Advanced Features
 - Wormhole FEC module for lossy networks
 - REST orchestration API
 - Job scheduler with cron-like syntax

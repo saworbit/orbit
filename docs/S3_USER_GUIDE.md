@@ -1,14 +1,14 @@
 # S3 Integration Guide
 
-**Version:** v0.5.0  
-**Status:** Production Ready  
-**Last Updated:** October 25, 2025
+**Version:** v0.4.0
+**Status:** Production Ready
+**Last Updated:** November 1, 2025
 
 ---
 
 ## Overview
 
-Orbit v0.5.0 introduces native AWS S3 support, enabling seamless file transfers between local storage and S3 buckets. The implementation is pure Rust, async-first, and designed for high-performance data transfers with built-in resilience features.
+Orbit v0.4.0 introduces native AWS S3 support, enabling seamless file transfers between local storage and S3 buckets. The implementation is pure Rust, async-first, and designed for high-performance data transfers with built-in resilience features.
 
 ### Key Features
 
@@ -37,7 +37,7 @@ Or add to your `Cargo.toml` if using Orbit as a library:
 
 ```toml
 [dependencies]
-orbit = { version = "0.5", features = ["s3-native"] }
+orbit = { version = "0.4", features = ["s3-native"] }
 ```
 
 ### System Requirements
@@ -684,7 +684,7 @@ for entry in WalkDir::new("/data/to/migrate") {
 
 ## Roadmap
 
-### Planned Features (v0.5.1+)
+### Planned Features (v0.4.1+)
 
 - [ ] Object versioning support
 - [ ] S3 Select queries
