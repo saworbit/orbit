@@ -92,6 +92,32 @@ pub enum ProgressEvent {
         duration_ms: u64,
         timestamp: u64,
     },
+
+    /// Resume decision made for interrupted transfer
+    ResumeDecision {
+        file_id: FileId,
+        decision: String,
+        from_offset: u64,
+        verified_chunks: usize,
+        reason: Option<String>,
+        timestamp: u64,
+    },
+
+    /// Chunk verification started
+    ChunkVerification {
+        file_id: FileId,
+        chunk_id: u32,
+        chunk_size: u64,
+        timestamp: u64,
+    },
+
+    /// Chunk verified successfully
+    ChunkVerified {
+        file_id: FileId,
+        chunk_id: u32,
+        digest: String,
+        timestamp: u64,
+    },
 }
 
 impl ProgressEvent {

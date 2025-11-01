@@ -66,6 +66,26 @@ pub enum TelemetryEvent {
         avg_throughput_mbps: f64,
         timestamp: u64,
     },
+    ResumeDecision {
+        file_id: String,
+        decision: String,
+        from_offset: u64,
+        verified_chunks: usize,
+        reason: Option<String>,
+        timestamp: u64,
+    },
+    ChunkVerification {
+        file_id: String,
+        chunk_id: u32,
+        chunk_size: u64,
+        timestamp: u64,
+    },
+    ChunkVerified {
+        file_id: String,
+        chunk_id: u32,
+        digest: String,
+        timestamp: u64,
+    },
 }
 
 impl TelemetryEvent {
@@ -150,6 +170,32 @@ impl TelemetryEvent {
                     total_bytes,
                     duration_ms,
                     avg_throughput_mbps,
+                    timestamp,
+                }
+            }
+            ProgressEvent::ResumeDecision { file_id, decision, from_offset, verified_chunks, reason, timestamp } => {
+                TelemetryEvent::ResumeDecision {
+                    file_id: file_id.as_str().to_string(),
+                    decision,
+                    from_offset,
+                    verified_chunks,
+                    reason,
+                    timestamp,
+                }
+            }
+            ProgressEvent::ChunkVerification { file_id, chunk_id, chunk_size, timestamp } => {
+                TelemetryEvent::ChunkVerification {
+                    file_id: file_id.as_str().to_string(),
+                    chunk_id,
+                    chunk_size,
+                    timestamp,
+                }
+            }
+            ProgressEvent::ChunkVerified { file_id, chunk_id, digest, timestamp } => {
+                TelemetryEvent::ChunkVerified {
+                    file_id: file_id.as_str().to_string(),
+                    chunk_id,
+                    digest,
                     timestamp,
                 }
             }

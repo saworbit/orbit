@@ -187,6 +187,32 @@ impl CliProgressRenderer {
                     throughput_mbps
                 );
             }
+
+            ProgressEvent::ResumeDecision { file_id, decision, from_offset, verified_chunks, reason, .. } => {
+                if self.verbose {
+                    println!("\n🔄 Resume Decision for {}: {}", file_id.as_str(), decision);
+                    if from_offset > 0 {
+                        println!("   Offset: {} ({} chunks verified)",
+                            format_bytes(from_offset), verified_chunks);
+                    }
+                    if let Some(r) = reason {
+                        println!("   Reason: {}", r);
+                    }
+                }
+            }
+
+            ProgressEvent::ChunkVerification { file_id, chunk_id, chunk_size, .. } => {
+                if self.verbose {
+                    print!("\r   Verifying chunk {}: {}", chunk_id, format_bytes(chunk_size));
+                    io::stdout().flush()?;
+                }
+            }
+
+            ProgressEvent::ChunkVerified { file_id, chunk_id, digest, .. } => {
+                if self.verbose {
+                    println!("\r   ✓ Chunk {} verified: {}", chunk_id, &digest[..16]);
+                }
+            }
         }
 
         Ok(())
