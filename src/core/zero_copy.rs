@@ -119,7 +119,17 @@ pub fn same_filesystem(path1: &Path, path2: &Path) -> io::Result<bool> {
     {
         use std::os::unix::fs::MetadataExt;
         let meta1 = std::fs::metadata(path1)?;
-        let meta2 = std::fs::metadata(path2)?;
+        let meta2 = match std::fs::metadata(path2) {
+            Ok(meta) => meta,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                if let Some(parent) = path2.parent() {
+                    std::fs::metadata(parent)?
+                } else {
+                    return Ok(false);
+                }
+            }
+            Err(e) => return Err(e),
+        };
         Ok(meta1.dev() == meta2.dev())
     }
     

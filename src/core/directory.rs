@@ -2,6 +2,7 @@
  * Directory copy operations with parallel processing support
  */
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -11,10 +12,11 @@ use crossbeam_channel::bounded;
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
-use crate::config::{CopyConfig, SymlinkMode};
-use crate::error::{OrbitError, Result};
-use super::CopyStats;
 use super::metadata::preserve_metadata;
+use super::validation::matches_exclude_pattern;
+use super::CopyStats;
+use crate::config::{CopyConfig, CopyMode, SymlinkMode};
+use crate::error::{OrbitError, Result};
 
 /// Work item for parallel processing
 #[derive(Clone)]
@@ -24,7 +26,7 @@ struct WorkItem {
     entry_type: EntryType,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum EntryType {
     Directory,
     File,
@@ -68,6 +70,7 @@ pub fn copy_directory(
     let source_dir = source_dir.to_path_buf();
     let dest_dir = dest_dir.to_path_buf();
     let total_stats = Arc::new(Mutex::new(CopyStats::new()));
+    let expected_entries = Arc::new(Mutex::new(HashSet::new()));
 
     println!("Scanning and copying directory tree...");
 
@@ -76,20 +79,15 @@ pub fn copy_directory(
         let source_dir = source_dir.clone();
         let dest_dir = dest_dir.clone();
         let config = config.clone();
+        let expected_entries = expected_entries.clone();
 
         thread::spawn(move || -> Result<()> {
-            produce_work_items(&source_dir, &dest_dir, &config, tx)
+            produce_work_items(&source_dir, &dest_dir, &config, tx, expected_entries)
         })
     };
 
     // Consumer: process work items (files) in parallel or sequentially
-    consume_work_items(
-        &source_dir,
-        &dest_dir,
-        config,
-        rx,
-        total_stats.clone(),
-    )?;
+    consume_work_items(&source_dir, &dest_dir, config, rx, total_stats.clone())?;
 
     // Wait for producer to finish and check for errors
     match producer_handle.join() {
@@ -109,6 +107,21 @@ pub fn copy_directory(
         Err(arc) => arc.lock().unwrap().clone(),
     };
 
+    let mut deleted_count = 0;
+    if config.copy_mode == CopyMode::Mirror {
+        match collect_deletion_candidates(&dest_dir, &expected_entries, config) {
+            Ok(deletions) => {
+                let summary = apply_deletions(&deletions, config);
+                deleted_count = summary.deleted as u64;
+                final_stats.files_failed += summary.failed as u64;
+            }
+            Err(e) => {
+                eprintln!("Failed to scan destination for deletions: {}", e);
+                final_stats.files_failed += 1;
+            }
+        }
+    }
+
     final_stats.duration = start_time.elapsed();
 
     println!("\nDirectory copy completed:");
@@ -117,11 +130,15 @@ pub fn copy_directory(
     println!("  Files failed: {}", final_stats.files_failed);
     println!("  Total bytes: {}", final_stats.bytes_copied);
     println!("  Duration: {:?}", final_stats.duration);
+    if config.copy_mode == CopyMode::Mirror {
+        println!("  Files deleted: {}", deleted_count);
+    }
 
     if final_stats.files_failed > 0 {
-        return Err(OrbitError::Parallel(
-            format!("{} files failed to copy", final_stats.files_failed)
-        ));
+        return Err(OrbitError::Parallel(format!(
+            "{} files failed to copy",
+            final_stats.files_failed
+        )));
     }
 
     Ok(final_stats)
@@ -133,16 +150,18 @@ fn produce_work_items(
     dest_dir: &Path,
     config: &CopyConfig,
     tx: crossbeam_channel::Sender<WorkItem>,
+    expected_entries: Arc<Mutex<HashSet<PathBuf>>>,
 ) -> Result<()> {
-    let walker = WalkDir::new(source_dir)
+    let mut walker = WalkDir::new(source_dir)
         .follow_links(false)
-        .same_file_system(true);
+        .same_file_system(true)
+        .into_iter();
 
     // Process in batches for better cache locality and reduced syscalls
     let mut dir_batch = Vec::with_capacity(100);
     let mut file_batch = Vec::with_capacity(100);
 
-    for entry in walker {
+    while let Some(entry) = walker.next() {
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
@@ -154,10 +173,24 @@ fn produce_work_items(
         let relative_path = match entry.path().strip_prefix(source_dir) {
             Ok(p) => p,
             Err(_) => {
-                eprintln!("Warning: Failed to compute relative path for {:?}", entry.path());
+                eprintln!(
+                    "Warning: Failed to compute relative path for {:?}",
+                    entry.path()
+                );
                 continue;
             }
         };
+
+        if relative_path.as_os_str().is_empty() {
+            continue;
+        }
+
+        if matches_exclude_pattern(relative_path, &config.exclude_patterns) {
+            if entry.file_type().is_dir() {
+                walker.skip_current_dir();
+            }
+            continue;
+        }
 
         let dest_path = dest_dir.join(relative_path);
         let source_path = entry.path().to_path_buf();
@@ -177,6 +210,10 @@ fn produce_work_items(
             dest_path,
             entry_type: entry_type.clone(),
         };
+
+        if let Ok(mut expected) = expected_entries.lock() {
+            expected.insert(relative_path.to_path_buf());
+        }
 
         // Batch directories and files separately
         match entry_type {
@@ -203,6 +240,118 @@ fn produce_work_items(
     Ok(())
 }
 
+#[derive(Debug)]
+struct DeletionItem {
+    path: PathBuf,
+    entry_type: EntryType,
+}
+
+#[derive(Default)]
+struct DeletionSummary {
+    deleted: usize,
+    failed: usize,
+}
+
+fn collect_deletion_candidates(
+    dest_dir: &Path,
+    expected_entries: &Arc<Mutex<HashSet<PathBuf>>>,
+    config: &CopyConfig,
+) -> Result<Vec<DeletionItem>> {
+    let expected: HashSet<PathBuf> = expected_entries.lock().unwrap().iter().cloned().collect();
+    let mut deletions = Vec::new();
+    let mut walker = WalkDir::new(dest_dir)
+        .follow_links(false)
+        .same_file_system(true)
+        .contents_first(true)
+        .into_iter();
+
+    while let Some(entry) = walker.next() {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("Warning: Failed to read destination entry: {}", e);
+                continue;
+            }
+        };
+
+        if entry.depth() == 0 {
+            continue;
+        }
+
+        let relative_path = match entry.path().strip_prefix(dest_dir) {
+            Ok(p) => p,
+            Err(_) => {
+                eprintln!(
+                    "Warning: Failed to compute relative destination path for {:?}",
+                    entry.path()
+                );
+                continue;
+            }
+        };
+
+        if matches_exclude_pattern(relative_path, &config.exclude_patterns) {
+            if entry.file_type().is_dir() {
+                walker.skip_current_dir();
+            }
+            continue;
+        }
+
+        if entry.file_type().is_symlink() && config.symlink_mode == SymlinkMode::Skip {
+            continue;
+        }
+
+        if expected.contains(relative_path) {
+            continue;
+        }
+
+        let entry_type = if entry.file_type().is_dir() {
+            EntryType::Directory
+        } else if entry.file_type().is_symlink() {
+            EntryType::Symlink
+        } else if entry.file_type().is_file() {
+            EntryType::File
+        } else {
+            continue;
+        };
+
+        deletions.push(DeletionItem {
+            path: entry.path().to_path_buf(),
+            entry_type,
+        });
+    }
+
+    Ok(deletions)
+}
+
+fn apply_deletions(deletions: &[DeletionItem], config: &CopyConfig) -> DeletionSummary {
+    let mut summary = DeletionSummary::default();
+
+    for item in deletions {
+        if config.dry_run {
+            println!("Would delete: {:?}", item.path);
+            summary.deleted += 1;
+            continue;
+        }
+
+        let result = match item.entry_type {
+            EntryType::Directory => std::fs::remove_dir_all(&item.path),
+            EntryType::File | EntryType::Symlink => std::fs::remove_file(&item.path),
+        };
+
+        match result {
+            Ok(_) => {
+                summary.deleted += 1;
+            }
+            Err(e) => {
+                eprintln!("Failed to delete {:?}: {}", item.path, e);
+                summary.failed += 1;
+            }
+        }
+    }
+
+    summary
+}
+
 /// Flush directory batch - create directories sequentially before files
 fn flush_directory_batch(
     batch: &mut Vec<WorkItem>,
@@ -215,8 +364,10 @@ fn flush_directory_batch(
 
         if config.preserve_metadata {
             if let Err(e) = preserve_metadata(&item.source_path, &item.dest_path) {
-                eprintln!("Warning: Failed to preserve directory metadata for {:?}: {}",
-                    item.dest_path, e);
+                eprintln!(
+                    "Warning: Failed to preserve directory metadata for {:?}: {}",
+                    item.dest_path, e
+                );
             }
         }
     }
@@ -255,7 +406,8 @@ fn consume_work_items(
 
         pool.install(|| {
             rx.into_iter().par_bridge().for_each(|item| {
-                if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats) {
+                if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats)
+                {
                     eprintln!("Error copying {:?}: {}", item.source_path, e);
                     if let Ok(mut stats) = total_stats.lock() {
                         stats.files_failed += 1;
@@ -292,7 +444,12 @@ fn process_work_item(
             return Ok(());
         }
         EntryType::Symlink => {
-            handle_symlink(&item.source_path, &item.dest_path, config.symlink_mode, config)?;
+            handle_symlink(
+                &item.source_path,
+                &item.dest_path,
+                config.symlink_mode,
+                config,
+            )?;
             CopyStats {
                 bytes_copied: 0,
                 duration: Duration::ZERO,
@@ -303,9 +460,7 @@ fn process_work_item(
                 files_failed: 0,
             }
         }
-        EntryType::File => {
-            super::copy_file(&item.source_path, &item.dest_path, config)?
-        }
+        EntryType::File => super::copy_file(&item.source_path, &item.dest_path, config)?
     };
 
     // Update total stats atomically
@@ -319,7 +474,12 @@ fn process_work_item(
 }
 
 /// Handle symbolic link based on mode
-fn handle_symlink(source_path: &Path, dest_path: &Path, mode: SymlinkMode, config: &CopyConfig) -> Result<()> {
+fn handle_symlink(
+    source_path: &Path,
+    dest_path: &Path,
+    mode: SymlinkMode,
+    config: &CopyConfig,
+) -> Result<()> {
     match mode {
         SymlinkMode::Skip => {
             println!("Skipping symlink: {:?}", source_path);
@@ -330,7 +490,8 @@ fn handle_symlink(source_path: &Path, dest_path: &Path, mode: SymlinkMode, confi
             let resolved = if target.is_absolute() {
                 target
             } else {
-                source_path.parent()
+                source_path
+                    .parent()
                     .unwrap_or_else(|| Path::new("."))
                     .join(target)
             };
@@ -350,8 +511,7 @@ fn handle_symlink(source_path: &Path, dest_path: &Path, mode: SymlinkMode, confi
 /// Create a symbolic link (cross-platform)
 #[cfg(unix)]
 fn create_symlink(target: &Path, link_path: &Path) -> Result<()> {
-    std::os::unix::fs::symlink(target, link_path)
-        .map_err(|e| OrbitError::Symlink(e.to_string()))
+    std::os::unix::fs::symlink(target, link_path).map_err(|e| OrbitError::Symlink(e.to_string()))
 }
 
 #[cfg(windows)]
@@ -362,5 +522,100 @@ fn create_symlink(target: &Path, link_path: &Path) -> Result<()> {
     } else {
         std::os::windows::fs::symlink_dir(target, link_path)
             .map_err(|e| OrbitError::Symlink(e.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn mirror_config() -> CopyConfig {
+        CopyConfig {
+            copy_mode: CopyMode::Mirror,
+            recursive: true,
+            show_progress: false,
+            ..CopyConfig::default()
+        }
+    }
+
+    #[test]
+    fn collect_deletion_candidates_flags_extras() {
+        let temp = TempDir::new().unwrap();
+        let dest_dir = temp.path();
+
+        std::fs::create_dir_all(dest_dir).unwrap();
+        std::fs::write(dest_dir.join("keep.txt"), b"keep").unwrap();
+        std::fs::write(dest_dir.join("extra.txt"), b"extra").unwrap();
+
+        let expected = Arc::new(Mutex::new(HashSet::new()));
+        expected.lock().unwrap().insert(PathBuf::from("keep.txt"));
+
+        let config = mirror_config();
+        let deletions = collect_deletion_candidates(dest_dir, &expected, &config).unwrap();
+
+        assert_eq!(deletions.len(), 1);
+        assert_eq!(deletions[0].path, dest_dir.join("extra.txt"));
+        assert!(matches!(deletions[0].entry_type, EntryType::File));
+    }
+
+    #[test]
+    fn collect_deletion_candidates_respects_excludes() {
+        let temp = TempDir::new().unwrap();
+        let dest_dir = temp.path();
+
+        std::fs::create_dir_all(dest_dir).unwrap();
+        std::fs::write(dest_dir.join("skip.log"), b"log").unwrap();
+
+        let expected = Arc::new(Mutex::new(HashSet::new()));
+
+        let mut config = mirror_config();
+        config.exclude_patterns = vec!["*.log".to_string()];
+
+        let deletions = collect_deletion_candidates(dest_dir, &expected, &config).unwrap();
+
+        assert!(deletions.is_empty());
+    }
+
+    #[test]
+    fn apply_deletions_removes_files() {
+        let temp = TempDir::new().unwrap();
+        let dest_dir = temp.path();
+
+        std::fs::create_dir_all(dest_dir).unwrap();
+        let victim = dest_dir.join("victim.txt");
+        std::fs::write(&victim, b"bye").unwrap();
+
+        let deletions = vec![DeletionItem {
+            path: victim.clone(),
+            entry_type: EntryType::File,
+        }];
+
+        let summary = apply_deletions(&deletions, &mirror_config());
+
+        assert_eq!(summary.deleted, 1);
+        assert!(summary.failed == 0);
+        assert!(!victim.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn collect_deletion_candidates_honors_symlink_skip() {
+        use std::os::unix::fs as unix_fs;
+
+        let temp = TempDir::new().unwrap();
+        let dest_dir = temp.path();
+
+        std::fs::create_dir_all(dest_dir).unwrap();
+        unix_fs::symlink("target", dest_dir.join("link")).unwrap();
+
+        let expected = Arc::new(Mutex::new(HashSet::new()));
+
+        let mut config = mirror_config();
+        config.symlink_mode = SymlinkMode::Skip;
+
+        let deletions = collect_deletion_candidates(dest_dir, &expected, &config).unwrap();
+
+        assert!(deletions.is_empty());
     }
 }
