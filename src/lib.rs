@@ -141,8 +141,9 @@ mod tests {
 
     #[test]
     fn test_version() {
+        // Verify VERSION is properly initialized from CARGO_PKG_VERSION
         assert!(!VERSION.is_empty());
-        assert_eq!(VERSION, "0.4.0");
+        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
     }
 
     #[test]

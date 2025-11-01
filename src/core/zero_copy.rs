@@ -308,10 +308,153 @@ mod macos {
     }
 }
 
+// ============================================================================
+// Zero-copy heuristics and orchestration
+// ============================================================================
+
+use std::fs::OpenOptions;
+use std::time::Instant;
+use indicatif::{ProgressBar, ProgressStyle};
+use crate::config::CopyConfig;
+use crate::error::{OrbitError, Result};
+use super::CopyStats;
+use super::checksum;
+
+/// Determine if zero-copy should be attempted based on heuristics
+///
+/// Returns true if conditions are favorable for zero-copy:
+/// - Zero-copy is available on this platform
+/// - No resume needed (complex offset handling works better with buffered)
+/// - No bandwidth throttling (need granular control)
+/// - Files on same filesystem (if required by platform)
+/// - File size >= 64KB (small files have syscall overhead)
+pub fn should_use_zero_copy(
+    source_path: &Path,
+    dest_path: &Path,
+    config: &CopyConfig,
+) -> Result<bool> {
+    // Check if zero-copy is available on this platform
+    let caps = ZeroCopyCapabilities::detect();
+    if !caps.available {
+        return Ok(false);
+    }
+
+    // Don't use zero-copy if:
+    // 1. Resume is enabled (complex offset handling works better with buffered)
+    // 2. Bandwidth throttling is active (need granular control)
+    if config.resume_enabled || config.max_bandwidth > 0 {
+        return Ok(false);
+    }
+
+    // Check if files are on the same filesystem (required for Linux copy_file_range)
+    if !caps.cross_filesystem {
+        let same_fs = same_filesystem(source_path, dest_path)?;
+        if !same_fs {
+            return Ok(false);
+        }
+    }
+
+    // For very small files (< 64KB), buffered copy is often faster due to syscall overhead
+    if source_path.metadata()?.len() < 64 * 1024 {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
+/// Attempt zero-copy transfer with progress tracking and checksum verification
+///
+/// This function attempts a zero-copy transfer and handles:
+/// - Progress bar updates
+/// - Post-copy checksum verification
+/// - File descriptor management
+///
+/// Returns `Err(OrbitError::ZeroCopyUnsupported)` if zero-copy is not available,
+/// allowing the caller to fall back to buffered copy.
+pub fn try_zero_copy_direct(
+    source_path: &Path,
+    dest_path: &Path,
+    source_size: u64,
+    config: &CopyConfig,
+) -> Result<CopyStats> {
+    let start_time = Instant::now();
+
+    // Open files
+    let source_file = File::open(source_path)?;
+    let dest_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(dest_path)?;
+
+    // Setup progress bar
+    let progress = if config.show_progress {
+        let pb = ProgressBar::new(source_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                .unwrap()
+                .progress_chars("#>-")
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
+    // Attempt zero-copy
+    let result = try_zero_copy(&source_file, &dest_file, 0, source_size);
+
+    let bytes_copied = match result {
+        ZeroCopyResult::Success(n) => n,
+        ZeroCopyResult::Unsupported => {
+            return Err(OrbitError::ZeroCopyUnsupported);
+        }
+        ZeroCopyResult::Failed(e) => {
+            return Err(OrbitError::Io(e));
+        }
+    };
+
+    // Flush to ensure data is written
+    dest_file.sync_all()?;
+
+    if let Some(pb) = progress {
+        pb.set_position(bytes_copied);
+        pb.finish_with_message("Complete");
+    }
+
+    // If checksum verification is enabled, calculate it post-copy
+    let checksum = if config.verify_checksum {
+        if config.show_progress {
+            println!("Calculating checksum...");
+        }
+        let source_checksum = checksum::calculate_checksum(source_path)?;
+        let dest_checksum = checksum::calculate_checksum(dest_path)?;
+
+        if source_checksum != dest_checksum {
+            return Err(OrbitError::ChecksumMismatch {
+                expected: source_checksum,
+                actual: dest_checksum,
+            });
+        }
+        Some(source_checksum)
+    } else {
+        None
+    };
+
+    Ok(CopyStats {
+        bytes_copied,
+        duration: start_time.elapsed(),
+        checksum,
+        compression_ratio: None,
+        files_copied: 1,
+        files_skipped: 0,
+        files_failed: 0,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use tempfile::NamedTempFile;
     
     #[test]
@@ -339,11 +482,11 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn test_zero_copy_basic() {
-        use std::io::{Read, Seek, SeekFrom};
-        
+        use std::io::{Read, Seek, SeekFrom, Write};
+
         let mut source = NamedTempFile::new().unwrap();
         let mut dest = NamedTempFile::new().unwrap();
-        
+
         // Write test data
         let test_data = b"Hello, zero-copy world!";
         source.write_all(test_data).unwrap();
