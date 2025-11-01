@@ -1,6 +1,6 @@
 /*!
  * Zero-copy file transfer using platform-specific system calls
- * 
+ *
  * This module provides optimized file copying that bypasses userspace buffers
  * by using kernel-level operations like copy_file_range (Linux), CopyFileExW (Windows),
  * and sendfile (Unix-like systems).
@@ -39,7 +39,7 @@ impl ZeroCopyCapabilities {
                 method: "copy_file_range",
             }
         }
-        
+
         #[cfg(target_os = "windows")]
         {
             Self {
@@ -48,7 +48,7 @@ impl ZeroCopyCapabilities {
                 method: "CopyFileExW",
             }
         }
-        
+
         #[cfg(target_os = "macos")]
         {
             Self {
@@ -57,7 +57,7 @@ impl ZeroCopyCapabilities {
                 method: "copyfile",
             }
         }
-        
+
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         {
             Self {
@@ -70,42 +70,37 @@ impl ZeroCopyCapabilities {
 }
 
 /// Attempt to copy a file using zero-copy system calls
-/// 
+///
 /// # Arguments
 /// * `source` - Source file (must be opened for reading)
 /// * `dest` - Destination file (must be opened for writing)
 /// * `offset` - Starting offset in bytes (for resume support)
 /// * `len` - Number of bytes to copy
-/// 
+///
 /// # Returns
 /// * `ZeroCopyResult::Success(n)` - Successfully copied n bytes
 /// * `ZeroCopyResult::Unsupported` - Zero-copy not available, use buffered copy
 /// * `ZeroCopyResult::Failed(err)` - Operation failed with error
-pub fn try_zero_copy(
-    source: &File,
-    dest: &File,
-    offset: u64,
-    len: u64,
-) -> ZeroCopyResult {
+pub fn try_zero_copy(source: &File, dest: &File, offset: u64, len: u64) -> ZeroCopyResult {
     if len == 0 {
         return ZeroCopyResult::Success(0);
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         linux::copy_file_range_loop(source, dest, offset, len)
     }
-    
+
     #[cfg(target_os = "windows")]
     {
         windows::copy_file_ex(source, dest, offset, len)
     }
-    
+
     #[cfg(target_os = "macos")]
     {
         macos::copyfile_wrapper(source, dest, offset, len)
     }
-    
+
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
         ZeroCopyResult::Unsupported
@@ -119,10 +114,20 @@ pub fn same_filesystem(path1: &Path, path2: &Path) -> io::Result<bool> {
     {
         use std::os::unix::fs::MetadataExt;
         let meta1 = std::fs::metadata(path1)?;
-        let meta2 = std::fs::metadata(path2)?;
+        let meta2 = match std::fs::metadata(path2) {
+            Ok(meta) => meta,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                if let Some(parent) = path2.parent() {
+                    std::fs::metadata(parent)?
+                } else {
+                    return Ok(false);
+                }
+            }
+            Err(e) => return Err(e),
+        };
         Ok(meta1.dev() == meta2.dev())
     }
-    
+
     #[cfg(windows)]
     {
         // On Windows, check if drive letters match
@@ -130,7 +135,7 @@ pub fn same_filesystem(path1: &Path, path2: &Path) -> io::Result<bool> {
         let vol2 = get_volume_path(path2)?;
         Ok(vol1 == vol2)
     }
-    
+
     #[cfg(not(any(unix, windows)))]
     {
         // Conservative: assume different filesystems
@@ -159,7 +164,7 @@ mod linux {
     use std::fs::File;
     use std::io;
     use std::os::unix::io::AsRawFd;
-    
+
     pub fn copy_file_range_loop(
         source: &File,
         dest: &File,
@@ -169,13 +174,13 @@ mod linux {
         let mut total_copied = 0u64;
         let mut src_offset = offset as i64;
         let mut dst_offset = offset as i64;
-        
+
         while total_copied < len {
             let remaining = len - total_copied;
-            
+
             // copy_file_range can copy at most isize::MAX bytes
             let to_copy = remaining.min(isize::MAX as u64) as usize;
-            
+
             match unsafe {
                 libc::syscall(
                     libc::SYS_copy_file_range,
@@ -189,7 +194,7 @@ mod linux {
             } {
                 -1 => {
                     let err = io::Error::last_os_error();
-                    
+
                     // Check for specific error codes that indicate unsupported
                     match err.raw_os_error() {
                         Some(libc::ENOSYS) | Some(libc::EXDEV) | Some(libc::EOPNOTSUPP) => {
@@ -209,7 +214,7 @@ mod linux {
                 }
             }
         }
-        
+
         ZeroCopyResult::Success(total_copied)
     }
 }
@@ -222,13 +227,8 @@ mod linux {
 mod windows {
     use super::ZeroCopyResult;
     use std::fs::File;
-    
-    pub fn copy_file_ex(
-        _source: &File,
-        _dest: &File,
-        _offset: u64,
-        _len: u64,
-    ) -> ZeroCopyResult {
+
+    pub fn copy_file_ex(_source: &File, _dest: &File, _offset: u64, _len: u64) -> ZeroCopyResult {
         // Windows CopyFileExW works at the path level, not file descriptor level
         // For now, we'll return Unsupported and implement path-based copying
         // in a separate function that can be called before files are opened
@@ -247,30 +247,20 @@ mod macos {
     use std::fs::File;
     use std::io;
     use std::os::unix::io::AsRawFd;
-    
-    pub fn copyfile_wrapper(
-        source: &File,
-        dest: &File,
-        offset: u64,
-        len: u64,
-    ) -> ZeroCopyResult {
+
+    pub fn copyfile_wrapper(source: &File, dest: &File, offset: u64, len: u64) -> ZeroCopyResult {
         // macOS has fcopyfile which works on file descriptors
         // For simplicity, we'll use sendfile which is more portable
         sendfile_loop(source, dest, offset, len)
     }
-    
-    fn sendfile_loop(
-        source: &File,
-        dest: &File,
-        offset: u64,
-        len: u64,
-    ) -> ZeroCopyResult {
+
+    fn sendfile_loop(source: &File, dest: &File, offset: u64, len: u64) -> ZeroCopyResult {
         let mut total_copied = 0u64;
         let mut current_offset = offset as i64;
-        
+
         while total_copied < len {
             let remaining = (len - total_copied) as i64;
-            
+
             let result = unsafe {
                 let mut bytes_written: libc::off_t = remaining;
                 libc::sendfile(
@@ -282,7 +272,7 @@ mod macos {
                     0,
                 )
             };
-            
+
             if result == -1 {
                 let err = io::Error::last_os_error();
                 match err.raw_os_error() {
@@ -294,16 +284,16 @@ mod macos {
                     }
                 }
             }
-            
+
             // sendfile updates current_offset automatically
             // bytes_written contains the actual bytes transferred
             if result == 0 {
                 break; // EOF
             }
-            
+
             total_copied += result as u64;
         }
-        
+
         ZeroCopyResult::Success(total_copied)
     }
 }
@@ -312,13 +302,13 @@ mod macos {
 // Zero-copy heuristics and orchestration
 // ============================================================================
 
-use std::fs::OpenOptions;
-use std::time::Instant;
-use indicatif::{ProgressBar, ProgressStyle};
+use super::checksum;
+use super::CopyStats;
 use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
-use super::CopyStats;
-use super::checksum;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::fs::OpenOptions;
+use std::time::Instant;
 
 /// Determine if zero-copy should be attempted based on heuristics
 ///
@@ -394,7 +384,7 @@ pub fn try_zero_copy_direct(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                 .unwrap()
-                .progress_chars("#>-")
+                .progress_chars("#>-"),
         );
         Some(pb)
     } else {
@@ -456,29 +446,29 @@ pub fn try_zero_copy_direct(
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
-    
+
     #[test]
     fn test_capabilities_detection() {
         let caps = ZeroCopyCapabilities::detect();
-        
+
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         assert!(caps.available);
-        
+
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         assert!(!caps.available);
     }
-    
+
     #[test]
     fn test_same_filesystem() {
         let temp1 = NamedTempFile::new().unwrap();
         let temp2 = NamedTempFile::new().unwrap();
-        
+
         // Both temp files should be on the same filesystem
         let result = same_filesystem(temp1.path(), temp2.path());
         assert!(result.is_ok());
         // Note: We can't assert true because temp dirs might be on different mounts
     }
-    
+
     #[cfg(target_os = "linux")]
     #[test]
     fn test_zero_copy_basic() {
@@ -492,19 +482,14 @@ mod tests {
         source.write_all(test_data).unwrap();
         source.flush().unwrap();
         source.seek(SeekFrom::Start(0)).unwrap();
-        
+
         // Attempt zero-copy
-        let result = try_zero_copy(
-            source.as_file(),
-            dest.as_file(),
-            0,
-            test_data.len() as u64,
-        );
-        
+        let result = try_zero_copy(source.as_file(), dest.as_file(), 0, test_data.len() as u64);
+
         match result {
             ZeroCopyResult::Success(n) => {
                 assert_eq!(n, test_data.len() as u64);
-                
+
                 // Verify data
                 dest.seek(SeekFrom::Start(0)).unwrap();
                 let mut buffer = Vec::new();
