@@ -119,15 +119,23 @@ orbit -s ./source -d ./dest -R --dry-run
 Create `~/.orbit/orbit.toml` for default settings:
 
 ```toml
-[defaults]
-compress = "zstd:3"
+# Compression
+compression = { zstd = { level = 3 } }
+
+# Chunk size in bytes
 chunk_size = 2048
+
+# Retry attempts
 retry_attempts = 5
+
+# Preserve metadata
 preserve_metadata = true
+
+# Parallel operations
 parallel = 4
 
-[exclude]
-patterns = [
+# Exclude patterns
+exclude_patterns = [
     "*.tmp",
     "*.log",
     ".git/*",
@@ -135,9 +143,9 @@ patterns = [
     "__pycache__/*",
 ]
 
-[audit]
-format = "json"
-path = "~/.orbit/audit.log"
+# Audit log settings
+audit_format = "json"
+audit_log_path = "~/.orbit/audit.log"
 ```
 
 Now all commands use these defaults automatically! Override with CLI flags.
@@ -161,9 +169,9 @@ cat orbit_audit.log | jq 'select(.status == "failed")'
 cat orbit_audit.log | jq '.bytes_copied' | paste -sd+ | bc
 ```
 
-### CSV Format
+### Text/CSV Format
 ```bash
-orbit -s file.txt -d backup.txt --audit-format csv
+orbit -s file.txt -d backup.txt --audit-format text
 
 # Open in Excel or
 cat orbit_audit.log | column -t -s,

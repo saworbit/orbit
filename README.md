@@ -5,7 +5,7 @@
 **The intelligent file transfer tool that never gives up** 💪  
 
 [![Crates.io](https://img.shields.io/crates/v/orbit.svg)](https://crates.io/crates/orbit)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-orange.svg)](LICENSE)
 [![Build Status](https://github.com/saworbit/orbit/workflows/CI/badge.svg)](https://github.com/saworbit/orbit/actions)
 
 ---
@@ -352,44 +352,83 @@ This feature is currently in the design phase. See the [roadmap](#-roadmap) for 
 
 ## ⚙️ Configuration
 
-Persistent defaults via `orbit.toml` or environment variables:
+Persistent defaults via `orbit.toml`:
 ```toml
 # ~/.orbit/orbit.toml or ./orbit.toml
 
-[defaults]
-compression = "zstd:5"
-checksum = "sha256"
-concurrency = 8
-resume = true
-audit_log = "/var/log/orbit_audit.log"
-telemetry = true
+# Copy mode: "copy", "sync", "update", or "mirror"
+copy_mode = "copy"
 
-[exclude]
-patterns = [
+# Enable recursive directory copying
+recursive = true
+
+# Preserve file metadata (timestamps, permissions)
+preserve_metadata = true
+
+# Enable resume capability for interrupted transfers
+resume_enabled = true
+
+# Enable checksum verification
+verify_checksum = true
+
+# Compression: "none", "lz4", or { zstd = { level = 5 } }
+compression = { zstd = { level = 5 } }
+
+# Show progress bar
+show_progress = true
+
+# Chunk size in bytes for buffered I/O
+chunk_size = 1048576  # 1 MB
+
+# Number of retry attempts on failure
+retry_attempts = 3
+
+# Retry delay in seconds
+retry_delay_secs = 2
+
+# Use exponential backoff for retries
+exponential_backoff = true
+
+# Maximum bandwidth in bytes per second (0 = unlimited)
+max_bandwidth = 0
+
+# Number of parallel operations (0 = sequential)
+parallel = 4
+
+# Symbolic link handling: "skip", "follow", or "preserve"
+symlink_mode = "skip"
+
+# Exclude patterns (glob patterns)
+exclude_patterns = [
     "*.tmp",
     "*.log",
     ".git/*",
     "node_modules/*",
 ]
 
-[s3]
-region = "us-east-1"
-storage_class = "INTELLIGENT_TIERING"
-chunk_size = "10MB"
-parallel_operations = 8
-server_side_encryption = "AES256"
+# Dry run mode (don't actually copy)
+dry_run = false
 
-[smb]
-timeout_seconds = 30
-max_retries = 5
+# Use zero-copy system calls when available
+use_zero_copy = true
+
+# Generate manifests for transfers
+generate_manifest = false
+
+# Audit log format: "json" or "csv"
+audit_format = "json"
+
+# Path to audit log file
+audit_log_path = "/var/log/orbit_audit.log"
 ```
+
+**Note:** S3-specific options (region, storage class) and SMB options (timeout, encryption) are configured via environment variables or protocol-specific configuration files in future releases.
 
 **Configuration Priority:**
 1. CLI arguments (highest)
-2. Environment variables
-3. `./orbit.toml` (project)
-4. `~/.orbit/orbit.toml` (user)
-5. Built-in defaults (lowest)
+2. `./orbit.toml` (project)
+3. `~/.orbit/orbit.toml` (user)
+4. Built-in defaults (lowest)
 
 ---
 
@@ -548,9 +587,10 @@ cargo clippy
 
 - **Quick Start:** This README
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md) ⭐ NEW!
-- **Configuration:** [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
-- **Protocol Guide:** [`docs/PROTOCOL_GUIDE.md`](docs/PROTOCOL_GUIDE.md)
+- **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
 - **SMB Status:** [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md)
+- **Manifest System:** [`docs/MANIFEST_SYSTEM.md`](docs/MANIFEST_SYSTEM.md)
+- **Zero-Copy Guide:** [`docs/ZERO_COPY.md`](docs/ZERO_COPY.md)
 - **API Reference:** Run `cargo doc --open`
 - **Examples:** [`examples/`](examples/) directory
 
@@ -558,11 +598,35 @@ cargo clippy
 
 ## 📜 License
 
-Licensed under both:
-- 📄 **MIT License** — See [LICENSE-MIT](LICENSE-MIT)
-- 📄 **Apache License 2.0** — See [LICENSE-APACHE](LICENSE-APACHE)
+**Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**
 
-You may choose either license for your use.
+Orbit uses a dual-license model:
+
+### Non-Commercial Use (Free)
+You are free to use, copy, redistribute, and modify Orbit for **non-commercial purposes** under the terms of CC BY-NC-SA 4.0:
+- ✅ Personal projects and learning
+- ✅ Academic research and education
+- ✅ Open source/non-profit projects
+- ✅ Internal evaluation and prototyping
+
+**Requirements:**
+- **Attribution:** Credit the original author (Shane Wall)
+- **ShareAlike:** Distribute modifications under the same license
+- **Non-Commercial:** No commercial use without separate license
+
+### Commercial Use (Requires License)
+Any use of Orbit in a commercial context requires a **separate commercial license**:
+- ❌ Use in commercial products or services (free or paid)
+- ❌ Integration into commercial workflows
+- ❌ Production use by for-profit entities
+
+**For commercial licensing, contact:**
+- **Shane Wall** — shaneawall@gmail.com
+
+### Important Note
+⚠️ **This is NOT an OSI-approved open source license.** The CC BY-NC-SA license restricts commercial use, unlike MIT/Apache. If you need to use Orbit commercially, you must obtain a commercial license from the author.
+
+📄 **Full license text:** See [LICENSE](LICENSE) or https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
 
 ---
 

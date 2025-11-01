@@ -142,17 +142,11 @@ export SMB_RETRY_COUNT=3
 Add to `~/.orbit/orbit.toml`:
 
 ```toml
-[smb]
-default_username = "myuser"
-# Don't store passwords in config!
-timeout_secs = 30
-retry_count = 3
-use_encryption = true
-workgroup = "WORKGROUP"
+# Note: SMB-specific configuration ([smb] section) is planned for future releases
+# Currently, SMB credentials must be provided in the URI or via environment variables
 
-[defaults]
-# SMB works with all existing options
-compress = "zstd:3"
+# General settings work with SMB transfers
+compression = { zstd = { level = 3 } }
 retry_attempts = 5
 preserve_metadata = true
 parallel = 4

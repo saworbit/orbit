@@ -99,7 +99,7 @@ orbit -s ./file.txt -d /dest/file.txt --compress zstd:3 --retry-attempts 3
 **New:** JSON Lines by default (one JSON object per line)
 
 **Migration:**
-- Use `--audit-format csv` to get CSV output
+- Use `--audit-format text` to get CSV output
 - Old audit logs won't be automatically migrated
 - JSON format is more parseable: `cat orbit_audit.log | jq`
 
@@ -142,13 +142,17 @@ copy_file(&source, &dest, &config)?;
 Create `orbit.toml` in your project or `~/.orbit/orbit.toml`:
 
 ```toml
-[defaults]
-compress = "zstd:3"
+# Compression
+compression = { zstd = { level = 3 } }
+
+# Chunk size in bytes
 chunk_size = 2048
+
+# Parallel operations
 parallel = 4
 
-[exclude]
-patterns = ["*.tmp", "*.log", ".git/*"]
+# Exclude patterns
+exclude_patterns = ["*.tmp", "*.log", ".git/*"]
 ```
 
 ### 2. **Multiple Copy Modes**

@@ -106,6 +106,14 @@ pub struct CopyConfig {
     /// Chunking strategy for manifest generation
     #[serde(default)]
     pub chunking_strategy: ChunkingStrategy,
+
+    /// Audit log format
+    #[serde(default)]
+    pub audit_format: AuditFormat,
+
+    /// Path to audit log file
+    #[serde(default)]
+    pub audit_log_path: Option<PathBuf>,
 }
 
 impl Default for CopyConfig {
@@ -131,6 +139,8 @@ impl Default for CopyConfig {
             generate_manifest: false,
             manifest_output_dir: None,
             chunking_strategy: ChunkingStrategy::default(),
+            audit_format: AuditFormat::Json,
+            audit_log_path: None,
         }
     }
 }
@@ -368,5 +378,54 @@ mod tests {
     fn test_chunking_strategy_default() {
         let strategy = ChunkingStrategy::default();
         assert!(matches!(strategy, ChunkingStrategy::Cdc { .. }));
+    }
+
+    #[test]
+    fn test_readme_config_example() {
+        // Verify the README configuration example can be deserialized
+        let toml_str = r#"
+copy_mode = "copy"
+recursive = true
+preserve_metadata = true
+resume_enabled = true
+verify_checksum = true
+compression = { zstd = { level = 5 } }
+show_progress = true
+chunk_size = 1048576
+retry_attempts = 3
+retry_delay_secs = 2
+exponential_backoff = true
+max_bandwidth = 0
+parallel = 4
+symlink_mode = "skip"
+exclude_patterns = ["*.tmp", "*.log", ".git/*", "node_modules/*"]
+dry_run = false
+use_zero_copy = true
+generate_manifest = false
+audit_format = "json"
+audit_log_path = "/var/log/orbit_audit.log"
+"#;
+
+        let config: CopyConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.copy_mode, CopyMode::Copy);
+        assert!(config.recursive);
+        assert!(config.preserve_metadata);
+        assert!(config.resume_enabled);
+        assert!(config.verify_checksum);
+        assert!(matches!(config.compression, CompressionType::Zstd { level: 5 }));
+        assert!(config.show_progress);
+        assert_eq!(config.chunk_size, 1048576);
+        assert_eq!(config.retry_attempts, 3);
+        assert_eq!(config.retry_delay_secs, 2);
+        assert!(config.exponential_backoff);
+        assert_eq!(config.max_bandwidth, 0);
+        assert_eq!(config.parallel, 4);
+        assert_eq!(config.symlink_mode, SymlinkMode::Skip);
+        assert_eq!(config.exclude_patterns.len(), 4);
+        assert!(!config.dry_run);
+        assert!(config.use_zero_copy);
+        assert!(!config.generate_manifest);
+        assert_eq!(config.audit_format, AuditFormat::Json);
+        assert_eq!(config.audit_log_path, Some(PathBuf::from("/var/log/orbit_audit.log")));
     }
 }

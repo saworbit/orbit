@@ -8,7 +8,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use orbit::{
-    config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy},
+    config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy, AuditFormat},
     copy_file, copy_directory, CopyStats,
     error::{Result, OrbitError},
     stats::TransferStats,
@@ -271,6 +271,15 @@ enum AuditFormatArg {
     Text,
 }
 
+impl From<AuditFormatArg> for AuditFormat {
+    fn from(format: AuditFormatArg) -> Self {
+        match format {
+            AuditFormatArg::Json => AuditFormat::Json,
+            AuditFormatArg::Text => AuditFormat::Csv,
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     
@@ -353,10 +362,9 @@ fn main() -> Result<()> {
         }
     }
     
-    // Audit logging would be initialized here if needed
-    if let Some(_audit_path) = cli.audit_log {
-        // Audit path provided, logging would happen here
-    }
+    // Configure audit logging
+    config.audit_format = cli.audit_format.into();
+    config.audit_log_path = cli.audit_log;
     
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {
