@@ -13,7 +13,7 @@ use crate::config::CopyConfig;
 use crate::error::Result;
 use super::CopyStats;
 use super::checksum::StreamingHasher;
-use super::resume::{ResumeInfo, load_resume_info, save_resume_info, cleanup_resume_info};
+use super::resume::{ResumeInfo, load_resume_info, save_resume_info_full, cleanup_resume_info, decide_resume_strategy, ResumeDecision, record_chunk_digest, validate_chunks};
 use super::bandwidth;
 use super::progress::ProgressPublisher;
 
@@ -40,19 +40,100 @@ pub fn copy_buffered(
     );
 
     // Load resume info if enabled
-    let resume_info = if config.resume_enabled {
+    let mut resume_info = if config.resume_enabled {
         load_resume_info(dest_path, false)?
     } else {
         ResumeInfo::default()
     };
 
-    let start_offset = resume_info.bytes_copied;
+    // Get source file metadata for resume decision
+    let source_metadata = std::fs::metadata(source_path)?;
+    let source_mtime = source_metadata.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs());
+
+    // Store source metadata in resume info for future validation
+    resume_info.file_size = Some(source_size);
+    resume_info.file_mtime = source_mtime;
+
+    // Decide resume strategy
+    let resume_decision = if config.resume_enabled && resume_info.bytes_copied > 0 {
+        decide_resume_strategy(dest_path, &resume_info)
+    } else {
+        ResumeDecision::StartFresh
+    };
+
+    // Emit resume decision event
+    match &resume_decision {
+        ResumeDecision::Resume { from_offset, verified_chunks } => {
+            publisher.publish_resume_decision(
+                &file_id,
+                "Resume".to_string(),
+                *from_offset,
+                *verified_chunks,
+                None,
+            );
+        }
+        ResumeDecision::Revalidate { reason } => {
+            publisher.publish_resume_decision(
+                &file_id,
+                "Revalidate".to_string(),
+                0,
+                0,
+                Some(reason.clone()),
+            );
+        }
+        ResumeDecision::Restart { reason } => {
+            publisher.publish_resume_decision(
+                &file_id,
+                "Restart".to_string(),
+                0,
+                0,
+                Some(reason.clone()),
+            );
+        }
+        ResumeDecision::StartFresh => {
+            publisher.publish_resume_decision(
+                &file_id,
+                "StartFresh".to_string(),
+                0,
+                0,
+                None,
+            );
+        }
+    }
+
+    // Determine start offset based on decision
+    let start_offset = match resume_decision {
+        ResumeDecision::Resume { from_offset, .. } => {
+            println!("Resuming from byte {} ({} chunks verified)",
+                from_offset, resume_info.verified_chunks.len());
+            from_offset
+        }
+        ResumeDecision::Revalidate { ref reason } => {
+            println!("Revalidating file: {}", reason);
+            println!("Re-hashing from beginning but preserving partial transfer");
+            resume_info.bytes_copied
+        }
+        ResumeDecision::Restart { ref reason } => {
+            println!("Restarting transfer: {}", reason);
+            if dest_path.exists() {
+                std::fs::remove_file(dest_path)?;
+            }
+            cleanup_resume_info(dest_path, false);
+            resume_info = ResumeInfo::default();
+            resume_info.file_size = Some(source_size);
+            resume_info.file_mtime = source_mtime;
+            0
+        }
+        ResumeDecision::StartFresh => 0,
+    };
 
     // Open source file
     let mut source_file = BufReader::new(File::open(source_path)?);
     if start_offset > 0 {
         source_file.seek(SeekFrom::Start(start_offset))?;
-        println!("Resuming from byte {}", start_offset);
     }
 
     // Open destination file
@@ -87,6 +168,25 @@ pub fn copy_buffered(
         None
     };
 
+    // Validate existing chunks if in Revalidate mode
+    if matches!(resume_decision, ResumeDecision::Revalidate { .. }) && resume_info.verified_chunks.len() > 0 {
+        println!("Validating {} existing chunks...", resume_info.verified_chunks.len());
+        match validate_chunks(dest_path, &resume_info, config.chunk_size, publisher, &file_id) {
+            Ok(failures) => {
+                if failures > 0 {
+                    println!("Warning: {} chunks failed validation, will be re-verified", failures);
+                    resume_info.verified_chunks.clear();
+                } else {
+                    println!("All chunks validated successfully");
+                }
+            }
+            Err(e) => {
+                println!("Chunk validation error: {}, clearing verified chunks", e);
+                resume_info.verified_chunks.clear();
+            }
+        }
+    }
+
     // Copy loop
     let mut buffer = vec![0u8; config.chunk_size];
     let mut bytes_copied = start_offset;
@@ -110,6 +210,13 @@ pub fn copy_buffered(
 
         // Write to destination
         dest_file.write_all(&buffer[..n])?;
+
+        // Record chunk digest if this is a complete chunk and resume is enabled
+        if config.resume_enabled && n == config.chunk_size {
+            let chunk_id = (bytes_copied / config.chunk_size as u64) as u32;
+            record_chunk_digest(chunk_id, &buffer[..n], &mut resume_info);
+        }
+
         bytes_copied += n as u64;
 
         // Update progress bar
@@ -126,7 +233,8 @@ pub fn copy_buffered(
         // Checkpoint for resume
         if config.resume_enabled && last_checkpoint.elapsed() > Duration::from_secs(5) {
             dest_file.flush()?;
-            save_resume_info(dest_path, bytes_copied, None, false)?;
+            resume_info.bytes_copied = bytes_copied;
+            save_resume_info_full(dest_path, &resume_info, false)?;
             last_checkpoint = Instant::now();
         }
 

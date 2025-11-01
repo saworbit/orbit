@@ -23,7 +23,7 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 | Feature | Benefit |
 |---------|---------|
 | 🚄 **3× Faster** | Zero-copy system calls transfer at device speed |
-| 🛡️ **Bulletproof** | Automatic resume, checksums, retries with exponential backoff |
+| 🛡️ **Bulletproof** | Smart resume with chunk verification, checksums, corruption detection |
 | 🧠 **Smart** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🌐 **Protocol Ready** | Local, SMB/CIFS, **S3**, Azure (expanding) |
 | 📊 **Fully Auditable** | Structured JSON telemetry for every operation |
@@ -234,7 +234,7 @@ Every operation emits structured audit events for full observability.
 - **Multipart Upload:** 500+ MB/s on high-bandwidth links
 - **Parallel Operations:** 4-16 concurrent chunks (configurable)
 - **Adaptive Chunking:** 5MB-2GB chunks based on file size
-- **Resume Efficiency:** Sub-second overhead for checkpoint validation
+- **Resume Efficiency:** Chunk-level verification with intelligent restart decisions
 
 **Compression Performance:**
 - Zstd level 3 → 2.3× faster over networks
@@ -311,7 +311,7 @@ Same-disk large file  → Zero-copy (copy_file_range, sendfile)
 Cross-filesystem      → Streaming with buffer pool
 Slow network link     → Compression (zstd/lz4)
 Cloud storage (S3)    → Multipart with parallel chunks
-Unreliable network    → Resume + exponential backoff retry
+Unreliable network    → Smart resume (detect corruption, revalidate modified files)
 Critical data         → SHA-256 checksum + audit log
 ```
 
@@ -591,6 +591,7 @@ cargo clippy
 
 - **Quick Start:** This README
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md) ⭐ NEW!
+- **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md) ⭐ NEW!
 - **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
 - **SMB Status:** [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md)
 - **Manifest System:** [`docs/MANIFEST_SYSTEM.md`](docs/MANIFEST_SYSTEM.md)

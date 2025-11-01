@@ -254,6 +254,54 @@ impl ProgressPublisher {
             bytes_transferred,
         ));
     }
+
+    /// Publish resume decision
+    pub fn publish_resume_decision(
+        &self,
+        file_id: &FileId,
+        decision: String,
+        from_offset: u64,
+        verified_chunks: usize,
+        reason: Option<String>,
+    ) {
+        self.publish(ProgressEvent::ResumeDecision {
+            file_id: file_id.clone(),
+            decision,
+            from_offset,
+            verified_chunks,
+            reason,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        });
+    }
+
+    /// Publish chunk verification started
+    pub fn publish_chunk_verification(&self, file_id: &FileId, chunk_id: u32, chunk_size: u64) {
+        self.publish(ProgressEvent::ChunkVerification {
+            file_id: file_id.clone(),
+            chunk_id,
+            chunk_size,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        });
+    }
+
+    /// Publish chunk verified
+    pub fn publish_chunk_verified(&self, file_id: &FileId, chunk_id: u32, digest: String) {
+        self.publish(ProgressEvent::ChunkVerified {
+            file_id: file_id.clone(),
+            chunk_id,
+            digest,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        });
+    }
 }
 
 /// Progress subscriber - receives events

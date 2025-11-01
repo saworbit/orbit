@@ -218,23 +218,80 @@ pub fn decide_resume_strategy(
     }
 }
 
-/// Validate destination file against manifest chunk data
+/// Validate destination file chunks against stored digests
 ///
-/// This checks if existing chunks match their expected digests from the manifest.
-/// Returns the number of chunks that need re-verification.
-pub fn validate_against_manifest(
-    _destination_path: &Path,
+/// Reads chunks from the destination file, calculates their digests,
+/// and compares with the stored verified_chunks in resume_info.
+/// Emits ChunkVerification and ChunkVerified events through the publisher.
+///
+/// Returns the number of chunks that failed verification.
+pub fn validate_chunks(
+    destination_path: &Path,
     resume_info: &ResumeInfo,
-    _manifest_chunks: &HashMap<u32, String>,
+    chunk_size: usize,
+    publisher: &super::progress::ProgressPublisher,
+    file_id: &super::progress::FileId,
 ) -> Result<usize> {
-    // For now, return the number of verified chunks
-    // Full implementation would:
-    // 1. Read each verified chunk from destination
-    // 2. Calculate its digest
-    // 3. Compare with manifest
-    // 4. Return count of mismatches
+    use std::fs::File;
+    use std::io::{Read, Seek, SeekFrom};
 
-    Ok(resume_info.verified_chunks.len())
+    if resume_info.verified_chunks.is_empty() {
+        return Ok(0);
+    }
+
+    let mut file = File::open(destination_path)?;
+    let mut failures = 0;
+    let mut buffer = vec![0u8; chunk_size];
+
+    for (chunk_id, expected_digest) in &resume_info.verified_chunks {
+        // Calculate chunk offset and size
+        let chunk_offset = (*chunk_id as u64) * (chunk_size as u64);
+        let remaining = resume_info.bytes_copied.saturating_sub(chunk_offset);
+        let this_chunk_size = remaining.min(chunk_size as u64);
+
+        if this_chunk_size == 0 {
+            continue;
+        }
+
+        // Emit chunk verification start event
+        publisher.publish_chunk_verification(file_id, *chunk_id, this_chunk_size);
+
+        // Read chunk from file
+        file.seek(SeekFrom::Start(chunk_offset))?;
+        let bytes_read = file.read(&mut buffer[..this_chunk_size as usize])?;
+
+        if bytes_read != this_chunk_size as usize {
+            failures += 1;
+            continue;
+        }
+
+        // Calculate BLAKE3 hash
+        let hash = blake3::hash(&buffer[..bytes_read]);
+        let digest_hex = hex::encode(hash.as_bytes());
+
+        // Compare with expected digest
+        if &digest_hex == expected_digest {
+            // Emit chunk verified event
+            publisher.publish_chunk_verified(file_id, *chunk_id, digest_hex);
+        } else {
+            failures += 1;
+        }
+    }
+
+    Ok(failures)
+}
+
+/// Calculate and store chunk digest for a newly copied chunk
+///
+/// This is called during the copy process to track verified chunks.
+pub fn record_chunk_digest(
+    chunk_id: u32,
+    chunk_data: &[u8],
+    resume_info: &mut ResumeInfo,
+) {
+    let hash = blake3::hash(chunk_data);
+    let digest_hex = hex::encode(hash.as_bytes());
+    resume_info.verified_chunks.insert(chunk_id, digest_hex);
 }
 
 #[cfg(test)]
@@ -262,11 +319,200 @@ mod tests {
     fn test_compressed_resume_info() {
         let dir = tempdir().unwrap();
         let dest = dir.path().join("test.txt");
-        
+
         save_resume_info(&dest, 2048, Some(1024), true).unwrap();
         let info = load_resume_info(&dest, true).unwrap();
-        
+
         assert_eq!(info.bytes_copied, 2048);
         assert_eq!(info.compressed_bytes, Some(1024));
+    }
+
+    #[test]
+    fn test_resume_decision_start_fresh() {
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("test.txt");
+
+        let resume_info = ResumeInfo::default();
+        let decision = decide_resume_strategy(&dest, &resume_info);
+
+        assert!(matches!(decision, ResumeDecision::StartFresh));
+    }
+
+    #[test]
+    fn test_resume_decision_restart_file_missing() {
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("test.txt");
+
+        let mut resume_info = ResumeInfo::default();
+        resume_info.bytes_copied = 1024;
+        resume_info.file_size = Some(2048);
+
+        let decision = decide_resume_strategy(&dest, &resume_info);
+
+        match decision {
+            ResumeDecision::Restart { reason } => {
+                assert!(reason.contains("no longer exists"));
+            }
+            _ => panic!("Expected Restart decision"),
+        }
+    }
+
+    #[test]
+    fn test_resume_decision_resume_valid() {
+        use std::io::Write;
+
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("test.txt");
+
+        // Create a partial file
+        let mut file = std::fs::File::create(&dest).unwrap();
+        file.write_all(&[0u8; 1024]).unwrap();
+        drop(file);
+
+        let metadata = std::fs::metadata(&dest).unwrap();
+        let mtime = metadata.modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+
+        let mut resume_info = ResumeInfo::default();
+        resume_info.bytes_copied = 1024;
+        resume_info.file_size = Some(1024);
+        resume_info.file_mtime = mtime;
+
+        let decision = decide_resume_strategy(&dest, &resume_info);
+
+        match decision {
+            ResumeDecision::Resume { from_offset, verified_chunks } => {
+                assert_eq!(from_offset, 1024);
+                assert_eq!(verified_chunks, 0);
+            }
+            _ => panic!("Expected Resume decision, got {:?}", decision),
+        }
+    }
+
+    #[test]
+    fn test_resume_decision_restart_file_truncated() {
+        use std::io::Write;
+
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("test.txt");
+
+        // Create a file smaller than expected
+        let mut file = std::fs::File::create(&dest).unwrap();
+        file.write_all(&[0u8; 512]).unwrap();
+        drop(file);
+
+        let mut resume_info = ResumeInfo::default();
+        resume_info.bytes_copied = 1024;
+        resume_info.file_size = Some(1024);
+
+        let decision = decide_resume_strategy(&dest, &resume_info);
+
+        match decision {
+            ResumeDecision::Restart { reason } => {
+                // File size mismatch check happens before truncation check
+                assert!(reason.contains("mismatch") || reason.contains("truncated"));
+            }
+            _ => panic!("Expected Restart decision"),
+        }
+    }
+
+    #[test]
+    fn test_chunk_digest_recording() {
+        let mut resume_info = ResumeInfo::default();
+        let chunk_data = b"Hello, World!";
+
+        record_chunk_digest(0, chunk_data, &mut resume_info);
+
+        assert_eq!(resume_info.verified_chunks.len(), 1);
+        assert!(resume_info.verified_chunks.contains_key(&0));
+
+        // Verify the digest is a valid hex string (64 chars for BLAKE3)
+        let digest = resume_info.verified_chunks.get(&0).unwrap();
+        assert_eq!(digest.len(), 64); // BLAKE3 produces 32 bytes = 64 hex chars
+    }
+
+    #[test]
+    fn test_chunk_validation_success() {
+        use std::io::Write;
+
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("test.txt");
+
+        // Create a file with known content
+        let chunk_data = vec![0x42u8; 1024];
+        let mut file = std::fs::File::create(&dest).unwrap();
+        file.write_all(&chunk_data).unwrap();
+        drop(file);
+
+        // Record the chunk digest
+        let mut resume_info = ResumeInfo::default();
+        resume_info.bytes_copied = 1024;
+        record_chunk_digest(0, &chunk_data, &mut resume_info);
+
+        // Validate chunks
+        let (publisher, _subscriber) = super::super::progress::ProgressPublisher::unbounded();
+        let file_id = super::super::progress::FileId::new(
+            &std::path::PathBuf::from("source"),
+            &dest,
+        );
+
+        let failures = validate_chunks(&dest, &resume_info, 1024, &publisher, &file_id).unwrap();
+        assert_eq!(failures, 0);
+    }
+
+    #[test]
+    fn test_chunk_validation_failure() {
+        use std::io::Write;
+
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("test.txt");
+
+        // Create a file with different content than expected
+        let chunk_data = vec![0x42u8; 1024];
+        let different_data = vec![0x99u8; 1024];
+
+        let mut file = std::fs::File::create(&dest).unwrap();
+        file.write_all(&different_data).unwrap();
+        drop(file);
+
+        // Record digest for original data
+        let mut resume_info = ResumeInfo::default();
+        resume_info.bytes_copied = 1024;
+        record_chunk_digest(0, &chunk_data, &mut resume_info);
+
+        // Validate chunks (should fail)
+        let (publisher, _subscriber) = super::super::progress::ProgressPublisher::unbounded();
+        let file_id = super::super::progress::FileId::new(
+            &std::path::PathBuf::from("source"),
+            &dest,
+        );
+
+        let failures = validate_chunks(&dest, &resume_info, 1024, &publisher, &file_id).unwrap();
+        assert_eq!(failures, 1);
+    }
+
+    #[test]
+    fn test_save_load_resume_info_full() {
+        let dir = tempdir().unwrap();
+        let dest = dir.path().join("test.txt");
+
+        let mut resume_info = ResumeInfo::default();
+        resume_info.bytes_copied = 2048;
+        resume_info.file_size = Some(4096);
+        resume_info.file_mtime = Some(1234567890);
+        resume_info.verified_chunks.insert(0, "abc123".to_string());
+        resume_info.verified_chunks.insert(1, "def456".to_string());
+        resume_info.verified_windows.push(0);
+
+        save_resume_info_full(&dest, &resume_info, false).unwrap();
+        let loaded = load_resume_info(&dest, false).unwrap();
+
+        assert_eq!(loaded.bytes_copied, 2048);
+        assert_eq!(loaded.file_size, Some(4096));
+        assert_eq!(loaded.file_mtime, Some(1234567890));
+        assert_eq!(loaded.verified_chunks.len(), 2);
+        assert_eq!(loaded.verified_windows.len(), 1);
     }
 }
