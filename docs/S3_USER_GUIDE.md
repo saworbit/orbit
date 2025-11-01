@@ -700,7 +700,7 @@ for entry in WalkDir::new("/data/to/migrate") {
 
 ### Documentation
 - **Orbit README:** [README.md](../README.md)
-- **Protocol Guide:** [PROTOCOL_GUIDE.md](PROTOCOL_GUIDE.md)
+- **Protocol Guide:** [PROTOCOL_GUIDE.md](../PROTOCOL_GUIDE.md)
 - **API Documentation:** Run `cargo doc --features s3-native --open`
 
 ### Issues

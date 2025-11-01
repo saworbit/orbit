@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
 description = "Binary index (Star Map) for efficient chunk and window queries in Orbit"
-license-file = "../../LICENSE"
+license = "Apache-2.0"
 
 [dependencies]
 # Binary serialization (replaces Cap'n Proto)

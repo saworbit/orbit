@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
 description = "Manifest data structures and validation for Orbit"
-license-file = "../../LICENSE"
+license = "Apache-2.0"
 
 [dependencies]
 # Serialization

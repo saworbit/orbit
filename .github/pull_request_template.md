@@ -115,6 +115,6 @@ orbit -s test.txt -d backup.txt
 ---
 
 **By submitting this PR, I confirm that:**
-- My contribution is made under the project's license (CC BY-NC-SA 4.0 for non-commercial use)
+- My contribution is made under the project's license (Apache License 2.0)
 - I have read and understood the [Contributing Guidelines](CONTRIBUTING.md)
 - I have read and agree to the [Code of Conduct](CODE_OF_CONDUCT.md)

@@ -5,7 +5,7 @@
 **The intelligent file transfer tool that never gives up** 💪  
 
 [![Crates.io](https://img.shields.io/crates/v/orbit.svg)](https://crates.io/crates/orbit)
-[![License](https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-orange.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Build Status](https://github.com/saworbit/orbit/workflows/CI/badge.svg)](https://github.com/saworbit/orbit/actions)
 
 ---
@@ -603,35 +603,41 @@ cargo clippy
 
 ## 📜 License
 
-**Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**
+**Apache License 2.0**
 
-Orbit uses a dual-license model:
+Orbit is licensed under the Apache License, Version 2.0 - a permissive open source license that allows you to:
 
-### Non-Commercial Use (Free)
-You are free to use, copy, redistribute, and modify Orbit for **non-commercial purposes** under the terms of CC BY-NC-SA 4.0:
-- ✅ Personal projects and learning
-- ✅ Academic research and education
-- ✅ Open source/non-profit projects
-- ✅ Internal evaluation and prototyping
+- ✅ **Use** commercially and privately
+- ✅ **Modify** and distribute
+- ✅ **Patent use** - grants patent rights
+- ✅ **Sublicense** to third parties
 
 **Requirements:**
-- **Attribution:** Credit the original author (Shane Wall)
-- **ShareAlike:** Distribute modifications under the same license
-- **Non-Commercial:** No commercial use without separate license
+- **License and copyright notice** - Include a copy of the license and copyright notice with the software
+- **State changes** - Document significant changes made to the code
 
-### Commercial Use (Requires License)
-Any use of Orbit in a commercial context requires a **separate commercial license**:
-- ❌ Use in commercial products or services (free or paid)
-- ❌ Integration into commercial workflows
-- ❌ Production use by for-profit entities
+**Limitations:**
+- ❌ **Liability** - The license includes a limitation of liability
+- ❌ **Warranty** - The software is provided "as is" without warranty
+- ❌ **Trademark use** - Does not grant rights to use trade names or trademarks
 
-**For commercial licensing, contact:**
-- **Shane Wall** — shaneawall@gmail.com
+📄 **Full license text:** See [LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0
 
-### Important Note
-⚠️ **This is NOT an OSI-approved open source license.** The CC BY-NC-SA license restricts commercial use, unlike MIT/Apache. If you need to use Orbit commercially, you must obtain a commercial license from the author.
+```
+Copyright 2024 Shane Wall
 
-📄 **Full license text:** See [LICENSE](LICENSE) or https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
 
 ---
 

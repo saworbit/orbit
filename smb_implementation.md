@@ -832,9 +832,7 @@ Include:
 
 ## License
 
-SMB support is included in Orbit under the same dual-license:
-- **Non-commercial**: CC BY-NC-SA 4.0
-- **Commercial**: Contact shaneawall@gmail.com
+SMB support is included in Orbit under the Apache License 2.0. See [LICENSE](LICENSE) for full details.
 
 ---
 

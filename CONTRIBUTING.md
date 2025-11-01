@@ -54,7 +54,7 @@ We welcome contributions such as:
 
 ## 📜 License and Agreement
 
-By submitting a contribution, you agree that your code will be licensed under the MIT License as specified in this repository.
+By submitting a contribution, you agree that your code will be licensed under the Apache License 2.0 as specified in this repository. See [LICENSE](LICENSE) for details.
 
 ---
 
