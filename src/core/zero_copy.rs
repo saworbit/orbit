@@ -329,6 +329,7 @@ use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
 use super::CopyStats;
 use super::checksum;
+use super::progress::ProgressPublisher;
 
 /// Determine if zero-copy should be attempted based on heuristics
 ///
@@ -376,6 +377,7 @@ pub fn should_use_zero_copy(
 ///
 /// This function attempts a zero-copy transfer and handles:
 /// - Progress bar updates
+/// - Progress event emission
 /// - Post-copy checksum verification
 /// - File descriptor management
 ///
@@ -386,8 +388,16 @@ pub fn try_zero_copy_direct(
     dest_path: &Path,
     source_size: u64,
     config: &CopyConfig,
+    publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
+
+    // Emit transfer start event
+    let file_id = publisher.start_transfer(
+        source_path.to_path_buf(),
+        dest_path.to_path_buf(),
+        source_size,
+    );
 
     // Open files
     let source_file = File::open(source_path)?;
@@ -451,9 +461,19 @@ pub fn try_zero_copy_direct(
         None
     };
 
+    let duration = start_time.elapsed();
+
+    // Emit transfer complete event
+    publisher.complete_transfer(
+        file_id,
+        bytes_copied,
+        duration.as_millis() as u64,
+        checksum.clone(),
+    );
+
     Ok(CopyStats {
         bytes_copied,
-        duration: start_time.elapsed(),
+        duration,
         checksum,
         compression_ratio: None,
         files_copied: 1,

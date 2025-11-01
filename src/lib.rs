@@ -34,6 +34,7 @@ pub use orbit_core_audit as manifest_audit;
 pub use config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy};
 pub use error::{OrbitError, Result};
 pub use core::{CopyStats, copy_file, copy_directory};
+pub use core::{copy_file_impl, copy_directory_impl}; // For testing with progress events
 pub use core::zero_copy::{ZeroCopyCapabilities, ZeroCopyResult};
 pub use stats::TransferStats;
 pub use protocol::Protocol;

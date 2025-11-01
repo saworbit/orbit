@@ -15,6 +15,7 @@ use walkdir::WalkDir;
 use super::metadata::preserve_metadata;
 use super::validation::matches_exclude_pattern;
 use super::CopyStats;
+use super::progress::ProgressPublisher;
 use crate::config::{CopyConfig, CopyMode, SymlinkMode};
 use crate::error::{OrbitError, Result};
 
@@ -39,10 +40,22 @@ enum EntryType {
 /// - Prevent scanner from overwhelming copiers
 /// - Support parallel file copying
 /// - Minimize memory footprint for large directory trees
+///
+/// If `publisher` is provided via the internal implementation, progress events will be emitted.
 pub fn copy_directory(
     source_dir: &Path,
     dest_dir: &Path,
     config: &CopyConfig,
+) -> Result<CopyStats> {
+    copy_directory_impl(source_dir, dest_dir, config, None)
+}
+
+/// Internal implementation of copy_directory with optional progress publisher
+pub fn copy_directory_impl(
+    source_dir: &Path,
+    dest_dir: &Path,
+    config: &CopyConfig,
+    publisher: Option<&ProgressPublisher>,
 ) -> Result<CopyStats> {
     if !config.recursive {
         return Err(OrbitError::Config(
@@ -51,6 +64,19 @@ pub fn copy_directory(
     }
 
     let start_time = Instant::now();
+
+    // Use provided publisher or create a no-op one
+    let noop_publisher = ProgressPublisher::noop();
+    let pub_ref = publisher.unwrap_or(&noop_publisher);
+
+    // Emit directory scan start event
+    pub_ref.publish(super::progress::ProgressEvent::DirectoryScanStart {
+        path: source_dir.to_path_buf(),
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64,
+    });
 
     // Create destination directory
     if !dest_dir.exists() {
@@ -123,6 +149,29 @@ pub fn copy_directory(
     }
 
     final_stats.duration = start_time.elapsed();
+
+    // Emit directory scan complete event
+    let total_files = final_stats.files_copied + final_stats.files_skipped + final_stats.files_failed;
+    pub_ref.publish(super::progress::ProgressEvent::DirectoryScanComplete {
+        total_files,
+        total_dirs: 0, // We don't track directories separately in current implementation
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64,
+    });
+
+    // Emit batch complete event
+    pub_ref.publish(super::progress::ProgressEvent::BatchComplete {
+        files_succeeded: final_stats.files_copied,
+        files_failed: final_stats.files_failed,
+        total_bytes: final_stats.bytes_copied,
+        duration_ms: final_stats.duration.as_millis() as u64,
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64,
+    });
 
     println!("\nDirectory copy completed:");
     println!("  Files copied: {}", final_stats.files_copied);

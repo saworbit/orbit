@@ -13,6 +13,7 @@ pub mod transfer;
 pub mod buffered;
 pub mod bandwidth;
 pub mod directory;
+pub mod progress;
 
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -66,10 +67,22 @@ impl Default for CopyStats {
 ///
 /// The actual copy is delegated to the transfer module which decides between
 /// compression, zero-copy, or buffered copy based on configuration.
+///
+/// If `publisher` is provided, progress events will be emitted. Otherwise, no events are emitted.
 pub fn copy_file(
     source_path: &Path,
     dest_path: &Path,
     config: &CopyConfig,
+) -> Result<CopyStats> {
+    copy_file_impl(source_path, dest_path, config, None)
+}
+
+/// Internal implementation of copy_file with optional progress publisher
+pub fn copy_file_impl(
+    source_path: &Path,
+    dest_path: &Path,
+    config: &CopyConfig,
+    publisher: Option<&progress::ProgressPublisher>,
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
 
@@ -111,12 +124,16 @@ pub fn copy_file(
     // Validate disk space
     validation::validate_disk_space(dest_path, source_size)?;
 
+    // Use provided publisher or create a no-op one
+    let noop_publisher = progress::ProgressPublisher::noop();
+    let pub_ref = publisher.unwrap_or(&noop_publisher);
+
     // Perform copy with retry logic and metadata preservation
     retry::with_retry_and_metadata(
         source_path,
         dest_path,
         config,
-        || transfer::perform_copy(source_path, dest_path, source_size, config)
+        || transfer::perform_copy(source_path, dest_path, source_size, config, pub_ref)
     )
 }
 
@@ -128,7 +145,7 @@ pub fn copy_file(
 /// - Memory-efficient streaming with bounded channels
 /// - Symlink handling
 /// - Error aggregation
-pub use directory::copy_directory;
+pub use directory::{copy_directory, copy_directory_impl};
 
 #[cfg(test)]
 mod tests {

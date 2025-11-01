@@ -10,6 +10,7 @@ use crate::compression;
 use super::CopyStats;
 use super::zero_copy;
 use super::buffered;
+use super::progress::ProgressPublisher;
 
 /// Internal copy implementation (called by retry logic)
 ///
@@ -17,15 +18,18 @@ use super::buffered;
 /// - Compression (LZ4/Zstd) if enabled
 /// - Zero-copy optimization if favorable
 /// - Buffered copy as fallback
+///
+/// Progress events are emitted through the provided publisher.
 pub fn perform_copy(
     source_path: &Path,
     dest_path: &Path,
     source_size: u64,
     config: &CopyConfig,
+    publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
     match config.compression {
         CompressionType::None => {
-            copy_direct(source_path, dest_path, source_size, config)
+            copy_direct(source_path, dest_path, source_size, config, publisher)
         }
         CompressionType::Lz4 => {
             compression::copy_with_lz4(source_path, dest_path, source_size, config)
@@ -47,13 +51,14 @@ fn copy_direct(
     dest_path: &Path,
     source_size: u64,
     config: &CopyConfig,
+    publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
     // Determine if we should attempt zero-copy
     let use_zero_copy = zero_copy::should_use_zero_copy(source_path, dest_path, config)?;
 
     if use_zero_copy {
         // Try zero-copy first
-        match zero_copy::try_zero_copy_direct(source_path, dest_path, source_size, config) {
+        match zero_copy::try_zero_copy_direct(source_path, dest_path, source_size, config, publisher) {
             Ok(stats) => {
                 if config.show_progress {
                     println!("✓ Zero-copy transfer completed");
@@ -74,5 +79,5 @@ fn copy_direct(
     }
 
     // Use buffered copy (either as fallback or by default)
-    buffered::copy_buffered(source_path, dest_path, source_size, config)
+    buffered::copy_buffered(source_path, dest_path, source_size, config, publisher)
 }

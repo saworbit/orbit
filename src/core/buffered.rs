@@ -15,18 +15,29 @@ use super::CopyStats;
 use super::checksum::StreamingHasher;
 use super::resume::{ResumeInfo, load_resume_info, save_resume_info, cleanup_resume_info};
 use super::bandwidth;
+use super::progress::ProgressPublisher;
 
 /// Buffered copy with streaming checksum (original implementation)
 ///
 /// This is the most compatible copy method that works across all filesystems
 /// and supports resume, checksum verification, and bandwidth throttling.
+///
+/// Emits progress events through the provided publisher for real-time monitoring.
 pub fn copy_buffered(
     source_path: &Path,
     dest_path: &Path,
     source_size: u64,
     config: &CopyConfig,
+    publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
+
+    // Emit transfer start event
+    let file_id = publisher.start_transfer(
+        source_path.to_path_buf(),
+        dest_path.to_path_buf(),
+        source_size,
+    );
 
     // Load resume info if enabled
     let resume_info = if config.resume_enabled {
@@ -80,6 +91,8 @@ pub fn copy_buffered(
     let mut buffer = vec![0u8; config.chunk_size];
     let mut bytes_copied = start_offset;
     let mut last_checkpoint = Instant::now();
+    let mut last_progress_event = Instant::now();
+    let progress_interval = Duration::from_millis(500); // Emit progress events every 500ms
 
     while bytes_copied < source_size {
         let remaining = (source_size - bytes_copied) as usize;
@@ -99,9 +112,15 @@ pub fn copy_buffered(
         dest_file.write_all(&buffer[..n])?;
         bytes_copied += n as u64;
 
-        // Update progress
+        // Update progress bar
         if let Some(ref pb) = progress {
             pb.set_position(bytes_copied);
+        }
+
+        // Emit progress event periodically
+        if last_progress_event.elapsed() >= progress_interval {
+            publisher.update_progress(&file_id, bytes_copied, source_size);
+            last_progress_event = Instant::now();
         }
 
         // Checkpoint for resume
@@ -136,9 +155,19 @@ pub fn copy_buffered(
         None
     };
 
+    let duration = start_time.elapsed();
+
+    // Emit transfer complete event
+    publisher.complete_transfer(
+        file_id,
+        bytes_copied,
+        duration.as_millis() as u64,
+        checksum.clone(),
+    );
+
     Ok(CopyStats {
         bytes_copied,
-        duration: start_time.elapsed(),
+        duration,
         checksum,
         compression_ratio: None,
         files_copied: 1,
