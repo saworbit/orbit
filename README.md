@@ -34,17 +34,39 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 
 ## 🗂️ Manifest System + Starmap Planner
 
-Orbit v0.4 introduces a **declarative transfer framework** where jobs are defined in TOML manifests and executed through Starmap, an intelligent dependency planner.
+Orbit v0.4 introduces a **manifest-based transfer framework** with flight plans, cargo manifests, and verification tools.
 
-### Example Manifest
+### Current Workflow (v0.4.0)
+```bash
+# 1. Create flight plan (transfer metadata)
+orbit manifest plan --source /data --dest /backup --output ./manifests
+
+# 2. Execute transfer with manifest generation
+orbit --source /data --dest /backup --recursive \
+  --generate-manifest --manifest-dir ./manifests
+
+# 3. Verify transfer integrity
+orbit manifest verify --manifest-dir ./manifests
+```
+
+### 🔭 Current Starmap Features
+
+- **Flight Plans** — JSON-based transfer metadata and file tracking
+- **Cargo Manifests** — Per-file chunk-level verification
+- **Verification Tools** — Post-transfer integrity checking
+- **Diff Support** — Compare manifests with target directories
+- **Audit Integration** — Full traceability for every operation
+
+### 🚧 Planned: Declarative Manifests (v0.6.0+)
+
+**Future support for TOML-based job definitions:**
+
 ```toml
+# orbit.manifest.toml (PLANNED)
 [defaults]
 checksum = "sha256"
 compression = "zstd:6"
 resume = true
-concurrency = 4
-audit_log = "audit.log"
-plan_visualisation = true
 
 [[job]]
 name = "source-sync"
@@ -55,37 +77,19 @@ destination = "/mnt/backup/source/"
 name = "media-archive"
 source = "/media/camera/"
 destination = "/tank/archive/"
-compression = "zstd:1"
-depends_on = ["source-sync"]
-
-[[job]]
-name = "cloud-backup"
-source = "/local/data/"
-destination = "s3://my-bucket/backups/"
-protocol = "s3-native"
-storage_class = "INTELLIGENT_TIERING"
-
-[[job]]
-name = "smb-backup"
-source = "/local/data/"
-destination = "smb://server/backups/"
-protocol = "smb-native"
+depends_on = ["source-sync"]  # Dependency ordering
 ```
 
-### Execute
+**Planned execution:**
 ```bash
-# Manifest execution via subcommand
-orbit manifest plan --source /data/source --dest /mnt/backup --output ./manifests
-orbit manifest verify --manifest-dir ./manifests
+orbit run --manifest orbit.manifest.toml  # Coming in v0.6.0+
 ```
 
-### 🔭 Starmap Features
-
-- **Dependency Graph** — Validates and orders jobs before execution
-- **Parallel Execution** — Runs independent jobs concurrently
-- **Resource Validation** — Checks space, permissions, connectivity upfront
-- **Visual Planning** — Generates execution graph when enabled
-- **Audit Integration** — Every job tagged for full traceability
+**Planned features:**
+- Dependency graphs with automatic ordering
+- Parallel execution of independent jobs
+- Resource validation before execution
+- Visual planning and execution graphs
 
 ---
 
@@ -252,10 +256,10 @@ orbit <stats|presets|capabilities>
 ```bash
 orbit cp <SOURCE> <DEST> [FLAGS]          # Friendly alias
 orbit sync <SOURCE> <DEST> [FLAGS]        # Sync mode alias
-orbit run --manifest <FILE>               # Execute manifest
+orbit run --manifest <FILE>               # Execute from manifest (planned)
 ```
 
-> **Note:** The current release uses flag-based syntax. User-friendly subcommands like `cp` and `sync` are planned for v0.6.0.
+> **Note:** The current release uses flag-based syntax. User-friendly subcommands like `cp`, `sync`, and `run` are planned for v0.6.0.
 
 ---
 

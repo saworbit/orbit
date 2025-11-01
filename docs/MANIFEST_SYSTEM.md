@@ -46,16 +46,58 @@ The Manifest System was built around three principles:
 
 ---
 
-## 📄 Manifest Structure
+## 📄 Current Workflow (v0.4.0)
 
-A manifest defines:
-1. Optional `[defaults]` section  
-2. One or more `[[job]]` entries  
+The manifest system in v0.4.0 supports transfer planning, verification, and auditing:
 
-### Example
+### 1. Create a Flight Plan
+
+Generate manifests without transferring data:
+
+```bash
+# Create flight plan for a transfer
+orbit manifest plan --source /data/source --dest /mnt/backup --output ./manifests
+
+# This creates:
+#   ./manifests/job.flightplan.json     (transfer metadata)
+#   ./manifests/*.cargo.json            (per-file manifests with chunks)
+```
+
+### 2. Execute Transfer with Manifest Generation
+
+Perform the actual transfer while generating/updating manifests:
+
+```bash
+orbit --source /data/source --dest /mnt/backup \
+  --recursive \
+  --generate-manifest \
+  --manifest-dir ./manifests
+```
+
+### 3. Verify Transfer
+
+Verify the transfer was successful:
+
+```bash
+orbit manifest verify --manifest-dir ./manifests
+```
+
+### 4. Check Differences
+
+Compare manifests with target directory:
+
+```bash
+orbit manifest diff --manifest-dir ./manifests --target /mnt/backup
+```
+
+---
+
+## 🚧 Planned: Declarative Manifest Execution (v0.6.0+)
+
+The full declarative manifest system with `[[job]]` entries and `orbit run` is planned for v0.6.0:
 
 ```toml
-# orbit.manifest.toml
+# orbit.manifest.toml (PLANNED - not yet implemented)
 
 [defaults]
 checksum = "sha256"
@@ -63,7 +105,7 @@ compression = "zstd:6"
 resume = true
 concurrency = 4
 audit_log = "audit.log"
-plan_visualisation = true  # renders the Starmap for inspection
+plan_visualisation = true
 
 [[job]]
 name = "source-sync"
@@ -77,14 +119,12 @@ name = "media-archive"
 source = "/media/camera/"
 destination = "/tank/archive/"
 compression = "zstd:1"
-checksum = "sha256"
-resume = true
-depends_on = ["source-sync"]  # Job ordering handled by Starmap
+depends_on = ["source-sync"]  # Job ordering
 ```
 
-Run it:
+**Planned execution:**
 ```bash
-orbit run --manifest orbit.manifest.toml
+orbit run --manifest orbit.manifest.toml  # Coming in v0.6.0+
 ```
 
 ---
@@ -164,7 +204,11 @@ Audit data is:
 
 ---
 
-## 🧰 Supported Keys
+## 🧰 Planned: Manifest Keys (v0.6.0+)
+
+> **Note:** The following sections describe the planned declarative manifest system for v0.6.0+. The current v0.4.0 release uses flight plans generated via `orbit manifest plan` rather than declarative TOML manifests.
+
+**Planned manifest structure:**
 
 | Section | Key | Type | Description |
 |----------|-----|------|-------------|
@@ -186,29 +230,33 @@ Audit data is:
 
 ---
 
-## ⚙️ Execution Flow
+## ⚙️ Planned: Execution Flow (v0.6.0+)
 
-1. **Parse** manifest file  
-2. **Validate** syntax, keys, and paths  
-3. **Build Starmap** job graph  
-4. **Preflight audit** record created  
-5. **Execute jobs** in dependency order  
-6. **Emit per-job audit logs**  
+**When `orbit run --manifest` is implemented:**
+
+1. **Parse** manifest file
+2. **Validate** syntax, keys, and paths
+3. **Build Starmap** job graph
+4. **Preflight audit** record created
+5. **Execute jobs** in dependency order
+6. **Emit per-job audit logs**
 7. **Generate completion summary**
 
 ---
 
-## 🧩 Error Handling and Recovery
+## 🧩 Planned: Error Handling and Recovery (v0.6.0+)
 
-- 🛑 If a job fails, dependent jobs are paused automatically  
-- 🧩 Partial progress is recorded in audit logs  
-- 🔁 Rerunning the same manifest resumes from failed jobs only  
-- ⚠️ Warnings (non-critical) are logged but do not halt Starmap execution  
-- 🧮 Future versions will support *checkpoint restoration* directly from audit logs  
+**Planned features:**
+
+- 🛑 If a job fails, dependent jobs are paused automatically
+- 🧩 Partial progress is recorded in audit logs
+- 🔁 Rerunning the same manifest resumes from failed jobs only
+- ⚠️ Warnings (non-critical) are logged but do not halt Starmap execution
+- 🧮 Checkpoint restoration directly from audit logs
 
 ---
 
-## 🧮 Example: Multi-Stage Backup with Dependencies
+## 🧮 Planned Example: Multi-Stage Backup with Dependencies
 
 ```toml
 [defaults]
@@ -269,11 +317,12 @@ Execution order (Starmap will display):
 
 ## 🤝 Best Practices
 
-- Keep manifests in version control  
-- Validate with `orbit run --manifest file.toml --dry-run`  
-- Use clear `name` fields for jobs to simplify audit tracking  
-- Enable `plan_visualisation = true` before first run  
-- Periodically archive `audit.log` outputs for compliance  
+- Keep manifests in version control
+- Test transfers with `--dry-run` flag before production runs
+- Use `orbit manifest plan` to preview transfer operations before executing
+- Use `orbit manifest verify` after transfers to ensure integrity
+- Periodically archive audit log outputs for compliance
+- Use descriptive naming for manifest directories (e.g., `./manifests/backup-2025-01`)  
 
 ---
 
