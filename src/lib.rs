@@ -27,6 +27,10 @@ pub mod cli_progress;
 #[cfg(feature = "smb-native")]
 pub mod protocols;
 
+// Unified backend abstraction (feature-gated)
+#[cfg(feature = "backend-abstraction")]
+pub mod backend;
+
 // Manifest system modules (re-exported from workspace crates)
 pub use orbit_core_manifest as manifest;
 pub use orbit_core_starmap as starmap;

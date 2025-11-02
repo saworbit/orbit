@@ -73,7 +73,7 @@ orbit-core-audit = { path = "crates/core-audit" }
 
 # SMB native dependencies (optional, feature-gated)
 bytes = { version = "1", optional = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync"], optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "fs", "io-util"], optional = true }
 smb = { version = "0.10.2", optional = true, default-features = false, features = ["async", "encrypt_aesgcm", "encrypt_aesccm", "sign_hmac", "sign_gmac", "sign_cmac", "compress_lz4", "compress_pattern_v1", "std-fs-impls", "netbios-transport"] }
 async-trait = { version = "0.1", optional = true }
 bitflags = { version = "2", optional = true }
@@ -83,6 +83,15 @@ zeroize = { version = "1", optional = true }
 aws-config = { version = "1.5", default-features = false, features = ["behavior-version-latest", "rustls"], optional = true }
 aws-sdk-s3 = { version = "1.50", default-features = false, features = ["rt-tokio", "rustls"], optional = true }
 url = { version = "2.5", optional = true }
+
+# SSH backend dependencies (optional, feature-gated)
+ssh2 = { version = "0.9", optional = true }
+secrecy = { version = "0.10", optional = true, features = ["serde"] }
+
+# Async utilities for backend abstraction
+futures = { version = "0.3", optional = true }
+pin-project = { version = "1", optional = true }
+once_cell = { version = "1.19", optional = true }
 
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -137,5 +146,11 @@ smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:ze
 # Native S3 client (pure Rust, async) - disabled by default
 s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes"]
 
+# SSH backend support - disabled by default
+ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes"]
+
+# Unified backend abstraction layer - enables async backends with extensibility
+backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
+
 # Full feature set
-full = ["zero-copy", "protocols", "smb-native", "s3-native"]
+full = ["zero-copy", "protocols", "smb-native", "s3-native", "ssh-backend", "backend-abstraction"]

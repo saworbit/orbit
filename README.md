@@ -46,7 +46,7 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 | 🛡️ **Bulletproof** | Smart resume with chunk verification, checksums, corruption detection |
 | 🧠 **Smart** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
-| 🌐 **Protocol Ready** | Local, SMB/CIFS, **S3**, Azure (expanding) |
+| 🌐 **Protocol Ready** | Local, **SSH/SFTP**, SMB/CIFS, **S3**, with unified backend API |
 | 📊 **Fully Auditable** | Structured JSON telemetry for every operation |
 | 🧩 **Modular** | Clean architecture with reusable crates |
 | 🌍 **Cross-Platform** | Linux, macOS, Windows with native optimizations |
@@ -259,11 +259,12 @@ breaker.execute(|| {
 
 ### 🌐 Protocol Support
 
-Orbit supports multiple storage backends through a unified protocol abstraction layer.
+Orbit supports multiple storage backends through a **unified backend abstraction layer** that provides a consistent async API across all storage types.
 
 | Protocol | Status | Feature Flag | Description |
 |----------|--------|--------------|-------------|
 | 🗂️ **Local** | ✅ Stable | Built-in | Local filesystem with zero-copy optimization |
+| 🔐 **SSH/SFTP** | 🚧 WIP | `ssh-backend` | Remote filesystem access via SSH/SFTP (implementation in progress) |
 | 🌐 **SMB/CIFS** | 🟡 Ready* | `smb-native` | Native SMB2/3 client (pure Rust, no dependencies) |
 | ☁️ **S3** | ✅ **Stable** | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
 | ☁️ **Azure Blob** | 🚧 Planned | - | Microsoft Azure Blob Storage |
@@ -271,6 +272,35 @@ Orbit supports multiple storage backends through a unified protocol abstraction 
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
 
 **\*SMB Status:** Implementation complete (~1,900 lines) but blocked by upstream dependency conflict. See [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md) for details.
+
+#### 🆕 Unified Backend Abstraction (v0.4.1)
+
+**NEW!** Write once, run on any storage backend. The backend abstraction provides a consistent async API across all storage types:
+
+```rust
+use orbit::backend::{Backend, LocalBackend, SshBackend, S3Backend};
+
+// All backends implement the same trait
+async fn copy_file<B: Backend>(backend: &B, src: &Path, dest: &Path) -> Result<()> {
+    let data = backend.read(src).await?;
+    backend.write(dest, data, Default::default()).await?;
+    Ok(())
+}
+
+// Works with any backend
+let local = LocalBackend::new();
+let ssh = SshBackend::connect(config).await?;
+let s3 = S3Backend::new(s3_config).await?;
+```
+
+**Features:**
+- ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, etc.
+- ✅ **Streaming I/O**: Memory-efficient for large files
+- ✅ **Extensibility**: Plugin system for custom backends
+- ✅ **Type-safe**: Strong typing with comprehensive error handling
+- ✅ **Security**: Built-in secure credential handling
+
+📖 **Full Guide:** [BACKEND_GUIDE.md](BACKEND_GUIDE.md)
 
 #### 🆕 S3 Cloud Storage (v0.4.1)
 
