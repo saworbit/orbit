@@ -17,6 +17,7 @@
 - [Key Features](#-key-features)
   - [Disk Guardian](#-disk-guardian-pre-flight-safety)
   - [Manifest System + Starmap](#-manifest-system--starmap-planner)
+  - [Magnetar State Machine](#-magnetar-persistent-job-state-machine)
   - [Protocol Support](#-protocol-support)
   - [Audit & Telemetry](#-audit-and-telemetry)
 - [Quick Start](#-quick-start)
@@ -151,6 +152,60 @@ source = "/media/camera/"
 destination = "/tank/archive/"
 depends_on = ["source-sync"]  # Dependency ordering
 ```
+
+---
+
+### 🧲 Magnetar: Persistent Job State Machine
+
+**NEW in v0.4.1!** A crash-proof, idempotent state machine for managing persistent jobs with dual backend support.
+
+**Prevents:**
+- ❌ Duplicate work after crashes
+- ❌ Lost progress on interruptions
+- ❌ Dependency conflicts in DAG-based workflows
+
+**Features:**
+- **Atomic Claims** — Idempotent "pending → processing" transitions
+- **Crash Recovery** — Resume from any point with chunk-level verification
+- **DAG Dependencies** — Topological sorting for complex job graphs
+- **Dual Backends** — SQLite (default) or redb (pure Rust, WASM-ready)
+- **Zero-Downtime Migration** — Swap backends without stopping jobs
+- **Analytics Ready** — Export to Parquet for analysis
+
+```rust
+use magnetar::JobStatus;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let mut store = magnetar::open("jobs.db").await?;
+
+    // Load chunks from manifest
+    let manifest = toml::from_str(r#"
+        [[chunks]]
+        id = 1
+        checksum = "abc123"
+    "#)?;
+
+    store.init_from_manifest(42, &manifest).await?;
+
+    // Process with automatic deduplication
+    while let Some(chunk) = store.claim_pending(42).await? {
+        // Do work... (if crash happens, chunk auto-reverts to pending)
+        store.mark_status(42, chunk.chunk, JobStatus::Done, None).await?;
+    }
+
+    Ok(())
+}
+```
+
+**Try it:**
+```bash
+cd crates/magnetar
+cargo run --example basic_usage
+cargo run --example crash_recovery  # Simulates crash and resume
+```
+
+📖 **Full Documentation:** See [`crates/magnetar/README.md`](crates/magnetar/README.md)
 
 ---
 
@@ -504,7 +559,8 @@ Orbit is built from clean, reusable crates:
 | 📊 `core-audit` | Structured logging and telemetry | ✅ Stable |
 | ⚡ `core-zero-copy` | OS-level optimized I/O | ✅ Stable |
 | 🗜️ `core-compress` | Compression and decompression | ✅ Stable |
-| 🛡️ `disk-guardian` | Pre-flight space & integrity checks | ✅ **NEW!** |
+| 🛡️ `disk-guardian` | Pre-flight space & integrity checks | ✅ Stable |
+| 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | ✅ **NEW!** |
 | 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
 | 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
 | 🧪 `wormhole` | Forward-error correction | 🚧 Dev |
@@ -561,7 +617,8 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 - S3 batch operations with rate limiting
 - Enhanced error recovery (circuit breaker, exponential backoff)
 - Progress callbacks for UI integration
-- **Disk Guardian: Pre-flight space & integrity checks** ⭐ **NEW!**
+- **Disk Guardian: Pre-flight space & integrity checks** ⭐
+- **Magnetar: Idempotent job state machine with SQLite + redb backends** ⭐ **NEW!**
 - SMB2/3 native implementation (awaiting upstream fix)
 
 ### 🚧 In Progress (v0.5.0)
@@ -636,7 +693,8 @@ cargo clippy
 ### User Guides
 - **Quick Start:** This README
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
-- **Disk Guardian:** [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md) ⭐ **NEW!**
+- **Disk Guardian:** [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md)
+- **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
 - **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md)
 - **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
 
@@ -644,12 +702,14 @@ cargo clippy
 - **SMB Status:** [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md)
 - **Manifest System:** [`docs/MANIFEST_SYSTEM.md`](docs/MANIFEST_SYSTEM.md)
 - **Zero-Copy Guide:** [`docs/ZERO_COPY.md`](docs/ZERO_COPY.md)
+- **Magnetar Quick Start:** [`crates/magnetar/QUICKSTART.md`](crates/magnetar/QUICKSTART.md) ⭐ **NEW!**
 - **API Reference:** Run `cargo doc --open`
 
 ### Examples
 - **Basic Examples:** [`examples/`](examples/) directory
 - **S3 Examples:** [`examples/s3_*.rs`](examples/)
-- **Disk Guardian Demo:** [`examples/disk_guardian_demo.rs`](examples/disk_guardian_demo.rs) ⭐ **NEW!**
+- **Disk Guardian Demo:** [`examples/disk_guardian_demo.rs`](examples/disk_guardian_demo.rs)
+- **Magnetar Examples:** [`crates/magnetar/examples/`](crates/magnetar/examples/) ⭐ **NEW!**
 - **Progress Demo:** [`examples/progress_demo.rs`](examples/progress_demo.rs)
 
 ---
