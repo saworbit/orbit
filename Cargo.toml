@@ -4,6 +4,7 @@ members = [
     "crates/core-manifest",
     "crates/core-starmap",
     "crates/core-audit",
+    "crates/magnetar",
 ]
 
 [package]
