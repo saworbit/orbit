@@ -277,7 +277,9 @@ impl ManifestGenerator {
             });
 
             window_id += 1;
-            first_chunk += (count as u32).saturating_sub(overlap as u32);
+            // Ensure we always advance by at least 1 chunk to prevent infinite loops
+            // when count <= overlap (e.g., small files with few chunks)
+            first_chunk += (count as u32).saturating_sub(overlap as u32).max(1);
         }
 
         Ok((chunks, windows))
