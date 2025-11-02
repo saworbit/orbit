@@ -1,25 +1,29 @@
 # S3 Integration Guide
 
-**Version:** v0.4.0
+**Version:** v0.4.1
 **Status:** Production Ready
-**Last Updated:** November 1, 2025
+**Last Updated:** November 2, 2025
 
 ---
 
 ## Overview
 
-Orbit v0.4.0 introduces native AWS S3 support, enabling seamless file transfers between local storage and S3 buckets. The implementation is pure Rust, async-first, and designed for high-performance data transfers with built-in resilience features.
+Orbit v0.4.1 provides comprehensive AWS S3 support with advanced features for production workloads. The implementation is pure Rust, async-first, and designed for high-performance data transfers with built-in resilience, versioning, batch operations, and sophisticated error recovery.
 
 ### Key Features
 
-✅ **Pure Rust** - No external dependencies or binaries required  
-✅ **Async Operations** - Built on Tokio for high concurrency  
-✅ **Multipart Upload/Download** - Efficient handling of large files (>5MB)  
-✅ **Resumable Transfers** - Automatic resume on interruption  
-✅ **Parallel Operations** - Configurable concurrent chunk transfers  
-✅ **Integrity Verification** - Built-in checksum validation  
-✅ **Flexible Authentication** - Multiple credential sources  
-✅ **S3-Compatible Storage** - Works with MinIO, LocalStack, and other S3-compatible services  
+✅ **Pure Rust** - No external dependencies or binaries required
+✅ **Async Operations** - Built on Tokio for high concurrency
+✅ **Multipart Upload/Download** - Efficient handling of large files (>5MB)
+✅ **Resumable Transfers** - Automatic resume on interruption
+✅ **Parallel Operations** - Configurable concurrent chunk transfers
+✅ **Integrity Verification** - Built-in checksum validation
+✅ **Flexible Authentication** - Multiple credential sources
+✅ **S3-Compatible Storage** - Works with MinIO, LocalStack, and other S3-compatible services
+✅ **Object Versioning** - Full version lifecycle management (v0.4.1+)
+✅ **Batch Operations** - Concurrent batch processing with rate limiting (v0.4.1+)
+✅ **Enhanced Error Recovery** - Circuit breaker and exponential backoff (v0.4.1+)
+✅ **Progress Callbacks** - Real-time transfer progress for UI integration (v0.4.1+)  
 
 ---
 
@@ -258,6 +262,514 @@ client.copy_object("source/file.txt", "destination/file.txt").await?;
 
 ```rust
 client.delete("old-data/file.txt").await?;
+```
+
+---
+
+## Object Versioning (v0.4.1+)
+
+S3 object versioning allows you to preserve, retrieve, and restore every version of every object in your bucket. This provides protection against accidental deletion and overwrites.
+
+### Enable Versioning on a Bucket
+
+```rust
+use orbit::protocol::s3::versioning::VersioningOperations;
+
+// Enable versioning
+client.enable_versioning().await?;
+
+// Check versioning status
+let status = client.get_versioning_status().await?;
+println!("Versioning enabled: {}", status.enabled);
+```
+
+### List All Versions of an Object
+
+```rust
+use orbit::protocol::s3::versioning::VersioningOperations;
+
+let versions = client.list_object_versions("documents/report.pdf").await?;
+
+for version in versions.versions {
+    println!(
+        "Version ID: {}, Size: {} bytes, Last Modified: {:?}, Latest: {}",
+        version.version_id,
+        version.size,
+        version.last_modified,
+        version.is_latest
+    );
+}
+
+// Also check delete markers
+for marker in versions.delete_markers {
+    println!("Delete Marker at {:?}", marker.last_modified);
+}
+```
+
+### Download a Specific Version
+
+```rust
+use std::path::Path;
+use orbit::protocol::s3::versioning::VersioningOperations;
+
+// Download a specific version by version ID
+client.download_version(
+    "documents/report.pdf",
+    "3/L4kqtJlcpXroDTDmJ+rmSpXd3dIbrHY",
+    Path::new("local/report_v1.pdf")
+).await?;
+```
+
+### Restore a Previous Version
+
+```rust
+use orbit::protocol::s3::versioning::VersioningOperations;
+
+// Restore a previous version by copying it to current
+let new_version_id = client.restore_version(
+    "documents/report.pdf",
+    "3/L4kqtJlcpXroDTDmJ+rmSpXd3dIbrHY",
+    None  // Use default options
+).await?;
+
+println!("Restored as new version: {}", new_version_id);
+```
+
+### Delete a Specific Version
+
+```rust
+use orbit::protocol::s3::versioning::VersioningOperations;
+
+// Permanently delete a specific version
+client.delete_version(
+    "documents/old-report.pdf",
+    "2/K3lmnJklsdXopTEmK+abCdXd4fJcHqZ"
+).await?;
+```
+
+### Compare Versions
+
+```rust
+use orbit::protocol::s3::versioning::VersioningOperations;
+
+let comparison = client.compare_versions(
+    "documents/report.pdf",
+    "3/L4kqtJlcpXroDTDmJ+rmSpXd3dIbrHY",
+    "4/M5nopKlmteYqpUFnL+bcDdYe5gKdIaA"
+).await?;
+
+println!("Size difference: {} bytes", comparison.size_diff);
+println!("Time between versions: {:?}", comparison.time_diff);
+println!("Content changed: {}", comparison.content_differs);
+```
+
+### Suspend Versioning
+
+```rust
+use orbit::protocol::s3::versioning::VersioningOperations;
+
+// Suspend versioning (keeps existing versions, stops creating new ones)
+client.suspend_versioning().await?;
+```
+
+### Best Practices for Versioning
+
+- **Lifecycle Policies**: Set up lifecycle rules to expire old versions automatically
+- **Cost Management**: Monitor storage costs as versioning increases storage usage
+- **Delete Markers**: Understand that deleting a versioned object creates a delete marker
+- **MFA Delete**: Enable MFA delete for critical buckets to prevent accidental deletion
+- **Restoration Testing**: Regularly test version restoration procedures
+
+---
+
+## Batch Operations (v0.4.1+)
+
+Batch operations enable efficient concurrent processing of multiple S3 objects with built-in rate limiting, error handling, and progress tracking.
+
+### Batch Delete
+
+```rust
+use orbit::protocol::s3::batch::{BatchOperations, BatchConfig};
+
+// Delete multiple objects efficiently
+let keys = vec![
+    "logs/2023/jan.log",
+    "logs/2023/feb.log",
+    "logs/2023/mar.log",
+    "temp/cache1.tmp",
+    "temp/cache2.tmp",
+];
+
+let config = BatchConfig::default()
+    .with_max_concurrent(10)
+    .with_fail_fast(false);  // Continue even if some deletions fail
+
+let result = client.batch_delete(&keys, Some(config)).await?;
+
+println!("Deleted: {}, Failed: {}", result.successful, result.failed);
+
+// Check individual results
+for (key, outcome) in result.results.iter() {
+    match outcome {
+        Ok(_) => println!("✓ Deleted: {}", key),
+        Err(e) => eprintln!("✗ Failed {}: {}", key, e),
+    }
+}
+```
+
+### Batch Copy
+
+```rust
+use orbit::protocol::s3::batch::{BatchOperations, BatchConfig};
+
+// Copy multiple objects to a new prefix
+let source_keys = vec![
+    "data/2024/report1.pdf",
+    "data/2024/report2.pdf",
+    "data/2024/report3.pdf",
+];
+
+let config = BatchConfig::default()
+    .with_max_concurrent(5)
+    .with_rate_limit(100);  // Max 100 requests per second
+
+let result = client.batch_copy(
+    &source_keys,
+    "archive/2024/",  // Destination prefix
+    Some(config)
+).await?;
+
+println!("Copied: {}/{}", result.successful, result.total);
+```
+
+### Batch Storage Class Changes
+
+```rust
+use orbit::protocol::s3::batch::{BatchOperations, BatchConfig};
+
+// Move old data to Glacier
+let keys = vec![
+    "archive/2022/data1.bin",
+    "archive/2022/data2.bin",
+    "archive/2022/data3.bin",
+];
+
+let result = client.batch_change_storage_class(
+    &keys,
+    "GLACIER_FLEXIBLE_RETRIEVAL",
+    None  // Use default config
+).await?;
+
+println!("Transitioned {} objects to Glacier", result.successful);
+```
+
+### Batch Metadata Updates
+
+```rust
+use orbit::protocol::s3::batch::BatchOperations;
+use std::collections::HashMap;
+
+let keys = vec!["data/file1.json", "data/file2.json"];
+let mut metadata = HashMap::new();
+metadata.insert("project".to_string(), "analytics".to_string());
+metadata.insert("team".to_string(), "data-science".to_string());
+
+let result = client.batch_update_metadata(&keys, metadata, None).await?;
+```
+
+### Batch Tagging
+
+```rust
+use orbit::protocol::s3::batch::BatchOperations;
+use std::collections::HashMap;
+
+let keys = vec!["images/photo1.jpg", "images/photo2.jpg"];
+let mut tags = HashMap::new();
+tags.insert("category".to_string(), "photos".to_string());
+tags.insert("year".to_string(), "2025".to_string());
+
+let result = client.batch_tag_objects(&keys, tags, None).await?;
+```
+
+### Custom Batch Configuration
+
+```rust
+use orbit::protocol::s3::batch::BatchConfig;
+use std::time::Duration;
+
+let config = BatchConfig {
+    max_concurrent: 20,           // Max 20 concurrent operations
+    rate_limit: Some(50),          // Max 50 requests/second
+    operation_timeout: Duration::from_secs(120),  // 2 minute timeout per operation
+    fail_fast: false,              // Process all items even if some fail
+    max_retries: 3,                // Retry failed operations up to 3 times
+    retry_delay: Duration::from_millis(500),
+};
+```
+
+### Monitoring Batch Progress
+
+```rust
+use orbit::protocol::s3::batch::BatchOperations;
+
+// The result contains detailed information
+let result = client.batch_delete(&keys, None).await?;
+
+println!("Batch Statistics:");
+println!("  Total items: {}", result.total);
+println!("  Successful: {}", result.successful);
+println!("  Failed: {}", result.failed);
+println!("  Duration: {:?}", result.duration);
+
+// Check individual errors
+for error in &result.errors {
+    eprintln!("Error processing {}: {}", error.key, error.message);
+}
+```
+
+---
+
+## Error Recovery (v0.4.1+)
+
+Advanced error recovery with retry policies, circuit breakers, and intelligent backoff strategies.
+
+### Retry Policies
+
+```rust
+use orbit::protocol::s3::recovery::{RetryPolicy, BackoffStrategy, with_retry};
+
+// Use preset fast retry policy
+let policy = RetryPolicy::fast();
+
+let result = with_retry(policy, || async {
+    client.upload_bytes(data.clone(), "important/file.bin").await
+}).await?;
+```
+
+### Custom Retry Policy
+
+```rust
+use orbit::protocol::s3::recovery::{RetryPolicy, BackoffStrategy};
+use std::time::Duration;
+
+let policy = RetryPolicy {
+    max_attempts: 5,
+    initial_delay: Duration::from_millis(100),
+    max_delay: Duration::from_secs(30),
+    backoff: BackoffStrategy::Exponential { multiplier: 2.0 },
+    jitter_factor: 0.1,  // Add 10% random jitter
+    use_circuit_breaker: true,
+    circuit_breaker_threshold: 5,
+    circuit_breaker_timeout: Duration::from_secs(60),
+};
+
+let result = with_retry(policy, || async {
+    client.download_bytes("critical/data.bin").await
+}).await?;
+```
+
+### Circuit Breaker Pattern
+
+```rust
+use orbit::protocol::s3::recovery::{CircuitBreaker, CircuitBreakerConfig};
+use std::sync::Arc;
+use std::time::Duration;
+
+// Create a shared circuit breaker
+let config = CircuitBreakerConfig {
+    failure_threshold: 5,        // Open after 5 failures
+    timeout: Duration::from_secs(60),  // Wait 60s before retry
+    success_threshold: 2,        // Close after 2 successes
+};
+
+let circuit_breaker = Arc::new(CircuitBreaker::new(config));
+
+// Use in operations
+match circuit_breaker.call(|| async {
+    client.upload_bytes(data.clone(), "file.bin").await
+}).await {
+    Ok(result) => println!("Upload successful"),
+    Err(e) if circuit_breaker.is_open() => {
+        eprintln!("Circuit breaker open, skipping request");
+    }
+    Err(e) => eprintln!("Upload failed: {}", e),
+}
+```
+
+### Preset Retry Policies
+
+```rust
+use orbit::protocol::s3::recovery::RetryPolicy;
+
+// Fast retry for low-latency operations
+let fast_policy = RetryPolicy::fast();
+// max_attempts: 3
+// initial_delay: 50ms
+// max_delay: 1s
+
+// Slow retry for high-latency operations
+let slow_policy = RetryPolicy::slow();
+// max_attempts: 5
+// initial_delay: 200ms
+// max_delay: 10s
+
+// Network-optimized retry
+let network_policy = RetryPolicy::network();
+// max_attempts: 5
+// initial_delay: 100ms
+// max_delay: 5s
+// Includes circuit breaker
+```
+
+### Error Classification
+
+```rust
+use orbit::protocol::s3::S3Error;
+
+match client.download_bytes("file.txt").await {
+    Err(e) if e.is_retryable() => {
+        println!("Retryable error: {}", e);
+        // Network timeout, throttling, etc.
+    }
+    Err(S3Error::NotFound { .. }) => {
+        println!("Fatal error: File not found");
+        // Don't retry
+    }
+    Err(S3Error::AccessDenied(_)) => {
+        println!("Fatal error: Access denied");
+        // Don't retry
+    }
+    Ok(data) => {
+        println!("Success!");
+    }
+}
+```
+
+---
+
+## Progress Callbacks (v0.4.1+)
+
+Real-time progress tracking for UI integration and monitoring.
+
+### Basic Progress Tracking
+
+```rust
+use orbit::protocol::s3::progress::{ProgressReporter, ProgressEvent};
+
+// Create progress reporter
+let (reporter, mut receiver) = ProgressReporter::new();
+
+// Spawn task to handle progress events
+tokio::spawn(async move {
+    while let Some(event) = receiver.recv().await {
+        match event {
+            ProgressEvent::TransferStarted { key, total_bytes, .. } => {
+                println!("Starting transfer: {} ({} bytes)", key, total_bytes);
+            }
+            ProgressEvent::Progress { percentage, rate_bps, eta_secs, .. } => {
+                println!(
+                    "Progress: {:.1}% ({:.2} MB/s, ETA: {}s)",
+                    percentage,
+                    rate_bps / 1_048_576.0,
+                    eta_secs.unwrap_or(0)
+                );
+            }
+            ProgressEvent::TransferCompleted { total_bytes, duration, .. } => {
+                println!(
+                    "Transfer complete: {} bytes in {:?}",
+                    total_bytes, duration
+                );
+            }
+            ProgressEvent::TransferFailed { error, .. } => {
+                eprintln!("Transfer failed: {}", error);
+            }
+            _ => {}
+        }
+    }
+});
+
+// Use reporter with operations (implementation-specific)
+```
+
+### Throughput Tracking
+
+```rust
+use orbit::protocol::s3::progress::ThroughputTracker;
+
+let tracker = ThroughputTracker::new();
+
+// Update with bytes transferred
+tracker.update(1_048_576).await;  // 1 MB
+
+// Get metrics
+let throughput_mbps = tracker.throughput_mbps().await;
+let eta = tracker.eta(10_485_760).await;  // 10 MB total
+
+println!("Speed: {:.2} MB/s", throughput_mbps);
+if let Some(eta) = eta {
+    println!("ETA: {:?}", eta);
+}
+```
+
+### Batch Progress Tracking
+
+```rust
+use orbit::protocol::s3::progress::ProgressEvent;
+
+while let Some(event) = receiver.recv().await {
+    if let ProgressEvent::BatchProgress {
+        completed,
+        total,
+        succeeded,
+        failed,
+        ..
+    } = event
+    {
+        println!(
+            "Batch: {}/{} complete ({} succeeded, {} failed)",
+            completed, total, succeeded, failed
+        );
+    }
+}
+```
+
+### Progress Aggregation
+
+```rust
+use orbit::protocol::s3::progress::{ProgressAggregator, ProgressReporter};
+
+// Create aggregator
+let aggregator = ProgressAggregator::new();
+
+// Add multiple reporters
+let (reporter1, receiver1) = ProgressReporter::new();
+let (reporter2, receiver2) = ProgressReporter::new();
+
+aggregator.add_reporter(reporter1).await;
+aggregator.add_reporter(reporter2).await;
+
+// Events sent to aggregator are broadcast to all reporters
+aggregator.report(ProgressEvent::TransferStarted {
+    operation_id: "op1".to_string(),
+    key: "file.bin".to_string(),
+    total_bytes: 1000,
+    direction: TransferDirection::Upload,
+}).await;
+```
+
+### Transfer Statistics
+
+```rust
+use orbit::protocol::s3::progress::TransferStats;
+use std::time::Duration;
+
+let stats = TransferStats::new(
+    10_485_760,  // 10 MB transferred
+    Duration::from_secs(10)
+);
+
+println!("Average throughput: {:.2} MB/s", stats.avg_throughput_mbps());
+println!("Peak throughput: {:.2} MB/s", stats.peak_throughput_mbps());
 ```
 
 ---
@@ -684,15 +1196,21 @@ for entry in WalkDir::new("/data/to/migrate") {
 
 ## Roadmap
 
-### Planned Features (v0.4.1+)
+### Completed in v0.4.1
 
-- [ ] Object versioning support
-- [ ] S3 Select queries
-- [ ] Batch operations
-- [ ] Progress callbacks for UI integration
-- [ ] Bandwidth throttling
-- [ ] Advanced retry strategies
-- [ ] CloudWatch metrics integration
+- [x] Object versioning support - Full version lifecycle management
+- [x] Batch operations - Concurrent processing with rate limiting
+- [x] Progress callbacks for UI integration - Real-time transfer tracking
+- [x] Advanced retry strategies - Circuit breaker and exponential backoff
+
+### Planned Features (v0.5.0+)
+
+- [ ] S3 Select queries - Server-side filtering
+- [ ] Bandwidth throttling - Network rate limiting
+- [ ] CloudWatch metrics integration - Native AWS monitoring
+- [ ] S3 Transfer Acceleration support
+- [ ] Intelligent chunk size auto-tuning
+- [ ] Enhanced presigned URL support
 
 ---
 

@@ -2,6 +2,78 @@
 
 All notable changes to Orbit will be documented in this file.
 
+## [0.4.1] - 2025-11-02
+
+### Added
+- **Enhanced Resume System** - Smart resume with chunk-level verification
+  - `ResumeInfo` now tracks verified chunk digests using BLAKE3
+  - Window ID tracking for manifest-based verification
+  - Four resume strategies: Resume, Revalidate, Restart, StartFresh
+  - File metadata validation (mtime, size) to detect external modifications
+  - Smart decision logic compares resume info against destination state
+  - Progress events for resume decisions (ResumeDecision events)
+  - New documentation: [docs/RESUME_SYSTEM.md](docs/RESUME_SYSTEM.md)
+
+- **S3 Object Versioning** - Full versioning support (`src/protocol/s3/versioning.rs`)
+  - List all versions of an object with metadata
+  - Download specific versions by version ID
+  - Delete specific versions or create delete markers
+  - Restore previous versions to current
+  - Compare versions (size, timestamps, etags)
+  - Enable/disable versioning on buckets
+  - Suspend versioning without deleting version history
+  - `VersioningOperations` trait for extensibility
+
+- **S3 Batch Operations** - Efficient batch processing (`src/protocol/s3/batch.rs`)
+  - Batch delete up to 1,000 objects per operation
+  - Batch copy with concurrent transfers
+  - Batch metadata updates
+  - Batch storage class changes (STANDARD, IA, GLACIER, etc.)
+  - Batch tagging operations
+  - Rate limiting with token bucket algorithm
+  - Configurable concurrency control via semaphores
+  - Comprehensive error tracking per operation
+  - `BatchOperations` trait for custom batch operations
+
+- **Enhanced Error Recovery** - Production-grade retry logic (`src/protocol/s3/recovery.rs`)
+  - Retry policies with exponential backoff
+  - Circuit breaker pattern to prevent cascading failures
+  - Jitter to prevent thundering herd
+  - Error classification (retryable vs fatal)
+  - Preset policies: fast, slow, network-optimized
+  - Configurable max attempts and delays
+  - Integration with S3 operations
+
+- **Progress Callbacks** - Real-time UI integration (`src/protocol/s3/progress.rs`)
+  - `ProgressEvent` enum for transfer lifecycle events
+  - `ProgressReporter` using tokio unbounded channels
+  - `ThroughputTracker` for transfer rate calculation
+  - ETA (estimated time remaining) calculation
+  - Transfer statistics collection
+  - `ProgressAggregator` for multiple reporters
+  - Batch progress tracking
+  - Support for pause/resume operations
+
+### Changed
+- **License** - Migrated to Apache License 2.0
+  - Updated LICENSE file from dual-license (MIT/Commercial) to Apache 2.0
+  - Updated all Cargo.toml files with `license = "Apache-2.0"`
+  - Updated README.md with Apache 2.0 badge and license section
+  - Updated CONTRIBUTING.md and PR templates
+  - Removed obsolete commercial license references
+
+- **S3 Module Structure** - Expanded protocol support
+  - New modules: `versioning`, `batch`, `recovery`, `progress`
+  - All modules include comprehensive documentation and examples
+  - Async-first design using tokio
+  - Trait-based APIs for extensibility
+
+### Fixed
+- Documentation link in S3_USER_GUIDE.md (PROTOCOL_GUIDE.md path corrected)
+- Resume system now handles filesystem timestamp precision (2-second tolerance)
+
+---
+
 ## [0.4.0] - 2025-10-14
 
 ### Added

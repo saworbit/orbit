@@ -87,6 +87,12 @@ mod multipart;
 mod operations;
 mod types;
 
+// New modules for v0.4.1
+pub mod versioning;
+pub mod batch;
+pub mod recovery;
+pub mod progress;
+
 #[cfg(test)]
 mod tests;
 
@@ -95,13 +101,17 @@ pub use client::S3Client;
 pub use config::{S3Config, S3ConfigBuilder};
 pub use error::{S3Error, S3Result};
 pub use types::{
-    S3Object, S3ObjectMetadata, S3ListResult, 
+    S3Object, S3ObjectMetadata, S3ListResult,
     S3StorageClass, S3ServerSideEncryption,
     ResumeState, UploadPartInfo,
 };
 
 // Re-export operations trait for extensibility
 pub use operations::S3Operations;
+
+// Re-export new feature traits
+pub use versioning::VersioningOperations;
+pub use batch::BatchOperations;
 
 /// Default multipart chunk size (5 MB - minimum for S3)
 pub const DEFAULT_CHUNK_SIZE: usize = 5 * 1024 * 1024;

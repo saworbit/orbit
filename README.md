@@ -36,7 +36,7 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 
 Orbit v0.4 introduces a **manifest-based transfer framework** with flight plans, cargo manifests, and verification tools.
 
-### Current Workflow (v0.4.0)
+### Current Workflow (v0.4.1)
 ```bash
 # 1. Create flight plan (transfer metadata)
 orbit manifest plan --source /data --dest /backup --output ./manifests
@@ -108,9 +108,9 @@ Orbit supports multiple storage backends through a unified protocol abstraction 
 
 **\*SMB Status:** Implementation complete (~1,900 lines) but blocked by upstream dependency conflict. See [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md) for details.
 
-### 🆕 S3 Cloud Storage (v0.4.0)
+### 🆕 S3 Cloud Storage (v0.4.1)
 
-Transfer files seamlessly to AWS S3 and S3-compatible storage services:
+Transfer files seamlessly to AWS S3 and S3-compatible storage services with advanced features:
 
 ```bash
 # Upload to S3
@@ -140,6 +140,10 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 - ✅ S3-compatible services (MinIO, LocalStack, DigitalOcean Spaces)
 - ✅ Flexible authentication (env vars, credentials file, IAM roles)
 - ✅ Full integration with manifest system
+- ✅ **Object versioning** - Full version lifecycle management (v0.4.1)
+- ✅ **Batch operations** - Concurrent processing with rate limiting (v0.4.1)
+- ✅ **Enhanced error recovery** - Circuit breaker and exponential backoff (v0.4.1)
+- ✅ **Progress callbacks** - Real-time transfer tracking (v0.4.1)
 
 **Quick Example:**
 ```rust
@@ -245,7 +249,7 @@ Every operation emits structured audit events for full observability.
 
 ## 📖 CLI Quick Reference
 
-**Current syntax (v0.4.0):**
+**Current syntax (v0.4.1):**
 ```bash
 orbit --source <PATH> --dest <PATH> [FLAGS]
 orbit manifest <plan|verify|diff|info> [OPTIONS]
@@ -507,24 +511,20 @@ Benefits: Native SMB, automatic resume, exponential backoff
 
 ## 🧪 Roadmap
 
-### ✅ Completed (v0.4.0)
+### ✅ Completed (v0.4.1)
 
 - Zero-copy and compression engines
 - Manifest + Starmap + Audit integration
 - Structured telemetry with JSON Lines
 - Modular crate architecture
-- Resume and retry improvements
-- **Native S3 support with multipart transfers** ⭐ NEW!
+- Resume and retry improvements with chunk-level verification
+- **Native S3 support with multipart transfers** ⭐
 - S3-compatible storage (MinIO, LocalStack)
+- **S3 object versioning support** ⭐ NEW!
+- **S3 batch operations with rate limiting** ⭐ NEW!
+- **Enhanced error recovery (circuit breaker, exponential backoff)** ⭐ NEW!
+- **Progress callbacks for UI integration** ⭐ NEW!
 - SMB2/3 native implementation (awaiting upstream fix)
-
-### 🧠 In Progress (v0.4.1)
-
-- S3 object versioning support
-- S3 batch operations
-- Enhanced error recovery
-- Performance optimizations
-- Progress callbacks for UI integration
 
 ### 🚧 Planned (v0.6.0+)
 

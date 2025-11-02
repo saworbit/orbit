@@ -1,6 +1,6 @@
 # Protocol Support in Orbit
 
-Orbit v0.4.0 introduces a **protocol abstraction layer** that enables copying files across different storage backends using a unified interface.
+Orbit v0.4.1 introduces a **protocol abstraction layer** that enables copying files across different storage backends using a unified interface.
 
 ---
 
@@ -51,7 +51,7 @@ orbit -s /home/user/docs -d /backup/docs \
 
 **Protocol:** `smb://` or `cifs://`
 
-**Status:** Experimental stub implementation (v0.4.0)
+**Status:** Experimental stub implementation (v0.4.0, awaiting upstream dependency fix)
 
 **Production-ready:** v0.4.1 (planned Q1 2026)
 
@@ -78,8 +78,8 @@ orbit -s /local/source.txt -d smb://server/share/dest.txt
 orbit -s smb://server/projects/data -d /backup/data -R
 ```
 
-**Current Limitations (v0.4.0):**
-- ⚠️ Stub implementation only - for testing architecture
+**Current Limitations (v0.4.0/v0.4.1):**
+- ⚠️ Stub implementation only - awaiting upstream dependency fix
 - ⚠️ Not recommended for production use
 - ⚠️ Authentication not fully implemented
 - ⚠️ Large file transfers untested
@@ -93,7 +93,7 @@ orbit -s smb://server/projects/data -d /backup/data -R
 
 ---
 
-### ✅ Amazon S3 (Available in v0.4.0)
+### ✅ Amazon S3 (Available in v0.4.1)
 
 **Protocol:** `s3://`
 
@@ -299,7 +299,7 @@ orbit -s smb://server/share/file.txt -d ./file.txt --credentials ~/.orbit/creds.
 
 ## 🧪 Testing Protocol Support
 
-### Test SMB (v0.4.0 stub)
+### Test SMB (v0.4.0/v0.4.1 stub)
 
 ```bash
 # This will connect but not actually transfer
@@ -343,11 +343,11 @@ Error: Unsupported protocol: ftp
 ```
 **Solution:** Check the list of supported protocols above. FTP is not yet supported.
 
-### SMB connection failures (v0.4.0)
+### SMB connection failures (v0.4.0/v0.4.1)
 ```
 Error: SMB connection failed
 ```
-**Expected:** SMB is experimental in v0.4.0. Wait for v0.4.1 or use local filesystem.
+**Expected:** SMB implementation is blocked by upstream dependency conflict in v0.4.0/v0.4.1. See [docs/SMB_NATIVE_STATUS.md](docs/SMB_NATIVE_STATUS.md) for details. Use local filesystem or S3 protocol instead.
 
 ### URI parsing errors
 ```
