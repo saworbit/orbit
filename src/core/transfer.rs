@@ -3,6 +3,7 @@
  */
 
 use std::path::Path;
+use std::time::Instant;
 
 use crate::config::{CopyConfig, CompressionType};
 use crate::error::{OrbitError, Result};
@@ -11,6 +12,8 @@ use super::CopyStats;
 use super::zero_copy;
 use super::buffered;
 use super::progress::ProgressPublisher;
+use super::validation;
+use super::delta::{self, DeltaConfig};
 
 /// Internal copy implementation (called by retry logic)
 ///
@@ -53,6 +56,11 @@ fn copy_direct(
     config: &CopyConfig,
     publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
+    // Check if delta transfer should be used
+    if validation::should_use_delta_transfer(source_path, dest_path, config)? {
+        return copy_with_delta_integration(source_path, dest_path, source_size, config);
+    }
+
     // Determine if we should attempt zero-copy
     let use_zero_copy = zero_copy::should_use_zero_copy(source_path, dest_path, config)?;
 
@@ -80,4 +88,48 @@ fn copy_direct(
 
     // Use buffered copy (either as fallback or by default)
     buffered::copy_buffered(source_path, dest_path, source_size, config, publisher)
+}
+
+/// Perform delta transfer and convert to CopyStats
+fn copy_with_delta_integration(
+    source_path: &Path,
+    dest_path: &Path,
+    _source_size: u64,
+    config: &CopyConfig,
+) -> Result<CopyStats> {
+    let start = Instant::now();
+
+    let delta_config = DeltaConfig {
+        check_mode: config.check_mode,
+        block_size: config.delta_block_size,
+        whole_file: config.whole_file,
+        update_manifest: config.update_manifest,
+        ignore_existing: config.ignore_existing,
+        hash_algorithm: config.delta_hash_algorithm,
+        parallel_hashing: config.parallel_hashing,
+        manifest_path: config.delta_manifest_path.clone(),
+    };
+
+    let (delta_stats, checksum) = delta::copy_with_delta_fallback(
+        source_path,
+        dest_path,
+        &delta_config,
+    )?;
+
+    let duration = start.elapsed();
+
+    if config.show_progress {
+        println!("✓ Delta transfer: {}", delta_stats);
+    }
+
+    Ok(CopyStats {
+        bytes_copied: delta_stats.bytes_transferred,
+        duration,
+        checksum,
+        compression_ratio: None,
+        files_copied: 1,
+        files_skipped: 0,
+        files_failed: 0,
+        delta_stats: Some(delta_stats),
+    })
 }

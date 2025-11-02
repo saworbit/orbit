@@ -4,9 +4,10 @@
 
 use std::path::Path;
 use sysinfo::Disks;
-use crate::config::CopyMode;
+use crate::config::{CopyMode, CopyConfig};
 use crate::error::{OrbitError, Result};
 use super::disk_guardian::{self, GuardianConfig};
+use super::delta::{CheckMode, self};
 
 /// Validate that sufficient disk space is available (basic check)
 ///
@@ -79,15 +80,65 @@ pub fn should_copy_file(source_path: &Path, dest_path: &Path, mode: CopyMode) ->
 /// Check if a path matches any exclude patterns
 pub fn matches_exclude_pattern(path: &Path, patterns: &[String]) -> bool {
     use glob::Pattern;
-    
+
     let path_str = path.to_string_lossy();
-    
+
     patterns.iter().any(|pattern| {
         Pattern::new(pattern)
             .ok()
             .map(|p| p.matches(&path_str))
             .unwrap_or(false)
     })
+}
+
+/// Determine if files need to be transferred based on check mode
+pub fn files_need_transfer(
+    source_path: &Path,
+    dest_path: &Path,
+    check_mode: CheckMode,
+) -> Result<bool> {
+    if !dest_path.exists() {
+        return Ok(true);
+    }
+
+    let source_meta = std::fs::metadata(source_path)?;
+    let dest_meta = std::fs::metadata(dest_path)?;
+
+    match check_mode {
+        CheckMode::ModTime => {
+            Ok(source_meta.modified()? > dest_meta.modified()?
+               || source_meta.len() != dest_meta.len())
+        }
+        CheckMode::Size => {
+            Ok(source_meta.len() != dest_meta.len())
+        }
+        CheckMode::Checksum | CheckMode::Delta => {
+            if source_meta.len() != dest_meta.len() {
+                return Ok(true);
+            }
+            Ok(true)
+        }
+    }
+}
+
+/// Determine if delta transfer should be used for a file pair
+pub fn should_use_delta_transfer(
+    source_path: &Path,
+    dest_path: &Path,
+    config: &CopyConfig,
+) -> Result<bool> {
+    let delta_config = super::delta::DeltaConfig {
+        check_mode: config.check_mode,
+        block_size: config.delta_block_size,
+        whole_file: config.whole_file,
+        update_manifest: config.update_manifest,
+        ignore_existing: config.ignore_existing,
+        hash_algorithm: config.delta_hash_algorithm,
+        parallel_hashing: config.parallel_hashing,
+        manifest_path: config.delta_manifest_path.clone(),
+    };
+
+    delta::should_use_delta(source_path, dest_path, &delta_config)
 }
 
 #[cfg(test)]

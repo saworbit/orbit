@@ -120,11 +120,36 @@ struct Cli {
     /// Output directory for manifests
     #[arg(long, global = true, requires = "generate_manifest")]
     manifest_dir: Option<PathBuf>,
-    
+
+    // Delta detection options
+    /// Check mode for change detection (modtime, size, checksum, delta)
+    #[arg(long, value_enum, default_value = "modtime", global = true)]
+    check: CheckModeArg,
+
+    /// Block size for delta algorithm (in KB)
+    #[arg(long, default_value = "1024", global = true)]
+    block_size: usize,
+
+    /// Force whole file copy, disable delta optimization
+    #[arg(long, global = true)]
+    whole_file: bool,
+
+    /// Update manifest database after transfer
+    #[arg(long, global = true)]
+    update_manifest: bool,
+
+    /// Skip files that already exist at destination
+    #[arg(long, global = true)]
+    ignore_existing: bool,
+
+    /// Path to delta manifest database
+    #[arg(long, global = true)]
+    delta_manifest: Option<PathBuf>,
+
     /// Path to config file (overrides default locations)
     #[arg(long, global = true)]
     config: Option<PathBuf>,
-    
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -280,6 +305,25 @@ impl From<AuditFormatArg> for AuditFormat {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum CheckModeArg {
+    ModTime,
+    Size,
+    Checksum,
+    Delta,
+}
+
+impl From<CheckModeArg> for orbit::core::delta::CheckMode {
+    fn from(mode: CheckModeArg) -> Self {
+        match mode {
+            CheckModeArg::ModTime => orbit::core::delta::CheckMode::ModTime,
+            CheckModeArg::Size => orbit::core::delta::CheckMode::Size,
+            CheckModeArg::Checksum => orbit::core::delta::CheckMode::Checksum,
+            CheckModeArg::Delta => orbit::core::delta::CheckMode::Delta,
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     
@@ -365,7 +409,15 @@ fn main() -> Result<()> {
     // Configure audit logging
     config.audit_format = cli.audit_format.into();
     config.audit_log_path = cli.audit_log;
-    
+
+    // Configure delta detection
+    config.check_mode = cli.check.into();
+    config.delta_block_size = cli.block_size * 1024; // Convert KB to bytes
+    config.whole_file = cli.whole_file;
+    config.update_manifest = cli.update_manifest;
+    config.ignore_existing = cli.ignore_existing;
+    config.delta_manifest_path = cli.delta_manifest;
+
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {
         copy_directory(&source_path, &dest_path, &config)?

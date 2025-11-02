@@ -15,6 +15,7 @@ pub mod buffered;
 pub mod bandwidth;
 pub mod directory;
 pub mod progress;
+pub mod delta;
 
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -33,6 +34,7 @@ pub struct CopyStats {
     pub files_copied: u64,
     pub files_skipped: u64,
     pub files_failed: u64,
+    pub delta_stats: Option<delta::DeltaStats>,
 }
 
 impl CopyStats {
@@ -45,7 +47,13 @@ impl CopyStats {
             files_copied: 0,
             files_skipped: 0,
             files_failed: 0,
+            delta_stats: None,
         }
+    }
+
+    pub fn with_delta(mut self, delta_stats: delta::DeltaStats) -> Self {
+        self.delta_stats = Some(delta_stats);
+        self
     }
 }
 
@@ -105,6 +113,7 @@ pub fn copy_file_impl(
             files_copied: 0,
             files_skipped: 1,
             files_failed: 0,
+            delta_stats: None,
         });
     }
 
@@ -119,6 +128,7 @@ pub fn copy_file_impl(
             files_copied: 1,
             files_skipped: 0,
             files_failed: 0,
+            delta_stats: None,
         });
     }
 

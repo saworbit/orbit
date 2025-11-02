@@ -114,6 +114,39 @@ pub struct CopyConfig {
     /// Path to audit log file
     #[serde(default)]
     pub audit_log_path: Option<PathBuf>,
+
+    // Delta detection options
+    /// Check mode for delta detection (modtime, size, checksum, delta)
+    #[serde(default)]
+    pub check_mode: crate::core::delta::CheckMode,
+
+    /// Block size for delta algorithm (default: 1MB)
+    #[serde(default = "default_delta_block_size")]
+    pub delta_block_size: usize,
+
+    /// Force whole file copy, disable delta
+    #[serde(default)]
+    pub whole_file: bool,
+
+    /// Update manifest database after transfer
+    #[serde(default)]
+    pub update_manifest: bool,
+
+    /// Skip files that already exist at destination
+    #[serde(default)]
+    pub ignore_existing: bool,
+
+    /// Hash algorithm for delta (blake3, md5, sha256)
+    #[serde(default)]
+    pub delta_hash_algorithm: crate::core::delta::HashAlgorithm,
+
+    /// Enable parallel hashing for delta
+    #[serde(default = "default_true")]
+    pub parallel_hashing: bool,
+
+    /// Path to delta manifest database
+    #[serde(default)]
+    pub delta_manifest_path: Option<PathBuf>,
 }
 
 impl Default for CopyConfig {
@@ -141,6 +174,14 @@ impl Default for CopyConfig {
             chunking_strategy: ChunkingStrategy::default(),
             audit_format: AuditFormat::Json,
             audit_log_path: None,
+            check_mode: crate::core::delta::CheckMode::ModTime,
+            delta_block_size: default_delta_block_size(),
+            whole_file: false,
+            update_manifest: false,
+            ignore_existing: false,
+            delta_hash_algorithm: crate::core::delta::HashAlgorithm::Blake3,
+            parallel_hashing: true,
+            delta_manifest_path: None,
         }
     }
 }
@@ -240,6 +281,10 @@ fn default_retry_attempts() -> u32 {
 
 fn default_retry_delay() -> u64 {
     5
+}
+
+fn default_delta_block_size() -> usize {
+    1024 * 1024 // 1 MB
 }
 
 impl CopyConfig {

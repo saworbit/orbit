@@ -479,6 +479,7 @@ pub fn try_zero_copy_direct(
         files_copied: 1,
         files_skipped: 0,
         files_failed: 0,
+        delta_stats: None,
     })
 }
 

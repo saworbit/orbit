@@ -36,6 +36,7 @@ zstd = "0.13"
 # Checksums
 sha2 = "0.10"
 blake3 = "1.5"
+adler = "1.0"
 
 # Parallel processing
 rayon = "1.10"
@@ -92,6 +93,9 @@ secrecy = { version = "0.10", optional = true, features = ["serde"] }
 futures = { version = "0.3", optional = true }
 pin-project = { version = "1", optional = true }
 once_cell = { version = "1.19", optional = true }
+
+# Delta manifest persistence (optional)
+rusqlite = { version = "0.31", features = ["bundled"], optional = true }
 
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -152,5 +156,8 @@ ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:b
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
 
+# Delta manifest persistence with SQLite
+delta-manifest = ["dep:rusqlite"]
+
 # Full feature set
-full = ["zero-copy", "protocols", "smb-native", "s3-native", "ssh-backend", "backend-abstraction"]
+full = ["zero-copy", "protocols", "smb-native", "s3-native", "ssh-backend", "backend-abstraction", "delta-manifest"]

@@ -125,6 +125,7 @@ pub fn copy_with_lz4(
         files_copied: 1,
         files_skipped: 0,
         files_failed: 0,
+        delta_stats: None,
     })
 }
 
@@ -253,6 +254,7 @@ pub fn copy_with_zstd(
         files_copied: 1,
         files_skipped: 0,
         files_failed: 0,
+        delta_stats: None,
     })
 }
 
