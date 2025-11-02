@@ -1,12 +1,31 @@
 # 🚀 Orbit
 
-> **O**pen **R**esilient **B**ulk **I**nformation **T**ransfer  
+> **O**pen **R**esilient **B**ulk **I**nformation **T**ransfer
 
-**The intelligent file transfer tool that never gives up** 💪  
+**The intelligent file transfer tool that never gives up** 💪
 
 [![Crates.io](https://img.shields.io/crates/v/orbit.svg)](https://crates.io/crates/orbit)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Build Status](https://github.com/saworbit/orbit/workflows/CI/badge.svg)](https://github.com/saworbit/orbit/actions)
+
+---
+
+## 📑 Table of Contents
+
+- [What is Orbit?](#-what-is-orbit)
+- [Why Orbit?](#-why-orbit)
+- [Key Features](#-key-features)
+  - [Disk Guardian](#-disk-guardian-pre-flight-safety)
+  - [Manifest System + Starmap](#-manifest-system--starmap-planner)
+  - [Protocol Support](#-protocol-support)
+  - [Audit & Telemetry](#-audit-and-telemetry)
+- [Quick Start](#-quick-start)
+- [Performance](#-performance-benchmarks)
+- [Use Cases](#-use-cases)
+- [Configuration](#-configuration)
+- [Documentation](#-documentation)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
 
 ---
 
@@ -25,6 +44,7 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 | 🚄 **3× Faster** | Zero-copy system calls transfer at device speed |
 | 🛡️ **Bulletproof** | Smart resume with chunk verification, checksums, corruption detection |
 | 🧠 **Smart** | Adapts strategy based on environment (zero-copy, compression, buffered) |
+| 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
 | 🌐 **Protocol Ready** | Local, SMB/CIFS, **S3**, Azure (expanding) |
 | 📊 **Fully Auditable** | Structured JSON telemetry for every operation |
 | 🧩 **Modular** | Clean architecture with reusable crates |
@@ -32,11 +52,63 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 
 ---
 
-## 🗂️ Manifest System + Starmap Planner
+## 🔑 Key Features
+
+### 🛡️ Disk Guardian: Pre-Flight Safety
+
+**NEW in v0.4.1!** Comprehensive disk space and filesystem validation to prevent mid-transfer failures.
+
+**Prevents:**
+- ❌ Mid-transfer disk-full errors
+- ❌ OOM conditions from insufficient space
+- ❌ Transfers to read-only filesystems
+- ❌ Permission errors (detected early)
+
+**Features:**
+- **Safety Margins** — 10% extra space by default, fully configurable
+- **Minimum Free Space** — Always leaves 100 MB free (configurable)
+- **Filesystem Integrity** — Write permissions, read-only detection
+- **Staging Areas** — Atomic transfers with temporary staging
+- **Live Monitoring** — Optional filesystem watching (via `notify` crate)
+- **Directory Estimation** — Pre-calculate space needed for directory transfers
+
+```bash
+# Automatic pre-flight checks for directory transfers
+orbit --source /data --dest /backup --recursive
+# Output:
+# Performing pre-flight checks...
+# Estimated transfer size: 5368709120 bytes
+# ✓ Sufficient disk space (with safety margin)
+```
+
+**Manual API:**
+```rust
+use orbit::core::disk_guardian::{ensure_transfer_safety, GuardianConfig};
+
+let config = GuardianConfig {
+    safety_margin_percent: 0.10,      // 10% extra
+    min_free_space: 100 * 1024 * 1024, // 100 MB
+    check_integrity: true,
+    enable_watching: false,
+};
+
+ensure_transfer_safety(dest_path, required_bytes, &config)?;
+```
+
+**Try it:**
+```bash
+cargo run --example disk_guardian_demo
+```
+
+📖 **Full Documentation:** See [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md)
+
+---
+
+### 🗂️ Manifest System + Starmap Planner
 
 Orbit v0.4 introduces a **manifest-based transfer framework** with flight plans, cargo manifests, and verification tools.
 
-### Current Workflow (v0.4.1)
+#### Current Workflow (v0.4.1)
 ```bash
 # 1. Create flight plan (transfer metadata)
 orbit manifest plan --source /data --dest /backup --output ./manifests
@@ -49,7 +121,7 @@ orbit --source /data --dest /backup --recursive \
 orbit manifest verify --manifest-dir ./manifests
 ```
 
-### 🔭 Current Starmap Features
+#### 🔭 Current Starmap Features
 
 - **Flight Plans** — JSON-based transfer metadata and file tracking
 - **Cargo Manifests** — Per-file chunk-level verification
@@ -57,7 +129,7 @@ orbit manifest verify --manifest-dir ./manifests
 - **Diff Support** — Compare manifests with target directories
 - **Audit Integration** — Full traceability for every operation
 
-### 🚧 Planned: Declarative Manifests (v0.6.0+)
+#### 🚧 Planned: Declarative Manifests (v0.6.0+)
 
 **Future support for TOML-based job definitions:**
 
@@ -80,20 +152,9 @@ destination = "/tank/archive/"
 depends_on = ["source-sync"]  # Dependency ordering
 ```
 
-**Planned execution:**
-```bash
-orbit run --manifest orbit.manifest.toml  # Coming in v0.6.0+
-```
-
-**Planned features:**
-- Dependency graphs with automatic ordering
-- Parallel execution of independent jobs
-- Resource validation before execution
-- Visual planning and execution graphs
-
 ---
 
-## 🌐 Protocol Support
+### 🌐 Protocol Support
 
 Orbit supports multiple storage backends through a unified protocol abstraction layer.
 
@@ -101,14 +162,14 @@ Orbit supports multiple storage backends through a unified protocol abstraction 
 |----------|--------|--------------|-------------|
 | 🗂️ **Local** | ✅ Stable | Built-in | Local filesystem with zero-copy optimization |
 | 🌐 **SMB/CIFS** | 🟡 Ready* | `smb-native` | Native SMB2/3 client (pure Rust, no dependencies) |
-| ☁️ **S3** | ✅ **NEW!** | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
+| ☁️ **S3** | ✅ **Stable** | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
 | ☁️ **Azure Blob** | 🚧 Planned | - | Microsoft Azure Blob Storage |
 | ☁️ **GCS** | 🚧 Planned | - | Google Cloud Storage |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
 
 **\*SMB Status:** Implementation complete (~1,900 lines) but blocked by upstream dependency conflict. See [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md) for details.
 
-### 🆕 S3 Cloud Storage (v0.4.1)
+#### 🆕 S3 Cloud Storage (v0.4.1)
 
 Transfer files seamlessly to AWS S3 and S3-compatible storage services with advanced features:
 
@@ -128,8 +189,6 @@ export S3_ENDPOINT=http://localhost:9000
 orbit --source file.txt --dest s3://my-bucket/file.txt
 ```
 
-**Note:** S3-specific flags (`--region`, `--storage-class`) are planned for v0.6.0. Currently configure via environment variables or configuration file.
-
 **S3 Features:**
 - ✅ Pure Rust (no AWS CLI dependency)
 - ✅ Multipart upload/download for large files (>5MB)
@@ -140,35 +199,14 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 - ✅ S3-compatible services (MinIO, LocalStack, DigitalOcean Spaces)
 - ✅ Flexible authentication (env vars, credentials file, IAM roles)
 - ✅ Full integration with manifest system
-- ✅ **Object versioning** - Full version lifecycle management (v0.4.1)
-- ✅ **Batch operations** - Concurrent processing with rate limiting (v0.4.1)
-- ✅ **Enhanced error recovery** - Circuit breaker and exponential backoff (v0.4.1)
-- ✅ **Progress callbacks** - Real-time transfer tracking (v0.4.1)
+- ✅ Object versioning and lifecycle management
+- ✅ Batch operations with rate limiting
+- ✅ Enhanced error recovery with circuit breaker
 
-**Quick Example:**
-```rust
-use orbit::protocol::s3::{S3Client, S3Config};
-use bytes::Bytes;
+📖 **Full Documentation:** See [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = S3Config::new("my-bucket".to_string());
-    let client = S3Client::new(config).await?;
-    
-    // Upload
-    client.upload_bytes(Bytes::from("Hello, S3!"), "hello.txt").await?;
-    
-    // Download
-    let data = client.download_bytes("hello.txt").await?;
-    println!("Downloaded: {}", String::from_utf8_lossy(&data));
-    
-    Ok(())
-}
-```
+#### SMB/CIFS Network Shares
 
-📖 **Full Documentation:** See [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md) for complete guide including authentication, configuration, multipart transfers, and S3-compatible storage setup.
-
-### SMB/CIFS Network Shares
 ```bash
 # Copy to SMB share (when available)
 orbit --source /local/file.txt --dest smb://user:pass@server/share/file.txt
@@ -177,8 +215,6 @@ orbit --source /local/file.txt --dest smb://user:pass@server/share/file.txt
 orbit --source /local/data --dest smb://server/backup \
   --mode sync --resume --parallel 4 --recursive
 ```
-
-**Note:** SMB-specific flags (`--smb-user`, `--smb-domain`) are planned for future releases. Currently embed credentials in URI or use configuration file.
 
 **SMB Features:**
 - Pure Rust (no libsmbclient dependency)
@@ -190,11 +226,11 @@ orbit --source /local/data --dest smb://server/backup \
 
 ---
 
-## 📊 Audit and Telemetry
+### 📊 Audit and Telemetry
 
 Every operation emits structured audit events for full observability.
 
-### Example Audit Log
+**Example Audit Log:**
 ```json
 {
   "timestamp": "2025-10-25T16:42:19Z",
@@ -220,56 +256,16 @@ Every operation emits structured audit events for full observability.
 - JSON Lines format (machine-parseable)
 - Timestamped with nanosecond precision
 - Full job context and metadata
-- Protocol-specific metrics (S3 storage class, multipart info, etc.)
+- Protocol-specific metrics
 - Ready for ELK, Loki, Datadog ingestion
 - Starmap node correlation
-
----
-
-## ⚡ Performance Benchmarks
-
-| File Size | Traditional cp | Orbit (Zero-Copy) | Speedup | CPU Usage |
-|-----------|----------------|-------------------|---------|-----------|
-| 10 MB | 12 ms | 8 ms | 1.5× | ↓ 65% |
-| 1 GB | 980 ms | 340 ms | 2.9× | ↓ 78% |
-| 10 GB | 9.8 s | 3.4 s | 2.9× | ↓ 80% |
-
-**S3 Transfer Performance:**
-- **Multipart Upload:** 500+ MB/s on high-bandwidth links
-- **Parallel Operations:** 4-16 concurrent chunks (configurable)
-- **Adaptive Chunking:** 5MB-2GB chunks based on file size
-- **Resume Efficiency:** Chunk-level verification with intelligent restart decisions
-
-**Compression Performance:**
-- Zstd level 3 → 2.3× faster over networks
-- LZ4 → near-realtime local copies
-- Adaptive selection based on link speed
-
----
-
-## 📖 CLI Quick Reference
-
-**Current syntax (v0.4.1):**
-```bash
-orbit --source <PATH> --dest <PATH> [FLAGS]
-orbit manifest <plan|verify|diff|info> [OPTIONS]
-orbit <stats|presets|capabilities>
-```
-
-**Planned syntax (v0.6.0+):**
-```bash
-orbit cp <SOURCE> <DEST> [FLAGS]          # Friendly alias
-orbit sync <SOURCE> <DEST> [FLAGS]        # Sync mode alias
-orbit run --manifest <FILE>               # Execute from manifest (planned)
-```
-
-> **Note:** The current release uses flag-based syntax. User-friendly subcommands like `cp`, `sync`, and `run` are planned for v0.6.0.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Install
+
 ```bash
 # From crates.io
 cargo install orbit
@@ -285,11 +281,12 @@ sudo cp target/release/orbit /usr/local/bin/
 ```
 
 ### Basic Usage
+
 ```bash
 # Simple copy
 orbit --source source.txt --dest destination.txt
 
-# Copy with resume and checksum verification (checksum is enabled by default)
+# Copy with resume and checksum verification
 orbit --source large-file.iso --dest /backup/large-file.iso --resume
 
 # Recursive directory copy with compression
@@ -307,60 +304,117 @@ orbit manifest plan --source /data --dest /backup --output ./manifests
 
 ---
 
+## ⚡ Performance Benchmarks
+
+### Local Transfer Performance
+
+| File Size | Traditional cp | Orbit (Zero-Copy) | Speedup | CPU Usage |
+|-----------|----------------|-------------------|---------|-----------|
+| 10 MB | 12 ms | 8 ms | 1.5× | ↓ 65% |
+| 1 GB | 980 ms | 340 ms | 2.9× | ↓ 78% |
+| 10 GB | 9.8 s | 3.4 s | 2.9× | ↓ 80% |
+
+### S3 Transfer Performance
+
+- **Multipart Upload:** 500+ MB/s on high-bandwidth links
+- **Parallel Operations:** 4-16 concurrent chunks (configurable)
+- **Adaptive Chunking:** 5MB-2GB chunks based on file size
+- **Resume Efficiency:** Chunk-level verification with intelligent restart decisions
+
+### Compression Performance
+
+- Zstd level 3 → 2.3× faster over networks
+- LZ4 → near-realtime local copies
+- Adaptive selection based on link speed
+
+---
+
 ## 🧠 Smart Strategy Selection
 
 Orbit automatically selects the optimal transfer strategy:
+
 ```
 Same-disk large file  → Zero-copy (copy_file_range, sendfile)
 Cross-filesystem      → Streaming with buffer pool
 Slow network link     → Compression (zstd/lz4)
 Cloud storage (S3)    → Multipart with parallel chunks
-Unreliable network    → Smart resume (detect corruption, revalidate modified files)
+Unreliable network    → Smart resume (detect corruption, revalidate)
 Critical data         → SHA-256 checksum + audit log
+Directory transfers   → Disk Guardian pre-flight checks
 ```
 
 You can override with explicit flags when needed.
 
 ---
 
-## 🧩 Modular Architecture
+## 📈 Use Cases
 
-Orbit is built from clean, reusable crates:
+### Cloud Data Lake Ingestion
 
-| Crate | Purpose | Status |
-|-------|---------|--------|
-| 🧩 `core-manifest` | Manifest parsing and job orchestration | ✅ Stable |
-| 🌌 `core-starmap` | Job planner and dependency graph | ✅ Stable |
-| 📊 `core-audit` | Structured logging and telemetry | ✅ Stable |
-| ⚡ `core-zero-copy` | OS-level optimized I/O | ✅ Stable |
-| 🗜️ `core-compress` | Compression and decompression | ✅ Stable |
-| 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
-| 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
-| 🧪 `wormhole` | Forward-error correction | 🚧 Dev |
+```bash
+# Upload analytics data to S3
+orbit --source /data/analytics --dest s3://data-lake/raw/2025/ \
+  --recursive \
+  --parallel 16 \
+  --compress zstd:3
+```
 
-This structure ensures isolation, testability, and reusability.
+**Benefits:** Parallel uploads, compression, checksums, automatic pre-flight checks
 
----
+### Enterprise Backup
 
-## 🕵️ Watcher / Beacon
+```bash
+# Use manifest system for complex backup jobs
+orbit manifest plan --source /data --dest /backup --output ./manifests
+orbit manifest verify --manifest-dir ./manifests
+```
 
-**Status:** 🚧 Planned for v0.6.0+
+**Benefits:** Resume, checksums, parallel jobs, full audit trail, disk space validation
 
-A companion service that will monitor Orbit runtime health:
+### Hybrid Cloud Migration
 
-**Planned Features:**
-- Detect stalled transfers
-- Track telemetry and throughput
-- Trigger recovery actions
-- Prometheus-compatible metrics export
+```bash
+# Migrate local storage to S3
+orbit --source /on-prem/data --dest s3://migration-bucket/data \
+  --mode sync \
+  --recursive \
+  --resume \
+  --parallel 12
+```
 
-This feature is currently in the design phase. See the [roadmap](#-roadmap) for details.
+**Benefits:** Resumable, parallel transfers, pre-flight safety checks
+
+### Data Migration
+
+```bash
+orbit --source /old-storage --dest /new-storage \
+  --recursive \
+  --parallel 16 \
+  --show-progress
+```
+
+**Benefits:** Parallel streams, verification enabled by default, progress tracking, disk space validation
+
+### Network Shares
+
+```bash
+orbit --source /local/files --dest smb://nas/backup \
+  --mode sync \
+  --recursive \
+  --resume \
+  --retry-attempts 10
+```
+
+**Benefits:** Native SMB, automatic resume, exponential backoff
 
 ---
 
 ## ⚙️ Configuration
 
+### Configuration File
+
 Persistent defaults via `orbit.toml`:
+
 ```toml
 # ~/.orbit/orbit.toml or ./orbit.toml
 
@@ -430,13 +484,32 @@ audit_format = "json"
 audit_log_path = "/var/log/orbit_audit.log"
 ```
 
-**Note:** S3-specific options (region, storage class) and SMB options (timeout, encryption) are configured via environment variables or protocol-specific configuration files in future releases.
+### Configuration Priority
 
-**Configuration Priority:**
 1. CLI arguments (highest)
 2. `./orbit.toml` (project)
 3. `~/.orbit/orbit.toml` (user)
 4. Built-in defaults (lowest)
+
+---
+
+## 🧩 Modular Architecture
+
+Orbit is built from clean, reusable crates:
+
+| Crate | Purpose | Status |
+|-------|---------|--------|
+| 🧩 `core-manifest` | Manifest parsing and job orchestration | ✅ Stable |
+| 🌌 `core-starmap` | Job planner and dependency graph | ✅ Stable |
+| 📊 `core-audit` | Structured logging and telemetry | ✅ Stable |
+| ⚡ `core-zero-copy` | OS-level optimized I/O | ✅ Stable |
+| 🗜️ `core-compress` | Compression and decompression | ✅ Stable |
+| 🛡️ `disk-guardian` | Pre-flight space & integrity checks | ✅ **NEW!** |
+| 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
+| 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
+| 🧪 `wormhole` | Forward-error correction | 🚧 Dev |
+
+This structure ensures isolation, testability, and reusability.
 
 ---
 
@@ -448,64 +521,28 @@ audit_log_path = "/var/log/orbit_audit.log"
 - **S3 Encryption** — Server-side encryption (AES-256, AWS KMS)
 - **No Telemetry Phone-Home** — All data stays local
 - **AWS Credential Chain** — Secure credential sourcing (IAM roles, env vars, credential files)
+- **Pre-Flight Validation** — Disk Guardian prevents dangerous operations
 - **Future FIPS Support** — Compliance-ready crypto modules
 
 ---
 
-## 📈 Use Cases
+## 📖 CLI Quick Reference
 
-### Cloud Data Lake Ingestion
+**Current syntax (v0.4.1):**
 ```bash
-# Upload analytics data to S3
-orbit --source /data/analytics --dest s3://data-lake/raw/2025/ \
-  --recursive \
-  --parallel 16 \
-  --compress zstd:3
+orbit --source <PATH> --dest <PATH> [FLAGS]
+orbit manifest <plan|verify|diff|info> [OPTIONS]
+orbit <stats|presets|capabilities>
 ```
 
-Benefits: Parallel uploads, compression, checksums (storage class via config file)
-
-### Enterprise Backup
+**Planned syntax (v0.6.0+):**
 ```bash
-# Use manifest system for complex backup jobs
-orbit manifest plan --source /data --dest /backup --output ./manifests
-orbit manifest verify --manifest-dir ./manifests
+orbit cp <SOURCE> <DEST> [FLAGS]          # Friendly alias
+orbit sync <SOURCE> <DEST> [FLAGS]        # Sync mode alias
+orbit run --manifest <FILE>               # Execute from manifest (planned)
 ```
 
-Benefits: Resume, checksums, parallel jobs, full audit trail
-
-### Hybrid Cloud Migration
-```bash
-# Migrate local storage to S3
-orbit --source /on-prem/data --dest s3://migration-bucket/data \
-  --mode sync \
-  --recursive \
-  --resume \
-  --parallel 12
-```
-
-Benefits: Resumable, parallel transfers (storage class via config file)
-
-### Data Migration
-```bash
-orbit --source /old-storage --dest /new-storage \
-  --recursive \
-  --parallel 16 \
-  --show-progress
-```
-
-Benefits: Parallel streams, verification enabled by default, progress tracking
-
-### Network Shares
-```bash
-orbit --source /local/files --dest smb://nas/backup \
-  --mode sync \
-  --recursive \
-  --resume \
-  --retry-attempts 10
-```
-
-Benefits: Native SMB, automatic resume, exponential backoff
+> **Note:** The current release uses flag-based syntax. User-friendly subcommands like `cp`, `sync`, and `run` are planned for v0.6.0.
 
 ---
 
@@ -520,19 +557,26 @@ Benefits: Native SMB, automatic resume, exponential backoff
 - Resume and retry improvements with chunk-level verification
 - **Native S3 support with multipart transfers** ⭐
 - S3-compatible storage (MinIO, LocalStack)
-- **S3 object versioning support** ⭐ NEW!
-- **S3 batch operations with rate limiting** ⭐ NEW!
-- **Enhanced error recovery (circuit breaker, exponential backoff)** ⭐ NEW!
-- **Progress callbacks for UI integration** ⭐ NEW!
+- S3 object versioning support
+- S3 batch operations with rate limiting
+- Enhanced error recovery (circuit breaker, exponential backoff)
+- Progress callbacks for UI integration
+- **Disk Guardian: Pre-flight space & integrity checks** ⭐ **NEW!**
 - SMB2/3 native implementation (awaiting upstream fix)
 
-### 🚧 Planned (v0.6.0+)
+### 🚧 In Progress (v0.5.0)
+
+- Watcher component for monitoring transfer health
+- Delta sync algorithm
+- Enhanced CLI with subcommands
+
+### 🔮 Planned (v0.6.0+)
 
 #### CLI Improvements
 - Friendly subcommands (`orbit cp`, `orbit sync`, `orbit run`) as aliases
 - Protocol-specific flags (`--smb-user`, `--region`, `--storage-class`)
 - File watching mode (`--watch`)
-- Watcher component for monitoring transfer health
+- Interactive mode with prompts
 
 #### New Protocols
 - Azure Blob Storage connector
@@ -544,10 +588,9 @@ Benefits: Native SMB, automatic resume, exponential backoff
 - REST orchestration API
 - Job scheduler with cron-like syntax
 - Plugin framework for custom protocols
-- Disk-space pre-check
-- Delta sync algorithm
 - S3 Transfer Acceleration
 - CloudWatch metrics integration
+- Disk quota integration
 
 ---
 
@@ -556,6 +599,7 @@ Benefits: Native SMB, automatic resume, exponential backoff
 Pull requests welcome! See `CONTRIBUTING.md` for code style and guidelines.
 
 ### Development
+
 ```bash
 # Clone and build
 git clone https://github.com/saworbit/orbit.git
@@ -589,15 +633,40 @@ cargo clippy
 
 ## 📚 Documentation
 
+### User Guides
 - **Quick Start:** This README
-- **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md) ⭐ NEW!
-- **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md) ⭐ NEW!
+- **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
+- **Disk Guardian:** [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md) ⭐ **NEW!**
+- **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md)
 - **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
+
+### Technical Documentation
 - **SMB Status:** [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md)
 - **Manifest System:** [`docs/MANIFEST_SYSTEM.md`](docs/MANIFEST_SYSTEM.md)
 - **Zero-Copy Guide:** [`docs/ZERO_COPY.md`](docs/ZERO_COPY.md)
 - **API Reference:** Run `cargo doc --open`
-- **Examples:** [`examples/`](examples/) directory
+
+### Examples
+- **Basic Examples:** [`examples/`](examples/) directory
+- **S3 Examples:** [`examples/s3_*.rs`](examples/)
+- **Disk Guardian Demo:** [`examples/disk_guardian_demo.rs`](examples/disk_guardian_demo.rs) ⭐ **NEW!**
+- **Progress Demo:** [`examples/progress_demo.rs`](examples/progress_demo.rs)
+
+---
+
+## 🕵️ Watcher / Beacon
+
+**Status:** 🚧 Planned for v0.6.0+
+
+A companion service that will monitor Orbit runtime health:
+
+**Planned Features:**
+- Detect stalled transfers
+- Track telemetry and throughput
+- Trigger recovery actions
+- Prometheus-compatible metrics export
+
+This feature is currently in the design phase. See the [roadmap](#-roadmap) for details.
 
 ---
 
@@ -655,7 +724,7 @@ limitations under the License.
 
 ### Made with ❤️ and 🦀 by [Shane Wall](https://github.com/saworbit)
 
-**Orbit — because your data deserves to travel in style.** ✨  
+**Orbit — because your data deserves to travel in style.** ✨
 
 [⬆ Back to Top](#-orbit)
 

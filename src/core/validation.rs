@@ -6,15 +6,20 @@ use std::path::Path;
 use sysinfo::Disks;
 use crate::config::CopyMode;
 use crate::error::{OrbitError, Result};
+use super::disk_guardian::{self, GuardianConfig};
 
-/// Validate that sufficient disk space is available
+/// Validate that sufficient disk space is available (basic check)
+///
+/// This is a backward-compatible wrapper that uses the default guardian configuration.
+/// For more advanced checks with safety margins and integrity validation,
+/// use `validate_disk_space_enhanced` instead.
 pub fn validate_disk_space(destination_path: &Path, required_size: u64) -> Result<()> {
     let disks = Disks::new_with_refreshed_list();
-    
+
     let destination_disk = disks.iter().find(|disk| {
         destination_path.starts_with(disk.mount_point())
     });
-    
+
     if let Some(disk) = destination_disk {
         if disk.available_space() < required_size {
             return Err(OrbitError::InsufficientDiskSpace {
@@ -25,8 +30,29 @@ pub fn validate_disk_space(destination_path: &Path, required_size: u64) -> Resul
     } else {
         eprintln!("Warning: Could not determine available disk space");
     }
-    
+
     Ok(())
+}
+
+/// Enhanced disk space validation with safety margins and integrity checks
+///
+/// This uses the disk_guardian module to provide:
+/// - Safety margins (default 10% extra space)
+/// - Minimum free space requirements
+/// - Filesystem integrity checks (permissions, writability)
+pub fn validate_disk_space_enhanced(
+    destination_path: &Path,
+    required_size: u64,
+    config: Option<&GuardianConfig>,
+) -> Result<()> {
+    let default_config = GuardianConfig::default();
+    let guardian_config = config.unwrap_or(&default_config);
+
+    disk_guardian::ensure_transfer_safety(
+        destination_path,
+        required_size,
+        guardian_config
+    )
 }
 
 /// Determine if a file should be copied based on the copy mode

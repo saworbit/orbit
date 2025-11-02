@@ -14,6 +14,7 @@ use walkdir::WalkDir;
 
 use super::metadata::preserve_metadata;
 use super::validation::matches_exclude_pattern;
+use super::disk_guardian::{self, GuardianConfig};
 use super::CopyStats;
 use super::progress::ProgressPublisher;
 use crate::config::{CopyConfig, CopyMode, SymlinkMode};
@@ -64,6 +65,20 @@ pub fn copy_directory_impl(
     }
 
     let start_time = Instant::now();
+
+    // Pre-flight disk space check for directory transfers
+    if config.show_progress {
+        println!("Performing pre-flight checks...");
+    }
+
+    let guardian_config = GuardianConfig::default();
+    let estimated_size = disk_guardian::estimate_directory_size(source_dir)?;
+
+    if config.show_progress {
+        println!("Estimated transfer size: {} bytes", estimated_size);
+    }
+
+    disk_guardian::ensure_transfer_safety(dest_dir, estimated_size, &guardian_config)?;
 
     // Use provided publisher or create a no-op one
     let noop_publisher = ProgressPublisher::noop();

@@ -7,6 +7,7 @@ pub mod checksum;
 pub mod resume;
 pub mod metadata;
 pub mod validation;
+pub mod disk_guardian;
 pub mod zero_copy;
 pub mod retry;
 pub mod transfer;
