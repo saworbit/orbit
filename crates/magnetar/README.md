@@ -19,6 +19,7 @@ Magnetar is a lightweight, embeddable state machine for managing idempotent jobs
 - **Multiple Backends**: SQLite (default) and redb (pure Rust, WASM-ready)
 - **Zero-Downtime Swaps**: Dual-write mode for live backend migration
 - **Analytics Export**: Export to Parquet/CSV for integration with Polars/Arrow
+- **Resilience Module**: Circuit breaker, connection pooling, and rate limiting for fault-tolerant data access ⭐ **NEW in v0.4.1!**
 
 ## Quick Start
 
@@ -115,6 +116,83 @@ pub trait JobStore: Send + Sync {
 - MMAP for zero-copy reads
 - WASM/embedded-friendly (no FFI)
 
+## Resilience Module
+
+**NEW in v0.4.1!** Magnetar includes a comprehensive resilience module for fault-tolerant access to flaky external services like S3, SMB, and databases.
+
+### Components
+
+- **Circuit Breaker** — Prevents cascading failures with automatic recovery
+- **Connection Pool** — Efficient connection reuse with health checking
+- **Rate Limiter** — Token bucket rate limiting to prevent service overload
+
+### Quick Example
+
+```rust
+use magnetar::resilience::prelude::*;
+use std::sync::Arc;
+
+#[tokio::main]
+async fn main() -> Result<(), ResilienceError> {
+    // Setup resilience stack
+    let breaker = CircuitBreaker::new_default();
+    let pool = Arc::new(ConnectionPool::new_default(factory));
+    let limiter = RateLimiter::per_second(100);
+
+    // Execute with full protection
+    breaker.execute(|| {
+        let pool = pool.clone();
+        let limiter = limiter.clone();
+        async move {
+            limiter.execute(|| async {
+                let conn = pool.acquire().await?;
+                let result = perform_operation(&conn).await;
+                pool.release(conn).await;
+                result
+            }).await
+        }
+    }).await?;
+
+    Ok(())
+}
+```
+
+### Features
+
+- ✅ Three-state circuit breaker (Closed → Open → HalfOpen)
+- ✅ Exponential backoff with configurable retries
+- ✅ Generic connection pool with health checks
+- ✅ Pool statistics and monitoring
+- ✅ Idle timeout and max lifetime management
+- ✅ Rate limiting with token bucket algorithm
+- ✅ Optional governor crate integration
+- ✅ Thread-safe async/await support
+- ✅ Transient vs permanent error classification
+
+### S3 Integration Example
+
+```rust
+use aws_sdk_s3::Client;
+use magnetar::resilience::{ConnectionFactory, ResilienceError};
+
+struct S3ClientFactory {
+    config: aws_config::SdkConfig,
+}
+
+#[async_trait::async_trait]
+impl ConnectionFactory<Client> for S3ClientFactory {
+    async fn create(&self) -> Result<Client, ResilienceError> {
+        Ok(Client::new(&self.config))
+    }
+
+    async fn is_healthy(&self, _client: &Client) -> bool {
+        true
+    }
+}
+```
+
+📖 **Full Documentation:** See [`src/resilience/README.md`](src/resilience/README.md)
+
 ## Examples
 
 Run the included examples:
@@ -128,17 +206,23 @@ cargo run --example dag_dependencies --features sqlite
 
 # Crash recovery simulation
 cargo run --example crash_recovery --features sqlite
+
+# Resilience demo (circuit breaker, connection pool, rate limiter)
+cargo run --example resilience_demo --features resilience
 ```
 
 ## Features
 
 ```toml
 [features]
-default = ["sqlite"]
+default = ["sqlite", "resilience"]
 sqlite = ["dep:sqlx"]
 redb = ["dep:redb", "dep:bincode"]
 analytics = ["dep:polars", "dep:arrow"]
-all = ["sqlite", "redb", "analytics"]
+resilience = []
+resilience-governor = ["resilience", "dep:governor"]
+s3-integration = ["resilience", "dep:aws-config", "dep:aws-sdk-s3", "dep:hyper"]
+all = ["sqlite", "redb", "analytics", "resilience-governor", "s3-integration"]
 ```
 
 ## Testing
@@ -150,6 +234,10 @@ cargo test --all-features
 # Test specific backend
 cargo test --features sqlite
 cargo test --features redb
+
+# Test resilience module
+cargo test --features resilience --lib
+cargo test --features resilience --test resilience_integration_tests
 ```
 
 ## Performance
@@ -165,10 +253,12 @@ Benchmarks on 10,000 chunks (local SQLite/redb):
 
 ## Use Cases
 
-- **Data Pipelines**: Chunked file processing with resume capability
-- **ETL Jobs**: Transform large datasets with failure recovery
-- **Distributed Computation**: Track work units across workers
+- **Data Pipelines**: Chunked file processing with resume capability and resilient S3/SMB access
+- **ETL Jobs**: Transform large datasets with failure recovery and circuit breaker protection
+- **Distributed Computation**: Track work units across workers with connection pooling
 - **Build Systems**: Incremental builds with dependency tracking
+- **Cloud Data Transfer**: S3 uploads/downloads with rate limiting and automatic retry
+- **Network File Operations**: SMB transfers with circuit breaker for flaky connections
 
 ## License
 

@@ -163,6 +163,7 @@ depends_on = ["source-sync"]  # Dependency ordering
 - ❌ Duplicate work after crashes
 - ❌ Lost progress on interruptions
 - ❌ Dependency conflicts in DAG-based workflows
+- ❌ Cascading failures from flaky external services
 
 **Features:**
 - **Atomic Claims** — Idempotent "pending → processing" transitions
@@ -171,6 +172,7 @@ depends_on = ["source-sync"]  # Dependency ordering
 - **Dual Backends** — SQLite (default) or redb (pure Rust, WASM-ready)
 - **Zero-Downtime Migration** — Swap backends without stopping jobs
 - **Analytics Ready** — Export to Parquet for analysis
+- **Resilience Module** — Circuit breaker, connection pooling, and rate limiting for fault-tolerant data access ⭐ **NEW!**
 
 ```rust
 use magnetar::JobStatus;
@@ -203,9 +205,55 @@ async fn main() -> anyhow::Result<()> {
 cd crates/magnetar
 cargo run --example basic_usage
 cargo run --example crash_recovery  # Simulates crash and resume
+cargo run --example resilience_demo --features resilience  # Circuit breaker demo
 ```
 
-📖 **Full Documentation:** See [`crates/magnetar/README.md`](crates/magnetar/README.md)
+#### 🛡️ Resilience Module
+
+**NEW in v0.4.1!** Built-in resilience patterns for fault-tolerant access to flaky external services like S3, SMB, and databases.
+
+**Components:**
+- **Circuit Breaker** — Fail-fast protection with automatic recovery
+- **Connection Pool** — Efficient connection reuse with health checking
+- **Rate Limiter** — Token bucket rate limiting to prevent service overload
+
+```rust
+use magnetar::resilience::prelude::*;
+use std::sync::Arc;
+
+// Setup resilience stack
+let breaker = CircuitBreaker::new_default();
+let pool = Arc::new(ConnectionPool::new_default(factory));
+let limiter = RateLimiter::per_second(100);
+
+// Execute with full protection
+breaker.execute(|| {
+    let pool = pool.clone();
+    let limiter = limiter.clone();
+    async move {
+        limiter.execute(|| async {
+            let conn = pool.acquire().await?;
+            let result = perform_s3_operation(&conn).await;
+            pool.release(conn).await;
+            result
+        }).await
+    }
+}).await?;
+```
+
+**Resilience Features:**
+- ✅ Three-state circuit breaker (Closed → Open → HalfOpen)
+- ✅ Exponential backoff with configurable retries
+- ✅ Generic connection pool with health checks
+- ✅ Pool statistics and monitoring
+- ✅ Idle timeout and max lifetime management
+- ✅ Rate limiting with token bucket algorithm
+- ✅ Optional governor crate integration
+- ✅ Thread-safe async/await support
+- ✅ Transient vs permanent error classification
+- ✅ S3 and SMB integration examples
+
+📖 **Full Documentation:** See [`crates/magnetar/README.md`](crates/magnetar/README.md) and [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md)
 
 ---
 
@@ -256,7 +304,7 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 - ✅ Full integration with manifest system
 - ✅ Object versioning and lifecycle management
 - ✅ Batch operations with rate limiting
-- ✅ Enhanced error recovery with circuit breaker
+- ✅ **Resilience patterns** — Circuit breaker, connection pooling, and rate limiting via Magnetar ⭐
 
 📖 **Full Documentation:** See [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
 
@@ -561,6 +609,7 @@ Orbit is built from clean, reusable crates:
 | 🗜️ `core-compress` | Compression and decompression | ✅ Stable |
 | 🛡️ `disk-guardian` | Pre-flight space & integrity checks | ✅ Stable |
 | 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | ✅ **NEW!** |
+| 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | ✅ **NEW!** |
 | 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
 | 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
 | 🧪 `wormhole` | Forward-error correction | 🚧 Dev |
@@ -619,6 +668,7 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 - Progress callbacks for UI integration
 - **Disk Guardian: Pre-flight space & integrity checks** ⭐
 - **Magnetar: Idempotent job state machine with SQLite + redb backends** ⭐ **NEW!**
+- **Magnetar Resilience Module: Circuit breaker, connection pooling, rate limiting** ⭐ **NEW!**
 - SMB2/3 native implementation (awaiting upstream fix)
 
 ### 🚧 In Progress (v0.5.0)
@@ -695,6 +745,7 @@ cargo clippy
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
 - **Disk Guardian:** [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
+- **Resilience Module:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
 - **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md)
 - **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
 
@@ -703,6 +754,7 @@ cargo clippy
 - **Manifest System:** [`docs/MANIFEST_SYSTEM.md`](docs/MANIFEST_SYSTEM.md)
 - **Zero-Copy Guide:** [`docs/ZERO_COPY.md`](docs/ZERO_COPY.md)
 - **Magnetar Quick Start:** [`crates/magnetar/QUICKSTART.md`](crates/magnetar/QUICKSTART.md) ⭐ **NEW!**
+- **Resilience Patterns:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
 - **API Reference:** Run `cargo doc --open`
 
 ### Examples
@@ -710,6 +762,7 @@ cargo clippy
 - **S3 Examples:** [`examples/s3_*.rs`](examples/)
 - **Disk Guardian Demo:** [`examples/disk_guardian_demo.rs`](examples/disk_guardian_demo.rs)
 - **Magnetar Examples:** [`crates/magnetar/examples/`](crates/magnetar/examples/) ⭐ **NEW!**
+- **Resilience Demo:** [`crates/magnetar/examples/resilience_demo.rs`](crates/magnetar/examples/resilience_demo.rs) ⭐ **NEW!**
 - **Progress Demo:** [`examples/progress_demo.rs`](examples/progress_demo.rs)
 
 ---

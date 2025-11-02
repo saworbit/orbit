@@ -54,6 +54,9 @@ use std::fmt;
 pub mod backends;
 pub mod migration;
 
+#[cfg(feature = "resilience")]
+pub mod resilience;
+
 #[cfg(feature = "sqlite")]
 pub use backends::sqlite::SqliteStore;
 

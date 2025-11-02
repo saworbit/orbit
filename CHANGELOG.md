@@ -54,6 +54,27 @@ All notable changes to Orbit will be documented in this file.
   - Batch progress tracking
   - Support for pause/resume operations
 
+- **Magnetar Resilience Module** - Fault-tolerant data access patterns (`crates/magnetar/src/resilience/`)
+  - **Circuit Breaker** - Three-state pattern (Closed → Open → HalfOpen) with automatic recovery
+    - Configurable failure and success thresholds
+    - Exponential backoff with jitter
+    - Cooldown period before recovery testing
+    - Smart retry logic for transient vs permanent errors
+  - **Connection Pool** - Generic connection management with health checking
+    - Configurable pool size, idle timeout, and max lifetime
+    - Automatic connection reuse and cleanup
+    - Health checking via `ConnectionFactory` trait
+    - Pool statistics and monitoring
+  - **Rate Limiter** - Token bucket rate limiting
+    - Configurable requests per period
+    - Optional governor crate integration for advanced features
+  - Thread-safe async/await with full Tokio integration
+  - Custom error types with transient/permanent classification
+  - Comprehensive unit and integration tests (27 tests)
+  - S3 and SMB integration examples
+  - Full documentation with usage patterns
+  - Features: `resilience` (default), `resilience-governor`, `s3-integration`
+
 ### Changed
 - **License** - Migrated to Apache License 2.0
   - Updated LICENSE file from dual-license (MIT/Commercial) to Apache 2.0
