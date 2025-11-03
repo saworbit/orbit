@@ -22,6 +22,8 @@ pub mod protocol;
 pub mod manifest_integration;
 pub mod telemetry;
 pub mod cli_progress;
+pub mod instrumentation;
+pub mod logging;
 
 // Native SMB protocol support (feature-gated)
 #[cfg(feature = "smb-native")]
@@ -37,13 +39,14 @@ pub use orbit_core_starmap as starmap;
 pub use orbit_core_audit as manifest_audit;
 
 // Re-export commonly used types for convenience
-pub use config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy};
-pub use error::{OrbitError, Result};
+pub use config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy, ErrorMode, LogLevel};
+pub use error::{OrbitError, Result, ErrorCategory};
 pub use core::{CopyStats, copy_file, copy_directory};
 pub use core::{copy_file_impl, copy_directory_impl}; // For testing with progress events
 pub use core::zero_copy::{ZeroCopyCapabilities, ZeroCopyResult};
 pub use stats::TransferStats;
 pub use protocol::Protocol;
+pub use instrumentation::{OperationStats, StatsSnapshot};
 
 // Manifest system convenience exports
 pub mod manifests {

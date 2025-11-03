@@ -101,6 +101,22 @@ pub struct CopyConfig {
     #[serde(default)]
     pub symlink_mode: SymlinkMode,
 
+    /// Error handling mode
+    #[serde(default)]
+    pub error_mode: ErrorMode,
+
+    /// Log level for diagnostic output
+    #[serde(default)]
+    pub log_level: LogLevel,
+
+    /// Log file path (None = stdout)
+    #[serde(default)]
+    pub log_file: Option<PathBuf>,
+
+    /// Enable verbose logging (shorthand for log_level = debug)
+    #[serde(default)]
+    pub verbose: bool,
+
     /// Include patterns (glob, regex, or path - can be specified multiple times)
     #[serde(default)]
     pub include_patterns: Vec<String>,
@@ -196,6 +212,10 @@ impl Default for CopyConfig {
             max_bandwidth: 0,
             parallel: 0,
             symlink_mode: SymlinkMode::Skip,
+            error_mode: ErrorMode::Abort,
+            log_level: LogLevel::Info,
+            log_file: None,
+            verbose: false,
             include_patterns: Vec::new(),
             exclude_patterns: Vec::new(),
             filter_from: None,
@@ -268,10 +288,10 @@ impl Default for CompressionType {
 pub enum SymlinkMode {
     /// Skip symbolic links
     Skip,
-    
+
     /// Follow symbolic links and copy target
     Follow,
-    
+
     /// Preserve symbolic links as-is
     Preserve,
 }
@@ -279,6 +299,65 @@ pub enum SymlinkMode {
 impl Default for SymlinkMode {
     fn default() -> Self {
         SymlinkMode::Skip
+    }
+}
+
+/// Error handling mode determines behavior on errors
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ErrorMode {
+    /// Abort on first error
+    Abort,
+
+    /// Skip failed files and continue
+    Skip,
+
+    /// Keep partial files on error (for resume)
+    Partial,
+}
+
+impl Default for ErrorMode {
+    fn default() -> Self {
+        ErrorMode::Abort
+    }
+}
+
+/// Log level for diagnostic output
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    /// Only errors
+    Error,
+
+    /// Warnings and errors
+    Warn,
+
+    /// Info, warnings, and errors
+    Info,
+
+    /// Debug and above
+    Debug,
+
+    /// All messages including traces
+    Trace,
+}
+
+impl Default for LogLevel {
+    fn default() -> Self {
+        LogLevel::Info
+    }
+}
+
+impl LogLevel {
+    /// Convert to tracing::Level
+    pub fn to_tracing_level(&self) -> tracing::Level {
+        match self {
+            LogLevel::Error => tracing::Level::ERROR,
+            LogLevel::Warn => tracing::Level::WARN,
+            LogLevel::Info => tracing::Level::INFO,
+            LogLevel::Debug => tracing::Level::DEBUG,
+            LogLevel::Trace => tracing::Level::TRACE,
+        }
     }
 }
 

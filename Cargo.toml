@@ -71,6 +71,10 @@ base64 = "0.22"
 
 # Logging/tracing
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+
+# Random for backoff jitter
+rand = "0.8"
 
 # Manifest system
 orbit-core-manifest = { path = "crates/core-manifest" }

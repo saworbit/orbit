@@ -8,13 +8,15 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 use orbit::{
-    config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy, AuditFormat},
+    config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy, AuditFormat, ErrorMode, LogLevel},
     copy_file, copy_directory, CopyStats,
     error::{Result, OrbitError},
     stats::TransferStats,
     protocol::Protocol,
     get_zero_copy_capabilities, is_zero_copy_available,
     manifest_integration::ManifestGenerator,
+    logging,
+    instrumentation::OperationStats,
 };
 
 #[derive(Parser)]
@@ -172,6 +174,22 @@ struct Cli {
     /// Path to delta manifest database
     #[arg(long, global = true)]
     delta_manifest: Option<PathBuf>,
+
+    /// Error handling mode (abort, skip, partial)
+    #[arg(long, value_enum, default_value = "abort", global = true)]
+    error_mode: ErrorModeArg,
+
+    /// Log level (error, warn, info, debug, trace)
+    #[arg(long, value_enum, default_value = "info", global = true)]
+    log_level: LogLevelArg,
+
+    /// Path to log file (default: stdout)
+    #[arg(long, value_name = "FILE", global = true)]
+    log: Option<PathBuf>,
+
+    /// Enable verbose logging (equivalent to --log-level=debug)
+    #[arg(short = 'v', long, global = true)]
+    verbose: bool,
 
     /// Path to config file (overrides default locations)
     #[arg(long, global = true)]
@@ -351,9 +369,77 @@ impl From<CheckModeArg> for orbit::core::delta::CheckMode {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum ErrorModeArg {
+    Abort,
+    Skip,
+    Partial,
+}
+
+impl From<ErrorModeArg> for ErrorMode {
+    fn from(arg: ErrorModeArg) -> Self {
+        match arg {
+            ErrorModeArg::Abort => ErrorMode::Abort,
+            ErrorModeArg::Skip => ErrorMode::Skip,
+            ErrorModeArg::Partial => ErrorMode::Partial,
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum LogLevelArg {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl From<LogLevelArg> for LogLevel {
+    fn from(arg: LogLevelArg) -> Self {
+        match arg {
+            LogLevelArg::Error => LogLevel::Error,
+            LogLevelArg::Warn => LogLevel::Warn,
+            LogLevelArg::Info => LogLevel::Info,
+            LogLevelArg::Debug => LogLevel::Debug,
+            LogLevelArg::Trace => LogLevel::Trace,
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    
+
+    // Check if we need to initialize logging for the command
+    let needs_logging = if let Some(ref command) = cli.command {
+        matches!(command, Commands::Manifest(_))
+    } else {
+        true // Main copy operation needs logging
+    };
+
+    // Initialize logging if needed
+    if needs_logging {
+        let mut config = if let Some(ref config_path) = cli.config {
+            CopyConfig::from_file(config_path)
+                .unwrap_or_else(|e| {
+                    eprintln!("Warning: Failed to load config file: {}", e);
+                    CopyConfig::default()
+                })
+        } else {
+            CopyConfig::default()
+        };
+
+        // Set logging config from CLI
+        config.log_level = cli.log_level.into();
+        config.log_file = cli.log.clone();
+        config.verbose = cli.verbose;
+
+        // Initialize logging
+        if let Err(e) = logging::init_logging(&config) {
+            eprintln!("Warning: Failed to initialize logging: {}", e);
+        }
+    }
+
     // Handle subcommands
     if let Some(command) = cli.command {
         return handle_subcommand(command);
@@ -405,6 +491,10 @@ fn main() -> Result<()> {
     config.exclude_patterns = cli.exclude_patterns;
     config.filter_from = cli.filter_from;
     config.dry_run = cli.dry_run;
+    config.error_mode = cli.error_mode.into();
+    config.log_level = cli.log_level.into();
+    config.log_file = cli.log;
+    config.verbose = cli.verbose;
     
     // Handle compression
     if let Some(comp) = cli.compress {

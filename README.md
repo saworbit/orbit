@@ -58,6 +58,45 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 
 ## 🔑 Key Features
 
+### 🔄 Error Handling & Retries: Never Give Up
+
+**NEW in v0.4.1!** Enterprise-grade error handling with intelligent retry logic and comprehensive diagnostics.
+
+**Features:**
+- **Smart Retry Logic** — Exponential backoff with jitter to avoid thundering herd
+- **Error Classification** — Distinguishes transient (retry-worthy) from fatal errors
+- **Flexible Error Modes** — Abort, Skip, or Partial (keep incomplete files for resume)
+- **Statistics Tracking** — Real-time metrics on operations, retries, and error types
+- **Structured Logging** — Tracing integration for detailed diagnostics
+
+**Error Modes:**
+- **Abort** (default) — Stop on first error for maximum safety
+- **Skip** — Skip failed files, continue with remaining files
+- **Partial** — Keep partial files and retry, perfect for unstable networks
+
+```bash
+# Resilient transfer with retries and logging
+orbit --source /data --dest /backup --recursive \
+      --retry-attempts 5 \
+      --exponential-backoff \
+      --error-mode partial \
+      --log-level debug \
+      --log /var/log/orbit.log
+
+# Quick skip mode for batch operations
+orbit -s /source -d /dest -R \
+      --error-mode skip \
+      --verbose
+```
+
+**Error Categories Tracked:**
+- Validation (path errors)
+- I/O operations
+- Network/protocol issues
+- Resource constraints (disk, memory)
+- Data integrity (checksums)
+- And 11 more categories for comprehensive diagnostics
+
 ### 🛡️ Disk Guardian: Pre-Flight Safety
 
 **NEW in v0.4.1!** Comprehensive disk space and filesystem validation to prevent mid-transfer failures.
@@ -636,6 +675,19 @@ orbit --source /project --dest /backup --recursive \
 orbit --source /data --dest /backup --recursive \
   --filter-from=backup.orbitfilter
 
+# Resilient transfer with retries and logging
+orbit --source /data --dest /backup --recursive \
+  --retry-attempts 5 \
+  --exponential-backoff \
+  --error-mode partial \
+  --log-level debug \
+  --log /var/log/orbit.log
+
+# Skip failed files for batch operations
+orbit --source /archive --dest /backup --recursive \
+  --error-mode skip \
+  --verbose
+
 # Create flight plan manifest
 orbit manifest plan --source /data --dest /backup --output ./manifests
 ```
@@ -811,6 +863,18 @@ parallel = 4
 
 # Symbolic link handling: "skip", "follow", or "preserve"
 symlink_mode = "skip"
+
+# Error handling mode: "abort" (stop on error), "skip" (skip failed files), or "partial" (keep partial files for resume)
+error_mode = "abort"
+
+# Log level: "error", "warn", "info", "debug", or "trace"
+log_level = "info"
+
+# Path to log file (omit for stdout)
+# log_file = "/var/log/orbit.log"
+
+# Enable verbose logging (shorthand for log_level = "debug")
+verbose = false
 
 # Include patterns (glob, regex, or path - can be specified multiple times)
 # Examples: "*.rs", "regex:^src/.*", "path:Cargo.toml"
