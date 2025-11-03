@@ -128,6 +128,8 @@ pub(crate) struct StarMapData {
     pub bloom_hashes: u32,
     /// Bloom filter element count
     pub bloom_elements: u32,
+    /// Bloom filter bit count
+    pub bloom_bits: usize,
     /// Bitmap data (one per window)
     pub bitmaps: Vec<Vec<u8>>,
 }

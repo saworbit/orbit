@@ -33,7 +33,7 @@ impl RankSelectBitmap {
     /// let mut bitmap = RankSelectBitmap::new(100);
     /// bitmap.set(10, true);
     /// assert!(bitmap.get(10));
-    /// assert_eq!(bitmap.rank(10), 1);
+    /// assert_eq!(bitmap.rank(11), 1); // rank(11) counts bits 0-10
     /// ```
     pub fn new(size: usize) -> Self {
         let block_size = 512; // Standard block size for rank caching

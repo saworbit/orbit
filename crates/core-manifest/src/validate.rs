@@ -343,8 +343,8 @@ mod tests {
         });
 
         let schema = get_flight_plan_schema();
-        let compiled = JSONSchema::compile(&schema).unwrap();
-        
+        let compiled = Validator::new(&schema).unwrap();
+
         let result = compiled.validate(&invalid_json);
         assert!(result.is_err(), "Should fail validation without source");
     }
@@ -384,11 +384,11 @@ mod tests {
     #[test]
     fn test_schema_compilation() {
         let flight_schema = get_flight_plan_schema();
-        let result = JSONSchema::compile(&flight_schema);
+        let result = Validator::new(&flight_schema);
         assert!(result.is_ok(), "Flight Plan schema should compile");
 
         let cargo_schema = get_cargo_manifest_schema();
-        let result = JSONSchema::compile(&cargo_schema);
+        let result = Validator::new(&cargo_schema);
         assert!(result.is_ok(), "Cargo Manifest schema should compile");
     }
 
@@ -415,7 +415,7 @@ mod tests {
                 }
             });
 
-            let compiled = JSONSchema::compile(&schema).unwrap();
+            let compiled = Validator::new(&schema).unwrap();
             let result = compiled.validate(&endpoint_json);
             assert!(result.is_ok(), "Type '{}' should be valid", endpoint_type);
         }
@@ -440,7 +440,7 @@ mod tests {
             }
         });
 
-        let compiled = JSONSchema::compile(&schema).unwrap();
+        let compiled = Validator::new(&schema).unwrap();
         assert!(compiled.validate(&cdc_json).is_ok());
 
         // Valid Fixed

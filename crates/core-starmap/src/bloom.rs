@@ -50,13 +50,17 @@ impl BloomFilter {
     }
 
     /// Create a Bloom filter from serialized data
-    pub fn from_bytes(data: &[u8], num_hashes: u32, num_elements: u32) -> Result<Self> {
+    pub fn from_bytes(data: &[u8], num_hashes: u32, num_elements: u32, num_bits: usize) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::bloom_filter("Empty bloom filter data"));
         }
 
+        // Create BitVec from the data and truncate to exact bit length
+        let mut bits = BitVec::from_vec(data.to_vec());
+        bits.truncate(num_bits);
+
         Ok(Self {
-            bits: BitVec::from_slice(data),
+            bits,
             num_hashes,
             num_elements,
         })
@@ -207,7 +211,7 @@ mod tests {
     #[test]
     fn test_bloom_filter_serialization() {
         let mut filter = BloomFilter::new(100, 0.01);
-        
+
         let item = [42u8; 32];
         filter.insert(&item);
 
@@ -215,10 +219,11 @@ mod tests {
         let bytes = filter.to_bytes();
         let num_hashes = filter.num_hashes();
         let num_elements = filter.num_elements();
+        let num_bits = filter.num_bits();
 
         // Deserialize
-        let restored = BloomFilter::from_bytes(&bytes, num_hashes, num_elements).unwrap();
-        
+        let restored = BloomFilter::from_bytes(&bytes, num_hashes, num_elements, num_bits).unwrap();
+
         // Should still contain the item
         assert!(restored.contains(&item));
         assert_eq!(restored.num_bits(), filter.num_bits());
@@ -280,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_from_empty_bytes() {
-        let result = BloomFilter::from_bytes(&[], 7, 0);
+        let result = BloomFilter::from_bytes(&[], 7, 0, 100);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Empty"));
     }

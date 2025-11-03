@@ -30,6 +30,7 @@ use std::sync::Arc;
 /// let missing = reader.next_missing(0).unwrap();
 /// println!("Missing chunks: {:?}", missing);
 /// ```
+#[derive(Debug)]
 pub struct StarMapReader {
     /// Memory-mapped file
     _mmap: Arc<Mmap>,
@@ -81,6 +82,7 @@ impl StarMapReader {
             &data.bloom_data,
             data.bloom_hashes,
             data.bloom_elements,
+            data.bloom_bits,
         )?;
 
         // Reconstruct bitmaps

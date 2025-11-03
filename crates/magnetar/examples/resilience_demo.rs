@@ -118,7 +118,7 @@ async fn example_circuit_breaker() -> Result<(), ResilienceError> {
     for i in 0..3 {
         let result = breaker
             .call(|| async move {
-                Err(ResilienceError::Transient(format!("Failure {}", i + 1)))
+                Err::<(), _>(ResilienceError::Transient(format!("Failure {}", i + 1)))
             })
             .await;
         println!("  Failure {}: {:?}", i + 1, result);
@@ -241,12 +241,14 @@ async fn example_combined_resilience() -> Result<(), ResilienceError> {
 
     for i in 0..20 {
         let pool = pool.clone();
+        let limiter = limiter.clone();
         let success_count = success_count.clone();
         let failure_count = failure_count.clone();
 
         let result = breaker
             .execute(|| {
                 let pool = pool.clone();
+                let limiter = limiter.clone();
                 let success_count = success_count.clone();
                 let failure_count = failure_count.clone();
                 async move {
@@ -311,7 +313,7 @@ async fn example_permanent_failures() -> Result<(), ResilienceError> {
     println!("🔄 Handling transient error (will retry)...");
     let result = breaker
         .execute(|| async {
-            Err(ResilienceError::Transient(
+            Err::<(), _>(ResilienceError::Transient(
                 "Network timeout".to_string(),
             ))
         })
@@ -322,7 +324,7 @@ async fn example_permanent_failures() -> Result<(), ResilienceError> {
     println!("🛑 Handling permanent error (no retry)...");
     let result = breaker
         .execute(|| async {
-            Err(ResilienceError::Permanent(
+            Err::<(), _>(ResilienceError::Permanent(
                 "Authentication failed".to_string(),
             ))
         })

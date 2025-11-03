@@ -156,6 +156,7 @@ impl StarMapBuilder {
             bloom_data: bloom.to_bytes(),
             bloom_hashes: bloom.num_hashes(),
             bloom_elements: bloom.num_elements(),
+            bloom_bits: bloom.num_bits(),
             bitmaps: bitmaps.iter().map(|b| b.to_bytes()).collect(),
         };
 
