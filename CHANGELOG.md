@@ -75,6 +75,36 @@ All notable changes to Orbit will be documented in this file.
   - Full documentation with usage patterns
   - Features: `resilience` (default), `resilience-governor`, `s3-integration`
 
+- **Progress Reporting & Operational Controls** - Production-grade progress tracking and resource management
+  - **Enhanced Progress Tracking** (`src/core/enhanced_progress.rs`)
+    - Multi-progress bars using `indicatif` for concurrent transfers
+    - Real-time ETA calculations and transfer speed tracking
+    - Per-file progress bars with bytes transferred
+    - Event-driven updates integrated with existing progress system
+    - Support for multiple simultaneous transfers
+  - **Dry-Run Mode** (`src/core/dry_run.rs`)
+    - Simulation mode for safe planning and preview
+    - Records all planned operations (copy, update, skip, delete, mkdir)
+    - Summary statistics with total data size
+    - Detailed logging via tracing framework
+    - Works with all features (filters, transformations, etc.)
+  - **Bandwidth Limiting** (`src/core/bandwidth.rs`)
+    - Token bucket rate limiting using `governor` crate
+    - Configurable bytes-per-second limits (MB/s via CLI)
+    - Zero overhead when disabled (0 = unlimited)
+    - Thread-safe and cloneable for concurrent operations
+    - Smooth throttling with ~1ms sleep granularity
+  - **Concurrency Control** (`src/core/concurrency.rs`)
+    - Counting semaphore for parallel operation management
+    - Auto-detection based on CPU cores (2x cores, capped at 16)
+    - Configurable maximum concurrent operations
+    - RAII-based permit release (automatic cleanup)
+    - Blocking and non-blocking acquire support
+  - CLI integration: `--dry-run`, `--max-bandwidth N`, `--parallel N`, `--show-progress`, `--verbose`
+  - Comprehensive unit tests (13 tests total across all modules)
+  - Full documentation: [PROGRESS_AND_CONCURRENCY.md](PROGRESS_AND_CONCURRENCY.md)
+  - Dependencies added: `indicatif = "0.17"`, `governor = "0.6"`
+
 ### Changed
 - **License** - Migrated to Apache License 2.0
   - Updated LICENSE file from dual-license (MIT/Commercial) to Apache 2.0

@@ -20,6 +20,7 @@
   - [Magnetar State Machine](#-magnetar-persistent-job-state-machine)
   - [Metadata Preservation](#-metadata-preservation--transformation)
   - [Delta Detection](#-delta-detection-efficient-transfers)
+  - [Progress Reporting & Operational Controls](#-progress-reporting--operational-controls)
   - [Inclusion/Exclusion Filters](#-inclusionexclusion-filters-selective-transfers)
   - [Protocol Support](#-protocol-support)
   - [Audit & Telemetry](#-audit-and-telemetry)
@@ -402,6 +403,88 @@ orbit --source vm.qcow2 --dest backup/vm.qcow2 \
 
 ---
 
+### 📊 Progress Reporting & Operational Controls
+
+**NEW in v0.4.1!** Production-grade progress tracking, simulation mode, bandwidth management, and concurrency control for enterprise workflows.
+
+**Features:**
+- **Enhanced Progress Bars** — Multi-transfer tracking with `indicatif`, real-time ETA and speed
+- **Dry-Run Mode** — Safe simulation and planning before actual transfers
+- **Bandwidth Limiting** — Token bucket rate limiting (governor) for controlled transfers
+- **Concurrency Control** — Semaphore-based parallel operation management
+- **Verbosity Levels** — Detailed logging with structured tracing
+- **Multi-Transfer Support** — Concurrent progress bars for parallel operations
+
+**Use Cases:**
+- ✅ Preview large migrations before executing (dry-run)
+- ✅ Limit bandwidth to avoid network saturation
+- ✅ Control resource usage with concurrency limits
+- ✅ Monitor complex parallel transfers with real-time progress
+- ✅ Test filter rules and transformations safely
+
+```bash
+# Preview transfer with dry-run
+orbit -s /data -d /backup -R --dry-run --verbose
+# Output:
+# [DRY-RUN] Would copy: /data/file1.txt -> /backup/file1.txt (1024 bytes)
+# [DRY-RUN] Would skip: /data/file2.txt - already exists
+#
+# Dry-Run Summary:
+#   Files to copy:    5
+#   Files to skip:    2
+#   Total data size:  10.5 MB
+
+# Limit bandwidth to 10 MB/s with 4 concurrent transfers
+orbit -s /large/dataset -d /backup \
+  --recursive \
+  --max-bandwidth 10 \
+  --parallel 4 \
+  --show-progress
+
+# Auto-detect optimal concurrency (2x CPU cores, capped at 16)
+orbit -s /data -d /backup -R --parallel 0
+
+# Full-featured production transfer
+orbit -s /production/data -d /backup/location \
+  --recursive \
+  --max-bandwidth 10 \
+  --parallel 8 \
+  --show-progress \
+  --resume \
+  --retry-attempts 5 \
+  --exponential-backoff \
+  --verbose
+```
+
+**Progress Features:**
+- Real-time transfer speed (MB/s)
+- Accurate ETA calculations
+- Per-file progress tracking
+- Support for concurrent transfers
+- Terminal-friendly progress bars
+
+**Bandwidth Limiting:**
+- Token bucket algorithm for smooth throttling
+- Configurable MB/s limits
+- Zero overhead when disabled (0 = unlimited)
+- Thread-safe and cloneable
+
+**Concurrency Control:**
+- Auto-detection based on CPU cores
+- Configurable maximum parallel operations
+- RAII-based permit management (automatic cleanup)
+- Optimal for I/O-bound operations
+
+**Dry-Run Capabilities:**
+- Simulate all operations (copy, update, skip, delete, mkdir)
+- Detailed logging via tracing framework
+- Summary statistics with total data size
+- Works with all other features (filters, transformations, etc.)
+
+📖 **Full Documentation:** See [`PROGRESS_AND_CONCURRENCY.md`](PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
+
+---
+
 ### 🎯 Inclusion/Exclusion Filters: Selective Transfers
 
 **NEW in v0.4.1!** Powerful rsync/rclone-inspired filter system for selective file processing with glob patterns, regex, and exact path matching.
@@ -687,6 +770,15 @@ orbit --source /data --dest /backup --recursive \
 orbit --source /archive --dest /backup --recursive \
   --error-mode skip \
   --verbose
+
+# Preview transfer with dry-run before executing
+orbit --source /data --dest /backup --recursive --dry-run --verbose
+
+# Bandwidth-limited transfer with progress tracking
+orbit --source /large/dataset --dest /backup --recursive \
+  --max-bandwidth 10 \
+  --parallel 4 \
+  --show-progress
 
 # Create flight plan manifest
 orbit manifest plan --source /data --dest /backup --output ./manifests
@@ -997,6 +1089,7 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 - **Delta Detection: rsync-inspired efficient transfers with block-based diffing** ⭐ **NEW!**
 - **Metadata Preservation & Transformation: Comprehensive attribute handling with transformations** ⭐ **NEW!**
 - **Inclusion/Exclusion Filters: Selective file processing with glob, regex, and path patterns** ⭐ **NEW!**
+- **Progress Reporting & Operational Controls: Enhanced progress bars, dry-run, bandwidth limiting, concurrency control** ⭐ **NEW!**
 - SMB2/3 native implementation (awaiting upstream fix)
 
 ### 🚧 In Progress (v0.5.0)
@@ -1075,6 +1168,7 @@ cargo clippy
 - **Resilience Module:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
 - **Delta Detection:** [`DELTA_DETECTION_GUIDE.md`](DELTA_DETECTION_GUIDE.md) and [`DELTA_QUICKSTART.md`](DELTA_QUICKSTART.md) ⭐ **NEW!**
 - **Filter System:** [`FILTER_SYSTEM.md`](FILTER_SYSTEM.md) ⭐ **NEW!**
+- **Progress & Concurrency:** [`PROGRESS_AND_CONCURRENCY.md`](PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
 - **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md)
 - **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
 

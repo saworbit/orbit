@@ -1,4 +1,4 @@
-# Orbit v0.4.0 - Quick Start Guide
+# Orbit v0.4.1 - Quick Start Guide
 
 Get up and running with Orbit in 5 minutes!
 
@@ -105,12 +105,51 @@ orbit -s database_dump.sql -d /backup/database_dump.sql \
 
 ### 4. Preview Before Copying (Dry Run)
 ```bash
-orbit -s ./source -d ./dest -R --dry-run
+orbit -s ./source -d ./dest -R --dry-run --verbose
 ```
 
 **What this does:**
 - Shows what would be copied without actually copying
-- Useful for testing exclude patterns
+- Displays detailed operation log ([DRY-RUN] messages)
+- Shows summary statistics (files to copy/skip, total size)
+- Useful for testing exclude patterns and transformations
+
+**Example Output:**
+```
+[DRY-RUN] Would copy: /source/file1.txt -> /dest/file1.txt (1024 bytes) - new file
+[DRY-RUN] Would skip: /source/file2.txt - already exists
+[DRY-RUN] Would create directory: /dest/subdir
+
+Dry-Run Summary:
+  Files to copy:    5
+  Files to skip:    2
+  Total data size:  10.5 MB
+
+No changes were made (dry-run mode).
+```
+
+### 5. Bandwidth-Limited Transfer with Progress
+```bash
+orbit -s /large/dataset -d /backup \
+  -R \
+  --max-bandwidth 10 \
+  --parallel 4 \
+  --show-progress \
+  --verbose
+```
+
+**What this does:**
+- Limits bandwidth to 10 MB/s (prevents network saturation)
+- Uses 4 concurrent transfers (auto-detects optimal with `--parallel 0`)
+- Shows real-time progress bars with ETA and transfer speed
+- Detailed logging with `--verbose`
+
+**Example Output:**
+```
+📁 Transferring: /large/dataset/file1.dat
+   [████████████████████████████░░░░] 75.2%  45.2 MB/s  ETA: 5s
+✓ Complete - 500.00 MB in 11.05s (45.25 MB/s)
+```
 
 ---
 

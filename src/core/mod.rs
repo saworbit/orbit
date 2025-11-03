@@ -20,6 +20,9 @@ pub mod bandwidth;
 pub mod directory;
 pub mod progress;
 pub mod delta;
+pub mod enhanced_progress; // Multi-transfer progress bars with indicatif
+pub mod dry_run;          // Dry-run simulation mode
+pub mod concurrency;      // Concurrency control with semaphore
 
 use std::path::Path;
 use std::time::{Duration, Instant};

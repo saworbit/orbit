@@ -3987,6 +3987,7 @@ dependencies = [
  "filetime",
  "futures",
  "glob",
+ "governor",
  "hex",
  "indicatif",
  "libc",
