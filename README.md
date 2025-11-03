@@ -20,6 +20,7 @@
   - [Magnetar State Machine](#-magnetar-persistent-job-state-machine)
   - [Metadata Preservation](#-metadata-preservation--transformation)
   - [Delta Detection](#-delta-detection-efficient-transfers)
+  - [Inclusion/Exclusion Filters](#-inclusionexclusion-filters-selective-transfers)
   - [Protocol Support](#-protocol-support)
   - [Audit & Telemetry](#-audit-and-telemetry)
 - [Quick Start](#-quick-start)
@@ -362,6 +363,89 @@ orbit --source vm.qcow2 --dest backup/vm.qcow2 \
 
 ---
 
+### 🎯 Inclusion/Exclusion Filters: Selective Transfers
+
+**NEW in v0.4.1!** Powerful rsync/rclone-inspired filter system for selective file processing with glob patterns, regex, and exact path matching.
+
+**Features:**
+- **Multiple Pattern Types** — Glob (`*.txt`, `target/**`), Regex (`^src/.*\.rs$`), Exact paths
+- **Include/Exclude Rules** — Both supported with first-match-wins semantics
+- **Filter Files** — Load reusable filter rules from `.orbitfilter` files
+- **Early Directory Pruning** — Skip entire directory trees efficiently
+- **Cross-Platform** — Consistent path matching across Windows, macOS, Linux
+- **Dry-Run Visibility** — See what would be filtered before actual transfer
+- **Negation Support** — Invert filter actions with `!` prefix
+
+**Use Cases:**
+- ✅ Selective backups (exclude build artifacts, logs, temp files)
+- ✅ Source code transfers (include only source files, exclude dependencies)
+- ✅ Clean migrations (exclude platform-specific files)
+- ✅ Compliance-aware transfers (exclude sensitive files by pattern)
+
+```bash
+# Basic exclude patterns
+orbit -s /project -d /backup -R \
+  --exclude="*.tmp" \
+  --exclude="target/**" \
+  --exclude="node_modules/**"
+
+# Include overrides exclude (higher priority)
+orbit -s /logs -d /archive -R \
+  --include="important.log" \
+  --exclude="*.log"
+
+# Use regex for complex patterns
+orbit -s /code -d /backup -R \
+  --exclude="regex:^tests/.*_test\.rs$" \
+  --include="**/*.rs"
+
+# Load filters from file
+orbit -s /data -d /backup -R --filter-from=backup.orbitfilter
+
+# Combine with other features
+orbit -s /source -d /dest -R \
+  --include="*.rs" \
+  --exclude="target/**" \
+  --check delta \
+  --compress zstd:3 \
+  --dry-run
+```
+
+**Filter File Example (`backup.orbitfilter`):**
+```text
+# Include source files (higher priority - checked first)
++ **/*.rs
++ **/*.toml
++ **/*.md
+
+# Exclude build artifacts
+- target/**
+- build/**
+- *.o
+
+# Exclude logs and temp files
+- *.log
+- *.tmp
+
+# Regex for test files
+- regex: ^tests/.*_test\.rs$
+
+# Exact path inclusion
+include path: Cargo.lock
+```
+
+**Pattern Priority:**
+1. Include patterns from `--include` (highest)
+2. Exclude patterns from `--exclude`
+3. Rules from filter file (in file order)
+4. Default: Include (if no rules match)
+
+**Example Filter File:** [`examples/filters/example.orbitfilter`](examples/filters/example.orbitfilter)
+
+📖 **Full Documentation:** See [`FILTER_SYSTEM.md`](FILTER_SYSTEM.md)
+
+---
+
 ### 🌐 Protocol Support
 
 Orbit supports multiple storage backends through a **unified backend abstraction layer** that provides a consistent async API across all storage types.
@@ -542,6 +626,16 @@ orbit --source /data --dest /backup --recursive \
   --preserve=times,perms,owners \
   --transform="case:lower"
 
+# Selective transfer with filters
+orbit --source /project --dest /backup --recursive \
+  --exclude="target/**" \
+  --exclude="*.log" \
+  --include="important.log"
+
+# Use filter file for complex rules
+orbit --source /data --dest /backup --recursive \
+  --filter-from=backup.orbitfilter
+
 # Create flight plan manifest
 orbit manifest plan --source /data --dest /backup --output ./manifests
 ```
@@ -718,13 +812,25 @@ parallel = 4
 # Symbolic link handling: "skip", "follow", or "preserve"
 symlink_mode = "skip"
 
-# Exclude patterns (glob patterns)
+# Include patterns (glob, regex, or path - can be specified multiple times)
+# Examples: "*.rs", "regex:^src/.*", "path:Cargo.toml"
+include_patterns = [
+    "**/*.rs",
+    "**/*.toml",
+]
+
+# Exclude patterns (glob, regex, or path - can be specified multiple times)
+# Examples: "*.tmp", "target/**", "regex:^build/.*"
 exclude_patterns = [
     "*.tmp",
     "*.log",
     ".git/*",
     "node_modules/*",
+    "target/**",
 ]
+
+# Load filter rules from a file (optional)
+# filter_from = "backup.orbitfilter"
 
 # Dry run mode (don't actually copy)
 dry_run = false
@@ -826,6 +932,7 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 - **Magnetar Resilience Module: Circuit breaker, connection pooling, rate limiting** ⭐ **NEW!**
 - **Delta Detection: rsync-inspired efficient transfers with block-based diffing** ⭐ **NEW!**
 - **Metadata Preservation & Transformation: Comprehensive attribute handling with transformations** ⭐ **NEW!**
+- **Inclusion/Exclusion Filters: Selective file processing with glob, regex, and path patterns** ⭐ **NEW!**
 - SMB2/3 native implementation (awaiting upstream fix)
 
 ### 🚧 In Progress (v0.5.0)
@@ -902,6 +1009,8 @@ cargo clippy
 - **Disk Guardian:** [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
 - **Resilience Module:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
+- **Delta Detection:** [`DELTA_DETECTION_GUIDE.md`](DELTA_DETECTION_GUIDE.md) and [`DELTA_QUICKSTART.md`](DELTA_QUICKSTART.md) ⭐ **NEW!**
+- **Filter System:** [`FILTER_SYSTEM.md`](FILTER_SYSTEM.md) ⭐ **NEW!**
 - **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md)
 - **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
 
@@ -919,6 +1028,7 @@ cargo clippy
 - **Disk Guardian Demo:** [`examples/disk_guardian_demo.rs`](examples/disk_guardian_demo.rs)
 - **Magnetar Examples:** [`crates/magnetar/examples/`](crates/magnetar/examples/) ⭐ **NEW!**
 - **Resilience Demo:** [`crates/magnetar/examples/resilience_demo.rs`](crates/magnetar/examples/resilience_demo.rs) ⭐ **NEW!**
+- **Filter Example:** [`examples/filters/example.orbitfilter`](examples/filters/example.orbitfilter) ⭐ **NEW!**
 - **Progress Demo:** [`examples/progress_demo.rs`](examples/progress_demo.rs)
 
 ---

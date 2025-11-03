@@ -10,6 +10,7 @@ pub mod file_metadata;  // Comprehensive metadata preservation
 pub mod transform;      // Metadata and path transformation
 pub mod metadata_ops;   // Metadata preservation orchestration
 pub mod validation;
+pub mod filter;         // Include/exclude filter patterns
 pub mod disk_guardian;
 pub mod zero_copy;
 pub mod retry;

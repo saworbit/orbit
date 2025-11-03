@@ -14,6 +14,7 @@ use walkdir::WalkDir;
 
 use super::metadata::preserve_metadata;
 use super::validation::matches_exclude_pattern;
+use super::filter::{FilterList, FilterDecision};
 use super::disk_guardian::{self, GuardianConfig};
 use super::CopyStats;
 use super::progress::ProgressPublisher;
@@ -98,6 +99,18 @@ pub fn copy_directory_impl(
         std::fs::create_dir_all(dest_dir)?;
     }
 
+    // Build filter list from config
+    let filter_list = match FilterList::from_config(
+        &config.include_patterns,
+        &config.exclude_patterns,
+        config.filter_from.as_deref(),
+    ) {
+        Ok(filters) => Arc::new(filters),
+        Err(e) => {
+            return Err(OrbitError::Config(format!("Invalid filter configuration: {}", e)));
+        }
+    };
+
     // Bounded channel prevents scanner from overwhelming copiers
     // Buffer size: use parallel threads as baseline, bounded between 16-1000
     let buffer_size = if config.parallel > 0 {
@@ -121,9 +134,10 @@ pub fn copy_directory_impl(
         let dest_dir = dest_dir.clone();
         let config = config.clone();
         let expected_entries = expected_entries.clone();
+        let filter_list = filter_list.clone();
 
         thread::spawn(move || -> Result<()> {
-            produce_work_items(&source_dir, &dest_dir, &config, tx, expected_entries)
+            produce_work_items(&source_dir, &dest_dir, &config, tx, expected_entries, &filter_list)
         })
     };
 
@@ -150,7 +164,7 @@ pub fn copy_directory_impl(
 
     let mut deleted_count = 0;
     if config.copy_mode == CopyMode::Mirror {
-        match collect_deletion_candidates(&dest_dir, &expected_entries, config) {
+        match collect_deletion_candidates(&dest_dir, &expected_entries, config, &filter_list) {
             Ok(deletions) => {
                 let summary = apply_deletions(&deletions, config);
                 deleted_count = summary.deleted as u64;
@@ -215,6 +229,7 @@ fn produce_work_items(
     config: &CopyConfig,
     tx: crossbeam_channel::Sender<WorkItem>,
     expected_entries: Arc<Mutex<HashSet<PathBuf>>>,
+    filter_list: &FilterList,
 ) -> Result<()> {
     let mut walker = WalkDir::new(source_dir)
         .follow_links(false)
@@ -249,7 +264,21 @@ fn produce_work_items(
             continue;
         }
 
-        if matches_exclude_pattern(relative_path, &config.exclude_patterns) {
+        // Apply filter rules (first-match-wins with include/exclude)
+        let should_process = if !filter_list.is_empty() {
+            // If we have filters configured, use them exclusively
+            filter_list.should_include(relative_path)
+        } else {
+            // No filters configured - use old exclude pattern matching for backward compatibility
+            !matches_exclude_pattern(relative_path, &config.exclude_patterns)
+        };
+
+        if !should_process {
+            // Show filtered items in dry-run mode
+            if config.dry_run {
+                println!("Filtered out: {}", relative_path.display());
+            }
+
             if entry.file_type().is_dir() {
                 walker.skip_current_dir();
             }
@@ -320,6 +349,7 @@ fn collect_deletion_candidates(
     dest_dir: &Path,
     expected_entries: &Arc<Mutex<HashSet<PathBuf>>>,
     config: &CopyConfig,
+    filter_list: &FilterList,
 ) -> Result<Vec<DeletionItem>> {
     let expected: HashSet<PathBuf> = expected_entries.lock().unwrap().iter().cloned().collect();
     let mut deletions = Vec::new();
@@ -353,7 +383,14 @@ fn collect_deletion_candidates(
             }
         };
 
-        if matches_exclude_pattern(relative_path, &config.exclude_patterns) {
+        // Apply filter rules (same logic as in produce_work_items)
+        let should_process = if !filter_list.is_empty() {
+            filter_list.should_include(relative_path)
+        } else {
+            !matches_exclude_pattern(relative_path, &config.exclude_patterns)
+        };
+
+        if !should_process {
             if entry.file_type().is_dir() {
                 walker.skip_current_dir();
             }
@@ -617,7 +654,8 @@ mod tests {
         expected.lock().unwrap().insert(PathBuf::from("keep.txt"));
 
         let config = mirror_config();
-        let deletions = collect_deletion_candidates(dest_dir, &expected, &config).unwrap();
+        let filter_list = FilterList::new();
+        let deletions = collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
 
         assert_eq!(deletions.len(), 1);
         assert_eq!(deletions[0].path, dest_dir.join("extra.txt"));
@@ -637,7 +675,8 @@ mod tests {
         let mut config = mirror_config();
         config.exclude_patterns = vec!["*.log".to_string()];
 
-        let deletions = collect_deletion_candidates(dest_dir, &expected, &config).unwrap();
+        let filter_list = FilterList::new();
+        let deletions = collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
 
         assert!(deletions.is_empty());
     }
@@ -679,7 +718,8 @@ mod tests {
         let mut config = mirror_config();
         config.symlink_mode = SymlinkMode::Skip;
 
-        let deletions = collect_deletion_candidates(dest_dir, &expected, &config).unwrap();
+        let filter_list = FilterList::new();
+        let deletions = collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
 
         assert!(deletions.is_empty());
     }

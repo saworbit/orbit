@@ -97,10 +97,21 @@ struct Cli {
     #[arg(long, default_value = "0", global = true)]
     parallel: usize,
     
-    /// Exclude patterns (can be specified multiple times)
+    /// Include patterns - glob, regex, or path (can be specified multiple times)
+    /// Examples: --include="*.rs" --include="regex:^src/.*"
+    #[arg(long = "include", global = true)]
+    include_patterns: Vec<String>,
+
+    /// Exclude patterns - glob, regex, or path (can be specified multiple times)
+    /// Examples: --exclude="*.tmp" --exclude="target/**"
     #[arg(long = "exclude", global = true)]
     exclude_patterns: Vec<String>,
-    
+
+    /// Load filter rules from a file (one rule per line)
+    /// File format: '+ pattern' (include) or '- pattern' (exclude)
+    #[arg(long = "filter-from", value_name = "FILE", global = true)]
+    filter_from: Option<PathBuf>,
+
     /// Dry run - show what would be copied
     #[arg(long, global = true)]
     dry_run: bool,
@@ -390,7 +401,9 @@ fn main() -> Result<()> {
     config.chunk_size = cli.chunk_size * 1024;
     config.max_bandwidth = cli.max_bandwidth * 1024 * 1024;
     config.parallel = cli.parallel;
+    config.include_patterns = cli.include_patterns;
     config.exclude_patterns = cli.exclude_patterns;
+    config.filter_from = cli.filter_from;
     config.dry_run = cli.dry_run;
     
     // Handle compression

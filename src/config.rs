@@ -100,11 +100,19 @@ pub struct CopyConfig {
     /// Symbolic link handling mode
     #[serde(default)]
     pub symlink_mode: SymlinkMode,
-    
-    /// Exclude patterns (glob patterns)
+
+    /// Include patterns (glob, regex, or path - can be specified multiple times)
+    #[serde(default)]
+    pub include_patterns: Vec<String>,
+
+    /// Exclude patterns (glob, regex, or path - can be specified multiple times)
     #[serde(default)]
     pub exclude_patterns: Vec<String>,
-    
+
+    /// Load filter rules from a file
+    #[serde(default)]
+    pub filter_from: Option<PathBuf>,
+
     /// Dry run mode (don't actually copy)
     #[serde(default)]
     pub dry_run: bool,
@@ -188,7 +196,9 @@ impl Default for CopyConfig {
             max_bandwidth: 0,
             parallel: 0,
             symlink_mode: SymlinkMode::Skip,
+            include_patterns: Vec::new(),
             exclude_patterns: Vec::new(),
+            filter_from: None,
             dry_run: false,
             use_zero_copy: true,
             generate_manifest: false,

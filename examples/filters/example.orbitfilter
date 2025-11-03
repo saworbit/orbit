@@ -1,0 +1,136 @@
+# Orbit Filter Configuration
+# ==========================
+# This file demonstrates the filter syntax for selective file/directory processing.
+# Rules are processed in order with first-match-wins semantics (like rsync).
+#
+# Syntax:
+#   + pattern   OR  include pattern   - Include matching files/directories
+#   - pattern   OR  exclude pattern   - Exclude matching files/directories
+#   ! prefix                           - Negation (inverts the action)
+#   # comment                          - Comments (ignored)
+#
+# Pattern Types:
+#   Default:        Glob patterns (*.txt, src/**/*.rs)
+#   glob: pattern   Explicit glob
+#   regex: pattern  Regular expression
+#   path: pattern   Exact path match
+#
+# Examples:
+
+# ==========================
+# Common Patterns
+# ==========================
+
+# Exclude build artifacts
+- target/**
+- build/**
+- dist/**
+- out/**
+
+# Exclude log files
+- *.log
+- *.tmp
+- *.temp
+
+# Exclude version control directories
+- .git/**
+- .svn/**
+- .hg/**
+
+# Exclude dependency directories
+- node_modules/**
+- vendor/**
+- .venv/**
+- venv/**
+
+# ==========================
+# Include Specific Files
+# ==========================
+
+# Include all Rust source files (takes priority over exclusions above)
++ **/*.rs
+
+# Include all configuration files
++ *.toml
++ *.yaml
++ *.yml
++ *.json
+
+# Include documentation
++ *.md
++ docs/**
+
+# ==========================
+# Advanced Patterns
+# ==========================
+
+# Include files with specific regex pattern (source files in src/ only)
++ regex: ^src/.*\.(rs|toml)$
+
+# Exclude test files using regex
+- regex: ^.*_test\.rs$
+- regex: ^tests/.*$
+
+# Include specific path
++ path: Cargo.lock
+
+# Exclude files with certain extensions
+- *.exe
+- *.dll
+- *.so
+- *.dylib
+- *.o
+- *.a
+
+# ==========================
+# Negation Examples
+# ==========================
+
+# This would normally exclude *.backup, but ! negates it to include
+! - *.backup
+
+# ==========================
+# Platform-Specific
+# ==========================
+
+# Windows
+- Thumbs.db
+- desktop.ini
+- *.lnk
+
+# macOS
+- .DS_Store
+- .AppleDouble
+- .LSOverride
+
+# Linux
+- .directory
+- .Trash-*
+
+# ==========================
+# IDE and Editor Files
+# ==========================
+
+- .idea/**
+- .vscode/**
+- *.swp
+- *.swo
+- *~
+- .project
+- .classpath
+- .settings/**
+
+# ==========================
+# Application-Specific
+# ==========================
+
+# Exclude large binary files
+- *.zip
+- *.tar
+- *.tar.gz
+- *.rar
+- *.7z
+
+# Include only compressed sources
++ *.tar.xz
++ *.tar.bz2
