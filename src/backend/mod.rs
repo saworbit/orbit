@@ -239,6 +239,113 @@ pub trait Backend: Send + Sync {
     /// Returns `BackendError::Unsupported` if cross-backend rename is attempted.
     async fn rename(&self, src: &Path, dest: &Path) -> BackendResult<()>;
 
+    /// Set file permissions (Unix mode bits)
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file
+    /// * `mode` - Unix permission bits (e.g., 0o755)
+    ///
+    /// # Errors
+    ///
+    /// Returns `BackendError::NotFound` if the path doesn't exist.
+    /// Returns `BackendError::Unsupported` if the backend doesn't support permissions.
+    /// Returns `BackendError::PermissionDenied` if access is denied.
+    async fn set_permissions(&self, path: &Path, mode: u32) -> BackendResult<()> {
+        let _ = (path, mode);
+        Err(BackendError::Unsupported {
+            backend: self.backend_name().to_string(),
+            operation: "set_permissions".to_string(),
+        })
+    }
+
+    /// Set file timestamps (access and modification times)
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file
+    /// * `atime` - Access time (None to keep current)
+    /// * `mtime` - Modification time (None to keep current)
+    ///
+    /// # Errors
+    ///
+    /// Returns `BackendError::NotFound` if the path doesn't exist.
+    /// Returns `BackendError::Unsupported` if the backend doesn't support timestamps.
+    async fn set_timestamps(
+        &self,
+        path: &Path,
+        atime: Option<std::time::SystemTime>,
+        mtime: Option<std::time::SystemTime>,
+    ) -> BackendResult<()> {
+        let _ = (path, atime, mtime);
+        Err(BackendError::Unsupported {
+            backend: self.backend_name().to_string(),
+            operation: "set_timestamps".to_string(),
+        })
+    }
+
+    /// Get extended attributes (xattrs) for a file
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file
+    ///
+    /// # Returns
+    ///
+    /// HashMap of attribute names to values
+    ///
+    /// # Errors
+    ///
+    /// Returns `BackendError::NotFound` if the path doesn't exist.
+    /// Returns `BackendError::Unsupported` if the backend doesn't support xattrs.
+    async fn get_xattrs(&self, path: &Path) -> BackendResult<std::collections::HashMap<String, Vec<u8>>> {
+        let _ = path;
+        Err(BackendError::Unsupported {
+            backend: self.backend_name().to_string(),
+            operation: "get_xattrs".to_string(),
+        })
+    }
+
+    /// Set extended attributes (xattrs) for a file
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file
+    /// * `attrs` - HashMap of attribute names to values
+    ///
+    /// # Errors
+    ///
+    /// Returns `BackendError::NotFound` if the path doesn't exist.
+    /// Returns `BackendError::Unsupported` if the backend doesn't support xattrs.
+    async fn set_xattrs(&self, path: &Path, attrs: &std::collections::HashMap<String, Vec<u8>>) -> BackendResult<()> {
+        let _ = (path, attrs);
+        Err(BackendError::Unsupported {
+            backend: self.backend_name().to_string(),
+            operation: "set_xattrs".to_string(),
+        })
+    }
+
+    /// Set owner and group (Unix UID/GID)
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file
+    /// * `uid` - User ID (None to keep current)
+    /// * `gid` - Group ID (None to keep current)
+    ///
+    /// # Errors
+    ///
+    /// Returns `BackendError::NotFound` if the path doesn't exist.
+    /// Returns `BackendError::Unsupported` if the backend doesn't support ownership.
+    /// Returns `BackendError::PermissionDenied` if access is denied (requires privileges).
+    async fn set_ownership(&self, path: &Path, uid: Option<u32>, gid: Option<u32>) -> BackendResult<()> {
+        let _ = (path, uid, gid);
+        Err(BackendError::Unsupported {
+            backend: self.backend_name().to_string(),
+            operation: "set_ownership".to_string(),
+        })
+    }
+
     /// Check if a path exists
     ///
     /// # Arguments
@@ -267,14 +374,19 @@ pub trait Backend: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `operation` - Operation name (e.g., "rename", "symlink")
+    /// * `operation` - Operation name (e.g., "rename", "symlink", "set_permissions")
     ///
     /// # Returns
     ///
     /// `true` if the operation is supported
     fn supports(&self, operation: &str) -> bool {
         // Default implementations support all core operations
-        matches!(operation, "stat" | "list" | "read" | "write" | "delete" | "mkdir" | "rename" | "exists")
+        // Metadata operations have default implementations that return Unsupported
+        matches!(
+            operation,
+            "stat" | "list" | "read" | "write" | "delete" | "mkdir" | "rename" | "exists"
+            | "set_permissions" | "set_timestamps" | "get_xattrs" | "set_xattrs" | "set_ownership"
+        )
     }
 }
 

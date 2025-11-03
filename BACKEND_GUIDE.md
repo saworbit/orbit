@@ -37,6 +37,18 @@ All backends support these operations:
 - `rename()` - Rename/move files
 - `exists()` - Check if path exists
 
+### Metadata Operations (v0.4.1+)
+
+**NEW!** Enhanced metadata operations for comprehensive attribute handling:
+
+- `set_permissions()` - Set Unix permissions (mode bits)
+- `set_timestamps()` - Set access and modification times
+- `get_xattrs()` - Read extended attributes
+- `set_xattrs()` - Write extended attributes
+- `set_ownership()` - Set owner and group (UID/GID)
+
+These operations have default implementations that return `Unsupported` for backends that don't implement them, ensuring graceful degradation.
+
 ### Security
 
 - Secure credential handling using the `secrecy` crate

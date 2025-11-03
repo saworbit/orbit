@@ -426,7 +426,207 @@ impl Backend for LocalBackend {
         matches!(
             operation,
             "stat" | "list" | "read" | "write" | "delete" | "mkdir" | "rename" | "exists"
+            | "set_permissions" | "set_timestamps" | "get_xattrs" | "set_xattrs"
         )
+    }
+
+    // Metadata operations implementation
+    async fn set_permissions(&self, path: &Path, mode: u32) -> BackendResult<()> {
+        let resolved = self.resolve_path(path);
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let permissions = std::fs::Permissions::from_mode(mode);
+            fs::set_permissions(&resolved, permissions)
+                .await
+                .map_err(|e| {
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        BackendError::NotFound {
+                            path: path.to_path_buf(),
+                            backend: "local".to_string(),
+                        }
+                    } else if e.kind() == std::io::ErrorKind::PermissionDenied {
+                        BackendError::PermissionDenied {
+                            path: path.to_path_buf(),
+                            backend: "local".to_string(),
+                        }
+                    } else {
+                        BackendError::from(e)
+                    }
+                })?;
+            Ok(())
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = (resolved, mode);
+            Err(BackendError::Unsupported {
+                backend: "local".to_string(),
+                operation: "set_permissions".to_string(),
+            })
+        }
+    }
+
+    async fn set_timestamps(
+        &self,
+        path: &Path,
+        atime: Option<std::time::SystemTime>,
+        mtime: Option<std::time::SystemTime>,
+    ) -> BackendResult<()> {
+        let resolved = self.resolve_path(path);
+
+        // Convert to blocking operation since filetime is sync
+        let path_clone = resolved.clone();
+        tokio::task::spawn_blocking(move || {
+            use filetime::{FileTime, set_file_times, set_file_mtime, set_file_atime};
+
+            if let (Some(atime_val), Some(mtime_val)) = (atime, mtime) {
+                let ft_atime = FileTime::from_system_time(atime_val);
+                let ft_mtime = FileTime::from_system_time(mtime_val);
+                set_file_times(&path_clone, ft_atime, ft_mtime)
+            } else if let Some(mtime_val) = mtime {
+                let ft_mtime = FileTime::from_system_time(mtime_val);
+                set_file_mtime(&path_clone, ft_mtime)
+            } else if let Some(atime_val) = atime {
+                let ft_atime = FileTime::from_system_time(atime_val);
+                set_file_atime(&path_clone, ft_atime)
+            } else {
+                Ok(())
+            }
+        })
+        .await
+        .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                BackendError::NotFound {
+                    path: path.to_path_buf(),
+                    backend: "local".to_string(),
+                }
+            } else if e.kind() == std::io::ErrorKind::PermissionDenied {
+                BackendError::PermissionDenied {
+                    path: path.to_path_buf(),
+                    backend: "local".to_string(),
+                }
+            } else {
+                BackendError::from(e)
+            }
+        })
+    }
+
+    async fn get_xattrs(&self, path: &Path) -> BackendResult<std::collections::HashMap<String, Vec<u8>>> {
+        #[cfg(feature = "extended-metadata")]
+        {
+            let resolved = self.resolve_path(path);
+            let path_clone = resolved.clone();
+
+            tokio::task::spawn_blocking(move || {
+                let mut xattrs = std::collections::HashMap::new();
+
+                match xattr::list(&path_clone) {
+                    Ok(names) => {
+                        for name in names {
+                            if let Ok(Some(value)) = xattr::get(&path_clone, &name) {
+                                xattrs.insert(name.to_string_lossy().to_string(), value);
+                            }
+                        }
+                        Ok(xattrs)
+                    }
+                    Err(e) => {
+                        if e.kind() == std::io::ErrorKind::NotFound {
+                            Err(BackendError::NotFound {
+                                path: path_clone,
+                                backend: "local".to_string(),
+                            })
+                        } else {
+                            // Non-fatal: filesystem may not support xattrs
+                            Ok(xattrs)
+                        }
+                    }
+                }
+            })
+            .await
+            .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+        }
+
+        #[cfg(not(feature = "extended-metadata"))]
+        {
+            let _ = path;
+            Err(BackendError::Unsupported {
+                backend: "local".to_string(),
+                operation: "get_xattrs".to_string(),
+            })
+        }
+    }
+
+    async fn set_xattrs(&self, path: &Path, attrs: &std::collections::HashMap<String, Vec<u8>>) -> BackendResult<()> {
+        #[cfg(feature = "extended-metadata")]
+        {
+            let resolved = self.resolve_path(path);
+            let path_clone = resolved.clone();
+            let attrs_clone = attrs.clone();
+
+            tokio::task::spawn_blocking(move || {
+                for (name, value) in attrs_clone.iter() {
+                    if let Err(e) = xattr::set(&path_clone, name, value) {
+                        // Log warning but continue with other xattrs
+                        tracing::warn!("Failed to set xattr {} on {:?}: {}", name, path_clone, e);
+                    }
+                }
+                Ok(())
+            })
+            .await
+            .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+        }
+
+        #[cfg(not(feature = "extended-metadata"))]
+        {
+            let _ = (path, attrs);
+            Err(BackendError::Unsupported {
+                backend: "local".to_string(),
+                operation: "set_xattrs".to_string(),
+            })
+        }
+    }
+
+    async fn set_ownership(&self, path: &Path, uid: Option<u32>, gid: Option<u32>) -> BackendResult<()> {
+        #[cfg(unix)]
+        {
+            let resolved = self.resolve_path(path);
+            let path_clone = resolved.clone();
+
+            tokio::task::spawn_blocking(move || {
+                use std::os::unix::fs::chown;
+
+                chown(&path_clone, uid, gid)
+            })
+            .await
+            .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    BackendError::NotFound {
+                        path: path.to_path_buf(),
+                        backend: "local".to_string(),
+                    }
+                } else if e.kind() == std::io::ErrorKind::PermissionDenied {
+                    BackendError::PermissionDenied {
+                        path: path.to_path_buf(),
+                        backend: "local".to_string(),
+                    }
+                } else {
+                    BackendError::from(e)
+                }
+            })
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = (path, uid, gid);
+            Err(BackendError::Unsupported {
+                backend: "local".to_string(),
+                operation: "set_ownership".to_string(),
+            })
+        }
     }
 }
 

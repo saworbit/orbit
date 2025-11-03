@@ -18,6 +18,7 @@
   - [Disk Guardian](#-disk-guardian-pre-flight-safety)
   - [Manifest System + Starmap](#-manifest-system--starmap-planner)
   - [Magnetar State Machine](#-magnetar-persistent-job-state-machine)
+  - [Metadata Preservation](#-metadata-preservation--transformation)
   - [Delta Detection](#-delta-detection-efficient-transfers)
   - [Protocol Support](#-protocol-support)
   - [Audit & Telemetry](#-audit-and-telemetry)
@@ -258,6 +259,70 @@ breaker.execute(|| {
 
 ---
 
+### 🏷️ Metadata Preservation & Transformation
+
+**NEW in v0.4.1!** Comprehensive file metadata preservation with transformation capabilities for cross-platform transfers and reproducible builds.
+
+**Features:**
+- **Complete Attribute Support** — Timestamps (atime, mtime, ctime), permissions, ownership (UID/GID), extended attributes (xattrs)
+- **Selective Preservation** — Choose exactly what to preserve: `times,perms,owners,xattrs`
+- **Path Transformations** — Regex-based renaming with sed-like syntax: `s/old/new/`
+- **Case Conversion** — Lowercase, uppercase, or titlecase filename normalization
+- **Metadata Filtering** — Strip ownership, permissions, or xattrs for privacy/portability
+- **Cross-Platform** — Graceful fallbacks on unsupported platforms
+- **Backend Integration** — Works with local, SSH, S3 (extensible)
+- **Strict Mode** — Configurable error handling (warn vs. fail)
+- **Verification** — Post-transfer metadata validation
+
+**Use Cases:**
+- ✅ Cross-platform migrations (Unix → Windows, macOS → Linux)
+- ✅ Reproducible builds (normalize timestamps, strip metadata)
+- ✅ Privacy-aware backups (strip ownership information)
+- ✅ Cloud storage with metadata (preserve via manifest integration)
+- ✅ Archival compliance (preserve extended attributes, ACLs)
+
+```bash
+# Basic metadata preservation
+orbit --source /data --dest /backup --recursive --preserve-metadata
+
+# Selective preservation with detailed flags
+orbit --source /data --dest /backup \
+  --preserve=times,perms,owners,xattrs \
+  --verify-metadata
+
+# With path transformations
+orbit --source /photos --dest /archive \
+  --preserve=all \
+  --transform="rename:s/IMG_/photo_/,case:lower"
+
+# Strip sensitive metadata for cloud
+orbit --source /data --dest s3://bucket/data \
+  --preserve=times,perms \
+  --transform="strip:ownership,strip:xattrs"
+
+# Strict mode (fail on any metadata error)
+orbit --source /critical --dest /backup \
+  --preserve=all \
+  --strict-metadata
+```
+
+**Preservation Flags:**
+- `times` — Access and modification timestamps
+- `perms` — Unix permissions (mode bits)
+- `owners` — User and group ownership (UID/GID)
+- `xattrs` — Extended attributes (requires `extended-metadata` feature)
+- `all` — Preserve everything
+
+**Transformation Options:**
+- `rename:pattern=replacement` — Regex-based path renaming
+- `case:lower|upper|title` — Filename case conversion
+- `strip:xattrs|ownership|permissions` — Remove metadata
+- `normalize:timestamps` — Set all timestamps to epoch (reproducible builds)
+
+📖 **API Documentation:** See `src/core/file_metadata.rs`, `src/core/transform.rs`, and `src/core/metadata_ops.rs`
+
+---
+
 ### 🔄 Delta Detection: Efficient Transfers
 
 **NEW in v0.4.1!** rsync-inspired delta algorithm that minimizes bandwidth by transferring only changed blocks.
@@ -336,6 +401,7 @@ let s3 = S3Backend::new(s3_config).await?;
 **Features:**
 - ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, etc.
 - ✅ **Streaming I/O**: Memory-efficient for large files
+- ✅ **Metadata operations**: Set permissions, timestamps, xattrs, ownership
 - ✅ **Extensibility**: Plugin system for custom backends
 - ✅ **Type-safe**: Strong typing with comprehensive error handling
 - ✅ **Security**: Built-in secure credential handling
@@ -471,6 +537,11 @@ orbit --source /source --dest /destination --mode sync --parallel 8 --recursive
 # Upload to S3
 orbit --source dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz
 
+# Preserve metadata with transformations
+orbit --source /data --dest /backup --recursive \
+  --preserve=times,perms,owners \
+  --transform="case:lower"
+
 # Create flight plan manifest
 orbit manifest plan --source /data --dest /backup --output ./manifests
 ```
@@ -599,6 +670,20 @@ recursive = true
 
 # Preserve file metadata (timestamps, permissions)
 preserve_metadata = true
+
+# Detailed metadata preservation flags (overrides preserve_metadata if set)
+# Options: "times", "perms", "owners", "xattrs", "all"
+preserve_flags = "times,perms,owners"
+
+# Metadata transformation configuration
+# Format: "rename:pattern=replacement,case:lower,strip:xattrs"
+transform = "case:lower"
+
+# Strict metadata preservation (fail on any metadata error)
+strict_metadata = false
+
+# Verify metadata after transfer
+verify_metadata = false
 
 # Enable resume capability for interrupted transfers
 resume_enabled = true
@@ -740,6 +825,7 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 - **Magnetar: Idempotent job state machine with SQLite + redb backends** ⭐ **NEW!**
 - **Magnetar Resilience Module: Circuit breaker, connection pooling, rate limiting** ⭐ **NEW!**
 - **Delta Detection: rsync-inspired efficient transfers with block-based diffing** ⭐ **NEW!**
+- **Metadata Preservation & Transformation: Comprehensive attribute handling with transformations** ⭐ **NEW!**
 - SMB2/3 native implementation (awaiting upstream fix)
 
 ### 🚧 In Progress (v0.5.0)

@@ -40,7 +40,23 @@ struct Cli {
     /// Preserve metadata (timestamps, permissions)
     #[arg(short = 'p', long = "preserve-metadata", global = true)]
     preserve_metadata: bool,
-    
+
+    /// Detailed preservation flags: times,perms,owners,xattrs (overrides -p)
+    #[arg(long = "preserve", value_name = "FLAGS", global = true)]
+    preserve_flags: Option<String>,
+
+    /// Metadata transformation: rename:pattern=replacement,case:lower,strip:xattrs
+    #[arg(long = "transform", value_name = "CONFIG", global = true)]
+    transform: Option<String>,
+
+    /// Strict metadata mode (fail on any metadata error)
+    #[arg(long, global = true)]
+    strict_metadata: bool,
+
+    /// Verify metadata after transfer
+    #[arg(long, global = true)]
+    verify_metadata: bool,
+
     /// Enable resume capability
     #[arg(short = 'r', long = "resume", global = true)]
     resume: bool,
@@ -360,6 +376,10 @@ fn main() -> Result<()> {
     config.copy_mode = cli.mode.into();
     config.recursive = cli.recursive;
     config.preserve_metadata = cli.preserve_metadata;
+    config.preserve_flags = cli.preserve_flags;
+    config.transform = cli.transform;
+    config.strict_metadata = cli.strict_metadata;
+    config.verify_metadata = cli.verify_metadata;
     config.resume_enabled = cli.resume;
     config.verify_checksum = !cli.no_verify;
     config.show_progress = cli.show_progress || !cli.no_progress;

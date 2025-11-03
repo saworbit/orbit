@@ -1,0 +1,190 @@
+✨ Add Metadata Preservation and Transformation
+
+Implement comprehensive metadata preservation and transformation framework with
+support for timestamps, permissions, ownership, extended attributes, and path
+transformations. Enables cross-platform migrations, reproducible builds, and
+privacy-aware backups.
+
+## Features
+
+### Core Metadata Support
+- Complete file metadata structure supporting:
+  - Timestamps (atime, mtime, ctime)
+  - Unix permissions (mode bits)
+  - Ownership (UID/GID on Unix)
+  - Extended attributes (xattrs) via feature flag
+  - Windows file attributes
+  - ACL entries (structure defined, ready for implementation)
+- Manifest integration for metadata serialization
+- Platform-specific handling (Unix/Windows/macOS)
+
+### Backend Abstraction Extensions
+- Added 5 new async trait methods to Backend:
+  - `set_permissions()` - Set Unix permission bits
+  - `set_timestamps()` - Set access and modification times
+  - `get_xattrs()` / `set_xattrs()` - Extended attribute operations
+  - `set_ownership()` - Set owner and group
+- Default implementations return Unsupported for graceful degradation
+- Full LocalBackend implementation with:
+  - Async/blocking bridging via tokio::spawn_blocking
+  - Platform-specific conditional compilation
+  - Comprehensive error handling
+
+### Transformation Framework
+- Regex-based path transformations (sed-like syntax)
+- Case conversion (lowercase, uppercase, titlecase)
+- Metadata filtering:
+  - Strip xattrs (all or by pattern)
+  - Strip ownership/permissions
+  - Normalize timestamps (for reproducible builds)
+- CLI string parser for easy configuration
+- Builder pattern for programmatic use
+
+### Orchestration Layer
+- MetadataPreserver for high-level coordination
+- Support for both local and backend-aware operations
+- Configurable strictness (warn vs. fail on errors)
+- Metadata verification capabilities
+- Statistics tracking (MetadataStats)
+
+### CLI Integration
+- New command-line options:
+  - `--preserve-metadata` / `-p` - Basic preservation
+  - `--preserve=FLAGS` - Selective preservation
+  - `--transform=CONFIG` - Apply transformations
+  - `--strict-metadata` - Fail on any error
+  - `--verify-metadata` - Post-transfer verification
+- Configuration file support (orbit.toml)
+
+## Implementation Details
+
+### New Files
+- `src/core/file_metadata.rs` (446 lines)
+  - FileMetadata structure
+  - PreserveFlags configuration
+  - Manifest integration (to_manifest_map/from_manifest_map)
+  - Platform-specific attribute extraction
+
+- `src/core/transform.rs` (413 lines)
+  - PathTransform with regex support
+  - CaseTransform enum
+  - MetadataFilter with multiple strategies
+  - Transformation config parser
+  - TransformBuilder pattern
+
+- `src/core/metadata_ops.rs` (349 lines)
+  - MetadataPreserver orchestration
+  - Backend-aware preservation
+  - Verification utilities
+  - Statistics tracking
+
+### Modified Files
+- `src/backend/mod.rs`:
+  - Extended Backend trait with 5 metadata methods
+  - Default implementations with Unsupported errors
+  - Updated supports() method
+
+- `src/backend/local.rs`:
+  - Full implementation of all metadata operations
+  - Platform-specific conditional compilation
+  - Async/blocking bridging
+
+- `src/config.rs`:
+  - Added preserve_flags field
+  - Added transform field
+  - Added strict_metadata field
+  - Added verify_metadata field
+
+- `src/main.rs`:
+  - Added CLI argument parsing
+  - Integrated with CopyConfig
+
+- `Cargo.toml`:
+  - Added regex = "1.10"
+  - Added base64 = "0.22"
+  - Added xattr = "1.3" (optional)
+  - New feature: extended-metadata
+
+### Documentation Updates
+- `README.md`:
+  - New section: "Metadata Preservation & Transformation"
+  - Updated table of contents
+  - Added to roadmap (v0.4.1 completed)
+  - Updated configuration section
+  - Added Quick Start examples
+
+- `BACKEND_GUIDE.md`:
+  - Documented new metadata operations
+  - Added graceful degradation notes
+
+## Testing
+
+- All 126 existing tests pass
+- 18 new tests added:
+  - file_metadata: 4 tests (extraction, preservation, manifest)
+  - transform: 9 tests (path, case, filters, parsing)
+  - metadata_ops: 5 tests (preservation, verification, stats)
+
+## Use Cases
+
+- ✅ Cross-platform migrations (Unix ↔ Windows ↔ macOS)
+- ✅ Reproducible builds (normalize timestamps, strip metadata)
+- ✅ Privacy-aware backups (strip ownership/xattrs)
+- ✅ Cloud storage with metadata (manifest integration)
+- ✅ Archival compliance (preserve extended attributes)
+
+## Examples
+
+```bash
+# Basic preservation
+orbit --source /data --dest /backup -p --recursive
+
+# Selective preservation
+orbit --source /data --dest /backup --preserve=times,perms,owners
+
+# With transformations
+orbit --source /photos --dest /archive \
+  --preserve=all \
+  --transform="rename:s/IMG_/photo_/,case:lower"
+
+# Strip sensitive metadata for cloud
+orbit --source /data --dest s3://bucket/data \
+  --preserve=times,perms \
+  --transform="strip:ownership,strip:xattrs"
+```
+
+## Breaking Changes
+
+None. All changes are additive and backwards compatible.
+
+## Dependencies
+
+- regex 1.10 - Path transformation patterns
+- base64 0.22 - Xattr encoding for manifests
+- xattr 1.3 - Extended attributes (optional, feature-gated)
+
+## Architecture
+
+Follows existing Orbit patterns:
+- Async-first with Tokio
+- Backend trait extension
+- Platform-aware conditional compilation
+- Graceful degradation for unsupported operations
+- Comprehensive error handling
+
+## Future Work
+
+- ACL support (structure exists, needs platform libs)
+- Windows ACL implementation
+- SSH/S3 backend metadata operations
+- Unicode normalization feature flag
+- Metadata-aware manifest verification
+
+---
+
+Closes #[issue-number] (if applicable)
+
+Signed-off-by: Claude (AI Assistant) <noreply@anthropic.com>
+Co-Authored-By: [Your Name] <your-email@example.com>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

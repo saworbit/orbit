@@ -38,7 +38,25 @@ pub struct CopyConfig {
     /// Preserve file metadata (timestamps, permissions)
     #[serde(default)]
     pub preserve_metadata: bool,
-    
+
+    /// Detailed metadata preservation flags (overrides preserve_metadata if set)
+    /// Format: "times,perms,owners,xattrs" or "all"
+    #[serde(default)]
+    pub preserve_flags: Option<String>,
+
+    /// Metadata transformation configuration
+    /// Format: "rename:pattern=replacement,case:lower,strip:xattrs"
+    #[serde(default)]
+    pub transform: Option<String>,
+
+    /// Strict metadata preservation (fail on any metadata error)
+    #[serde(default)]
+    pub strict_metadata: bool,
+
+    /// Verify metadata after transfer
+    #[serde(default)]
+    pub verify_metadata: bool,
+
     /// Enable resume capability for interrupted transfers
     #[serde(default)]
     pub resume_enabled: bool,
@@ -155,6 +173,10 @@ impl Default for CopyConfig {
             copy_mode: CopyMode::Copy,
             recursive: false,
             preserve_metadata: false,
+            preserve_flags: None,
+            transform: None,
+            strict_metadata: false,
+            verify_metadata: false,
             resume_enabled: false,
             verify_checksum: true,
             compression: CompressionType::None,
