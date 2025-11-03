@@ -120,7 +120,7 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn test_limiter_creation() {
@@ -209,5 +209,107 @@ mod tests {
         let optimal = detect_optimal_concurrency();
         assert!(optimal > 0);
         assert!(optimal <= 16);
+    }
+
+    #[test]
+    fn test_concurrency_limiting_load() {
+        // Test that concurrency limiting actually limits concurrent operations
+        let max_concurrent = 3;
+        let limiter = ConcurrencyLimiter::new(max_concurrent);
+        let counter = Arc::new(AtomicUsize::new(0));
+        let max_observed = Arc::new(AtomicUsize::new(0));
+        let mut handles = vec![];
+
+        // Spawn 10 threads that will compete for 3 permits
+        for _ in 0..10 {
+            let limiter = limiter.clone();
+            let counter = counter.clone();
+            let max_observed = max_observed.clone();
+
+            let handle = thread::spawn(move || {
+                let _permit = limiter.acquire();
+
+                // Increment counter to track concurrent operations
+                let current = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                max_observed.fetch_max(current, Ordering::SeqCst);
+
+                // Simulate work
+                thread::sleep(Duration::from_millis(50));
+
+                // Decrement counter
+                counter.fetch_sub(1, Ordering::SeqCst);
+            });
+
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Maximum observed concurrent operations should not exceed limit
+        let max = max_observed.load(Ordering::SeqCst);
+        assert!(
+            max <= max_concurrent,
+            "Max concurrent operations {} exceeded limit {}",
+            max,
+            max_concurrent
+        );
+    }
+
+    #[test]
+    #[ignore] // Timing-sensitive test - run manually with: cargo test -- --ignored
+    fn test_concurrency_limiting_throughput() {
+        // Test that concurrency limiting affects throughput as expected
+        let max_concurrent = 2;
+        let limiter = ConcurrencyLimiter::new(max_concurrent);
+        let num_tasks = 8;
+        let task_duration = Duration::from_millis(100);
+
+        let start = Instant::now();
+        let mut handles = vec![];
+
+        for _ in 0..num_tasks {
+            let limiter = limiter.clone();
+            let handle = thread::spawn(move || {
+                let _permit = limiter.acquire();
+                thread::sleep(task_duration);
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let elapsed = start.elapsed();
+
+        // With 2 concurrent tasks and 8 total tasks of 100ms each,
+        // we expect approximately 400ms (8 tasks / 2 concurrent = 4 batches * 100ms)
+        let expected_duration = task_duration * (num_tasks / max_concurrent) as u32;
+        let min_duration = expected_duration.mul_f32(0.8);
+        let max_duration = expected_duration.mul_f32(1.5);
+
+        assert!(
+            elapsed >= min_duration && elapsed <= max_duration,
+            "Elapsed time {:?} should be between {:?} and {:?}",
+            elapsed,
+            min_duration,
+            max_duration
+        );
+    }
+
+    #[test]
+    fn test_concurrency_permit_drop() {
+        // Test that permits are properly released on drop
+        let limiter = ConcurrencyLimiter::new(1);
+
+        {
+            let _permit = limiter.acquire();
+            assert_eq!(limiter.available(), 0);
+        } // permit dropped here
+
+        // Permit should be released
+        assert_eq!(limiter.available(), 1);
     }
 }

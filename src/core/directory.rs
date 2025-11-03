@@ -11,11 +11,13 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::bounded;
 use rayon::prelude::*;
 use walkdir::WalkDir;
+use tracing::info;
 
 use super::metadata::preserve_metadata;
 use super::validation::matches_exclude_pattern;
 use super::filter::{FilterList, FilterDecision};
 use super::disk_guardian::{self, GuardianConfig};
+use super::concurrency::ConcurrencyLimiter;
 use super::CopyStats;
 use super::progress::ProgressPublisher;
 use crate::config::{CopyConfig, CopyMode, SymlinkMode};
@@ -66,6 +68,15 @@ pub fn copy_directory_impl(
     }
 
     let start_time = Instant::now();
+
+    // Setup concurrency limiter for controlling parallel transfers
+    let concurrency_limiter = if config.parallel > 0 {
+        let limiter = ConcurrencyLimiter::new(config.parallel);
+        info!("Concurrency control enabled: max {} parallel transfers", limiter.max_concurrent());
+        Some(Arc::new(limiter))
+    } else {
+        None
+    };
 
     // Pre-flight disk space check for directory transfers
     if config.show_progress {
@@ -142,7 +153,7 @@ pub fn copy_directory_impl(
     };
 
     // Consumer: process work items (files) in parallel or sequentially
-    consume_work_items(&source_dir, &dest_dir, config, rx, total_stats.clone())?;
+    consume_work_items(&source_dir, &dest_dir, config, rx, total_stats.clone(), concurrency_limiter.as_ref())?;
 
     // Wait for producer to finish and check for errors
     match producer_handle.join() {
@@ -497,9 +508,10 @@ fn consume_work_items(
     config: &CopyConfig,
     rx: crossbeam_channel::Receiver<WorkItem>,
     total_stats: Arc<Mutex<CopyStats>>,
+    concurrency_limiter: Option<&Arc<ConcurrencyLimiter>>,
 ) -> Result<()> {
     if config.parallel > 0 {
-        // Parallel processing with thread pool
+        // Parallel processing with thread pool and concurrency control
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(config.parallel)
             .build()
@@ -507,7 +519,7 @@ fn consume_work_items(
 
         pool.install(|| {
             rx.into_iter().par_bridge().for_each(|item| {
-                if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats)
+                if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats, concurrency_limiter)
                 {
                     eprintln!("Error copying {:?}: {}", item.source_path, e);
                     if let Ok(mut stats) = total_stats.lock() {
@@ -517,9 +529,9 @@ fn consume_work_items(
             });
         });
     } else {
-        // Sequential processing
+        // Sequential processing (no concurrency limiter needed)
         for item in rx {
-            if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats) {
+            if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats, None) {
                 eprintln!("Error copying {:?}: {}", item.source_path, e);
                 if let Ok(mut stats) = total_stats.lock() {
                     stats.files_failed += 1;
@@ -538,7 +550,12 @@ fn process_work_item(
     _dest_dir: &Path,
     config: &CopyConfig,
     stats_mutex: &Arc<Mutex<CopyStats>>,
+    concurrency_limiter: Option<&Arc<ConcurrencyLimiter>>,
 ) -> Result<()> {
+    // Acquire concurrency permit if limiter is provided
+    // Permit is automatically released when dropped (RAII pattern)
+    let _permit = concurrency_limiter.map(|limiter| limiter.acquire());
+
     let stats = match item.entry_type {
         EntryType::Directory => {
             // Directories already handled in producer

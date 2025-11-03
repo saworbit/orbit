@@ -9,9 +9,11 @@ use std::time::{Duration, Instant};
 
 use lz4::{EncoderBuilder as Lz4Encoder, Decoder as Lz4Decoder};
 use zstd::stream::{Encoder as ZstdEncoder, Decoder as ZstdDecoder};
+use tracing::{debug, info};
 
 use crate::config::CopyConfig;
 use crate::core::{CopyStats, checksum::StreamingHasher, resume};
+use crate::core::bandwidth::BandwidthLimiter;
 use crate::error::{OrbitError, Result};
 
 /// Copy file with LZ4 compression
@@ -23,7 +25,13 @@ pub fn copy_with_lz4(
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
     let temp_compressed = dest_path.with_extension("tmp.lz4");
-    
+
+    // Setup bandwidth limiter
+    let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
+    if bandwidth_limiter.is_enabled() {
+        info!("LZ4 compression with bandwidth limiting: {} bytes/sec", config.max_bandwidth);
+    }
+
     // Ensure cleanup on exit
     let _cleanup = TempFileCleanup::new(&temp_compressed);
     
@@ -61,20 +69,30 @@ pub fn copy_with_lz4(
         let mut buffer = vec![0u8; config.chunk_size];
         let mut bytes_read = start_offset;
         let mut last_checkpoint = Instant::now();
-        
+
         while bytes_read < source_size {
             let remaining = (source_size - bytes_read) as usize;
             let to_read = remaining.min(config.chunk_size);
-            
+
             let n = source_file.read(&mut buffer[..to_read])?;
             if n == 0 {
                 break;
             }
-            
+
             encoder.write_all(&buffer[..n])
                 .map_err(|e| OrbitError::Compression(e.to_string()))?;
             bytes_read += n as u64;
-            
+
+            // Bandwidth throttling
+            if bandwidth_limiter.is_enabled() {
+                let throttle_start = Instant::now();
+                bandwidth_limiter.wait_for_capacity(n as u64);
+                let throttle_duration = throttle_start.elapsed();
+                if throttle_duration > Duration::from_millis(10) {
+                    debug!("LZ4: Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, n);
+                }
+            }
+
             if config.resume_enabled && last_checkpoint.elapsed() > Duration::from_secs(5) {
                 let compressed_size = std::fs::metadata(&temp_compressed)
                     .map(|m| m.len())
@@ -83,7 +101,7 @@ pub fn copy_with_lz4(
                 last_checkpoint = Instant::now();
             }
         }
-        
+
         let (_output, result) = encoder.finish();
         result.map_err(|e| OrbitError::Compression(e.to_string()))?;
     }
@@ -139,7 +157,13 @@ pub fn copy_with_zstd(
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
     let temp_compressed = dest_path.with_extension("tmp.zst");
-    
+
+    // Setup bandwidth limiter
+    let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
+    if bandwidth_limiter.is_enabled() {
+        info!("Zstd compression with bandwidth limiting: {} bytes/sec", config.max_bandwidth);
+    }
+
     let _cleanup = TempFileCleanup::new(&temp_compressed);
     
     let resume_info = if config.resume_enabled {
@@ -168,20 +192,30 @@ pub fn copy_with_zstd(
         let mut buffer = vec![0u8; config.chunk_size];
         let mut bytes_read = start_offset;
         let mut last_checkpoint = Instant::now();
-        
+
         while bytes_read < source_size {
             let remaining = (source_size - bytes_read) as usize;
             let to_read = remaining.min(config.chunk_size);
-            
+
             let n = source_file.read(&mut buffer[..to_read])?;
             if n == 0 {
                 break;
             }
-            
+
             encoder.write_all(&buffer[..n])
                 .map_err(|e| OrbitError::Compression(e.to_string()))?;
             bytes_read += n as u64;
-            
+
+            // Bandwidth throttling
+            if bandwidth_limiter.is_enabled() {
+                let throttle_start = Instant::now();
+                bandwidth_limiter.wait_for_capacity(n as u64);
+                let throttle_duration = throttle_start.elapsed();
+                if throttle_duration > Duration::from_millis(10) {
+                    debug!("Zstd: Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, n);
+                }
+            }
+
             if config.resume_enabled && last_checkpoint.elapsed() > Duration::from_secs(5) {
                 let compressed_size = std::fs::metadata(&temp_compressed)
                     .map(|m| m.len())
@@ -190,7 +224,7 @@ pub fn copy_with_zstd(
                 last_checkpoint = Instant::now();
             }
         }
-        
+
         encoder.finish()
             .map_err(|e| OrbitError::Compression(e.to_string()))?;
     }

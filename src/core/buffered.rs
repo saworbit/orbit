@@ -14,8 +14,9 @@ use crate::error::Result;
 use super::CopyStats;
 use super::checksum::StreamingHasher;
 use super::resume::{ResumeInfo, load_resume_info, save_resume_info_full, cleanup_resume_info, decide_resume_strategy, ResumeDecision, record_chunk_digest, validate_chunks};
-use super::bandwidth;
+use super::bandwidth::BandwidthLimiter;
 use super::progress::ProgressPublisher;
+use tracing::{debug, info};
 
 /// Buffered copy with streaming checksum (original implementation)
 ///
@@ -31,6 +32,12 @@ pub fn copy_buffered(
     publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
+
+    // Setup bandwidth limiter with token bucket algorithm
+    let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
+    if bandwidth_limiter.is_enabled() {
+        info!("Bandwidth limiting enabled: {} bytes/sec", config.max_bandwidth);
+    }
 
     // Emit transfer start event
     let file_id = publisher.start_transfer(
@@ -238,9 +245,16 @@ pub fn copy_buffered(
             last_checkpoint = Instant::now();
         }
 
-        // Bandwidth throttling
-        if config.max_bandwidth > 0 {
-            bandwidth::apply_limit(n as u64, config.max_bandwidth, &mut last_checkpoint);
+        // Bandwidth throttling using token bucket algorithm
+        if bandwidth_limiter.is_enabled() {
+            let throttle_start = Instant::now();
+            bandwidth_limiter.wait_for_capacity(n as u64);
+            let throttle_duration = throttle_start.elapsed();
+
+            // Log throttle events for monitoring
+            if throttle_duration > Duration::from_millis(10) {
+                debug!("Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, n);
+            }
         }
     }
 

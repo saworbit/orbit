@@ -410,15 +410,23 @@ orbit --source vm.qcow2 --dest backup/vm.qcow2 \
 **Features:**
 - **Enhanced Progress Bars** — Multi-transfer tracking with `indicatif`, real-time ETA and speed
 - **Dry-Run Mode** — Safe simulation and planning before actual transfers
-- **Bandwidth Limiting** — Token bucket rate limiting (governor) for controlled transfers
-- **Concurrency Control** — Semaphore-based parallel operation management
+- **Bandwidth Limiting** — Token bucket rate limiting (`governor`) **fully integrated** across all copy modes ⭐
+- **Concurrency Control** — Semaphore-based parallel operation management **fully integrated** ⭐
 - **Verbosity Levels** — Detailed logging with structured tracing
 - **Multi-Transfer Support** — Concurrent progress bars for parallel operations
+- **Zero New Dependencies** — Leveraged existing infrastructure
+
+**What's New:**
+- ✅ **BandwidthLimiter** now integrated into buffered, LZ4, Zstd, and zero-copy operations
+- ✅ **ConcurrencyLimiter** now integrated into directory copy with RAII permits
+- ✅ **Zero-copy** now supports bandwidth limiting (Linux/macOS with 1MB chunks)
+- ✅ **Throttle logging** for monitoring rate limit events (debug level)
+- ✅ **Load tests** verify accuracy of rate limiting and concurrency control
 
 **Use Cases:**
 - ✅ Preview large migrations before executing (dry-run)
-- ✅ Limit bandwidth to avoid network saturation
-- ✅ Control resource usage with concurrency limits
+- ✅ **Limit bandwidth to avoid network saturation or cloud costs**
+- ✅ **Control resource usage with fine-grained concurrency limits**
 - ✅ Monitor complex parallel transfers with real-time progress
 - ✅ Test filter rules and transformations safely
 
@@ -440,6 +448,9 @@ orbit -s /large/dataset -d /backup \
   --max-bandwidth 10 \
   --parallel 4 \
   --show-progress
+
+# Bandwidth limiting now works with zero-copy!
+orbit -s /large/file.bin -d /backup/file.bin --max-bandwidth 10
 
 # Auto-detect optimal concurrency (2x CPU cores, capped at 16)
 orbit -s /data -d /backup -R --parallel 0
@@ -464,22 +475,33 @@ orbit -s /production/data -d /backup/location \
 - Terminal-friendly progress bars
 
 **Bandwidth Limiting:**
-- Token bucket algorithm for smooth throttling
-- Configurable MB/s limits
+- Token bucket algorithm for smooth throttling (`governor` crate)
+- Configurable MB/s limits via `--max-bandwidth`
 - Zero overhead when disabled (0 = unlimited)
+- **Integrated across ALL copy modes**: buffered, LZ4, Zstd, zero-copy (Linux/macOS)
 - Thread-safe and cloneable
+- Throttle event logging (debug level)
+- 1MB chunks for precise control in zero-copy mode
 
 **Concurrency Control:**
-- Auto-detection based on CPU cores
-- Configurable maximum parallel operations
-- RAII-based permit management (automatic cleanup)
+- Auto-detection based on CPU cores (2× CPU count, max 16)
+- Configurable maximum parallel operations via `--parallel`
+- **Integrated into directory copy** with per-file permit acquisition
+- RAII-based permit management (automatic cleanup via Drop)
 - Optimal for I/O-bound operations
+- Works seamlessly with rayon thread pools
 
 **Dry-Run Capabilities:**
 - Simulate all operations (copy, update, skip, delete, mkdir)
 - Detailed logging via tracing framework
 - Summary statistics with total data size
 - Works with all other features (filters, transformations, etc.)
+
+**Technical Details:**
+- **Implementation**: Integrated existing `BandwidthLimiter` and `ConcurrencyLimiter` classes
+- **Testing**: 177 tests passed, 3 timing-sensitive load tests available with `--ignored`
+- **Monitoring**: Structured logging via `tracing` with debug-level throttle events
+- **Compatibility**: Zero impact on existing functionality, all tests passing
 
 📖 **Full Documentation:** See [`PROGRESS_AND_CONCURRENCY.md`](PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
 

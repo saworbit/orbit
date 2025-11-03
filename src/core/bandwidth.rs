@@ -133,4 +133,82 @@ mod tests {
         // Should be instant
         assert!(elapsed < Duration::from_millis(1));
     }
+
+    #[test]
+    #[ignore] // Timing-sensitive test - run manually with: cargo test -- --ignored
+    fn test_bandwidth_limiting_load() {
+        // Test that bandwidth limiting actually limits throughput
+        let bandwidth_limit = 1_048_576u64; // 1 MB/s
+        let limiter = BandwidthLimiter::new(bandwidth_limit);
+
+        let start = Instant::now();
+        let chunk_size = 262_144u64; // 256 KB chunks
+        let num_chunks = 8; // Total 2 MB
+
+        for _ in 0..num_chunks {
+            limiter.wait_for_capacity(chunk_size);
+        }
+
+        let elapsed = start.elapsed();
+        let total_bytes = chunk_size * num_chunks;
+
+        // Should take approximately 2 seconds (2 MB / 1 MB/s)
+        // Allow some tolerance for overhead
+        let expected_duration = Duration::from_secs_f64(total_bytes as f64 / bandwidth_limit as f64);
+        let min_duration = expected_duration.mul_f32(0.8); // 80% of expected
+        let max_duration = expected_duration.mul_f32(1.5); // 150% of expected
+
+        assert!(
+            elapsed >= min_duration && elapsed <= max_duration,
+            "Elapsed time {:?} should be between {:?} and {:?}",
+            elapsed,
+            min_duration,
+            max_duration
+        );
+    }
+
+    #[test]
+    #[ignore] // Timing-sensitive test - run manually with: cargo test -- --ignored
+    fn test_bandwidth_limiting_concurrent() {
+        use std::sync::Arc;
+        use std::thread;
+
+        // Test bandwidth limiting with multiple threads
+        let bandwidth_limit = 2_097_152u64; // 2 MB/s
+        let limiter = Arc::new(BandwidthLimiter::new(bandwidth_limit));
+        let chunk_size = 262_144u64; // 256 KB
+
+        let start = Instant::now();
+        let mut handles = vec![];
+
+        for _ in 0..4 {
+            let limiter = limiter.clone();
+            let handle = thread::spawn(move || {
+                for _ in 0..2 {
+                    limiter.wait_for_capacity(chunk_size);
+                }
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        let elapsed = start.elapsed();
+        let total_bytes = chunk_size * 4 * 2; // 2 MB total
+
+        // Should take approximately 1 second
+        let expected_duration = Duration::from_secs_f64(total_bytes as f64 / bandwidth_limit as f64);
+        let min_duration = expected_duration.mul_f32(0.7);
+        let max_duration = expected_duration.mul_f32(1.5);
+
+        assert!(
+            elapsed >= min_duration && elapsed <= max_duration,
+            "Elapsed time {:?} should be between {:?} and {:?}",
+            elapsed,
+            min_duration,
+            max_duration
+        );
+    }
 }

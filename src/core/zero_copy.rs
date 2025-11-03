@@ -70,13 +70,14 @@ impl ZeroCopyCapabilities {
 }
 
 /// Attempt to copy a file using zero-copy system calls
-/// 
+///
 /// # Arguments
 /// * `source` - Source file (must be opened for reading)
 /// * `dest` - Destination file (must be opened for writing)
 /// * `offset` - Starting offset in bytes (for resume support)
 /// * `len` - Number of bytes to copy
-/// 
+/// * `bandwidth_limiter` - Optional bandwidth limiter for throttling
+///
 /// # Returns
 /// * `ZeroCopyResult::Success(n)` - Successfully copied n bytes
 /// * `ZeroCopyResult::Unsupported` - Zero-copy not available, use buffered copy
@@ -86,26 +87,27 @@ pub fn try_zero_copy(
     dest: &File,
     offset: u64,
     len: u64,
+    bandwidth_limiter: Option<&BandwidthLimiter>,
 ) -> ZeroCopyResult {
     if len == 0 {
         return ZeroCopyResult::Success(0);
     }
-    
+
     #[cfg(target_os = "linux")]
     {
-        linux::copy_file_range_loop(source, dest, offset, len)
+        linux::copy_file_range_loop(source, dest, offset, len, bandwidth_limiter)
     }
-    
+
     #[cfg(target_os = "windows")]
     {
-        windows::copy_file_ex(source, dest, offset, len)
+        windows::copy_file_ex(source, dest, offset, len, bandwidth_limiter)
     }
-    
+
     #[cfg(target_os = "macos")]
     {
-        macos::copyfile_wrapper(source, dest, offset, len)
+        macos::copyfile_wrapper(source, dest, offset, len, bandwidth_limiter)
     }
-    
+
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     {
         ZeroCopyResult::Unsupported
@@ -165,27 +167,39 @@ fn get_volume_path(path: &Path) -> io::Result<String> {
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use super::ZeroCopyResult;
+    use super::{ZeroCopyResult, BandwidthLimiter};
     use std::fs::File;
     use std::io;
     use std::os::unix::io::AsRawFd;
-    
+    use std::time::{Duration, Instant};
+    use log::debug;
+
     pub fn copy_file_range_loop(
         source: &File,
         dest: &File,
         offset: u64,
         len: u64,
+        bandwidth_limiter: Option<&BandwidthLimiter>,
     ) -> ZeroCopyResult {
         let mut total_copied = 0u64;
         let mut src_offset = offset as i64;
         let mut dst_offset = offset as i64;
-        
+
+        // Use 1MB chunks for bandwidth limiting granularity
+        const CHUNK_SIZE: u64 = 1024 * 1024;
+
         while total_copied < len {
             let remaining = len - total_copied;
-            
-            // copy_file_range can copy at most isize::MAX bytes
-            let to_copy = remaining.min(isize::MAX as u64) as usize;
-            
+
+            // Use smaller chunks if bandwidth limiting is enabled for better granularity
+            let max_chunk = if bandwidth_limiter.is_some() {
+                CHUNK_SIZE
+            } else {
+                isize::MAX as u64
+            };
+
+            let to_copy = remaining.min(max_chunk) as usize;
+
             match unsafe {
                 libc::syscall(
                     libc::SYS_copy_file_range,
@@ -199,7 +213,7 @@ mod linux {
             } {
                 -1 => {
                     let err = io::Error::last_os_error();
-                    
+
                     // Check for specific error codes that indicate unsupported
                     match err.raw_os_error() {
                         Some(libc::ENOSYS) | Some(libc::EXDEV) | Some(libc::EOPNOTSUPP) => {
@@ -215,11 +229,22 @@ mod linux {
                     break;
                 }
                 n => {
-                    total_copied += n as u64;
+                    let bytes_copied = n as u64;
+                    total_copied += bytes_copied;
+
+                    // Apply bandwidth limiting
+                    if let Some(limiter) = bandwidth_limiter {
+                        let throttle_start = Instant::now();
+                        limiter.wait_for_capacity(bytes_copied);
+                        let throttle_duration = throttle_start.elapsed();
+                        if throttle_duration > Duration::from_millis(10) {
+                            debug!("Zero-copy (Linux): Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, bytes_copied);
+                        }
+                    }
                 }
             }
         }
-        
+
         ZeroCopyResult::Success(total_copied)
     }
 }
@@ -230,14 +255,15 @@ mod linux {
 
 #[cfg(target_os = "windows")]
 mod windows {
-    use super::ZeroCopyResult;
+    use super::{ZeroCopyResult, BandwidthLimiter};
     use std::fs::File;
-    
+
     pub fn copy_file_ex(
         _source: &File,
         _dest: &File,
         _offset: u64,
         _len: u64,
+        _bandwidth_limiter: Option<&BandwidthLimiter>,
     ) -> ZeroCopyResult {
         // Windows CopyFileExW works at the path level, not file descriptor level
         // For now, we'll return Unsupported and implement path-based copying
@@ -253,36 +279,50 @@ mod windows {
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use super::ZeroCopyResult;
+    use super::{ZeroCopyResult, BandwidthLimiter};
     use std::fs::File;
     use std::io;
     use std::os::unix::io::AsRawFd;
-    
+    use std::time::{Duration, Instant};
+    use log::debug;
+
     pub fn copyfile_wrapper(
         source: &File,
         dest: &File,
         offset: u64,
         len: u64,
+        bandwidth_limiter: Option<&BandwidthLimiter>,
     ) -> ZeroCopyResult {
         // macOS has fcopyfile which works on file descriptors
         // For simplicity, we'll use sendfile which is more portable
-        sendfile_loop(source, dest, offset, len)
+        sendfile_loop(source, dest, offset, len, bandwidth_limiter)
     }
-    
+
     fn sendfile_loop(
         source: &File,
         dest: &File,
         offset: u64,
         len: u64,
+        bandwidth_limiter: Option<&BandwidthLimiter>,
     ) -> ZeroCopyResult {
         let mut total_copied = 0u64;
         let mut current_offset = offset as i64;
-        
+
+        // Use 1MB chunks for bandwidth limiting granularity
+        const CHUNK_SIZE: i64 = 1024 * 1024;
+
         while total_copied < len {
             let remaining = (len - total_copied) as i64;
-            
+
+            // Use smaller chunks if bandwidth limiting is enabled
+            let to_copy = if bandwidth_limiter.is_some() {
+                remaining.min(CHUNK_SIZE)
+            } else {
+                remaining
+            };
+
             let result = unsafe {
-                let mut bytes_written: libc::off_t = remaining;
+                let mut bytes_written: libc::off_t = to_copy;
                 libc::sendfile(
                     dest.as_raw_fd(),
                     source.as_raw_fd(),
@@ -292,7 +332,7 @@ mod macos {
                     0,
                 )
             };
-            
+
             if result == -1 {
                 let err = io::Error::last_os_error();
                 match err.raw_os_error() {
@@ -304,16 +344,27 @@ mod macos {
                     }
                 }
             }
-            
+
             // sendfile updates current_offset automatically
             // bytes_written contains the actual bytes transferred
             if result == 0 {
                 break; // EOF
             }
-            
-            total_copied += result as u64;
+
+            let bytes_copied = result as u64;
+            total_copied += bytes_copied;
+
+            // Apply bandwidth limiting
+            if let Some(limiter) = bandwidth_limiter {
+                let throttle_start = Instant::now();
+                limiter.wait_for_capacity(bytes_copied);
+                let throttle_duration = throttle_start.elapsed();
+                if throttle_duration > Duration::from_millis(10) {
+                    debug!("Zero-copy (macOS): Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, bytes_copied);
+                }
+            }
         }
-        
+
         ZeroCopyResult::Success(total_copied)
     }
 }
@@ -323,20 +374,22 @@ mod macos {
 // ============================================================================
 
 use std::fs::OpenOptions;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use indicatif::{ProgressBar, ProgressStyle};
+use tracing::{debug, info};
 use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
 use super::CopyStats;
 use super::checksum;
 use super::progress::ProgressPublisher;
+use super::bandwidth::BandwidthLimiter;
 
 /// Determine if zero-copy should be attempted based on heuristics
 ///
 /// Returns true if conditions are favorable for zero-copy:
 /// - Zero-copy is available on this platform
 /// - No resume needed (complex offset handling works better with buffered)
-/// - No bandwidth throttling (need granular control)
+/// - Bandwidth limiting is supported via chunked transfers
 /// - Files on same filesystem (if required by platform)
 /// - File size >= 64KB (small files have syscall overhead)
 pub fn should_use_zero_copy(
@@ -350,10 +403,9 @@ pub fn should_use_zero_copy(
         return Ok(false);
     }
 
-    // Don't use zero-copy if:
-    // 1. Resume is enabled (complex offset handling works better with buffered)
-    // 2. Bandwidth throttling is active (need granular control)
-    if config.resume_enabled || config.max_bandwidth > 0 {
+    // Don't use zero-copy if resume is enabled (complex offset handling works better with buffered)
+    // Note: Bandwidth limiting IS supported via chunked zero-copy transfers
+    if config.resume_enabled {
         return Ok(false);
     }
 
@@ -392,6 +444,12 @@ pub fn try_zero_copy_direct(
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
 
+    // Setup bandwidth limiter
+    let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
+    if bandwidth_limiter.is_enabled() {
+        info!("Zero-copy with bandwidth limiting: {} bytes/sec", config.max_bandwidth);
+    }
+
     // Emit transfer start event
     let file_id = publisher.start_transfer(
         source_path.to_path_buf(),
@@ -421,8 +479,12 @@ pub fn try_zero_copy_direct(
         None
     };
 
-    // Attempt zero-copy
-    let result = try_zero_copy(&source_file, &dest_file, 0, source_size);
+    // Attempt zero-copy with bandwidth limiting support
+    let result = if bandwidth_limiter.is_enabled() {
+        try_zero_copy(&source_file, &dest_file, 0, source_size, Some(&bandwidth_limiter))
+    } else {
+        try_zero_copy(&source_file, &dest_file, 0, source_size, None)
+    };
 
     let bytes_copied = match result {
         ZeroCopyResult::Success(n) => n,
@@ -530,6 +592,7 @@ mod tests {
             dest.as_file(),
             0,
             test_data.len() as u64,
+            None,  // No bandwidth limiting in tests
         );
         
         match result {
