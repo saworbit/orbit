@@ -1064,39 +1064,72 @@ This structure ensures isolation, testability, and reusability.
 
 ## 🖥️ Web GUI (NEW in v0.5.0!)
 
-**Orbit Web** provides a modern, reactive web interface for orchestrating file transfers with real-time progress tracking.
+**Orbit Web** provides a modern, reactive web interface for orchestrating file transfers with real-time progress tracking. Built as a separate, modular crate, it offers a powerful alternative to CLI-based workflows while maintaining the same reliability and performance of Orbit's core engine.
 
-### Features
+### Why Use the Web GUI?
 
-- 📊 **Live Dashboard** — Real-time job monitoring with auto-refresh
-- 🎯 **Job Creation** — Intuitive form interface for creating transfers
-- 📈 **Progress Tracking** — Real-time progress bars with detailed statistics
-- 🔌 **WebSocket Updates** — Low-latency progress updates via WebSocket
-- 💾 **Persistent State** — All job state in Magnetar DB for crash recovery
-- 📱 **Responsive Design** — Works on desktop and mobile
+- **Visual Monitoring** — See all transfers at a glance with real-time progress
+- **Simplified Workflows** — No need to remember CLI flags or syntax
+- **Multi-Job Management** — Monitor and control multiple transfers simultaneously
+- **Historical Tracking** — Review completed jobs and their statistics
+- **Team Collaboration** — Centralized interface accessible from any browser
+- **Crash Recovery** — Resume monitoring after disconnects via Magnetar persistence
+
+### Core Features
+
+#### 1. Live Dashboard
+- **Auto-Refreshing Job List** — Updates every 2 seconds
+- **Status Indicators** — Color-coded job states (pending, processing, completed, failed)
+- **Progress Visualization** — Real-time progress bars with percentage display
+- **Chunk-Level Detail** — See done/total/failed chunk counts
+- **Responsive Layout** — Works on desktop, tablet, and mobile
+
+#### 2. Job Creation & Management
+- **Interactive Form** — Create jobs with visual controls
+- **Compression Toggle** — Enable/disable compression with one click
+- **Verification Control** — Toggle checksum verification
+- **Parallel Workers** — Visual slider to set worker count (1-16)
+- **Path Validation** — Real-time validation of source/destination
+- **Job Actions** — Delete completed or failed jobs
+
+#### 3. Real-Time Updates
+- **WebSocket Support** — Low-latency progress streaming (future enhancement)
+- **Automatic Polling** — Fallback with configurable refresh interval
+- **Live Statistics** — Bytes transferred, speed, ETA
+- **Status Changes** — Instant visual feedback on state transitions
+
+#### 4. Persistent State
+- **Magnetar Integration** — SQLite-backed job storage
+- **Crash Recovery** — Resume monitoring after server restart
+- **Job History** — Review past transfers and their outcomes
+- **Audit Trail** — Complete job lifecycle tracking
 
 ### Quick Start
 
 #### Prerequisites
 
-Install the required tools:
-
 ```bash
-# Install Cargo Leptos
+# Install Rust toolchain (if not already installed)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install Cargo Leptos build tool
 cargo install cargo-leptos
 
-# Add WASM target
+# Add WebAssembly target
 rustup target add wasm32-unknown-unknown
 ```
 
 #### Running the Server
 
+**Development Mode** (with hot-reload):
 ```bash
-# Development mode with hot-reload
 cd crates/orbit-web
 cargo leptos watch
+```
 
-# Production build and run
+**Production Mode**:
+```bash
+cd crates/orbit-web
 cargo leptos build --release
 cargo run --release
 ```
@@ -1105,39 +1138,190 @@ The web interface will be available at **http://127.0.0.1:8080**
 
 ### Architecture
 
-Built with cutting-edge Rust web technologies:
+Built with cutting-edge Rust web technologies for optimal performance and developer experience:
 
-- **Leptos** — Full-stack reactive framework (server-side rendering + hydration)
-- **Axum** — High-performance async web server
-- **WebSockets** — Real-time bidirectional communication
-- **Magnetar Integration** — Persistent job state and recovery
-- **Tailwind CSS** — Modern, responsive styling
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | Leptos 0.6 | Reactive UI with server-side rendering + hydration |
+| **Backend** | Axum 0.7 | High-performance async HTTP server |
+| **Real-time** | WebSockets | Low-latency bidirectional communication |
+| **State** | Magnetar (SQLite) | Persistent job state with crash recovery |
+| **Styling** | Tailwind CSS | Modern, utility-first responsive design |
+| **Runtime** | Tokio | Efficient async task execution |
 
-### API Endpoints
+**Key Design Principles:**
+- **Zero Coupling** — Web GUI is a separate crate, doesn't modify core engine
+- **Full-Stack Rust** — Type-safe from database to browser
+- **SSR + Hydration** — Fast initial load with interactive client
+- **Production Ready** — Enterprise-grade reliability and performance
 
-**HTTP:**
-- `GET /` — Main dashboard
-- `GET /api/health` — Health check
-- `POST /api/list_jobs` — List all jobs (Leptos server function)
-- `POST /api/create_job` — Create a new job
-- `POST /api/get_job_stats` — Get job statistics
+### User Interface
 
-**WebSocket:**
-- `WS /ws/progress/:job_id` — Real-time progress updates
+#### Dashboard Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  🚀 Orbit Web              Dashboard | About            │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌──────────────────┐    ┌──────────────────────────┐  │
+│  │ Create New Job   │    │ Active Jobs           ⟳  │  │
+│  │                  │    │                          │  │
+│  │ Source Path      │    │ ID  Source   Status  %  │  │
+│  │ [____________]   │    │ ─────────────────────── │  │
+│  │                  │    │ 1   Job-1    Done   100 │  │
+│  │ Destination      │    │ 2   Job-2    Active  65 │  │
+│  │ [____________]   │    │ 3   Job-3    Pending  0 │  │
+│  │                  │    │                          │  │
+│  │ ☑ Compress       │    │ Showing 3 jobs           │  │
+│  │ ☑ Verify         │    └──────────────────────────┘  │
+│  │                  │                                   │
+│  │ Workers: 4       │                                   │
+│  │ ├────●───┤       │                                   │
+│  │                  │                                   │
+│  │ [Create Job]     │                                   │
+│  └──────────────────┘                                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### API Reference
+
+#### HTTP Endpoints
+
+**Health Check**
+```bash
+GET /api/health
+# Returns: {"status":"ok","service":"orbit-web","version":"0.1.0"}
+```
+
+#### Leptos Server Functions (POST /api/*)
+
+**List Jobs**
+```bash
+POST /api/list_jobs
+# Returns: Array of JobInfo objects with stats
+```
+
+**Create Job**
+```bash
+POST /api/create_job
+Body: {"source":"/path","destination":"/dest","compress":true,"verify":true,"parallel":4}
+# Returns: {"job_id":"uuid"}
+```
+
+**Get Job Stats**
+```bash
+POST /api/get_job_stats
+Body: {"job_id":"1"}
+# Returns: JobInfo with detailed statistics
+```
+
+**Delete Job**
+```bash
+POST /api/delete_job
+Body: {"job_id":"1"}
+# Returns: Success/error
+```
+
+#### WebSocket Endpoints
+
+**Progress Updates**
+```bash
+WS /ws/progress/:job_id
+# Streams: Real-time ProgressUpdate messages
+```
 
 ### Configuration
 
-Set environment variables:
-
+**Environment Variables:**
 ```bash
-# Database path
-export ORBIT_WEB_DB=orbit-web.db
+# Database location (default: orbit-web.db)
+export ORBIT_WEB_DB=/var/lib/orbit/web.db
 
-# Log level
+# Logging level (default: info)
 export RUST_LOG=info,orbit_web=debug
+
+# Server address (default: 127.0.0.1:8080)
+export LEPTOS_SITE_ADDR=0.0.0.0:8080
 ```
 
-📖 **Full Documentation:** See [`crates/orbit-web/README.md`](crates/orbit-web/README.md)
+**Leptos Configuration** (`Leptos.toml`):
+```toml
+site-addr = "127.0.0.1:8080"
+site-root = "target/site"
+reload-port = 3001
+```
+
+### Deployment
+
+#### Systemd Service
+
+```ini
+[Unit]
+Description=Orbit Web GUI
+After=network.target
+
+[Service]
+Type=simple
+User=orbit
+WorkingDirectory=/opt/orbit-web
+Environment="ORBIT_WEB_DB=/var/lib/orbit/web.db"
+ExecStart=/opt/orbit-web/orbit-web
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Docker
+
+```bash
+docker build -t orbit-web .
+docker run -p 8080:8080 -v orbit-data:/data orbit-web
+```
+
+#### Reverse Proxy (Nginx)
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+```
+
+### Roadmap
+
+**v0.2.0** - Enhanced Monitoring
+- Log tail viewer with live streaming
+- Job pause/resume controls
+- Advanced filtering and search
+
+**v0.3.0** - Manifest Integration
+- Drag-and-drop manifest upload
+- Visual manifest editor
+- Template management
+
+**v0.4.0** - Analytics Dashboard
+- Parquet export integration
+- Interactive charts and visualizations
+- Historical trend analysis
+
+**v0.5.0** - Security
+- TLS/HTTPS support
+- Authentication and authorization
+- API key management
+
+**v0.6.0** - Advanced Features
+- Dark mode theme
+- Mobile PWA support
+- Multi-language support
+
+📖 **Complete Documentation:**
+- **Full Guide:** [`docs/WEB_GUI.md`](docs/WEB_GUI.md) - Comprehensive documentation
+- **Quick Reference:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) - Developer guide
+- **API Docs:** Run `cargo doc --open -p orbit-web`
 
 ---
 
@@ -1268,7 +1452,8 @@ cargo clippy
 
 ### User Guides
 - **Quick Start:** This README
-- **Web GUI:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **NEW!**
+- **Web GUI Complete Guide:** [`docs/WEB_GUI.md`](docs/WEB_GUI.md) ⭐ **NEW!**
+- **Web GUI Quick Reference:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **NEW!**
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
 - **Disk Guardian:** [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
