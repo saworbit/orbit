@@ -30,6 +30,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"
 thiserror = "1.0"
 
+# WASM support
+getrandom = { version = "0.3", features = ["js"] }
+
 # Internal dependencies
 magnetar = { path = "../magnetar" }
 orbit = { path = "../.." }
