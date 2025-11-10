@@ -279,14 +279,12 @@ pub fn transform_metadata(metadata: &mut FileMetadata, config: &TransformConfig)
 
 /// Normalize path encoding (UTF-8 NFC normalization)
 fn normalize_path_encoding(path: &Path) -> PathBuf {
-    // Convert path to string and normalize Unicode
-    let path_str = path.to_string_lossy();
-
     // Use Unicode NFC normalization for consistent representation
     // This ensures that é (single character) and é (e + combining accent) are the same
     #[cfg(feature = "unicode-normalization")]
     {
         use unicode_normalization::UnicodeNormalization;
+        let path_str = path.to_string_lossy();
         let normalized: String = path_str.nfc().collect();
         PathBuf::from(normalized)
     }

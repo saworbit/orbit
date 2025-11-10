@@ -154,7 +154,6 @@ fn check_not_readonly(path: &Path) -> Result<()> {
     // On Unix systems, we can check readonly attribute
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
         let perms = metadata.permissions();
         if perms.readonly() {
             return Err(OrbitError::MetadataFailed(

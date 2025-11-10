@@ -12,7 +12,7 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-use crate::config::{CopyConfig, LogLevel};
+use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
 
 /// Initialize structured logging based on configuration

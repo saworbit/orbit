@@ -13,8 +13,8 @@ use std::time::Instant;
 
 /// Transfer state for tracking progress
 struct TransferState {
-    source: String,
-    dest: String,
+    _source: String,
+    _dest: String,
     total_bytes: u64,
     bytes_transferred: u64,
     start_time: Instant,
@@ -86,8 +86,8 @@ impl CliProgressRenderer {
         match event {
             ProgressEvent::TransferStart { file_id, source, dest, total_bytes, .. } => {
                 let state = TransferState {
-                    source: source.display().to_string(),
-                    dest: dest.display().to_string(),
+                    _source: source.display().to_string(),
+                    _dest: dest.display().to_string(),
                     total_bytes,
                     bytes_transferred: 0,
                     start_time: Instant::now(),
@@ -285,8 +285,8 @@ mod tests {
     #[test]
     fn test_transfer_state_progress() {
         let state = TransferState {
-            source: "/source".to_string(),
-            dest: "/dest".to_string(),
+            _source: "/source".to_string(),
+            _dest: "/dest".to_string(),
             total_bytes: 1000,
             bytes_transferred: 500,
             start_time: Instant::now(),

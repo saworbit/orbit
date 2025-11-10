@@ -315,9 +315,10 @@ impl FileMetadata {
     }
 
     /// Apply extended attributes to destination
-    fn apply_xattrs(&self, dest_path: &Path) -> Result<()> {
+    fn apply_xattrs(&self, _dest_path: &Path) -> Result<()> {
         #[cfg(feature = "extended-metadata")]
         if let Some(xattrs) = &self.xattrs {
+            let dest_path = _dest_path;
             for (name, value) in xattrs {
                 if let Err(e) = xattr::set(dest_path, name, value) {
                     // Non-fatal: filesystem may not support xattrs
