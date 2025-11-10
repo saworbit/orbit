@@ -4690,6 +4690,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "getrandom 0.2.16",
  "leptos",
  "leptos_axum",
  "leptos_meta",
