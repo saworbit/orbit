@@ -2,6 +2,44 @@
 
 All notable changes to Orbit will be documented in this file.
 
+## [0.5.0] - 2025-11-10
+
+### Added
+- **Web GUI (orbit-web crate)** - Full-stack Rust web interface for transfer orchestration
+  - Real-time dashboard with auto-refreshing job list (2-second interval)
+  - Job creation form with compression, verification, and parallel settings
+  - Live progress tracking with visual progress bars and percentage display
+  - WebSocket support for real-time updates (/ws/progress/:job_id)
+  - Leptos 0.6 SSR framework with Axum 0.7 backend
+  - Magnetar SQLite integration for persistent job state
+  - Tailwind CSS responsive UI design
+  - RESTful API endpoints (/api/jobs, /api/create-job, /api/cancel-job)
+  - Comprehensive documentation (docs/WEB_GUI.md - 835 lines)
+  - Developer guide (crates/orbit-web/README.md)
+  - Architecture diagrams and deployment examples
+
+- **Release Automation System**
+  - GitHub Actions workflow for automated releases (.github/workflows/release.yml)
+  - Multi-platform binary building (Linux x64/ARM64, macOS x64/ARM64, Windows x64)
+  - Automated orbit-web WASM compilation with cargo-leptos
+  - Auto-generated GitHub releases with installation instructions
+  - Release documentation (RELEASE.md - 579 lines)
+  - Quick reference guide (docs/RELEASE_QUICKSTART.md - 136 lines)
+  - Semantic versioning guidelines and hotfix procedures
+
+### Changed
+- Updated installation instructions to use source-only installation (removed incorrect crates.io references)
+- Fixed README.md table of contents links with proper emoji anchors
+- Expanded README.md with comprehensive Web GUI section (~260 lines)
+- Updated badges (removed incorrect crates.io badges, added GitHub stars)
+- Enhanced documentation index with Web GUI and release guides
+
+### Documentation
+- docs/WEB_GUI.md - Complete Web GUI guide (835 lines)
+- RELEASE.md - Full release process documentation (579 lines)
+- docs/RELEASE_QUICKSTART.md - Quick 5-step release guide (136 lines)
+- Total new documentation: ~1,550 lines
+
 ## [0.4.1] - 2025-11-02
 
 ### Added
