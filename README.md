@@ -5,8 +5,9 @@
 **The intelligent file transfer tool that never gives up** 💪
 
 [![Crates.io](https://img.shields.io/crates/v/orbit.svg)](https://crates.io/crates/orbit)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Build Status](https://github.com/saworbit/orbit/workflows/CI/badge.svg)](https://github.com/saworbit/orbit/actions)
+[![Downloads](https://img.shields.io/crates/d/orbit.svg)](https://crates.io/crates/orbit)
+[![CI](https://github.com/saworbit/orbit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saworbit/orbit/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ---
 
