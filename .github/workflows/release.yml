@@ -159,17 +159,14 @@ jobs:
         run: cargo install cargo-leptos
 
       - name: Build orbit-web
-        run: |
-          cd crates/orbit-web
-          cargo leptos build --release
+        run: cargo leptos build --release -p orbit-web
 
       - name: Create orbit-web archive
         run: |
-          cd crates/orbit-web
           mkdir -p orbit-web-dist
           cp target/release/orbit-web orbit-web-dist/
-          cp -r target/site orbit-web-dist/
-          tar czf ../../orbit-web-${{ github.ref_name }}.tar.gz -C orbit-web-dist .
+          cp -r crates/orbit-web/target/site orbit-web-dist/
+          tar czf orbit-web-${{ github.ref_name }}.tar.gz -C orbit-web-dist .
 
       - name: Upload orbit-web artifact
         uses: actions/upload-artifact@v4

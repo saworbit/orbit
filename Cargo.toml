@@ -8,6 +8,38 @@ members = [
     "crates/orbit-web",
 ]
 
+[[workspace.metadata.leptos]]
+# Leptos configuration for orbit-web
+name = "orbit-web"
+bin-package = "orbit-web"
+lib-package = "orbit-web"
+
+# Output configuration
+output-name = "orbit-web"
+site-root = "crates/orbit-web/target/site"
+site-pkg-dir = "pkg"
+tailwind-input-file = "crates/orbit-web/style/input.css"
+tailwind-config-file = "crates/orbit-web/tailwind.config.js"
+assets-dir = "crates/orbit-web/public"
+
+# Server configuration
+site-addr = "127.0.0.1:8080"
+reload-port = 3001
+frontend-port = 8080
+backend-port = 8080
+
+# Build configuration
+browserquery = "defaults"
+watch = false
+env = "DEV"
+
+# Feature configuration
+bin-features = ["ssr"]
+bin-default-features = false
+lib-features = ["hydrate"]
+lib-default-features = false
+lib-profile-release = "wasm-release"
+
 [package]
 name = "orbit"
 version = "0.5.0"
@@ -149,6 +181,13 @@ strip = true
 
 [profile.bench]
 inherits = "release"
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
 
 [features]
 default = ["zero-copy"]
