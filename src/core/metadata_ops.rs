@@ -94,8 +94,6 @@ impl MetadataPreserver {
         dest_backend: &dyn Backend,
         dest_path: &Path,
     ) -> BackendResult<()> {
-        use crate::backend::BackendError;
-
         // Get metadata from source backend
         let source_meta = source_backend.stat(source_path).await?;
 

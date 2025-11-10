@@ -324,7 +324,6 @@ where
     };
 
     let mut attempt = 0;
-    let mut last_error = None;
 
     loop {
         attempt += 1;
@@ -349,7 +348,6 @@ where
                 return Ok(result);
             }
             Err(e) => {
-                last_error = Some(e.clone());
 
                 // Record failure
                 if let Some(cb) = &circuit_breaker {

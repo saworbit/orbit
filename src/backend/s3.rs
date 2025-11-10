@@ -267,9 +267,8 @@ impl Backend for S3Backend {
             })?;
 
         // Convert AWS ByteStream to our ReadStream
-        use futures::stream::{StreamExt as FuturesStreamExt, TryStreamExt};
-        let byte_stream = output.body;
-        let stream = byte_stream
+        use futures::stream::TryStreamExt;
+        let stream = output.body
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
 
         Ok(Box::pin(stream))
