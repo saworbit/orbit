@@ -144,7 +144,7 @@ ensure_transfer_safety(dest_path, required_bytes, &config)?;
 cargo run --example disk_guardian_demo
 ```
 
-📖 **Full Documentation:** See [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md)
+📖 **Full Documentation:** See [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
 
 ---
 
@@ -399,7 +399,7 @@ orbit --source vm.qcow2 --dest backup/vm.qcow2 \
 - 1GB file with 5% changes: **10x faster** (3s vs 30s), **95% less data** (50MB vs 1GB)
 - Identical files: **99% savings** with minimal CPU overhead
 
-📖 **Full Documentation:** See [`DELTA_DETECTION_GUIDE.md`](DELTA_DETECTION_GUIDE.md) and [`DELTA_QUICKSTART.md`](DELTA_QUICKSTART.md)
+📖 **Full Documentation:** See [`docs/DELTA_DETECTION_GUIDE.md`](docs/DELTA_DETECTION_GUIDE.md) and [`docs/DELTA_QUICKSTART.md`](docs/DELTA_QUICKSTART.md)
 
 ---
 
@@ -503,7 +503,7 @@ orbit -s /production/data -d /backup/location \
 - **Monitoring**: Structured logging via `tracing` with debug-level throttle events
 - **Compatibility**: Zero impact on existing functionality, all tests passing
 
-📖 **Full Documentation:** See [`PROGRESS_AND_CONCURRENCY.md`](PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
+📖 **Full Documentation:** See [`docs/PROGRESS_AND_CONCURRENCY.md`](docs/PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
 
 ---
 
@@ -586,7 +586,7 @@ include path: Cargo.lock
 
 **Example Filter File:** [`examples/filters/example.orbitfilter`](examples/filters/example.orbitfilter)
 
-📖 **Full Documentation:** See [`FILTER_SYSTEM.md`](FILTER_SYSTEM.md)
+📖 **Full Documentation:** See [`docs/FILTER_SYSTEM.md`](docs/FILTER_SYSTEM.md)
 
 ---
 
@@ -634,7 +634,7 @@ let s3 = S3Backend::new(s3_config).await?;
 - ✅ **Type-safe**: Strong typing with comprehensive error handling
 - ✅ **Security**: Built-in secure credential handling
 
-📖 **Full Guide:** [BACKEND_GUIDE.md](BACKEND_GUIDE.md)
+📖 **Full Guide:** [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md)
 
 #### 🆕 S3 Cloud Storage (v0.4.1)
 
@@ -1185,14 +1185,14 @@ cargo clippy
 ### User Guides
 - **Quick Start:** This README
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
-- **Disk Guardian:** [`DISK_GUARDIAN.md`](DISK_GUARDIAN.md)
+- **Disk Guardian:** [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
 - **Resilience Module:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
-- **Delta Detection:** [`DELTA_DETECTION_GUIDE.md`](DELTA_DETECTION_GUIDE.md) and [`DELTA_QUICKSTART.md`](DELTA_QUICKSTART.md) ⭐ **NEW!**
-- **Filter System:** [`FILTER_SYSTEM.md`](FILTER_SYSTEM.md) ⭐ **NEW!**
-- **Progress & Concurrency:** [`PROGRESS_AND_CONCURRENCY.md`](PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
+- **Delta Detection:** [`docs/DELTA_DETECTION_GUIDE.md`](docs/DELTA_DETECTION_GUIDE.md) and [`docs/DELTA_QUICKSTART.md`](docs/DELTA_QUICKSTART.md) ⭐ **NEW!**
+- **Filter System:** [`docs/FILTER_SYSTEM.md`](docs/FILTER_SYSTEM.md) ⭐ **NEW!**
+- **Progress & Concurrency:** [`docs/PROGRESS_AND_CONCURRENCY.md`](docs/PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
 - **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md)
-- **Protocol Guide:** [`PROTOCOL_GUIDE.md`](PROTOCOL_GUIDE.md)
+- **Protocol Guide:** [`docs/PROTOCOL_GUIDE.md`](docs/PROTOCOL_GUIDE.md)
 
 ### Technical Documentation
 - **SMB Status:** [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md)
