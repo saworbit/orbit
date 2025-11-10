@@ -579,7 +579,15 @@ fn process_work_item(
         delta_stats: None,
             }
         }
-        EntryType::File => super::copy_file(&item.source_path, &item.dest_path, config)?
+        EntryType::File => {
+            // Ensure parent directory exists before copying file
+            if let Some(parent) = item.dest_path.parent() {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent)?;
+                }
+            }
+            super::copy_file(&item.source_path, &item.dest_path, config)?
+        }
     };
 
     // Update total stats atomically

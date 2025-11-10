@@ -12,25 +12,44 @@ fn test_streaming_directory_copy_memory_efficiency() {
     let temp = TempDir::new().unwrap();
     let source_dir = temp.path().join("source");
     let dest_dir = temp.path().join("dest");
-    
+
     fs::create_dir(&source_dir).unwrap();
-    
+
     // Create 1000 small files to test streaming
     println!("Creating test files...");
+
+    // Pre-create all subdirectories first
+    for i in 0..10 {
+        let subdir = source_dir.join(format!("subdir_{}", i));
+        fs::create_dir_all(&subdir).unwrap();
+        assert!(subdir.exists(), "Subdir {} should exist", i);
+    }
+
+    // Create files
+    let mut created_count = 0;
     for i in 0..1000 {
         let subdir = source_dir.join(format!("subdir_{}", i / 100));
-        fs::create_dir_all(&subdir).unwrap();
-        
         let file_path = subdir.join(format!("file_{}.txt", i));
         fs::write(&file_path, format!("Test content {}", i)).unwrap();
+        assert!(file_path.exists(), "File {} should exist immediately after creation", i);
+        created_count += 1;
     }
-    
+
+    println!("✓ Created {} test files", created_count);
+
+    // Verify all files exist before starting copy
+    for i in 0..1000 {
+        let subdir = source_dir.join(format!("subdir_{}", i / 100));
+        let file_path = subdir.join(format!("file_{}.txt", i));
+        assert!(file_path.exists(), "Pre-copy verification: File {} should exist", i);
+    }
+
     // Configure for parallel copying
     let mut config = CopyConfig::default();
     config.recursive = true;
     config.parallel = 4;
     config.show_progress = false;
-    
+
     println!("Starting streaming copy...");
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
     
@@ -58,31 +77,40 @@ fn test_streaming_handles_large_directory_tree() {
     let temp = TempDir::new().unwrap();
     let source_dir = temp.path().join("large_tree");
     let dest_dir = temp.path().join("dest");
-    
+
     // Create a deeper directory structure
     fs::create_dir(&source_dir).unwrap();
-    
+
+    let mut file_count = 0;
+
     for i in 0..10 {
         let level1 = source_dir.join(format!("level1_{}", i));
         fs::create_dir(&level1).unwrap();
-        
+        assert!(level1.exists(), "Level1 dir {} should exist", i);
+
         for j in 0..10 {
             let level2 = level1.join(format!("level2_{}", j));
             fs::create_dir(&level2).unwrap();
-            
+            assert!(level2.exists(), "Level2 dir {}_{} should exist", i, j);
+
             // Create a few files in each directory
             for k in 0..5 {
                 let file = level2.join(format!("file_{}.txt", k));
                 fs::write(&file, format!("Content {}_{}", j, k)).unwrap();
+                assert!(file.exists(), "File should exist after creation");
+                file_count += 1;
             }
         }
     }
-    
+
+    println!("✓ Created {} files in nested directory tree", file_count);
+    assert_eq!(file_count, 500, "Should have created exactly 500 files");
+
     let mut config = CopyConfig::default();
     config.recursive = true;
     config.parallel = 2;
     config.show_progress = false;
-    
+
     println!("Copying large directory tree...");
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
     
