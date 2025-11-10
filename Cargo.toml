@@ -5,6 +5,7 @@ members = [
     "crates/core-starmap",
     "crates/core-audit",
     "crates/magnetar",
+    "crates/orbit-web",
 ]
 
 [package]

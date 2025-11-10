@@ -26,9 +26,11 @@
   - [Protocol Support](#-protocol-support)
   - [Audit & Telemetry](#-audit-and-telemetry)
 - [Quick Start](#-quick-start)
+- [Web GUI](#-web-gui-new-in-v050)
 - [Performance](#-performance-benchmarks)
 - [Use Cases](#-use-cases)
 - [Configuration](#-configuration)
+- [Modular Architecture](#-modular-architecture)
 - [Documentation](#-documentation)
 - [Roadmap](#-roadmap)
 - [Contributing](#-contributing)
@@ -1051,10 +1053,90 @@ Orbit is built from clean, reusable crates:
 | 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | ✅ **NEW!** |
 | 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | ✅ **NEW!** |
 | 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
+| 🌐 `orbit-web` | Web GUI for transfer orchestration | ✅ **NEW!** |
 | 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
 | 🧪 `wormhole` | Forward-error correction | 🚧 Dev |
 
 This structure ensures isolation, testability, and reusability.
+
+---
+
+## 🖥️ Web GUI (NEW in v0.5.0!)
+
+**Orbit Web** provides a modern, reactive web interface for orchestrating file transfers with real-time progress tracking.
+
+### Features
+
+- 📊 **Live Dashboard** — Real-time job monitoring with auto-refresh
+- 🎯 **Job Creation** — Intuitive form interface for creating transfers
+- 📈 **Progress Tracking** — Real-time progress bars with detailed statistics
+- 🔌 **WebSocket Updates** — Low-latency progress updates via WebSocket
+- 💾 **Persistent State** — All job state in Magnetar DB for crash recovery
+- 📱 **Responsive Design** — Works on desktop and mobile
+
+### Quick Start
+
+#### Prerequisites
+
+Install the required tools:
+
+```bash
+# Install Cargo Leptos
+cargo install cargo-leptos
+
+# Add WASM target
+rustup target add wasm32-unknown-unknown
+```
+
+#### Running the Server
+
+```bash
+# Development mode with hot-reload
+cd crates/orbit-web
+cargo leptos watch
+
+# Production build and run
+cargo leptos build --release
+cargo run --release
+```
+
+The web interface will be available at **http://127.0.0.1:8080**
+
+### Architecture
+
+Built with cutting-edge Rust web technologies:
+
+- **Leptos** — Full-stack reactive framework (server-side rendering + hydration)
+- **Axum** — High-performance async web server
+- **WebSockets** — Real-time bidirectional communication
+- **Magnetar Integration** — Persistent job state and recovery
+- **Tailwind CSS** — Modern, responsive styling
+
+### API Endpoints
+
+**HTTP:**
+- `GET /` — Main dashboard
+- `GET /api/health` — Health check
+- `POST /api/list_jobs` — List all jobs (Leptos server function)
+- `POST /api/create_job` — Create a new job
+- `POST /api/get_job_stats` — Get job statistics
+
+**WebSocket:**
+- `WS /ws/progress/:job_id` — Real-time progress updates
+
+### Configuration
+
+Set environment variables:
+
+```bash
+# Database path
+export ORBIT_WEB_DB=orbit-web.db
+
+# Log level
+export RUST_LOG=info,orbit_web=debug
+```
+
+📖 **Full Documentation:** See [`crates/orbit-web/README.md`](crates/orbit-web/README.md)
 
 ---
 
@@ -1185,6 +1267,7 @@ cargo clippy
 
 ### User Guides
 - **Quick Start:** This README
+- **Web GUI:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **NEW!**
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
 - **Disk Guardian:** [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**

@@ -1,0 +1,19 @@
+# Leptos build artifacts
+/target/
+/pkg/
+/dist/
+
+# WASM binaries
+*.wasm
+
+# Leptos temp files
+.leptos_*
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Environment files
+.env
+.env.local

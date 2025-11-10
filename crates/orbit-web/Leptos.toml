@@ -1,0 +1,46 @@
+# Leptos configuration file
+
+[package]
+name = "orbit-web"
+
+# The site root folder is where the wasm and js files are generated
+output-name = "orbit-web"
+
+# The source folder is where your web app source code is
+site-root = "target/site"
+
+# The site-pkg-dir is where the built WASM and JS files are written to
+site-pkg-dir = "pkg"
+
+# The IP and port to serve on
+site-addr = "127.0.0.1:8080"
+
+# The reload port to use for automatic reload
+reload-port = 3001
+
+# Set the frontend port
+frontend-port = 8080
+
+# Set the backend port
+backend-port = 8080
+
+# The browserlist query used for optimization
+browserquery = "defaults"
+
+# Set the environment
+env = "DEV"
+
+# The features to use for compiling
+features = []
+
+# The features to use when compiling the SSR binary
+ssr-features = ["ssr"]
+
+# The features to use when compiling the client binary
+csr-features = ["hydrate"]
+
+# The tailwind input file
+tailwind-input-file = "style/input.css"
+
+# The tailwind config file
+tailwind-config-file = "tailwind.config.js"
