@@ -83,7 +83,7 @@
 //! ```
 
 use super::client::S3Client;
-use super::error::{S3Error, S3Result};
+use super::error::S3Result;
 use async_trait::async_trait;
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -555,12 +555,18 @@ impl BatchOperations for S3Client {
             .collect::<Vec<_>>()
             .await;
 
+        // Extract values before creating result to avoid borrow issues
+        let succeeded_count = *succeeded.read().await;
+        let failed_count = *failed.read().await;
+        let bytes_count = *bytes_processed.read().await;
+        let errors_vec = errors.read().await.clone();
+
         Ok(BatchResult {
-            succeeded: *succeeded.read().await,
-            failed: *failed.read().await,
-            bytes_processed: *bytes_processed.read().await,
+            succeeded: succeeded_count,
+            failed: failed_count,
+            bytes_processed: bytes_count,
             elapsed: start_time.elapsed(),
-            errors: errors.read().await.clone(),
+            errors: errors_vec,
         })
     }
 

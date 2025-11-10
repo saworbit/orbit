@@ -7,7 +7,7 @@ use std::io;
 pub type S3Result<T> = Result<T, S3Error>;
 
 /// Errors that can occur during S3 operations
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum S3Error {
     /// AWS SDK error
     #[error("AWS SDK error: {0}")]
@@ -59,7 +59,7 @@ pub enum S3Error {
 
     /// I/O error
     #[error("I/O error: {0}")]
-    Io(#[from] io::Error),
+    Io(String),
 
     /// Network error
     #[error("Network error: {0}")]
@@ -116,6 +116,7 @@ impl S3Error {
         match self {
             S3Error::Network(_) | S3Error::Timeout(_) | S3Error::RateLimitExceeded(_) => true,
             S3Error::Service { code, .. } => is_retryable_code(code),
+            S3Error::Io(_) => true,  // I/O errors are generally retryable
             _ => false,
         }
     }
@@ -124,8 +125,15 @@ impl S3Error {
     pub fn is_transient(&self) -> bool {
         matches!(
             self,
-            S3Error::Network(_) | S3Error::Timeout(_) | S3Error::RateLimitExceeded(_)
+            S3Error::Network(_) | S3Error::Timeout(_) | S3Error::RateLimitExceeded(_) | S3Error::Io(_)
         )
+    }
+}
+
+// Convert io::Error to S3Error
+impl From<io::Error> for S3Error {
+    fn from(err: io::Error) -> Self {
+        S3Error::Io(err.to_string())
     }
 }
 

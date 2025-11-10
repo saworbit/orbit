@@ -468,15 +468,15 @@ impl VersioningOperations for S3Client {
 
         let mut file = tokio::fs::File::create(local_path)
             .await
-            .map_err(|e| S3Error::IoError(e.to_string()))?;
+            .map_err(|e| S3Error::Io(e.to_string()))?;
 
         let mut stream = response.body.into_async_read();
         tokio::io::copy(&mut stream, &mut file)
             .await
-            .map_err(|e| S3Error::IoError(e.to_string()))?;
+            .map_err(|e| S3Error::Io(e.to_string()))?;
 
         file.flush().await
-            .map_err(|e| S3Error::IoError(e.to_string()))?;
+            .map_err(|e| S3Error::Io(e.to_string()))?;
 
         Ok(())
     }
@@ -542,13 +542,13 @@ impl VersioningOperations for S3Client {
         let target_key = opts.target_key.as_deref().unwrap_or(key);
 
         // Copy the old version to become the new current version
-        let source = format!("{}/{}", self.bucket(), key);
+        // Include version ID in the copy source string
+        let source = format!("{}/{}?versionId={}", self.bucket(), key, version_id);
         let mut request = self.aws_client()
             .copy_object()
             .bucket(self.bucket())
             .copy_source(source)
-            .key(target_key)
-            .copy_source_version_id(version_id);
+            .key(target_key);
 
         if let Some(storage_class) = opts.storage_class {
             request = request.storage_class(

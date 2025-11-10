@@ -449,7 +449,7 @@ impl Backend for LocalBackend {
                     } else if e.kind() == std::io::ErrorKind::PermissionDenied {
                         BackendError::PermissionDenied {
                             path: path.to_path_buf(),
-                            backend: "local".to_string(),
+                            message: e.to_string(),
                         }
                     } else {
                         BackendError::from(e)
@@ -506,7 +506,7 @@ impl Backend for LocalBackend {
             } else if e.kind() == std::io::ErrorKind::PermissionDenied {
                 BackendError::PermissionDenied {
                     path: path.to_path_buf(),
-                    backend: "local".to_string(),
+                    message: e.to_string(),
                 }
             } else {
                 BackendError::from(e)
@@ -611,7 +611,7 @@ impl Backend for LocalBackend {
                 } else if e.kind() == std::io::ErrorKind::PermissionDenied {
                     BackendError::PermissionDenied {
                         path: path.to_path_buf(),
-                        backend: "local".to_string(),
+                        message: e.to_string(),
                     }
                 } else {
                     BackendError::from(e)

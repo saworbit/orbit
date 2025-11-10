@@ -270,8 +270,8 @@ impl CircuitBreaker {
 pub fn is_retryable_error(error: &S3Error) -> bool {
     match error {
         // Network/transient errors - retryable
-        S3Error::AwsSdk(e) => {
-            let err_str = e.to_string().to_lowercase();
+        S3Error::Sdk(e) => {
+            let err_str = e.to_lowercase();
             err_str.contains("timeout") ||
             err_str.contains("connection") ||
             err_str.contains("throttl") ||
@@ -281,18 +281,27 @@ pub fn is_retryable_error(error: &S3Error) -> bool {
         }
 
         // IO errors - potentially retryable
-        S3Error::IoError(_) => true,
+        S3Error::Io(_) => true,
 
         // These are typically not retryable
         S3Error::InvalidConfig(_) => false,
-        S3Error::NotFound(_) => false,
-        S3Error::PermissionDenied(_) => false,
+        S3Error::NotFound { .. } => false,
+        S3Error::AccessDenied(_) => false,
         S3Error::InvalidKey(_) => false,
         S3Error::BucketNotFound(_) => false,
-        S3Error::InvalidOperation(_) => false,
 
-        // Other errors - try once
-        S3Error::Other(_) => true,
+        // Service errors - check if retryable
+        S3Error::Service { code, .. } => {
+            matches!(code.as_str(),
+                "RequestTimeout" | "ServiceUnavailable" | "InternalError" |
+                "SlowDown" | "RequestTimeTooSkewed")
+        }
+
+        // Network, timeout, rate limit - retryable
+        S3Error::Network(_) | S3Error::Timeout(_) | S3Error::RateLimitExceeded(_) => true,
+
+        // Other errors - generally not retryable
+        _ => false,
     }
 }
 
@@ -323,9 +332,10 @@ where
         // Check circuit breaker
         if let Some(cb) = &circuit_breaker {
             if !cb.allow_request().await {
-                return Err(S3Error::Other(
-                    "Circuit breaker open - service unavailable".to_string()
-                ));
+                return Err(S3Error::Service {
+                    code: "CircuitBreakerOpen".to_string(),
+                    message: "Circuit breaker open - service unavailable".to_string(),
+                });
             }
         }
 

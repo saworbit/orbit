@@ -7,7 +7,7 @@ use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::stream::{self, StreamExt};
+use futures::stream::StreamExt;
 use std::path::{Path, PathBuf};
 
 use crate::protocol::s3::{S3Client, S3Config};
@@ -146,8 +146,6 @@ impl Backend for S3Backend {
 
         loop {
             // List objects with prefix
-            use aws_sdk_s3::types::CommonPrefix;
-
             let mut request = self
                 .client
                 .aws_client()
@@ -173,7 +171,8 @@ impl Backend for S3Backend {
             })?;
 
             // Process objects
-            if let Some(objects) = response.contents() {
+            let objects = response.contents();
+            if !objects.is_empty() {
                 for object in objects {
                     if let Some(key) = object.key() {
                         // Skip the prefix itself
@@ -206,7 +205,8 @@ impl Backend for S3Backend {
 
             // Process common prefixes (directories in non-recursive mode)
             if !options.recursive {
-                if let Some(prefixes) = response.common_prefixes() {
+                let prefixes = response.common_prefixes();
+                if !prefixes.is_empty() {
                     for common_prefix in prefixes {
                         if let Some(prefix_str) = common_prefix.prefix() {
                             let full_path = PathBuf::from(prefix_str);
@@ -267,10 +267,10 @@ impl Backend for S3Backend {
             })?;
 
         // Convert AWS ByteStream to our ReadStream
+        use futures::stream::{StreamExt as FuturesStreamExt, TryStreamExt};
         let byte_stream = output.body;
-        let stream = byte_stream.map(|result| {
-            result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-        });
+        let stream = byte_stream
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
 
         Ok(Box::pin(stream))
     }

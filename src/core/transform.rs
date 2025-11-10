@@ -9,7 +9,6 @@
  */
 
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use regex::Regex;
 use crate::error::{OrbitError, Result};
 use crate::core::file_metadata::FileMetadata;
