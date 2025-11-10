@@ -1,0 +1,178 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            archive: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }} --features s3-native,backend-abstraction
+
+      - name: Create archive (Unix)
+        if: matrix.archive == 'tar.gz'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../orbit-${{ github.ref_name }}-${{ matrix.target }}.tar.gz orbit
+          cd ../../..
+
+      - name: Create archive (Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          cd target/${{ matrix.target }}/release
+          Compress-Archive -Path orbit.exe -DestinationPath ../../../orbit-${{ github.ref_name }}-${{ matrix.target }}.zip
+          cd ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-${{ matrix.target }}
+          path: orbit-${{ github.ref_name }}-${{ matrix.target }}.*
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f -name 'orbit-*' -exec mv {} release/ \;
+          ls -lh release/
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Orbit v${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          files: release/orbit-*
+          body: |
+            # Orbit v${{ steps.version.outputs.VERSION }}
+
+            ## Installation
+
+            Download the appropriate binary for your platform below, extract it, and add it to your PATH.
+
+            ### Linux (x86_64)
+            ```bash
+            wget https://github.com/saworbit/orbit/releases/download/${{ github.ref_name }}/orbit-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+            tar xzf orbit-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz
+            sudo mv orbit /usr/local/bin/
+            orbit --version
+            ```
+
+            ### macOS (Apple Silicon)
+            ```bash
+            wget https://github.com/saworbit/orbit/releases/download/${{ github.ref_name }}/orbit-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz
+            tar xzf orbit-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz
+            sudo mv orbit /usr/local/bin/
+            orbit --version
+            ```
+
+            ### Windows (x86_64)
+            Download `orbit-${{ github.ref_name }}-x86_64-pc-windows-msvc.zip`, extract `orbit.exe`, and add to PATH.
+
+            ## What's Changed
+
+            See [CHANGELOG.md](https://github.com/saworbit/orbit/blob/main/CHANGELOG.md) for full details.
+
+            ## Documentation
+
+            - **Main README**: https://github.com/saworbit/orbit/blob/main/README.md
+            - **Web GUI Guide**: https://github.com/saworbit/orbit/blob/main/docs/WEB_GUI.md
+            - **Full Documentation**: https://github.com/saworbit/orbit/tree/main/docs
+
+            ---
+
+            **Full Changelog**: https://github.com/saworbit/orbit/compare/v${{ steps.version.outputs.VERSION }}...v${{ steps.version.outputs.VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-web:
+    name: Build orbit-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install cargo-leptos
+        run: cargo install cargo-leptos
+
+      - name: Build orbit-web
+        run: |
+          cd crates/orbit-web
+          cargo leptos build --release
+
+      - name: Create orbit-web archive
+        run: |
+          cd crates/orbit-web
+          mkdir -p orbit-web-dist
+          cp target/release/orbit-web orbit-web-dist/
+          cp -r target/site orbit-web-dist/
+          tar czf ../../orbit-web-${{ github.ref_name }}.tar.gz -C orbit-web-dist .
+
+      - name: Upload orbit-web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbit-web
+          path: orbit-web-${{ github.ref_name }}.tar.gz
