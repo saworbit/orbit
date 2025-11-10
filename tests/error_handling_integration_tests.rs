@@ -10,7 +10,7 @@
  */
 
 use orbit::{
-    config::{CopyConfig, ErrorMode, LogLevel},
+    config::{CopyConfig, ErrorMode},
     error::{OrbitError, ErrorCategory},
     instrumentation::OperationStats,
     core::CopyStats,
@@ -18,7 +18,6 @@ use orbit::{
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tempfile::TempDir;
 
 /// Simulated flaky operation that fails N times before succeeding
 struct FlakyOperation {

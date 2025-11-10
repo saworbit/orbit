@@ -348,6 +348,7 @@ impl Default for TransformBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_path_transform_basename() {

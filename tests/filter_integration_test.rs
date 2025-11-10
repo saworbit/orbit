@@ -4,7 +4,6 @@
 
 use orbit::{copy_directory, CopyConfig, CopyMode};
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]

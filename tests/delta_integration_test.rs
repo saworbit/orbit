@@ -4,7 +4,6 @@
 
 use orbit::{copy_file, config::CopyConfig, core::delta::CheckMode};
 use std::fs;
-use std::io::Write;
 use tempfile::tempdir;
 
 #[test]

@@ -276,7 +276,7 @@ impl TelemetryLogger {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::progress::{ProgressPublisher, FileId};
+    use crate::core::progress::FileId;
     use std::path::PathBuf;
 
     #[test]

@@ -1,13 +1,12 @@
 use orbit::{
-    config::{CopyConfig, CopyMode, CompressionType},
+    config::{CopyConfig, CompressionType},
     copy_file, copy_directory,
     error::OrbitError,
     core::validation::matches_exclude_pattern,
-    get_zero_copy_capabilities, is_zero_copy_available,
+    get_zero_copy_capabilities,
 };
 use std::path::Path;
 use tempfile::tempdir;
-use std::io::Write;
 
 #[test]
 fn test_copy_simple_file() {

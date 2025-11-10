@@ -53,6 +53,9 @@ tempfile = "3.10"
 glob = "0.3"
 regex = "1.10"
 
+# Unicode normalization for path handling (optional)
+unicode-normalization = { version = "0.1", optional = true }
+
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -173,6 +176,9 @@ delta-manifest = ["dep:rusqlite"]
 
 # Extended attributes and metadata preservation
 extended-metadata = ["dep:xattr"]
+
+# Unicode normalization for consistent path encoding
+unicode-normalization = ["dep:unicode-normalization"]
 
 # Full feature set
 full = ["zero-copy", "protocols", "smb-native", "s3-native", "ssh-backend", "backend-abstraction", "delta-manifest", "extended-metadata"]

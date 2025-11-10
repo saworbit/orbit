@@ -274,6 +274,7 @@ impl FileMetadata {
     }
 
     /// Apply permissions to destination
+    #[allow(unused_variables)]
     fn apply_permissions(&self, dest_path: &Path) -> Result<()> {
         #[cfg(unix)]
         if let Some(mode) = self.permissions {
@@ -293,6 +294,7 @@ impl FileMetadata {
     }
 
     /// Apply ownership to destination (Unix only, requires privileges)
+    #[allow(unused_variables)]
     fn apply_ownership(&self, dest_path: &Path) -> Result<()> {
         #[cfg(unix)]
         {
