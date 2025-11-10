@@ -15,7 +15,7 @@ use tracing::info;
 
 use super::metadata::preserve_metadata;
 use super::validation::matches_exclude_pattern;
-use super::filter::{FilterList, FilterDecision};
+use super::filter::FilterList;
 use super::disk_guardian::{self, GuardianConfig};
 use super::concurrency::ConcurrencyLimiter;
 use super::CopyStats;

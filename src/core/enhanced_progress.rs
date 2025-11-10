@@ -125,7 +125,7 @@ impl EnhancedProgressTracker {
                 }
 
                 match event {
-                    ProgressEvent::TransferStart { file_id, source, total_bytes, .. } => {
+                    ProgressEvent::TransferStart {    .. } => {
                         // This would be handled by start_transfer
                     }
                     ProgressEvent::TransferProgress { file_id, bytes_transferred, .. } => {

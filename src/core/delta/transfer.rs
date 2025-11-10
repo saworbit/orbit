@@ -7,7 +7,7 @@ use super::types::DeltaInstruction;
 use super::algorithm::{SignatureIndex, generate_delta, generate_delta_rolling};
 use super::checksum::{generate_signatures, generate_signatures_parallel};
 use crate::error::Result;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Write, Seek, SeekFrom};
 use std::path::Path;
 

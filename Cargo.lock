@@ -3959,6 +3959,7 @@ dependencies = [
  "hex",
  "indicatif",
  "libc",
+ "log",
  "lz4",
  "notify",
  "once_cell",

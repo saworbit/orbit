@@ -11,9 +11,9 @@
  */
 
 use std::path::Path;
-use crate::error::{OrbitError, Result};
+use crate::error::Result;
 use crate::core::file_metadata::{FileMetadata, PreserveFlags};
-use crate::core::transform::{TransformConfig, transform_metadata, transform_path};
+use crate::core::transform::{TransformConfig, transform_metadata};
 
 #[cfg(feature = "backend-abstraction")]
 use crate::backend::{Backend, BackendResult};

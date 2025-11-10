@@ -16,7 +16,6 @@ use orbit::{
     get_zero_copy_capabilities, is_zero_copy_available,
     manifest_integration::ManifestGenerator,
     logging,
-    instrumentation::OperationStats,
 };
 
 #[derive(Parser)]

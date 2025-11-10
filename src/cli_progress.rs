@@ -201,14 +201,14 @@ impl CliProgressRenderer {
                 }
             }
 
-            ProgressEvent::ChunkVerification { file_id, chunk_id, chunk_size, .. } => {
+            ProgressEvent::ChunkVerification {  chunk_id, chunk_size, .. } => {
                 if self.verbose {
                     print!("\r   Verifying chunk {}: {}", chunk_id, format_bytes(chunk_size));
                     io::stdout().flush()?;
                 }
             }
 
-            ProgressEvent::ChunkVerified { file_id, chunk_id, digest, .. } => {
+            ProgressEvent::ChunkVerified {  chunk_id, digest, .. } => {
                 if self.verbose {
                     println!("\r   ✓ Chunk {} verified: {}", chunk_id, &digest[..16]);
                 }

@@ -374,9 +374,9 @@ mod macos {
 // ============================================================================
 
 use std::fs::OpenOptions;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use indicatif::{ProgressBar, ProgressStyle};
-use tracing::{debug, info};
+use tracing::info;
 use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
 use super::CopyStats;

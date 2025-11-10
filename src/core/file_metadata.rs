@@ -10,11 +10,11 @@
  * - Metadata transformation (path renaming, filtering)
  */
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::SystemTime;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use filetime::{FileTime, set_file_times, set_file_mtime, set_file_atime};
+use filetime::{FileTime, set_file_times, set_file_mtime};
 use crate::error::{OrbitError, Result};
 
 #[cfg(unix)]
@@ -299,13 +299,14 @@ impl FileMetadata {
             if let (Some(uid), Some(gid)) = (self.owner_uid, self.owner_gid) {
                 use std::os::unix::fs::chown;
                 chown(dest_path, Some(uid), Some(gid))
-                    .map_err(|e| {
+                    .or_else(|e| {
                         // Non-fatal warning for permission errors
                         if e.kind() == std::io::ErrorKind::PermissionDenied {
                             tracing::warn!("Permission denied setting ownership for {:?}: requires root", dest_path);
-                            return Ok(());
+                            Ok(())
+                        } else {
+                            Err(OrbitError::MetadataFailed(format!("Failed to set ownership: {}", e)))
                         }
-                        OrbitError::MetadataFailed(format!("Failed to set ownership: {}", e))
                     })?;
             }
         }
