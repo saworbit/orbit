@@ -4,10 +4,9 @@
 
 **The intelligent file transfer tool that never gives up** 💪
 
-[![Crates.io](https://img.shields.io/crates/v/orbit.svg)](https://crates.io/crates/orbit)
-[![Downloads](https://img.shields.io/crates/d/orbit.svg)](https://crates.io/crates/orbit)
 [![CI](https://github.com/saworbit/orbit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saworbit/orbit/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![GitHub](https://img.shields.io/github/stars/saworbit/orbit?style=social)](https://github.com/saworbit/orbit)
 
 ---
 
@@ -737,17 +736,19 @@ Every operation emits structured audit events for full observability.
 ### Install
 
 ```bash
-# From crates.io
-cargo install orbit
-
-# With S3 support
-cargo install orbit --features s3-native
-
 # From source
 git clone https://github.com/saworbit/orbit.git
 cd orbit
+cargo build --release
+
+# With S3 support
 cargo build --release --features s3-native
+
+# Install to system
 sudo cp target/release/orbit /usr/local/bin/
+
+# Or with cargo
+cargo install --path .
 ```
 
 ### Basic Usage
