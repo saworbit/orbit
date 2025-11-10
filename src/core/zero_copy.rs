@@ -306,7 +306,7 @@ mod macos {
         bandwidth_limiter: Option<&BandwidthLimiter>,
     ) -> ZeroCopyResult {
         let mut total_copied = 0u64;
-        let mut current_offset = offset as i64;
+        let current_offset = offset as i64;
 
         // Use 1MB chunks for bandwidth limiting granularity
         const CHUNK_SIZE: i64 = 1024 * 1024;

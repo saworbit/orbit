@@ -486,7 +486,7 @@ impl BatchOperations for S3Client {
                 let succeeded = succeeded.clone();
                 let failed = failed.clone();
                 let errors = errors.clone();
-                let bytes_processed = bytes_processed.clone();
+                let _bytes_processed = bytes_processed.clone();
                 let dest_key = format!("{}{}", dest_prefix, source_key.trim_start_matches('/'));
                 let source_key = source_key.to_string();
                 let options = options.clone();

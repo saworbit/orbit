@@ -7,7 +7,6 @@ use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::stream::StreamExt;
 use std::path::{Path, PathBuf};
 
 use crate::protocol::s3::{S3Client, S3Config};
@@ -267,9 +266,22 @@ impl Backend for S3Backend {
             })?;
 
         // Convert AWS ByteStream to our ReadStream
-        use futures::stream::TryStreamExt;
-        let stream = output.body
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()));
+        use futures::stream;
+        use tokio::io::AsyncReadExt;
+
+        let reader = output.body.into_async_read();
+        const CHUNK_SIZE: usize = 64 * 1024; // 64 KB chunks
+
+        let stream = stream::unfold((reader, vec![0u8; CHUNK_SIZE]), |(mut reader, mut buffer)| async move {
+            match reader.read(&mut buffer).await {
+                Ok(0) => None, // EOF
+                Ok(n) => {
+                    let data = Bytes::copy_from_slice(&buffer[..n]);
+                    Some((Ok(data), (reader, buffer)))
+                }
+                Err(e) => Some((Err(e), (reader, buffer))),
+            }
+        });
 
         Ok(Box::pin(stream))
     }
@@ -321,7 +333,6 @@ impl Backend for S3Backend {
         // Check if it's a "directory" (prefix)
         if recursive {
             // List all objects with this prefix
-            let prefix = format!("{}/", key.trim_end_matches('/'));
             let objects = self.list(path, ListOptions::recursive()).await?;
 
             // Delete all objects
