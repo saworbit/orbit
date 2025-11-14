@@ -56,7 +56,18 @@ impl NativeSmbClient {
         if t.share.is_empty() {
             return Err(SmbError::InvalidPath("share cannot be empty".to_string()));
         }
-        
+
+        // Validate port if specified
+        if let Some(port) = t.port {
+            if port == 0 {
+                return Err(SmbError::InvalidPath(
+                    "port cannot be 0 (use None for default port 445)".to_string()
+                ));
+            }
+            // Note: u16 max is 65535, so no need to check upper bound
+            tracing::debug!("Using custom SMB port: {}", port);
+        }
+
         // Validate no path traversal in subpath
         if t.subpath.contains("..") {
             return Err(SmbError::InvalidPath(
@@ -69,6 +80,9 @@ impl NativeSmbClient {
 
     /// Perform the actual connection
     async fn do_connect(&mut self) -> Result<(), SmbError> {
+        // Get port from target, defaulting to 445
+        let port = self.target.port.unwrap_or(445);
+
         // Build UNC path: \\server\share
         let unc_path_str = format!(r"\\{}\{}", self.target.host, self.target.share);
         let unc_path = UncPath::from_str(&unc_path_str)
@@ -86,7 +100,34 @@ impl NativeSmbClient {
             }
         };
 
-        // Connect to share
+        // If using a custom port, establish connection with explicit address first
+        if port != 445 {
+            tracing::info!("Connecting to {}:{} (non-standard port)", self.target.host, port);
+
+            // Resolve host and create SocketAddr
+            let addr = format!("{}:{}", self.target.host, port);
+            let socket_addr: std::net::SocketAddr = tokio::net::lookup_host(&addr)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to resolve host {}: {:?}", self.target.host, e);
+                    SmbError::Connection(format!("Failed to resolve host: {:?}", e))
+                })?
+                .next()
+                .ok_or_else(|| {
+                    SmbError::Connection(format!("No addresses found for host: {}", self.target.host))
+                })?;
+
+            // Establish connection to custom port
+            self.client
+                .connect_to_address(&self.target.host, socket_addr)
+                .await
+                .map_err(|e| {
+                    tracing::error!("SMB connection to {}:{} failed: {:?}", self.target.host, port, e);
+                    SmbError::Connection(format!("Failed to connect to custom port {}: {:?}", port, e))
+                })?;
+        }
+
+        // Connect to share (will reuse existing connection if already established)
         self.client
             .share_connect(&unc_path, username, password)
             .await
@@ -96,7 +137,7 @@ impl NativeSmbClient {
             })?;
 
         self.connected = true;
-        tracing::info!("Successfully connected to {}\\{}", self.target.host, self.target.share);
+        tracing::info!("Successfully connected to {}\\{} (port: {})", self.target.host, self.target.share, port);
 
         Ok(())
     }
@@ -461,6 +502,29 @@ mod tests {
         let mut target = create_test_target();
         target.subpath = "../etc/passwd".to_string();
         assert!(NativeSmbClient::validate_target(&target).is_err());
+    }
+
+    #[test]
+    fn test_port_validation() {
+        let mut target = create_test_target();
+
+        // Valid custom port
+        target.port = Some(8445);
+        assert!(NativeSmbClient::validate_target(&target).is_ok());
+
+        // Valid default port
+        target.port = Some(445);
+        assert!(NativeSmbClient::validate_target(&target).is_ok());
+
+        // None is also valid (defaults to 445)
+        target.port = None;
+        assert!(NativeSmbClient::validate_target(&target).is_ok());
+
+        // Invalid: port 0
+        target.port = Some(0);
+        let err = NativeSmbClient::validate_target(&target);
+        assert!(err.is_err());
+        assert!(err.unwrap_err().to_string().contains("port cannot be 0"));
     }
 
     #[tokio::test]
