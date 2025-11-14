@@ -59,31 +59,31 @@ use std::ops::Range;
 #[async_trait]
 pub trait SmbClient: Send + Sync {
     /// Connect to the SMB target
-    async fn connect(&mut self, target: &SmbTarget) -> Result<(), SmbError>;
-    
+    async fn connect(&mut self, target: &SmbTarget) -> Result<()>;
+
     /// List directory contents
-    async fn list_dir(&self, rel: &str) -> Result<Vec<String>, SmbError>;
-    
+    async fn list_dir(&self, rel: &str) -> Result<Vec<String>>;
+
     /// Read file with optional byte range
-    async fn read_file(&self, rel: &str, range: Option<Range<u64>>) -> Result<Bytes, SmbError>;
-    
+    async fn read_file(&self, rel: &str, range: Option<Range<u64>>) -> Result<Bytes>;
+
     /// Write file data
-    async fn write_file(&self, rel: &str, data: Bytes) -> Result<(), SmbError>;
-    
+    async fn write_file(&self, rel: &str, data: Bytes) -> Result<()>;
+
     /// Create directory
-    async fn mkdir(&self, rel: &str) -> Result<(), SmbError>;
-    
+    async fn mkdir(&self, rel: &str) -> Result<()>;
+
     /// Remove file or directory
-    async fn remove(&self, rel: &str) -> Result<(), SmbError>;
-    
+    async fn remove(&self, rel: &str) -> Result<()>;
+
     /// Rename/move file
-    async fn rename(&self, from_rel: &str, to_rel: &str) -> Result<(), SmbError>;
-    
+    async fn rename(&self, from_rel: &str, to_rel: &str) -> Result<()>;
+
     /// Get file metadata
-    async fn metadata(&self, rel: &str) -> Result<SmbMetadata, SmbError>;
-    
+    async fn metadata(&self, rel: &str) -> Result<SmbMetadata>;
+
     /// Disconnect from the server
-    async fn disconnect(&mut self) -> Result<(), SmbError>;
+    async fn disconnect(&mut self) -> Result<()>;
 }
 
 /// Factory function to create an SMB client
@@ -113,12 +113,12 @@ pub trait SmbClient: Send + Sync {
 /// # }
 /// ```
 #[cfg(feature = "smb-native")]
-pub async fn client_for(target: &SmbTarget) -> Result<Box<dyn SmbClient>, SmbError> {
+pub async fn client_for(target: &SmbTarget) -> Result<Box<dyn SmbClient>> {
     Ok(Box::new(native::NativeSmbClient::new(target).await?))
 }
 
 #[cfg(not(feature = "smb-native"))]
-pub async fn client_for(_target: &SmbTarget) -> Result<Box<dyn SmbClient>, SmbError> {
+pub async fn client_for(_target: &SmbTarget) -> Result<Box<dyn SmbClient>> {
     Err(SmbError::Unsupported("smb-native feature is not enabled. Rebuild with --features smb-native"))
 }
 

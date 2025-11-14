@@ -199,7 +199,7 @@ zero-copy = []
 protocols = []
 
 # Native SMB2/3 client (pure Rust, async) - disabled by default
-smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes"]
+smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes", "dep:futures"]
 
 # Native S3 client (pure Rust, async) - disabled by default
 s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes"]

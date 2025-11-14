@@ -5,11 +5,16 @@
 use crate::protocols::smb::{types::*, error::SmbError};
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::stream::StreamExt;
 use std::ops::Range;
 use std::str::FromStr;
 
 #[cfg(feature = "smb-native")]
-use smb::{Client, ClientConfig, UncPath, FileCreateArgs, FileAccessMask, Resource};
+use smb::{
+    Client, ClientConfig, UncPath, FileCreateArgs, FileAccessMask, Resource,
+    FileAttributes, CreateOptions,
+    resource::file_util::{ReadAt, WriteAt, GetLen},
+};
 
 /// Native SMB client implementation
 ///
@@ -207,26 +212,39 @@ impl super::SmbClient for NativeSmbClient {
 
         // Ensure it's a directory
         let dir = match resource {
-            Resource::Directory(d) => d,
+            Resource::Directory(d) => std::sync::Arc::new(d),
             _ => return Err(SmbError::InvalidPath(format!("{} is not a directory", rel))),
         };
 
-        // List entries
-        let entries = dir.list()
+        // Query directory entries using FileNamesInformation
+        use smb::FileNamesInformation;
+
+        let mut stream = smb::resource::Directory::query::<FileNamesInformation>(&dir, "*")
             .await
             .map_err(|e| {
-                tracing::error!("Failed to list directory: {:?}", e);
+                tracing::error!("Failed to query directory: {:?}", e);
                 SmbError::Protocol("directory listing failed")
             })?;
 
-        // Extract names
-        let names: Vec<String> = entries
-            .into_iter()
-            .map(|entry| entry.file_name)
-            .collect();
+        // Collect all filenames from the stream
+        let mut names = Vec::new();
+        while let Some(result) = stream.next().await {
+            match result {
+                Ok(info) => names.push(info.file_name.to_string()),
+                Err(e) => {
+                    tracing::error!("Error reading directory entry: {:?}", e);
+                    return Err(SmbError::Protocol("directory listing failed"));
+                }
+            }
+        }
+
+        // Drop stream before closing directory
+        drop(stream);
 
         // Close directory
-        dir.close().await.ok();
+        if let Some(dir_ref) = std::sync::Arc::into_inner(dir) {
+            dir_ref.close().await.ok();
+        }
 
         Ok(names)
     }
@@ -305,9 +323,10 @@ impl super::SmbClient for NativeSmbClient {
 
         let unc_path = self.build_unc_path(rel)?;
         
-        // Open file for writing (create if not exists)
-        let open_args = FileCreateArgs::make_create_always(
-            FileAccessMask::new().with_generic_write(true)
+        // Open file for writing (create or overwrite)
+        let open_args = FileCreateArgs::make_overwrite(
+            FileAttributes::default(),
+            CreateOptions::default()
         );
         
         let resource = self.client
@@ -355,7 +374,10 @@ impl super::SmbClient for NativeSmbClient {
         let unc_path = self.build_unc_path(rel)?;
         
         // Create directory
-        let open_args = FileCreateArgs::make_create_directory();
+        let open_args = FileCreateArgs::make_create_new(
+            FileAttributes::default(),
+            CreateOptions::default().with_directory_file(true)
+        );
         
         let resource = self.client
             .create_file(&unc_path, &open_args)
