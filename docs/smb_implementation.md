@@ -133,9 +133,35 @@ export SMB_PASSWORD=mypass
 export SMB_DOMAIN=WORKGROUP
 
 # Connection
+export SMB_PORT=8445              # Custom SMB port (default: 445)
 export SMB_TIMEOUT=30
 export SMB_RETRY_COUNT=3
 ```
+
+### Custom Ports
+
+SMB servers typically run on port 445, but Orbit supports custom ports for non-standard configurations:
+
+```rust
+// In code
+let target = SmbTarget {
+    host: "server.example.com".to_string(),
+    share: "data".to_string(),
+    subpath: "files".to_string(),
+    port: Some(8445),  // Custom port instead of default 445
+    auth: SmbAuth::Ntlmv2 {
+        username: "user".to_string(),
+        password: Secret("pass".to_string()),
+    },
+    security: SmbSecurity::RequireEncryption,
+};
+```
+
+**Use cases:**
+- Testing environments with port forwarding
+- SMB-over-SSH tunnels
+- Non-standard enterprise configurations
+- Firewalled environments with port mapping
 
 ### Configuration File
 
@@ -192,22 +218,69 @@ parallel = 4
    orbit -s file -d smb://server/share/file --use-kerberos
    ```
 
+### Security Modes
+
+Orbit supports three security levels for SMB connections:
+
+1. **RequireEncryption** (Most Secure)
+   ```rust
+   security: SmbSecurity::RequireEncryption
+   ```
+   - Enforces SMB3 encryption
+   - Connection fails if encryption unavailable
+   - Recommended for sensitive data
+   - Requires SMB 3.0+ server
+
+2. **SignOnly** (Medium Security)
+   ```rust
+   security: SmbSecurity::SignOnly
+   ```
+   - Packet signing enabled (integrity protection)
+   - No payload encryption
+   - Good for trusted networks
+   - Compatible with SMB 2.0+
+
+3. **Opportunistic** (Default)
+   ```rust
+   security: SmbSecurity::Opportunistic
+   ```
+   - Uses encryption if server supports it
+   - Falls back to signing only
+   - Best compatibility
+   - Recommended for most use cases
+
+**Example:**
+```rust
+let target = SmbTarget {
+    host: "secure-server".to_string(),
+    share: "confidential".to_string(),
+    subpath: "data".to_string(),
+    port: None,
+    auth: SmbAuth::Ntlmv2 {
+        username: "admin".to_string(),
+        password: Secret("password".to_string()),
+    },
+    security: SmbSecurity::RequireEncryption, // Enforce encryption
+};
+```
+
 ### Security Best Practices
 
 **DO:**
+- ✅ Use `RequireEncryption` for sensitive data
 - ✅ Use environment variables for credentials
 - ✅ Prompt for passwords interactively
 - ✅ Use Kerberos in enterprise environments
-- ✅ Enable SMB3 encryption when available
 - ✅ Use strong passwords
 - ✅ Rotate credentials regularly
+- ✅ Validate server certificates in production
 
 **DON'T:**
 - ❌ Store passwords in config files
 - ❌ Put passwords in command history
 - ❌ Use credentials in URIs (visible in `ps`)
 - ❌ Use 'guest' access for sensitive data
-- ❌ Disable encryption
+- ❌ Disable signing or encryption for sensitive data
 - ❌ Ignore certificate warnings
 
 ---
@@ -716,28 +789,39 @@ orbit -s file2 -d smb://server/share/file2
 
 ## Roadmap
 
-### v0.4.0 (Current) - Architecture
+### v0.5.0 (Current) - ✅ Functional Implementation
 - [x] Protocol abstraction layer
 - [x] URI parsing
-- [x] SMB backend structure
-- [x] Basic authentication
-- [ ] Real SMB library integration
+- [x] SMB backend implementation
+- [x] Real SMB library integration (smb crate v0.10.3)
+- [x] NTLM v2 authentication
+- [x] Custom port support
+- [x] Security/encryption mode configuration
+- [x] Streaming directory operations
+- [x] Async I/O with proper trait support
+- [x] Comprehensive error handling
+- [x] Unit tests complete
+- [ ] Integration testing with real servers
+- [ ] Performance benchmarking
 
-### v0.4.1 - Production Ready
-- [ ] Choose and integrate SMB library
-- [ ] Full authentication support
+### v0.5.1 - Production Hardening
+- [ ] Integration test suite
+- [ ] Performance optimization
 - [ ] Connection pooling
-- [ ] Comprehensive testing
+- [ ] Enhanced error messages
 - [ ] Windows UNC path support
+- [ ] Extensive real-world testing
+- [ ] Documentation improvements
 
-### v0.4.2 - Enterprise Features
+### v0.5.2 - Enterprise Features
 - [ ] Kerberos/GSSAPI support
-- [ ] Domain authentication
+- [ ] Domain authentication improvements
 - [ ] DFS support
-- [ ] SMB3 encryption
-- [ ] Multi-channel support
+- [ ] Multi-channel support (SMB 3.x)
+- [ ] Advanced retry logic
+- [ ] Session resumption
 
-### v0.5.0 - Cloud Protocols
+### v0.6.0 - Cloud Protocols
 - [ ] S3 support
 - [ ] Azure Blob support
 - [ ] Google Cloud Storage support

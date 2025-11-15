@@ -78,6 +78,50 @@ orbit -s /local/source.txt -d smb://server/share/dest.txt
 orbit -s smb://server/projects/data -d /backup/data -R
 ```
 
+**Security Modes:**
+
+The SMB implementation supports three security modes:
+
+1. **RequireEncryption** (Most Secure)
+   - Forces SMB3 encryption for all traffic
+   - Connection fails if server doesn't support encryption
+   - Best for sensitive data over untrusted networks
+   ```rust
+   SmbTarget {
+       security: SmbSecurity::RequireEncryption,
+       // ... other fields
+   }
+   ```
+
+2. **SignOnly** (Performance-Optimized)
+   - Disables encryption but enforces packet signing
+   - Provides integrity protection without encryption overhead
+   - Use for trusted networks where performance is critical
+   ```rust
+   SmbTarget {
+       security: SmbSecurity::SignOnly,
+       // ... other fields
+   }
+   ```
+
+3. **Opportunistic** (Flexible, Default)
+   - Uses encryption if available, falls back to signing
+   - Balances security and compatibility
+   - Recommended for most use cases
+   ```rust
+   SmbTarget {
+       security: SmbSecurity::Opportunistic,
+       // ... other fields
+   }
+   ```
+
+**Security Features:**
+- ✅ Automatic policy enforcement - connection fails if requirements not met
+- ✅ SMB3 encryption (AES-128/256-GCM, AES-128/256-CCM)
+- ✅ Packet signing (HMAC-SHA256, AES-GMAC, AES-CMAC)
+- ✅ Unsigned guest access disabled by default
+- ✅ Credential protection (zeroed on drop)
+
 **Current Limitations (v0.4.0/v0.4.1):**
 - ⚠️ Stub implementation only - awaiting upstream dependency fix
 - ⚠️ Not recommended for production use

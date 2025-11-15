@@ -100,15 +100,71 @@ impl Drop for Secret {
 }
 
 /// SMB security and encryption settings
+///
+/// This enum defines the security policy enforced during SMB connection.
+/// The native client will configure the underlying SMB session to match
+/// the requested policy and **fail the connection** if the server cannot
+/// satisfy the requirements.
+///
+/// # Security Policy Enforcement
+///
+/// - **RequireEncryption**: Connection will fail if the server doesn't support SMB3 encryption
+/// - **SignOnly**: Encryption is explicitly disabled; signing is enforced
+/// - **Opportunistic**: Uses encryption if the server supports it, otherwise falls back to signing
+///
+/// # Examples
+///
+/// ```
+/// use orbit::protocols::smb::{SmbTarget, SmbSecurity, SmbAuth};
+///
+/// // Most secure: require encryption
+/// let secure_target = SmbTarget {
+///     host: "fileserver".to_string(),
+///     share: "sensitive".to_string(),
+///     subpath: String::new(),
+///     port: None,
+///     auth: SmbAuth::Anonymous,
+///     security: SmbSecurity::RequireEncryption,
+/// };
+///
+/// // Performance-optimized: disable encryption on trusted network
+/// let perf_target = SmbTarget {
+///     security: SmbSecurity::SignOnly,
+///     ..secure_target
+/// };
+///
+/// // Flexible: use encryption if available
+/// let compat_target = SmbTarget {
+///     security: SmbSecurity::Opportunistic,
+///     ..secure_target
+/// };
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SmbSecurity {
-    /// Use encryption if available, but don't require it
+    /// Use encryption if available, but don't require it (default)
+    ///
+    /// - Attempts to negotiate SMB3 encryption with the server
+    /// - Falls back to signing-only if encryption is unavailable
+    /// - Connection succeeds as long as signing is supported
+    /// - Recommended for most use cases
     Opportunistic,
-    
+
     /// Require SMB3 encryption, fail if not available
+    ///
+    /// - Forces encryption for all SMB traffic
+    /// - Connection fails if server doesn't support SMB3 encryption
+    /// - Provides both confidentiality and integrity protection
+    /// - Recommended for sensitive data over untrusted networks
+    /// - Uses AES-128/256-GCM or AES-128/256-CCM ciphers
     RequireEncryption,
-    
+
     /// Only signing (integrity), no payload encryption
+    ///
+    /// - Explicitly disables encryption
+    /// - Enforces packet signing for integrity protection
+    /// - Provides tamper detection but not confidentiality
+    /// - Recommended for performance-critical scenarios on trusted networks
+    /// - Uses HMAC-SHA256, AES-128-GMAC, or AES-128-CMAC
     SignOnly,
 }
 

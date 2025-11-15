@@ -692,8 +692,11 @@ orbit --source /local/data --dest smb://server/backup \
 **SMB Features:**
 - Pure Rust (no libsmbclient dependency)
 - SMB2/3 only (SMBv1 disabled for security)
-- Encryption support (AES-GCM, AES-CCM)
+- **Enforced security policies** (RequireEncryption, SignOnly, Opportunistic)
+- Encryption support (AES-128/256-GCM, AES-128/256-CCM)
+- Packet signing (HMAC-SHA256, AES-GMAC, AES-CMAC)
 - Async/await with Tokio
+- Custom port support for non-standard deployments
 - Adaptive chunking (256KB-2MB blocks)
 - Integration with manifest system
 
