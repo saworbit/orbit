@@ -336,6 +336,29 @@ impl JobStore for SqliteStore {
         Ok(())
     }
 
+    async fn new_job(
+        &mut self,
+        source: String,
+        destination: String,
+        compress: bool,
+        verify: bool,
+        parallel: Option<usize>,
+    ) -> Result<i64> {
+        let result = sqlx::query(
+            "INSERT INTO jobs (source, destination, compress, verify, parallel) VALUES (?, ?, ?, ?, ?)"
+        )
+        .bind(&source)
+        .bind(&destination)
+        .bind(compress)
+        .bind(verify)
+        .bind(parallel.map(|p| p as i64))
+        .execute(&self.pool)
+        .await?;
+
+        // SQLite returns the last inserted row ID
+        Ok(result.last_insert_rowid())
+    }
+
     async fn delete_job(&mut self, job_id: i64) -> Result<()> {
         let mut tx = self.pool.begin().await?;
 
@@ -345,6 +368,11 @@ impl JobStore for SqliteStore {
             .await?;
 
         sqlx::query("DELETE FROM chunks WHERE job_id = ?")
+            .bind(job_id)
+            .execute(&mut *tx)
+            .await?;
+
+        sqlx::query("DELETE FROM jobs WHERE id = ?")
             .bind(job_id)
             .execute(&mut *tx)
             .await?;
@@ -387,6 +415,102 @@ mod tests {
         let stats = store.get_stats(1).await?;
         assert_eq!(stats.done, 1);
         assert_eq!(stats.pending, 1);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_new_job_creates_numeric_id() -> Result<()> {
+        let tmp = NamedTempFile::new()?;
+        let mut store = SqliteStore::open(tmp.path().to_str().unwrap()).await?;
+
+        // Create a new job
+        let job_id = store
+            .new_job(
+                "/source/path".to_string(),
+                "/dest/path".to_string(),
+                true,
+                false,
+                Some(4),
+            )
+            .await?;
+
+        // Job ID should be auto-generated (1 for the first job)
+        assert_eq!(job_id, 1);
+
+        // Create a second job
+        let job_id2 = store
+            .new_job(
+                "/source2/path".to_string(),
+                "/dest2/path".to_string(),
+                false,
+                true,
+                None,
+            )
+            .await?;
+
+        // Second job should get ID 2
+        assert_eq!(job_id2, 2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_job_lifecycle_with_auto_id() -> Result<()> {
+        let tmp = NamedTempFile::new()?;
+        let mut store = SqliteStore::open(tmp.path().to_str().unwrap()).await?;
+
+        // Create a new job
+        let job_id = store
+            .new_job(
+                "/source/path".to_string(),
+                "/dest/path".to_string(),
+                true,
+                true,
+                Some(2),
+            )
+            .await?;
+
+        // Create and initialize a manifest
+        let manifest = toml::from_str(
+            r#"
+            [[chunks]]
+            id = 1
+            checksum = "abc123"
+
+            [[chunks]]
+            id = 2
+            checksum = "def456"
+            "#,
+        )?;
+
+        store.init_from_manifest(job_id, &manifest).await?;
+
+        // Get stats - should show 2 pending chunks
+        let stats = store.get_stats(job_id).await?;
+        assert_eq!(stats.total_chunks, 2);
+        assert_eq!(stats.pending, 2);
+        assert_eq!(stats.done, 0);
+
+        // Process a chunk
+        let chunk = store.claim_pending(job_id).await?.unwrap();
+        assert_eq!(chunk.chunk, 1);
+        store.mark_status(job_id, 1, JobStatus::Done, None).await?;
+
+        // Check stats again
+        let stats = store.get_stats(job_id).await?;
+        assert_eq!(stats.done, 1);
+        assert_eq!(stats.pending, 1);
+
+        // Delete the job
+        store.delete_job(job_id).await?;
+
+        // Stats should show all zeros after deletion
+        let stats = store.get_stats(job_id).await?;
+        assert_eq!(stats.total_chunks, 0);
+        assert_eq!(stats.pending, 0);
+        assert_eq!(stats.done, 0);
+        assert_eq!(stats.failed, 0);
 
         Ok(())
     }

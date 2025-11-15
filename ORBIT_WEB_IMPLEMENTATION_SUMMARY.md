@@ -24,9 +24,10 @@ Successfully implemented a production-ready Web GUI for Orbit file transfer orch
 3. **Server Functions** ✅
    - `list_jobs()` - List all active/completed jobs
    - `get_job_stats()` - Get statistics for a specific job
-   - `create_job()` - Create new transfer jobs
+   - `create_job()` - Create new transfer jobs with auto-generated numeric IDs
    - `delete_job()` - Delete jobs from the database
    - All integrated with Magnetar DB backend
+   - **Job ID Alignment** - Uses numeric IDs (i64) consistently across API and storage layer
 
 4. **Leptos Components** ✅
    - `App` - Root application component with routing
@@ -181,10 +182,24 @@ As outlined in the specification:
 ```bash
 $ cargo check -p orbit-web
     Checking orbit-web v0.1.0
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.12s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.04s
+
+$ cargo test -p magnetar --lib
+    Running unittests src\lib.rs
+    test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured
 ```
 
 **All builds passing! No compilation errors.** ✅
+
+## 🔧 Recent Updates (2025-11-15)
+
+**Job ID Alignment**
+- Fixed job ID inconsistency where `create_job` returned UUIDs while `get_job_stats` and `delete_job` expected numeric IDs
+- Added `jobs` metadata table to Magnetar with auto-incrementing IDs
+- Implemented `new_job()` method in JobStore trait for auto-generated numeric job IDs
+- Updated `create_job()` to properly integrate with Magnetar using sequential IDs
+- All job IDs now use consistent numeric format (i64) throughout the stack
+- Added comprehensive test coverage for job creation and lifecycle
 
 ## 🎯 Deliverables Met
 

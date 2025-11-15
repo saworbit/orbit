@@ -1213,7 +1213,7 @@ POST /api/list_jobs
 ```bash
 POST /api/create_job
 Body: {"source":"/path","destination":"/dest","compress":true,"verify":true,"parallel":4}
-# Returns: {"job_id":"uuid"}
+# Returns: "1" (numeric job ID as string)
 ```
 
 **Get Job Stats**

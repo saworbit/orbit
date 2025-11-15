@@ -224,6 +224,19 @@ pub trait JobStore: Send + Sync {
     #[cfg(feature = "analytics")]
     async fn export_to_parquet(&self, path: &str) -> anyhow::Result<()>;
 
+    /// Create a new job and return its auto-generated ID
+    ///
+    /// Stores job metadata and returns the unique job ID that should be used
+    /// for all subsequent operations (init_from_manifest, get_stats, etc.)
+    async fn new_job(
+        &mut self,
+        source: String,
+        destination: String,
+        compress: bool,
+        verify: bool,
+        parallel: Option<usize>,
+    ) -> anyhow::Result<i64>;
+
     /// Delete a job and all its chunks
     async fn delete_job(&mut self, job_id: i64) -> anyhow::Result<()>;
 }

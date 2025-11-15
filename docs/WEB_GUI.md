@@ -364,10 +364,10 @@ POST /api/create_job
 
 **Response:**
 ```json
-{
-  "job_id": "550e8400-e29b-41d4-a716-446655440000"
-}
+"1"
 ```
+
+**Note:** Returns a numeric job ID as a string (e.g., "1", "2", "3", etc.). Job IDs are auto-generated sequential integers managed by Magnetar.
 
 #### Get Job Statistics
 ```
@@ -757,7 +757,7 @@ println!("Created job: {}", job_id);
 ### Monitoring Progress via WebSocket
 
 ```javascript
-const jobId = "550e8400-e29b-41d4-a716-446655440000";
+const jobId = "1";  // Numeric job ID as string
 const ws = new WebSocket(`ws://localhost:8080/ws/progress/${jobId}`);
 
 ws.onmessage = (event) => {

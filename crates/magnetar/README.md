@@ -66,6 +66,46 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
+### Auto-Generated Job IDs
+
+For web applications and APIs that need auto-incrementing job IDs:
+
+```rust
+use magnetar::{JobStore, JobStatus};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let mut store = magnetar::open("jobs.db").await?;
+
+    // Create a new job with auto-generated ID
+    let job_id = store.new_job(
+        "/source/path".to_string(),
+        "/dest/path".to_string(),
+        true,  // compress
+        true,  // verify
+        Some(4),  // parallel workers
+    ).await?;
+
+    println!("Created job with ID: {}", job_id);
+
+    // Initialize the job with a manifest
+    let manifest = toml::from_str(r#"
+        [[chunks]]
+        id = 1
+        checksum = "abc123"
+    "#)?;
+
+    store.init_from_manifest(job_id, &manifest).await?;
+
+    // Process chunks as normal
+    while let Some(chunk) = store.claim_pending(job_id).await? {
+        store.mark_status(job_id, chunk.chunk, JobStatus::Done, None).await?;
+    }
+
+    Ok(())
+}
+```
+
 ### DAG Dependencies
 
 ```rust
@@ -95,11 +135,13 @@ The `JobStore` trait provides a unified API across backends:
 ```rust
 #[async_trait]
 pub trait JobStore: Send + Sync {
+    async fn new_job(&mut self, source: String, destination: String, compress: bool, verify: bool, parallel: Option<usize>) -> Result<i64>;
     async fn init_from_manifest(&mut self, job_id: i64, manifest: &toml::Value) -> Result<()>;
     async fn claim_pending(&mut self, job_id: i64) -> Result<Option<JobState>>;
     async fn mark_status(&mut self, job_id: i64, chunk: u64, status: JobStatus, checksum: Option<String>) -> Result<()>;
     async fn resume_pending(&self, job_id: i64) -> Result<Vec<JobState>>;
     async fn topo_sort_ready(&self, job_id: i64) -> Result<Vec<u64>>;
+    async fn delete_job(&mut self, job_id: i64) -> Result<()>;
     // ... more methods
 }
 ```
@@ -110,11 +152,13 @@ pub trait JobStore: Send + Sync {
 - SQL-based with WAL mode for concurrency
 - Automatic migrations via `sqlx::migrate!`
 - Ideal for analytics queries
+- **Supports auto-generated job IDs** via AUTOINCREMENT
 
 #### redb (optional)
 - Pure Rust embedded database
 - MMAP for zero-copy reads
 - WASM/embedded-friendly (no FFI)
+- **Note:** Auto-generated job IDs (`new_job`) not yet supported; use explicit job IDs instead
 
 ## Resilience Module
 

@@ -159,6 +159,19 @@ impl<S1: JobStore, S2: JobStore> JobStore for DualStore<S1, S2> {
         }
     }
 
+    async fn new_job(
+        &mut self,
+        source: String,
+        destination: String,
+        compress: bool,
+        verify: bool,
+        parallel: Option<usize>,
+    ) -> Result<i64> {
+        // Create the job in the primary store only
+        // The secondary store is read-only during migration
+        self.primary.new_job(source, destination, compress, verify, parallel).await
+    }
+
     async fn delete_job(&mut self, job_id: i64) -> Result<()> {
         self.primary.delete_job(job_id).await?;
         self.secondary.delete_job(job_id).await?;

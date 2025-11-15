@@ -364,6 +364,19 @@ impl JobStore for RedbStore {
         Ok(())
     }
 
+    async fn new_job(
+        &mut self,
+        _source: String,
+        _destination: String,
+        _compress: bool,
+        _verify: bool,
+        _parallel: Option<usize>,
+    ) -> Result<i64> {
+        // For the redb backend, we don't support auto-generated job IDs yet
+        // Users should provide their own job IDs when using redb
+        anyhow::bail!("Auto-generated job IDs are not supported in the redb backend. Please use the SQLite backend or provide your own job ID.")
+    }
+
     async fn delete_job(&mut self, job_id: i64) -> Result<()> {
         let write_txn = self.db.begin_write()?;
         {

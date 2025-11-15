@@ -93,17 +93,9 @@ pub async fn get_job_stats(job_id: String) -> Result<JobInfo, ServerFnError> {
     })
 }
 
-/// Create a new job (placeholder for MVP)
+/// Create a new job with a numeric ID
 #[server(CreateJob, "/api")]
 pub async fn create_job(request: CreateJobRequest) -> Result<String, ServerFnError> {
-    // For MVP, this is a placeholder
-    // In a full implementation, this would:
-    // 1. Validate the source/destination paths
-    // 2. Create a manifest
-    // 3. Initialize the job in Magnetar
-    // 4. Spawn a task to execute the transfer
-    // 5. Return the job ID
-
     tracing::info!(
         "Creating job: {} -> {} (compress: {}, verify: {})",
         request.source,
@@ -112,9 +104,39 @@ pub async fn create_job(request: CreateJobRequest) -> Result<String, ServerFnErr
         request.verify
     );
 
-    // For now, just return a mock job ID
-    let job_id = uuid::Uuid::new_v4().to_string();
-    Ok(job_id)
+    let db_path = std::env::var("ORBIT_WEB_DB").unwrap_or_else(|_| "orbit-web.db".to_string());
+    let mut store = magnetar::open(&db_path).await.map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    // Create a new job and get the auto-generated numeric ID
+    let job_id = store
+        .new_job(
+            request.source.clone(),
+            request.destination.clone(),
+            request.compress,
+            request.verify,
+            request.parallel,
+        )
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    // Create a minimal manifest with a single placeholder chunk
+    // In a full implementation, this would scan the source and create a proper manifest
+    let manifest = toml::Value::Table(toml::toml! {
+        [[chunks]]
+        id = 0
+        checksum = "pending"
+    });
+
+    // Initialize the job in Magnetar
+    store
+        .init_from_manifest(job_id, &manifest)
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
+
+    tracing::info!("Created job with ID: {}", job_id);
+
+    // Return the numeric job ID as a string
+    Ok(job_id.to_string())
 }
 
 /// Delete a job

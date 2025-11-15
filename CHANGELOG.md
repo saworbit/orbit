@@ -2,6 +2,24 @@
 
 All notable changes to Orbit will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Job ID Alignment** - Fixed inconsistency in Orbit Web API job ID handling
+  - `create_job` now returns numeric job IDs (e.g., "1", "2", "3") instead of UUIDs
+  - Added `jobs` metadata table to Magnetar with auto-incrementing INTEGER primary key
+  - Implemented `new_job()` method in JobStore trait for auto-generated job IDs
+  - All API endpoints now use consistent numeric ID format throughout the stack
+  - Updated `delete_job()` to clean up jobs metadata table
+  - Added comprehensive test coverage for job creation lifecycle
+
+### Added
+- **Magnetar Job Management**
+  - New `new_job()` method in JobStore trait for creating jobs with auto-generated IDs
+  - Jobs metadata table with source, destination, compress, verify, and parallel settings
+  - Database migration `20250102000000_add_jobs_table.sql`
+  - Support for SQLite AUTOINCREMENT job IDs (redb backend shows appropriate error)
+
 ## [0.5.0] - 2025-11-10
 
 ### Added
