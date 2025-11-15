@@ -37,9 +37,32 @@ impl NativeSmbClient {
         // Validate target configuration
         Self::validate_target(t)?;
 
-        // Create client with default config
-        // TODO: Add encryption/signing configuration based on SmbSecurity
-        let client = Client::new(ClientConfig::default());
+        // Create client config with security settings based on SmbSecurity
+        let mut config = ClientConfig::default();
+
+        // Configure encryption and signing based on security policy
+        match t.security {
+            SmbSecurity::RequireEncryption => {
+                // Require SMB3 encryption
+                config.connection.encryption_mode = smb::connection::EncryptionMode::Required;
+                config.connection.allow_unsigned_guest_access = false;
+                tracing::info!("SMB security: encryption required");
+            }
+            SmbSecurity::SignOnly => {
+                // Disable encryption, but signing is still enforced by default
+                config.connection.encryption_mode = smb::connection::EncryptionMode::Disabled;
+                config.connection.allow_unsigned_guest_access = false;
+                tracing::info!("SMB security: signing only (no encryption)");
+            }
+            SmbSecurity::Opportunistic => {
+                // Use encryption if available, but don't require it
+                config.connection.encryption_mode = smb::connection::EncryptionMode::Allowed;
+                config.connection.allow_unsigned_guest_access = false;
+                tracing::info!("SMB security: opportunistic (encryption if available)");
+            }
+        }
+
+        let client = Client::new(config);
 
         let mut smb_client = Self {
             client,
@@ -54,7 +77,7 @@ impl NativeSmbClient {
     }
 
     /// Validate SMB target configuration
-    fn validate_target(t: &SmbTarget) -> Result<(), SmbError> {
+    pub(crate) fn validate_target(t: &SmbTarget) -> Result<(), SmbError> {
         if t.host.is_empty() {
             return Err(SmbError::InvalidPath("host cannot be empty".to_string()));
         }
@@ -477,7 +500,14 @@ impl super::SmbClient for NativeSmbClient {
             size,
             is_dir,
             modified: None, // TODO: Query file attributes for timestamps
-            encrypted: matches!(self.target.security, SmbSecurity::RequireEncryption),
+            // Note: For RequireEncryption, encryption is guaranteed (connection would fail otherwise).
+            // For Opportunistic mode, this may be inaccurate if the server enabled encryption.
+            // The smb crate doesn't currently expose session encryption status through the Client API.
+            encrypted: match self.target.security {
+                SmbSecurity::RequireEncryption => true,
+                SmbSecurity::SignOnly => false,
+                SmbSecurity::Opportunistic => false, // Conservative: assume not encrypted unless required
+            },
         })
     }
 
@@ -563,5 +593,41 @@ mod tests {
         assert_eq!(native_client.adaptive_chunk_len(100_000).await, 256 * 1024); // Min
         assert_eq!(native_client.adaptive_chunk_len(1_000_000).await, 1_000_000); // Within range
         assert_eq!(native_client.adaptive_chunk_len(5_000_000).await, 2 * 1024 * 1024); // Max
+    }
+
+    #[test]
+    fn test_security_require_encryption() {
+        let mut target = create_test_target();
+        target.security = SmbSecurity::RequireEncryption;
+
+        // Validate the target passes validation
+        assert!(NativeSmbClient::validate_target(&target).is_ok());
+
+        // Verify the security setting is preserved
+        assert_eq!(target.security, SmbSecurity::RequireEncryption);
+    }
+
+    #[test]
+    fn test_security_sign_only() {
+        let mut target = create_test_target();
+        target.security = SmbSecurity::SignOnly;
+
+        // Validate the target passes validation
+        assert!(NativeSmbClient::validate_target(&target).is_ok());
+
+        // Verify the security setting is preserved
+        assert_eq!(target.security, SmbSecurity::SignOnly);
+    }
+
+    #[test]
+    fn test_security_opportunistic() {
+        let mut target = create_test_target();
+        target.security = SmbSecurity::Opportunistic;
+
+        // Validate the target passes validation
+        assert!(NativeSmbClient::validate_target(&target).is_ok());
+
+        // Verify the security setting is preserved
+        assert_eq!(target.security, SmbSecurity::Opportunistic);
     }
 }

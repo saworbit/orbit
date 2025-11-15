@@ -121,34 +121,3 @@ pub async fn client_for(target: &SmbTarget) -> Result<Box<dyn SmbClient>> {
 pub async fn client_for(_target: &SmbTarget) -> Result<Box<dyn SmbClient>> {
     Err(SmbError::Unsupported("smb-native feature is not enabled. Rebuild with --features smb-native"))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_smb_target_construction() {
-        let target = SmbTarget {
-            host: "server".to_string(),
-            share: "share".to_string(),
-            subpath: "path".to_string(),
-            port: Some(445),
-            auth: SmbAuth::Anonymous,
-            security: SmbSecurity::Opportunistic,
-        };
-        
-        assert_eq!(target.host, "server");
-        assert_eq!(target.share, "share");
-        assert_eq!(target.subpath, "path");
-        assert_eq!(target.port, Some(445));
-    }
-
-    #[cfg(not(feature = "smb-native"))]
-    #[tokio::test]
-    async fn test_client_for_without_feature() {
-        let target = SmbTarget::default();
-        let result = client_for(&target).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("smb-native feature"));
-    }
-}

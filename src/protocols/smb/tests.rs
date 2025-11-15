@@ -6,7 +6,6 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use bytes::Bytes;
 
     /// Create a test target with default values
     fn create_test_target() -> SmbTarget {
@@ -26,6 +25,32 @@ mod tests {
         assert_eq!(target.host, "localhost");
         assert_eq!(target.share, "test");
         assert_eq!(target.port, Some(445));
+    }
+
+    #[test]
+    fn test_smb_target_construction() {
+        let target = SmbTarget {
+            host: "server".to_string(),
+            share: "share".to_string(),
+            subpath: "path".to_string(),
+            port: Some(445),
+            auth: SmbAuth::Anonymous,
+            security: SmbSecurity::Opportunistic,
+        };
+
+        assert_eq!(target.host, "server");
+        assert_eq!(target.share, "share");
+        assert_eq!(target.subpath, "path");
+        assert_eq!(target.port, Some(445));
+    }
+
+    #[cfg(not(feature = "smb-native"))]
+    #[tokio::test]
+    async fn test_client_for_without_feature() {
+        let target = SmbTarget::default();
+        let result = client_for(&target).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("smb-native feature"));
     }
 
     #[test]
@@ -158,6 +183,7 @@ mod tests {
 #[cfg(all(test, feature = "smb-native"))]
 mod integration_tests {
     use super::super::*;
+    use bytes::Bytes;
     use std::env;
 
     fn should_run_integration_tests() -> bool {
