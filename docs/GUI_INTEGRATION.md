@@ -25,6 +25,11 @@
 - Extend routes inside `crates/orbit-web/src/server.rs` to add APIs or telemetry endpoints.
 - Swap the bind address with `orbit serve --addr 0.0.0.0:3000` for LAN access.
 
+## Common questions
+- **Do I need cargo-leptos to run the GUI?** No. The main `orbit serve` path works without it; cargo-leptos is only needed for hot-reload/front-end development.
+- **Where are the server assets built?** The default `cargo build` will place assets under `crates/orbit-web/target`; `cargo leptos build --release` creates optimized WASM for production.
+- **How do I disable it?** Use `--no-default-features --features zero-copy` when building the `orbit` binary.
+
 ## Troubleshooting
 - **Port already in use:** pass a different `--addr` value.
 - **Assets missing:** rebuild the `orbit-web` assets with `cargo leptos build --release`.
