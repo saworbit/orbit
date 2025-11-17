@@ -48,7 +48,10 @@ impl std::str::FromStr for CheckMode {
             "size" => Ok(Self::Size),
             "checksum" | "hash" => Ok(Self::Checksum),
             "delta" | "rsync" => Ok(Self::Delta),
-            _ => Err(format!("Invalid check mode: {}. Valid options: modtime, size, checksum, delta", s)),
+            _ => Err(format!(
+                "Invalid check mode: {}. Valid options: modtime, size, checksum, delta",
+                s
+            )),
         }
     }
 }
@@ -280,7 +283,10 @@ mod tests {
     fn test_check_mode_parsing() {
         assert_eq!("modtime".parse::<CheckMode>().unwrap(), CheckMode::ModTime);
         assert_eq!("size".parse::<CheckMode>().unwrap(), CheckMode::Size);
-        assert_eq!("checksum".parse::<CheckMode>().unwrap(), CheckMode::Checksum);
+        assert_eq!(
+            "checksum".parse::<CheckMode>().unwrap(),
+            CheckMode::Checksum
+        );
         assert_eq!("delta".parse::<CheckMode>().unwrap(), CheckMode::Delta);
         assert_eq!("rsync".parse::<CheckMode>().unwrap(), CheckMode::Delta);
         assert!("invalid".parse::<CheckMode>().is_err());

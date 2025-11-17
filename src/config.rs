@@ -30,11 +30,11 @@ pub struct CopyConfig {
     /// Copy mode (copy, sync, update, mirror)
     #[serde(default)]
     pub copy_mode: CopyMode,
-    
+
     /// Enable recursive directory copying
     #[serde(default)]
     pub recursive: bool,
-    
+
     /// Preserve file metadata (timestamps, permissions)
     #[serde(default)]
     pub preserve_metadata: bool,
@@ -60,43 +60,43 @@ pub struct CopyConfig {
     /// Enable resume capability for interrupted transfers
     #[serde(default)]
     pub resume_enabled: bool,
-    
+
     /// Enable checksum verification
     #[serde(default = "default_true")]
     pub verify_checksum: bool,
-    
+
     /// Compression type
     #[serde(default)]
     pub compression: CompressionType,
-    
+
     /// Show progress bar
     #[serde(default = "default_true")]
     pub show_progress: bool,
-    
+
     /// Chunk size in bytes for buffered I/O
     #[serde(default = "default_chunk_size")]
     pub chunk_size: usize,
-    
+
     /// Number of retry attempts on failure
     #[serde(default = "default_retry_attempts")]
     pub retry_attempts: u32,
-    
+
     /// Retry delay in seconds
     #[serde(default = "default_retry_delay")]
     pub retry_delay_secs: u64,
-    
+
     /// Use exponential backoff for retries
     #[serde(default)]
     pub exponential_backoff: bool,
-    
+
     /// Maximum bandwidth in bytes per second (0 = unlimited)
     #[serde(default)]
     pub max_bandwidth: u64,
-    
+
     /// Number of parallel operations (0 = sequential)
     #[serde(default)]
     pub parallel: usize,
-    
+
     /// Symbolic link handling mode
     #[serde(default)]
     pub symlink_mode: SymlinkMode,
@@ -132,19 +132,19 @@ pub struct CopyConfig {
     /// Dry run mode (don't actually copy)
     #[serde(default)]
     pub dry_run: bool,
-    
+
     /// Use zero-copy system calls when available
     #[serde(default = "default_true")]
     pub use_zero_copy: bool,
-    
+
     /// Generate manifests for transfers
     #[serde(default)]
     pub generate_manifest: bool,
-    
+
     /// Output directory for manifests
     #[serde(default)]
     pub manifest_output_dir: Option<PathBuf>,
-    
+
     /// Chunking strategy for manifest generation
     #[serde(default)]
     pub chunking_strategy: ChunkingStrategy,
@@ -244,13 +244,13 @@ impl Default for CopyConfig {
 pub enum CopyMode {
     /// Copy all files unconditionally
     Copy,
-    
+
     /// Only copy if source is newer or different size
     Sync,
-    
+
     /// Only copy if source is newer
     Update,
-    
+
     /// Mirror copy and delete files in destination that don't exist in source
     Mirror,
 }
@@ -267,10 +267,10 @@ impl Default for CopyMode {
 pub enum CompressionType {
     /// No compression
     None,
-    
+
     /// LZ4 compression (fast)
     Lz4,
-    
+
     /// Zstd compression with level (1-22)
     #[serde(rename = "zstd")]
     Zstd { level: i32 },
@@ -405,14 +405,14 @@ impl CopyConfig {
         let config: CopyConfig = toml::from_str(&contents)?;
         Ok(config)
     }
-    
+
     /// Save configuration to a TOML file
     pub fn to_file(&self, path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         let contents = toml::to_string_pretty(self)?;
         std::fs::write(path, contents)?;
         Ok(())
     }
-    
+
     /// Create a configuration optimized for maximum speed
     pub fn fast_preset() -> Self {
         Self {
@@ -427,7 +427,7 @@ impl CopyConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create a configuration optimized for reliability
     pub fn safe_preset() -> Self {
         Self {
@@ -442,7 +442,7 @@ impl CopyConfig {
             ..Default::default()
         }
     }
-    
+
     /// Create a configuration optimized for network transfers
     pub fn network_preset() -> Self {
         Self {
@@ -514,14 +514,14 @@ mod tests {
         let deserialized: CopyConfig = toml::from_str(&toml).unwrap();
         assert_eq!(config.use_zero_copy, deserialized.use_zero_copy);
     }
-    
+
     #[test]
     fn test_cpu_count() {
         let count = get_cpu_count();
         assert!(count > 0, "CPU count should be greater than 0");
         assert!(count <= 256, "CPU count seems unreasonably high");
     }
-    
+
     #[test]
     fn test_default_values() {
         assert_eq!(default_chunk_size(), 1024 * 1024);
@@ -529,7 +529,7 @@ mod tests {
         assert_eq!(default_retry_delay(), 5);
         assert!(default_true());
     }
-    
+
     #[test]
     fn test_chunking_strategy_default() {
         let strategy = ChunkingStrategy::default();
@@ -568,7 +568,10 @@ audit_log_path = "/var/log/orbit_audit.log"
         assert!(config.preserve_metadata);
         assert!(config.resume_enabled);
         assert!(config.verify_checksum);
-        assert!(matches!(config.compression, CompressionType::Zstd { level: 5 }));
+        assert!(matches!(
+            config.compression,
+            CompressionType::Zstd { level: 5 }
+        ));
         assert!(config.show_progress);
         assert_eq!(config.chunk_size, 1048576);
         assert_eq!(config.retry_attempts, 3);
@@ -582,6 +585,9 @@ audit_log_path = "/var/log/orbit_audit.log"
         assert!(config.use_zero_copy);
         assert!(!config.generate_manifest);
         assert_eq!(config.audit_format, AuditFormat::Json);
-        assert_eq!(config.audit_log_path, Some(PathBuf::from("/var/log/orbit_audit.log")));
+        assert_eq!(
+            config.audit_log_path,
+            Some(PathBuf::from("/var/log/orbit_audit.log"))
+        );
     }
 }

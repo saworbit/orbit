@@ -6,13 +6,10 @@ use crate::types::{CreateJobRequest, JobInfo};
 use leptos::*;
 
 #[cfg(feature = "ssr")]
-use magnetar::{JobStats, JobStore};
 
 /// List all jobs with their current status
 #[server(ListJobs, "/api")]
 pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
-    use magnetar::JobStatus;
-
     let db_path = std::env::var("ORBIT_WEB_DB").unwrap_or_else(|_| "orbit-web.db".to_string());
     let store = magnetar::open(&db_path)
         .await
@@ -105,7 +102,9 @@ pub async fn create_job(request: CreateJobRequest) -> Result<String, ServerFnErr
     );
 
     let db_path = std::env::var("ORBIT_WEB_DB").unwrap_or_else(|_| "orbit-web.db".to_string());
-    let mut store = magnetar::open(&db_path).await.map_err(|e| ServerFnError::new(e.to_string()))?;
+    let mut store = magnetar::open(&db_path)
+        .await
+        .map_err(|e| ServerFnError::new(e.to_string()))?;
 
     // Create a new job and get the auto-generated numeric ID
     let job_id = store

@@ -2,18 +2,18 @@
 
 use leptos::*;
 
-use crate::server_fns::list_jobs;
 use super::ProgressBar;
+use crate::server_fns::list_jobs;
 
 #[component]
 pub fn JobList() -> impl IntoView {
     let jobs = create_resource(
         || (),
-        |_| async move { list_jobs().await.unwrap_or_default() }
+        |_| async move { list_jobs().await.unwrap_or_default() },
     );
 
     // Auto-refresh every 2 seconds
-    let (refresh_trigger, set_refresh_trigger) = create_signal(0);
+    let (_refresh_trigger, set_refresh_trigger) = create_signal(0);
 
     set_interval(
         move || {
@@ -56,7 +56,6 @@ pub fn JobList() -> impl IntoView {
                                     </thead>
                                     <tbody>
                                         {jobs_data.into_iter().map(|job| {
-                                            let job_id = job.id.clone();
                                             let status_class = match job.status.as_str() {
                                                 "completed" => "text-green-600",
                                                 "failed" => "text-red-600",

@@ -50,7 +50,10 @@ mod tests {
         let target = SmbTarget::default();
         let result = client_for(&target).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("smb-native feature"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("smb-native feature"));
     }
 
     #[test]
@@ -83,7 +86,7 @@ mod tests {
     fn test_secret_redaction() {
         let secret = Secret("password123".to_string());
         let debug_str = format!("{:?}", secret);
-        
+
         assert!(!debug_str.contains("password123"));
         assert!(debug_str.contains("REDACTED"));
     }
@@ -148,10 +151,10 @@ mod tests {
     #[tokio::test]
     async fn test_client_factory() {
         let target = create_test_target();
-        
+
         // This will fail without a real server, but tests the factory
         let result = client_for(&target).await;
-        
+
         // We expect an error since there's no server
         assert!(result.is_err());
     }
@@ -160,7 +163,7 @@ mod tests {
     #[test]
     fn test_capability_flags() {
         let caps = SmbCapability::MULTI_CHANNEL | SmbCapability::LEASES;
-        
+
         assert!(caps.contains(SmbCapability::MULTI_CHANNEL));
         assert!(caps.contains(SmbCapability::LEASES));
         assert!(!caps.contains(SmbCapability::DFS));
@@ -170,14 +173,14 @@ mod tests {
 /// Integration tests that require a real SMB server
 ///
 /// To run these tests, set up an SMB server and configure the environment:
-/// 
+///
 /// ```bash
 /// export SMB_TEST_HOST=localhost
 /// export SMB_TEST_SHARE=test
 /// export SMB_TEST_USER=testuser
 /// export SMB_TEST_PASS=testpass
 /// export SMB_TEST_ENABLED=1
-/// 
+///
 /// cargo test --features smb-native -- --ignored
 /// ```
 #[cfg(all(test, feature = "smb-native"))]
@@ -222,7 +225,11 @@ mod integration_tests {
         };
 
         let result = client_for(&target).await;
-        assert!(result.is_ok(), "Failed to connect to SMB server: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to connect to SMB server: {:?}",
+            result.err()
+        );
     }
 
     #[tokio::test]
@@ -235,7 +242,7 @@ mod integration_tests {
 
         let client = client_for(&target).await.expect("Failed to connect");
         let entries = client.list_dir("").await.expect("Failed to list directory");
-        
+
         println!("Directory entries: {:?}", entries);
         assert!(entries.len() >= 0); // Directory might be empty
     }
@@ -249,17 +256,19 @@ mod integration_tests {
         };
 
         let client = client_for(&target).await.expect("Failed to connect");
-        
+
         // Write a test file
         let test_data = Bytes::from("Hello from Orbit SMB test!");
         let filename = "orbit_test_file.txt";
-        
-        client.write_file(filename, test_data.clone())
+
+        client
+            .write_file(filename, test_data.clone())
             .await
             .expect("Failed to write file");
 
         // Read it back
-        let read_data = client.read_file(filename, None)
+        let read_data = client
+            .read_file(filename, None)
             .await
             .expect("Failed to read file");
 
@@ -278,17 +287,19 @@ mod integration_tests {
         };
 
         let client = client_for(&target).await.expect("Failed to connect");
-        
+
         // Write a test file
         let test_data = Bytes::from("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ");
         let filename = "orbit_range_test.txt";
-        
-        client.write_file(filename, test_data.clone())
+
+        client
+            .write_file(filename, test_data.clone())
             .await
             .expect("Failed to write file");
 
         // Read a range
-        let range_data = client.read_file(filename, Some(10..20))
+        let range_data = client
+            .read_file(filename, Some(10..20))
             .await
             .expect("Failed to read range");
 
@@ -307,17 +318,19 @@ mod integration_tests {
         };
 
         let client = client_for(&target).await.expect("Failed to connect");
-        
+
         // Write a test file
         let test_data = Bytes::from("metadata test");
         let filename = "orbit_metadata_test.txt";
-        
-        client.write_file(filename, test_data.clone())
+
+        client
+            .write_file(filename, test_data.clone())
             .await
             .expect("Failed to write file");
 
         // Get metadata
-        let meta = client.metadata(filename)
+        let meta = client
+            .metadata(filename)
             .await
             .expect("Failed to get metadata");
 
@@ -337,16 +350,18 @@ mod integration_tests {
         };
 
         let client = client_for(&target).await.expect("Failed to connect");
-        
+
         let dirname = "orbit_test_dir";
-        
+
         // Create directory
-        client.mkdir(dirname)
+        client
+            .mkdir(dirname)
             .await
             .expect("Failed to create directory");
 
         // Verify it exists by getting metadata
-        let meta = client.metadata(dirname)
+        let meta = client
+            .metadata(dirname)
             .await
             .expect("Failed to get directory metadata");
 
@@ -365,18 +380,20 @@ mod integration_tests {
         };
 
         let client = client_for(&target).await.expect("Failed to connect");
-        
+
         // Create a 5MB file
         let size = 5 * 1024 * 1024;
         let test_data = Bytes::from(vec![0xAB; size]);
         let filename = "orbit_large_file_test.bin";
-        
-        client.write_file(filename, test_data.clone())
+
+        client
+            .write_file(filename, test_data.clone())
             .await
             .expect("Failed to write large file");
 
         // Read it back
-        let read_data = client.read_file(filename, None)
+        let read_data = client
+            .read_file(filename, None)
             .await
             .expect("Failed to read large file");
 

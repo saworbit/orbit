@@ -1,5 +1,5 @@
 use orbit::config::CopyConfig;
-use orbit::core::progress::{ProgressPublisher, ProgressEvent};
+use orbit::core::progress::{ProgressEvent, ProgressPublisher};
 use std::fs;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -46,11 +46,18 @@ fn test_progress_events_file_copy() {
     println!("Collected {} events", collected_events.len());
 
     // Should have at least TransferStart and TransferComplete
-    assert!(collected_events.len() >= 2, "Should have start and complete events");
+    assert!(
+        collected_events.len() >= 2,
+        "Should have start and complete events"
+    );
 
     // Verify event types
-    let has_start = collected_events.iter().any(|e| matches!(e, ProgressEvent::TransferStart { .. }));
-    let has_complete = collected_events.iter().any(|e| matches!(e, ProgressEvent::TransferComplete { .. }));
+    let has_start = collected_events
+        .iter()
+        .any(|e| matches!(e, ProgressEvent::TransferStart { .. }));
+    let has_complete = collected_events
+        .iter()
+        .any(|e| matches!(e, ProgressEvent::TransferComplete { .. }));
 
     assert!(has_start, "Should have TransferStart event");
     assert!(has_complete, "Should have TransferComplete event");
@@ -58,14 +65,33 @@ fn test_progress_events_file_copy() {
     // Print event summary
     for event in collected_events.iter() {
         match event {
-            ProgressEvent::TransferStart { file_id, total_bytes, .. } => {
-                println!("✓ TransferStart: {} bytes for {}", total_bytes, file_id.as_str());
+            ProgressEvent::TransferStart {
+                file_id,
+                total_bytes,
+                ..
+            } => {
+                println!(
+                    "✓ TransferStart: {} bytes for {}",
+                    total_bytes,
+                    file_id.as_str()
+                );
             }
-            ProgressEvent::TransferProgress { bytes_transferred, total_bytes, .. } => {
+            ProgressEvent::TransferProgress {
+                bytes_transferred,
+                total_bytes,
+                ..
+            } => {
                 println!("  Progress: {}/{} bytes", bytes_transferred, total_bytes);
             }
-            ProgressEvent::TransferComplete { total_bytes, duration_ms, .. } => {
-                println!("✓ TransferComplete: {} bytes in {}ms", total_bytes, duration_ms);
+            ProgressEvent::TransferComplete {
+                total_bytes,
+                duration_ms,
+                ..
+            } => {
+                println!(
+                    "✓ TransferComplete: {} bytes in {}ms",
+                    total_bytes, duration_ms
+                );
             }
             _ => {}
         }
@@ -115,9 +141,15 @@ fn test_progress_events_directory_copy() {
     println!("Collected {} directory events", collected_events.len());
 
     // Should have scan start, complete, and batch complete
-    let has_scan_start = collected_events.iter().any(|e| matches!(e, ProgressEvent::DirectoryScanStart { .. }));
-    let has_scan_complete = collected_events.iter().any(|e| matches!(e, ProgressEvent::DirectoryScanComplete { .. }));
-    let has_batch_complete = collected_events.iter().any(|e| matches!(e, ProgressEvent::BatchComplete { .. }));
+    let has_scan_start = collected_events
+        .iter()
+        .any(|e| matches!(e, ProgressEvent::DirectoryScanStart { .. }));
+    let has_scan_complete = collected_events
+        .iter()
+        .any(|e| matches!(e, ProgressEvent::DirectoryScanComplete { .. }));
+    let has_batch_complete = collected_events
+        .iter()
+        .any(|e| matches!(e, ProgressEvent::BatchComplete { .. }));
 
     assert!(has_scan_start, "Should have DirectoryScanStart event");
     assert!(has_scan_complete, "Should have DirectoryScanComplete event");

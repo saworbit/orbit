@@ -37,8 +37,8 @@ impl RankSelectBitmap {
     /// ```
     pub fn new(size: usize) -> Self {
         let block_size = 512; // Standard block size for rank caching
-        let num_blocks = (size + block_size - 1) / block_size;
-        
+        let num_blocks = size.div_ceil(block_size);
+
         Self {
             bits: bitvec![u8, Msb0; 0; size],
             rank_cache: vec![0; num_blocks + 1],
@@ -53,7 +53,7 @@ impl RankSelectBitmap {
         }
 
         let mut bitmap = Self::new(size);
-        
+
         // Copy bits from data
         let bits_to_copy = size.min(data.len() * 8);
         for i in 0..bits_to_copy {
@@ -221,10 +221,10 @@ impl RankSelectBitmap {
         let mut count = 0u32;
         for block_idx in 0..self.rank_cache.len() {
             self.rank_cache[block_idx] = count;
-            
+
             let block_start = block_idx * self.block_size;
             let block_end = (block_start + self.block_size).min(self.bits.len());
-            
+
             for i in block_start..block_end {
                 if self.bits[i] {
                     count += 1;
@@ -236,7 +236,7 @@ impl RankSelectBitmap {
     /// Update rank cache from a specific position onwards
     fn update_rank_cache_from(&mut self, position: usize) {
         let start_block = position / self.block_size;
-        
+
         // Recalculate from the start of this block
         let mut count = if start_block > 0 {
             self.rank_cache[start_block]
@@ -246,10 +246,10 @@ impl RankSelectBitmap {
 
         for block_idx in start_block..self.rank_cache.len() {
             self.rank_cache[block_idx] = count;
-            
+
             let block_start = block_idx * self.block_size;
             let block_end = (block_start + self.block_size).min(self.bits.len());
-            
+
             for i in block_start..block_end {
                 if self.bits[i] {
                     count += 1;
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn test_bitmap_basic() {
         let mut bitmap = RankSelectBitmap::new(100);
-        
+
         assert_eq!(bitmap.len(), 100);
         assert_eq!(bitmap.count_ones(), 0);
         assert_eq!(bitmap.count_zeros(), 100);
@@ -280,14 +280,14 @@ mod tests {
     #[test]
     fn test_rank() {
         let mut bitmap = RankSelectBitmap::new(100);
-        
+
         bitmap.set(5, true).unwrap();
         bitmap.set(10, true).unwrap();
         bitmap.set(15, true).unwrap();
 
         assert_eq!(bitmap.rank(0), 0);
-        assert_eq!(bitmap.rank(5), 0);  // Before position 5
-        assert_eq!(bitmap.rank(6), 1);  // After position 5
+        assert_eq!(bitmap.rank(5), 0); // Before position 5
+        assert_eq!(bitmap.rank(6), 1); // After position 5
         assert_eq!(bitmap.rank(10), 1); // Before position 10
         assert_eq!(bitmap.rank(11), 2); // After position 10
         assert_eq!(bitmap.rank(16), 3); // After position 15
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_select() {
         let mut bitmap = RankSelectBitmap::new(100);
-        
+
         bitmap.set(5, true).unwrap();
         bitmap.set(10, true).unwrap();
         bitmap.set(15, true).unwrap();
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_serialization() {
         let mut bitmap = RankSelectBitmap::new(100);
-        
+
         bitmap.set(10, true).unwrap();
         bitmap.set(20, true).unwrap();
         bitmap.set(30, true).unwrap();
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn test_get_set_positions() {
         let mut bitmap = RankSelectBitmap::new(100);
-        
+
         bitmap.set(5, true).unwrap();
         bitmap.set(15, true).unwrap();
         bitmap.set(25, true).unwrap();
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn test_out_of_bounds() {
         let mut bitmap = RankSelectBitmap::new(10);
-        
+
         let result = bitmap.set(10, true);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("out of bounds"));
@@ -355,7 +355,7 @@ mod tests {
     #[test]
     fn test_rank_cache_update() {
         let mut bitmap = RankSelectBitmap::new(1000);
-        
+
         // Set every 10th bit
         for i in (0..1000).step_by(10) {
             bitmap.set(i, true).unwrap();
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn test_empty_bitmap() {
         let bitmap = RankSelectBitmap::new(0);
-        
+
         assert!(bitmap.is_empty());
         assert_eq!(bitmap.len(), 0);
         assert_eq!(bitmap.count_ones(), 0);

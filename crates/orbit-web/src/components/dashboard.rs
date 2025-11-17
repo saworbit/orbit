@@ -1,7 +1,6 @@
 //! Main dashboard component
 
 use leptos::*;
-use leptos_router::*;
 
 use super::{JobForm, JobList};
 

@@ -508,7 +508,11 @@ mod tests {
 
         let event = receiver.recv().await.unwrap();
         match event {
-            ProgressEvent::TransferStarted { operation_id, total_bytes, .. } => {
+            ProgressEvent::TransferStarted {
+                operation_id,
+                total_bytes,
+                ..
+            } => {
                 assert_eq!(operation_id, "op1");
                 assert_eq!(total_bytes, 1000);
             }

@@ -1,7 +1,7 @@
 //! Star Map reader for querying binary indices
 
 use crate::error::{Error, Result};
-use crate::{BloomFilter, ChunkMeta, RankSelectBitmap, WindowMeta, StarMapData};
+use crate::{BloomFilter, ChunkMeta, RankSelectBitmap, StarMapData, WindowMeta};
 use crate::{STARMAP_MAGIC, STARMAP_VERSION};
 use memmap2::Mmap;
 use std::fs::File;
@@ -15,7 +15,7 @@ use std::sync::Arc;
 /// use orbit_core_starmap::StarMapReader;
 ///
 /// let reader = StarMapReader::open("file.starmap.bin").unwrap();
-/// 
+///
 /// // Check if a chunk exists
 /// let content_id = [1u8; 32];
 /// if reader.has_chunk(&content_id).unwrap() {
@@ -46,7 +46,7 @@ impl StarMapReader {
     /// Open and memory-map a Star Map file
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        
+
         if !path.exists() {
             return Err(Error::not_found(path));
         }
@@ -302,7 +302,10 @@ mod tests {
 
         let result = reader.get_chunk(10);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::ChunkIndexOutOfBounds { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            Error::ChunkIndexOutOfBounds { .. }
+        ));
     }
 
     #[test]

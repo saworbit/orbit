@@ -2,8 +2,8 @@
 //!
 //! Run with: cargo run --example basic_usage --features sqlite
 
-use magnetar::JobStatus;
 use anyhow::Result;
+use magnetar::JobStatus;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -46,13 +46,18 @@ async fn main() -> Result<()> {
     let mut processed = 0;
 
     while let Some(chunk) = store.claim_pending(42).await? {
-        println!("  Claimed chunk {} (checksum: {})", chunk.chunk, chunk.checksum);
+        println!(
+            "  Claimed chunk {} (checksum: {})",
+            chunk.chunk, chunk.checksum
+        );
 
         // Simulate processing work
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         // Mark as done
-        store.mark_status(42, chunk.chunk, JobStatus::Done, None).await?;
+        store
+            .mark_status(42, chunk.chunk, JobStatus::Done, None)
+            .await?;
         processed += 1;
         println!("  ✓ Completed chunk {}", chunk.chunk);
     }

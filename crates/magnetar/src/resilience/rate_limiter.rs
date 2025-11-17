@@ -121,13 +121,13 @@ impl RateLimiter {
 #[cfg(feature = "resilience-governor")]
 pub mod governor_impl {
     use super::*;
-    use std::num::NonZeroU32;
-    use std::sync::Arc;
     use governor::{
         clock::DefaultClock,
         state::{InMemoryState, NotKeyed},
         Quota, RateLimiter as GovernorRateLimiter,
     };
+    use std::num::NonZeroU32;
+    use std::sync::Arc;
 
     /// Rate limiter wrapper using governor
     pub struct GovernorRateLimiter {
@@ -137,8 +137,9 @@ pub mod governor_impl {
     impl GovernorRateLimiter {
         /// Create a new governor-based rate limiter
         pub fn new(max_requests: u32, period: Duration) -> Result<Self, ResilienceError> {
-            let max_requests = NonZeroU32::new(max_requests)
-                .ok_or_else(|| ResilienceError::Permanent("max_requests must be > 0".to_string()))?;
+            let max_requests = NonZeroU32::new(max_requests).ok_or_else(|| {
+                ResilienceError::Permanent("max_requests must be > 0".to_string())
+            })?;
 
             let quota = Quota::with_period(period)
                 .ok_or_else(|| ResilienceError::Permanent("Invalid period".to_string()))?
@@ -184,7 +185,9 @@ mod tests {
     async fn test_rate_limiter_basic() {
         let limiter = RateLimiter::per_second(10);
 
-        let result = limiter.execute(|| async { Ok::<_, ResilienceError>(42) }).await;
+        let result = limiter
+            .execute(|| async { Ok::<_, ResilienceError>(42) })
+            .await;
 
         assert_eq!(result.unwrap(), 42);
     }
@@ -195,7 +198,10 @@ mod tests {
 
         let start = Instant::now();
         for _ in 0..2 {
-            limiter.execute(|| async { Ok::<_, ResilienceError>(()) }).await.unwrap();
+            limiter
+                .execute(|| async { Ok::<_, ResilienceError>(()) })
+                .await
+                .unwrap();
         }
         let elapsed = start.elapsed();
 

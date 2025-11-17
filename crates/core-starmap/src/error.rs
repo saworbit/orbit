@@ -16,57 +16,35 @@ pub enum Error {
 
     /// Star Map file not found
     #[error("Star Map not found: {path}")]
-    NotFound {
-        path: PathBuf,
-    },
+    NotFound { path: PathBuf },
 
     /// Invalid Star Map format
     #[error("Invalid Star Map format: {reason}")]
-    InvalidFormat {
-        reason: String,
-    },
+    InvalidFormat { reason: String },
 
     /// Version mismatch
     #[error("Version mismatch: expected {expected}, found {found}")]
-    VersionMismatch {
-        expected: u16,
-        found: u16,
-    },
+    VersionMismatch { expected: u16, found: u16 },
 
     /// Invalid magic number (file is not a Star Map)
     #[error("Invalid magic number: expected {expected:?}, found {found:?}")]
-    InvalidMagic {
-        expected: Vec<u8>,
-        found: Vec<u8>,
-    },
+    InvalidMagic { expected: Vec<u8>, found: Vec<u8> },
 
     /// Chunk index out of bounds
     #[error("Chunk index out of bounds: {index} >= {count}")]
-    ChunkIndexOutOfBounds {
-        index: u32,
-        count: u32,
-    },
+    ChunkIndexOutOfBounds { index: u32, count: u32 },
 
     /// Window index out of bounds
     #[error("Window index out of bounds: {index} >= {count}")]
-    WindowIndexOutOfBounds {
-        index: u32,
-        count: u32,
-    },
+    WindowIndexOutOfBounds { index: u32, count: u32 },
 
     /// Invalid content ID size
     #[error("Invalid content ID size: expected {expected}, found {found}")]
-    InvalidContentIdSize {
-        expected: usize,
-        found: usize,
-    },
+    InvalidContentIdSize { expected: usize, found: usize },
 
     /// Invalid merkle root size
     #[error("Invalid merkle root size: expected {expected}, found {found}")]
-    InvalidMerkleRootSize {
-        expected: usize,
-        found: usize,
-    },
+    InvalidMerkleRootSize { expected: usize, found: usize },
 
     /// Memory mapping failed
     #[error("Memory mapping failed: {0}")]
@@ -82,9 +60,7 @@ pub enum Error {
 
     /// Data corruption detected
     #[error("Data corruption detected: {reason}")]
-    CorruptData {
-        reason: String,
-    },
+    CorruptData { reason: String },
 
     /// Empty Star Map (no chunks or windows)
     #[error("Empty Star Map: must contain at least one chunk and one window")]
@@ -114,9 +90,7 @@ impl Error {
 
     /// Create a not found error
     pub fn not_found<P: Into<PathBuf>>(path: P) -> Self {
-        Error::NotFound {
-            path: path.into(),
-        }
+        Error::NotFound { path: path.into() }
     }
 
     /// Create a chunk index out of bounds error

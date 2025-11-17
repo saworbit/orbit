@@ -85,13 +85,10 @@ pub fn init_test_logging() {
     static INIT: Once = Once::new();
 
     INIT.call_once(|| {
-        let env_filter = EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new("orbit=debug"));
+        let env_filter =
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("orbit=debug"));
 
-        let fmt_layer = fmt::layer()
-            .with_test_writer()
-            .with_target(false)
-            .compact();
+        let fmt_layer = fmt::layer().with_test_writer().with_target(false).compact();
 
         tracing_subscriber::registry()
             .with(env_filter)

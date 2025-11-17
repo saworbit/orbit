@@ -10,10 +10,10 @@
  * - Manifest integration
  */
 
-use std::path::Path;
-use crate::error::Result;
 use crate::core::file_metadata::{FileMetadata, PreserveFlags};
-use crate::core::transform::{TransformConfig, transform_metadata};
+use crate::core::transform::{transform_metadata, TransformConfig};
+use crate::error::Result;
+use std::path::Path;
 
 #[cfg(feature = "backend-abstraction")]
 use crate::backend::{Backend, BackendResult};
@@ -78,7 +78,11 @@ impl MetadataPreserver {
         match metadata.apply_to(dest, self.preserve_flags) {
             Ok(_) => Ok(()),
             Err(e) if !self.strict => {
-                tracing::warn!("Non-fatal metadata preservation error for {:?}: {}", dest, e);
+                tracing::warn!(
+                    "Non-fatal metadata preservation error for {:?}: {}",
+                    dest,
+                    e
+                );
                 Ok(())
             }
             Err(e) => Err(e),
@@ -123,7 +127,8 @@ impl MetadataPreserver {
         }
 
         // Apply metadata to destination backend
-        self.apply_to_backend(&metadata, dest_backend, dest_path).await
+        self.apply_to_backend(&metadata, dest_backend, dest_path)
+            .await
     }
 
     /// Apply metadata to a backend
@@ -154,7 +159,10 @@ impl MetadataPreserver {
         // Set timestamps if requested and supported
         if self.preserve_flags.times {
             if backend.supports("set_timestamps") {
-                match backend.set_timestamps(path, metadata.accessed, metadata.modified).await {
+                match backend
+                    .set_timestamps(path, metadata.accessed, metadata.modified)
+                    .await
+                {
                     Ok(_) => {}
                     Err(e) if !self.strict => {
                         tracing::warn!("Failed to set timestamps on {:?}: {}", path, e);
@@ -167,10 +175,16 @@ impl MetadataPreserver {
         // Set ownership if requested and supported
         if self.preserve_flags.ownership {
             if backend.supports("set_ownership") {
-                match backend.set_ownership(path, metadata.owner_uid, metadata.owner_gid).await {
+                match backend
+                    .set_ownership(path, metadata.owner_uid, metadata.owner_gid)
+                    .await
+                {
                     Ok(_) => {}
                     Err(BackendError::PermissionDenied { .. }) if !self.strict => {
-                        tracing::warn!("Permission denied setting ownership on {:?} (requires privileges)", path);
+                        tracing::warn!(
+                            "Permission denied setting ownership on {:?} (requires privileges)",
+                            path
+                        );
                     }
                     Err(e) if !self.strict => {
                         tracing::warn!("Failed to set ownership on {:?}: {}", path, e);
@@ -235,8 +249,9 @@ pub fn verify_metadata(source: &Path, dest: &Path, flags: PreserveFlags) -> Resu
 
     // Verify ownership
     if flags.ownership {
-        if source_meta.owner_uid != dest_meta.owner_uid ||
-           source_meta.owner_gid != dest_meta.owner_gid {
+        if source_meta.owner_uid != dest_meta.owner_uid
+            || source_meta.owner_gid != dest_meta.owner_gid
+        {
             tracing::warn!("Ownership mismatch for {:?}", dest);
             matches = false;
         }
@@ -344,7 +359,9 @@ mod tests {
         let dest = NamedTempFile::new().unwrap();
 
         let preserver = MetadataPreserver::new();
-        preserver.preserve_local(source.path(), dest.path()).unwrap();
+        preserver
+            .preserve_local(source.path(), dest.path())
+            .unwrap();
 
         // Verify metadata was preserved
         let source_meta = std::fs::metadata(source.path()).unwrap();

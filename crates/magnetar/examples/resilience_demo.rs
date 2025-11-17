@@ -124,10 +124,7 @@ async fn example_circuit_breaker() -> Result<(), ResilienceError> {
         println!("  Failure {}: {:?}", i + 1, result);
     }
 
-    println!(
-        "\n🔒 Circuit state: {:?}",
-        breaker.get_state().await
-    );
+    println!("\n🔒 Circuit state: {:?}", breaker.get_state().await);
 
     // Try operation with open circuit
     println!("\n⚠️  Attempting operation with open circuit...");
@@ -164,7 +161,10 @@ async fn example_connection_pool() -> Result<(), ResilienceError> {
         connections.push(conn);
     }
 
-    println!("\n📊 Pool stats with active connections: {:?}", pool.stats().await);
+    println!(
+        "\n📊 Pool stats with active connections: {:?}",
+        pool.stats().await
+    );
 
     // Release connections back to pool
     println!("\n🔄 Releasing connections...");
@@ -257,9 +257,7 @@ async fn example_combined_resilience() -> Result<(), ResilienceError> {
                             let conn = pool.acquire().await?;
 
                             // Make request
-                            let result = conn
-                                .make_request(&format!("Request {}", i + 1))
-                                .await;
+                            let result = conn.make_request(&format!("Request {}", i + 1)).await;
 
                             pool.release(conn).await;
 
@@ -290,10 +288,7 @@ async fn example_combined_resilience() -> Result<(), ResilienceError> {
     println!("  Successes: {}", success_count.load(Ordering::SeqCst));
     println!("  Failures: {}", failure_count.load(Ordering::SeqCst));
     println!("  Pool stats: {:?}", pool.stats().await);
-    println!(
-        "  Circuit state: {:?}",
-        breaker.get_state().await
-    );
+    println!("  Circuit state: {:?}", breaker.get_state().await);
 
     Ok(())
 }
@@ -313,9 +308,7 @@ async fn example_permanent_failures() -> Result<(), ResilienceError> {
     println!("🔄 Handling transient error (will retry)...");
     let result = breaker
         .execute(|| async {
-            Err::<(), _>(ResilienceError::Transient(
-                "Network timeout".to_string(),
-            ))
+            Err::<(), _>(ResilienceError::Transient("Network timeout".to_string()))
         })
         .await;
     println!("  Result: {:?}\n", result);

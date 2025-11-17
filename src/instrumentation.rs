@@ -2,12 +2,12 @@
  * Instrumentation for tracking operation statistics
  */
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 
-use crate::error::{OrbitError, ErrorCategory};
+use crate::error::{ErrorCategory, OrbitError};
 
 /// Thread-safe statistics tracker for operations
 #[derive(Debug, Clone)]
@@ -66,7 +66,9 @@ impl OperationStats {
     /// Record a successful operation
     pub fn record_success(&self) {
         self.inner.total_operations.fetch_add(1, Ordering::Relaxed);
-        self.inner.successful_operations.fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .successful_operations
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record a failed operation
@@ -76,7 +78,9 @@ impl OperationStats {
 
         // Categorize the error
         match error.category() {
-            ErrorCategory::Validation => self.inner.validation_errors.fetch_add(1, Ordering::Relaxed),
+            ErrorCategory::Validation => {
+                self.inner.validation_errors.fetch_add(1, Ordering::Relaxed)
+            }
             ErrorCategory::IoError => self.inner.io_errors.fetch_add(1, Ordering::Relaxed),
             ErrorCategory::Network => self.inner.network_errors.fetch_add(1, Ordering::Relaxed),
             ErrorCategory::Resource => self.inner.resource_errors.fetch_add(1, Ordering::Relaxed),
@@ -96,7 +100,9 @@ impl OperationStats {
     /// Record a skipped operation
     pub fn record_skip(&self) {
         self.inner.total_operations.fetch_add(1, Ordering::Relaxed);
-        self.inner.skipped_operations.fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .skipped_operations
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record a retry attempt
@@ -106,7 +112,9 @@ impl OperationStats {
         // Update max retries if this is higher
         let current_max = self.inner.max_retries_for_single_op.load(Ordering::Relaxed);
         if (attempt_number as u64) > current_max {
-            self.inner.max_retries_for_single_op.store(attempt_number as u64, Ordering::Relaxed);
+            self.inner
+                .max_retries_for_single_op
+                .store(attempt_number as u64, Ordering::Relaxed);
         }
     }
 
@@ -258,7 +266,10 @@ mod tests {
         let stats = OperationStats::new();
 
         stats.record_failure(&OrbitError::SourceNotFound(PathBuf::from("/tmp")));
-        stats.record_failure(&OrbitError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test")));
+        stats.record_failure(&OrbitError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "test",
+        )));
         stats.record_failure(&OrbitError::Protocol("network error".to_string()));
 
         let snapshot = stats.snapshot();

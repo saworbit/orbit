@@ -21,32 +21,27 @@ fn s3_tests_enabled() -> bool {
 
 /// Get test configuration from environment
 fn get_test_config() -> S3Config {
-    let bucket = env::var("S3_TEST_BUCKET")
-        .unwrap_or_else(|_| "orbit-test-bucket".to_string());
-    
-    let region = env::var("S3_TEST_REGION")
-        .ok();
-    
-    let endpoint = env::var("S3_TEST_ENDPOINT")
-        .ok();
-    
-    let access_key = env::var("AWS_ACCESS_KEY_ID")
-        .ok();
-    
-    let secret_key = env::var("AWS_SECRET_ACCESS_KEY")
-        .ok();
-    
+    let bucket = env::var("S3_TEST_BUCKET").unwrap_or_else(|_| "orbit-test-bucket".to_string());
+
+    let region = env::var("S3_TEST_REGION").ok();
+
+    let endpoint = env::var("S3_TEST_ENDPOINT").ok();
+
+    let access_key = env::var("AWS_ACCESS_KEY_ID").ok();
+
+    let secret_key = env::var("AWS_SECRET_ACCESS_KEY").ok();
+
     let mut config = S3Config::new(bucket);
     config.region = region;
     config.endpoint = endpoint;
     config.access_key = access_key;
     config.secret_key = secret_key;
-    
+
     // Use path-style for MinIO/LocalStack
     if config.endpoint.is_some() {
         config.force_path_style = true;
     }
-    
+
     config
 }
 
@@ -57,11 +52,16 @@ async fn test_connection() {
         println!("Skipping S3 integration test - set S3_TESTS_ENABLED=1 to run");
         return;
     }
-    
+
     let config = get_test_config();
-    let client = S3Client::new(config).await.expect("Failed to create client");
-    
-    client.test_connection().await.expect("Failed to connect to S3");
+    let client = S3Client::new(config)
+        .await
+        .expect("Failed to create client");
+
+    client
+        .test_connection()
+        .await
+        .expect("Failed to connect to S3");
 }
 
 #[tokio::test]
@@ -70,25 +70,31 @@ async fn test_upload_download_small_file() {
     if !s3_tests_enabled() {
         return;
     }
-    
+
     let config = get_test_config();
-    let client = S3Client::new(config).await.expect("Failed to create client");
-    
+    let client = S3Client::new(config)
+        .await
+        .expect("Failed to create client");
+
     // Upload test data
     let test_data = b"Hello, S3!";
     let key = "test/small-file.txt";
-    
-    client.upload_bytes(Bytes::from(test_data.to_vec()), key)
+
+    client
+        .upload_bytes(Bytes::from(test_data.to_vec()), key)
         .await
         .expect("Failed to upload");
-    
+
     // Verify exists
     assert!(client.exists(key).await.expect("Failed to check existence"));
-    
+
     // Download and verify
-    let downloaded = client.download_bytes(key).await.expect("Failed to download");
+    let downloaded = client
+        .download_bytes(key)
+        .await
+        .expect("Failed to download");
     assert_eq!(&downloaded[..], test_data);
-    
+
     // Cleanup
     client.delete(key).await.expect("Failed to delete");
 }
@@ -99,23 +105,26 @@ async fn test_list_objects() {
     if !s3_tests_enabled() {
         return;
     }
-    
+
     let config = get_test_config();
-    let client = S3Client::new(config).await.expect("Failed to create client");
-    
+    let client = S3Client::new(config)
+        .await
+        .expect("Failed to create client");
+
     // Upload test objects
     let prefix = "test/list/";
     for i in 1..=5 {
         let key = format!("{}file{}.txt", prefix, i);
-        client.upload_bytes(Bytes::from(format!("Content {}", i)), &key)
+        client
+            .upload_bytes(Bytes::from(format!("Content {}", i)), &key)
             .await
             .expect("Failed to upload");
     }
-    
+
     // List objects
     let result = client.list_objects(prefix).await.expect("Failed to list");
     assert!(result.objects.len() >= 5);
-    
+
     // Cleanup
     for obj in result.objects {
         client.delete(&obj.key).await.ok();
@@ -128,23 +137,29 @@ async fn test_get_metadata() {
     if !s3_tests_enabled() {
         return;
     }
-    
+
     let config = get_test_config();
-    let client = S3Client::new(config).await.expect("Failed to create client");
-    
+    let client = S3Client::new(config)
+        .await
+        .expect("Failed to create client");
+
     // Upload test data
     let test_data = b"Metadata test";
     let key = "test/metadata.txt";
-    
-    client.upload_bytes(Bytes::from(test_data.to_vec()), key)
+
+    client
+        .upload_bytes(Bytes::from(test_data.to_vec()), key)
         .await
         .expect("Failed to upload");
-    
+
     // Get metadata
-    let metadata = client.get_metadata(key).await.expect("Failed to get metadata");
+    let metadata = client
+        .get_metadata(key)
+        .await
+        .expect("Failed to get metadata");
     assert_eq!(metadata.size, test_data.len() as u64);
     assert_eq!(metadata.key, key);
-    
+
     // Cleanup
     client.delete(key).await.expect("Failed to delete");
 }
@@ -155,27 +170,34 @@ async fn test_copy_object() {
     if !s3_tests_enabled() {
         return;
     }
-    
+
     let config = get_test_config();
-    let client = S3Client::new(config).await.expect("Failed to create client");
-    
+    let client = S3Client::new(config)
+        .await
+        .expect("Failed to create client");
+
     // Upload source
     let test_data = b"Copy test";
     let source_key = "test/source.txt";
     let dest_key = "test/destination.txt";
-    
-    client.upload_bytes(Bytes::from(test_data.to_vec()), source_key)
+
+    client
+        .upload_bytes(Bytes::from(test_data.to_vec()), source_key)
         .await
         .expect("Failed to upload");
-    
+
     // Copy
-    client.copy_object(source_key, dest_key)
+    client
+        .copy_object(source_key, dest_key)
         .await
         .expect("Failed to copy");
-    
+
     // Verify destination exists
-    assert!(client.exists(dest_key).await.expect("Failed to check existence"));
-    
+    assert!(client
+        .exists(dest_key)
+        .await
+        .expect("Failed to check existence"));
+
     // Cleanup
     client.delete(source_key).await.ok();
     client.delete(dest_key).await.ok();
@@ -187,15 +209,17 @@ async fn test_object_not_found() {
     if !s3_tests_enabled() {
         return;
     }
-    
+
     let config = get_test_config();
-    let client = S3Client::new(config).await.expect("Failed to create client");
-    
+    let client = S3Client::new(config)
+        .await
+        .expect("Failed to create client");
+
     let key = "test/nonexistent.txt";
-    
+
     // Should return false for exists
     assert!(!client.exists(key).await.expect("Failed to check existence"));
-    
+
     // Should return error for download
     let result = client.download_bytes(key).await;
     assert!(result.is_err());
@@ -208,14 +232,19 @@ async fn test_delete_nonexistent() {
     if !s3_tests_enabled() {
         return;
     }
-    
+
     let config = get_test_config();
-    let client = S3Client::new(config).await.expect("Failed to create client");
-    
+    let client = S3Client::new(config)
+        .await
+        .expect("Failed to create client");
+
     let key = "test/nonexistent-delete.txt";
-    
+
     // Deleting non-existent object should succeed (S3 is idempotent)
-    client.delete(key).await.expect("Failed to delete non-existent");
+    client
+        .delete(key)
+        .await
+        .expect("Failed to delete non-existent");
 }
 
 #[cfg(test)]
@@ -229,11 +258,11 @@ mod unit_tests {
             .chunk_size(10 * 1024 * 1024)
             .build()
             .unwrap();
-        
+
         assert_eq!(config.bucket, "test-bucket");
         assert_eq!(config.region, Some("us-west-2".to_string()));
     }
-    
+
     #[test]
     fn test_storage_class_conversions() {
         let sc = S3StorageClass::Standard;
@@ -241,7 +270,7 @@ mod unit_tests {
         let back = S3StorageClass::from_aws(&aws_sc);
         assert_eq!(sc, back);
     }
-    
+
     #[test]
     fn test_error_retryability() {
         assert!(S3Error::Network("error".to_string()).is_retryable());

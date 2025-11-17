@@ -10,16 +10,16 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::bounded;
 use rayon::prelude::*;
-use walkdir::WalkDir;
 use tracing::info;
+use walkdir::WalkDir;
 
-use super::metadata::preserve_metadata;
-use super::validation::matches_exclude_pattern;
-use super::filter::FilterList;
-use super::disk_guardian::{self, GuardianConfig};
 use super::concurrency::ConcurrencyLimiter;
-use super::CopyStats;
+use super::disk_guardian::{self, GuardianConfig};
+use super::filter::FilterList;
+use super::metadata::preserve_metadata;
 use super::progress::ProgressPublisher;
+use super::validation::matches_exclude_pattern;
+use super::CopyStats;
 use crate::config::{CopyConfig, CopyMode, SymlinkMode};
 use crate::error::{OrbitError, Result};
 
@@ -63,7 +63,7 @@ pub fn copy_directory_impl(
 ) -> Result<CopyStats> {
     if !config.recursive {
         return Err(OrbitError::Config(
-            "Recursive flag not set for directory copy".to_string()
+            "Recursive flag not set for directory copy".to_string(),
         ));
     }
 
@@ -72,7 +72,10 @@ pub fn copy_directory_impl(
     // Setup concurrency limiter for controlling parallel transfers
     let concurrency_limiter = if config.parallel > 0 {
         let limiter = ConcurrencyLimiter::new(config.parallel);
-        info!("Concurrency control enabled: max {} parallel transfers", limiter.max_concurrent());
+        info!(
+            "Concurrency control enabled: max {} parallel transfers",
+            limiter.max_concurrent()
+        );
         Some(Arc::new(limiter))
     } else {
         None
@@ -118,7 +121,10 @@ pub fn copy_directory_impl(
     ) {
         Ok(filters) => Arc::new(filters),
         Err(e) => {
-            return Err(OrbitError::Config(format!("Invalid filter configuration: {}", e)));
+            return Err(OrbitError::Config(format!(
+                "Invalid filter configuration: {}",
+                e
+            )));
         }
     };
 
@@ -148,12 +154,26 @@ pub fn copy_directory_impl(
         let filter_list = filter_list.clone();
 
         thread::spawn(move || -> Result<()> {
-            produce_work_items(&source_dir, &dest_dir, &config, tx, expected_entries, &filter_list)
+            produce_work_items(
+                &source_dir,
+                &dest_dir,
+                &config,
+                tx,
+                expected_entries,
+                &filter_list,
+            )
         })
     };
 
     // Consumer: process work items (files) in parallel or sequentially
-    consume_work_items(&source_dir, &dest_dir, config, rx, total_stats.clone(), concurrency_limiter.as_ref())?;
+    consume_work_items(
+        &source_dir,
+        &dest_dir,
+        config,
+        rx,
+        total_stats.clone(),
+        concurrency_limiter.as_ref(),
+    )?;
 
     // Wait for producer to finish and check for errors
     match producer_handle.join() {
@@ -191,7 +211,8 @@ pub fn copy_directory_impl(
     final_stats.duration = start_time.elapsed();
 
     // Emit directory scan complete event
-    let total_files = final_stats.files_copied + final_stats.files_skipped + final_stats.files_failed;
+    let total_files =
+        final_stats.files_copied + final_stats.files_skipped + final_stats.files_failed;
     pub_ref.publish(super::progress::ProgressEvent::DirectoryScanComplete {
         total_files,
         total_dirs: 0, // We don't track directories separately in current implementation
@@ -465,10 +486,7 @@ fn apply_deletions(deletions: &[DeletionItem], config: &CopyConfig) -> DeletionS
 }
 
 /// Flush directory batch - create directories sequentially before files
-fn flush_directory_batch(
-    batch: &mut Vec<WorkItem>,
-    config: &CopyConfig,
-) -> Result<()> {
+fn flush_directory_batch(batch: &mut Vec<WorkItem>, config: &CopyConfig) -> Result<()> {
     for item in batch.drain(..) {
         if !item.dest_path.exists() {
             std::fs::create_dir_all(&item.dest_path)?;
@@ -519,8 +537,14 @@ fn consume_work_items(
 
         pool.install(|| {
             rx.into_iter().par_bridge().for_each(|item| {
-                if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats, concurrency_limiter)
-                {
+                if let Err(e) = process_work_item(
+                    &item,
+                    source_dir,
+                    dest_dir,
+                    config,
+                    &total_stats,
+                    concurrency_limiter,
+                ) {
                     eprintln!("Error copying {:?}: {}", item.source_path, e);
                     if let Ok(mut stats) = total_stats.lock() {
                         stats.files_failed += 1;
@@ -531,7 +555,9 @@ fn consume_work_items(
     } else {
         // Sequential processing (no concurrency limiter needed)
         for item in rx {
-            if let Err(e) = process_work_item(&item, source_dir, dest_dir, config, &total_stats, None) {
+            if let Err(e) =
+                process_work_item(&item, source_dir, dest_dir, config, &total_stats, None)
+            {
                 eprintln!("Error copying {:?}: {}", item.source_path, e);
                 if let Ok(mut stats) = total_stats.lock() {
                     stats.files_failed += 1;
@@ -576,7 +602,7 @@ fn process_work_item(
                 files_copied: 1,
                 files_skipped: 0,
                 files_failed: 0,
-        delta_stats: None,
+                delta_stats: None,
             }
         }
         EntryType::File => {
@@ -680,7 +706,8 @@ mod tests {
 
         let config = mirror_config();
         let filter_list = FilterList::new();
-        let deletions = collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
+        let deletions =
+            collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
 
         assert_eq!(deletions.len(), 1);
         assert_eq!(deletions[0].path, dest_dir.join("extra.txt"));
@@ -701,7 +728,8 @@ mod tests {
         config.exclude_patterns = vec!["*.log".to_string()];
 
         let filter_list = FilterList::new();
-        let deletions = collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
+        let deletions =
+            collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
 
         assert!(deletions.is_empty());
     }
@@ -744,7 +772,8 @@ mod tests {
         config.symlink_mode = SymlinkMode::Skip;
 
         let filter_list = FilterList::new();
-        let deletions = collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
+        let deletions =
+            collect_deletion_candidates(dest_dir, &expected, &config, &filter_list).unwrap();
 
         assert!(deletions.is_empty());
     }

@@ -5,11 +5,11 @@
 
 use crate::config::{ChunkingStrategy, CopyConfig};
 use crate::error::{OrbitError, Result};
+use orbit_core_audit::TelemetryLogger;
 use orbit_core_manifest::{
-    CargoManifest, Chunking, Endpoint, Encryption, FileRef, FlightPlan, Policy, WindowMeta,
+    CargoManifest, Chunking, Encryption, Endpoint, FileRef, FlightPlan, Policy, WindowMeta,
 };
 use orbit_core_starmap::{ChunkMeta, StarMapBuilder};
-use orbit_core_audit::TelemetryLogger;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -32,11 +32,7 @@ pub struct ManifestGenerator {
 
 impl ManifestGenerator {
     /// Create a new manifest generator
-    pub fn new(
-        source: &Path,
-        dest: &Path,
-        config: &CopyConfig,
-    ) -> Result<Self> {
+    pub fn new(source: &Path, dest: &Path, config: &CopyConfig) -> Result<Self> {
         // Generate job ID
         let job_id = format!("job-{}", chrono::Utc::now().format("%Y-%m-%dT%H_%M_%SZ"));
 
@@ -47,8 +43,7 @@ impl ManifestGenerator {
             .unwrap_or_else(|| PathBuf::from("/var/lib/orbit/manifests").join(&job_id));
 
         // Create output directory
-        std::fs::create_dir_all(&output_dir)
-            .map_err(|e| OrbitError::Io(e))?;
+        std::fs::create_dir_all(&output_dir).map_err(|e| OrbitError::Io(e))?;
 
         // Create endpoints
         let source_endpoint = Endpoint::filesystem(source.to_string_lossy().to_string());
@@ -56,12 +51,12 @@ impl ManifestGenerator {
 
         // Create policy
         let encryption = Encryption::aes256_gcm("env:ORBIT_KEY");
-        let policy = Policy::default_with_encryption(encryption)
-            .with_classification("UNCLASSIFIED");
+        let policy =
+            Policy::default_with_encryption(encryption).with_classification("UNCLASSIFIED");
 
         // Create flight plan
-        let flight_plan = FlightPlan::new(source_endpoint, target_endpoint, policy)
-            .with_job_id(job_id.clone());
+        let flight_plan =
+            FlightPlan::new(source_endpoint, target_endpoint, policy).with_job_id(job_id.clone());
 
         // Create telemetry logger
         let telemetry_path = output_dir.join("audit.jsonl");
@@ -79,18 +74,12 @@ impl ManifestGenerator {
     }
 
     /// Generate manifest for a single file
-    pub fn generate_file_manifest(
-        &mut self,
-        file_path: &Path,
-        relative_path: &str,
-    ) -> Result<()> {
+    pub fn generate_file_manifest(&mut self, file_path: &Path, relative_path: &str) -> Result<()> {
         // Open file
-        let mut file = File::open(file_path)
-            .map_err(|e| OrbitError::Io(e))?;
+        let mut file = File::open(file_path).map_err(|e| OrbitError::Io(e))?;
 
         // Get file size
-        let metadata = file.metadata()
-            .map_err(|e| OrbitError::Io(e))?;
+        let metadata = file.metadata().map_err(|e| OrbitError::Io(e))?;
         let file_size = metadata.len();
 
         // Accumulate total bytes
@@ -103,12 +92,8 @@ impl ManifestGenerator {
 
         // Create chunking configuration
         let chunking = match &self.chunking_strategy {
-            ChunkingStrategy::Cdc { avg_kib, algo } => {
-                Chunking::cdc(*avg_kib, algo)
-            }
-            ChunkingStrategy::Fixed { size_kib } => {
-                Chunking::fixed(*size_kib)
-            }
+            ChunkingStrategy::Cdc { avg_kib, algo } => Chunking::cdc(*avg_kib, algo),
+            ChunkingStrategy::Fixed { size_kib } => Chunking::fixed(*size_kib),
         };
 
         // Create cargo manifest
@@ -120,36 +105,35 @@ impl ManifestGenerator {
         // Build star map
         let mut starmap_builder = StarMapBuilder::new(file_size);
         for chunk in &chunks {
-            starmap_builder.add_chunk(
-                chunk.offset,
-                chunk.length,
-                &chunk.content_id,
-            ).map_err(|e| OrbitError::Other(format!("Star map error: {}", e)))?;
+            starmap_builder
+                .add_chunk(chunk.offset, chunk.length, &chunk.content_id)
+                .map_err(|e| OrbitError::Other(format!("Star map error: {}", e)))?;
         }
 
         // Add windows to cargo manifest and star map
         for window in windows.iter() {
             // Convert merkle_root bytes to hex string for cargo manifest
             let merkle_hex = hex::encode(window.merkle_root);
-            
-            cargo.add_window(WindowMeta::new(
-                window.id,
-                window.first_chunk,
-                window.count,
-                merkle_hex,
-            ).with_overlap(window.overlap.unwrap_or(0)));
-            
-            starmap_builder.add_window(
-                window.id,
-                window.first_chunk,
-                window.count,
-                &window.merkle_root,
-                window.overlap.unwrap_or(0),
-            ).map_err(|e| OrbitError::Other(format!("Star map error: {}", e)))?;
+
+            cargo.add_window(
+                WindowMeta::new(window.id, window.first_chunk, window.count, merkle_hex)
+                    .with_overlap(window.overlap.unwrap_or(0)),
+            );
+
+            starmap_builder
+                .add_window(
+                    window.id,
+                    window.first_chunk,
+                    window.count,
+                    &window.merkle_root,
+                    window.overlap.unwrap_or(0),
+                )
+                .map_err(|e| OrbitError::Other(format!("Star map error: {}", e)))?;
         }
 
         // Build star map
-        let starmap_data = starmap_builder.build()
+        let starmap_data = starmap_builder
+            .build()
             .map_err(|e| OrbitError::Other(format!("Star map build error: {}", e)))?;
 
         // Generate file names
@@ -159,19 +143,17 @@ impl ManifestGenerator {
 
         // Save cargo manifest
         let cargo_path = self.output_dir.join(&cargo_filename);
-        cargo.save(&cargo_path)
+        cargo
+            .save(&cargo_path)
             .map_err(|e| OrbitError::Other(format!("Failed to save cargo manifest: {}", e)))?;
 
         // Save star map
         let starmap_path = self.output_dir.join(&starmap_filename);
-        std::fs::write(&starmap_path, starmap_data)
-            .map_err(|e| OrbitError::Io(e))?;
+        std::fs::write(&starmap_path, starmap_data).map_err(|e| OrbitError::Io(e))?;
 
         // Add file reference to flight plan
-        self.flight_plan.add_file(
-            FileRef::new(relative_path, &cargo_filename)
-                .with_starmap(&starmap_filename)
-        );
+        self.flight_plan
+            .add_file(FileRef::new(relative_path, &cargo_filename).with_starmap(&starmap_filename));
 
         Ok(())
     }
@@ -183,7 +165,8 @@ impl ManifestGenerator {
 
         // Save flight plan
         let flight_plan_path = self.output_dir.join("job.flightplan.json");
-        self.flight_plan.save(&flight_plan_path)
+        self.flight_plan
+            .save(&flight_plan_path)
             .map_err(|e| OrbitError::Other(format!("Failed to save flight plan: {}", e)))?;
 
         // Log job completion with accumulated total bytes
@@ -215,8 +198,7 @@ impl ManifestGenerator {
             .map_err(|e| OrbitError::Io(e))?;
 
         loop {
-            let bytes_read = file.read(&mut buffer)
-                .map_err(|e| OrbitError::Io(e))?;
+            let bytes_read = file.read(&mut buffer).map_err(|e| OrbitError::Io(e))?;
 
             if bytes_read == 0 {
                 break;
@@ -304,8 +286,8 @@ pub fn should_generate_manifest(config: &CopyConfig) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::{NamedTempFile, TempDir};
     use std::io::Write;
+    use tempfile::{NamedTempFile, TempDir};
 
     #[test]
     fn test_should_generate_manifest() {
@@ -336,7 +318,7 @@ mod tests {
     fn test_chunk_file() {
         let temp_dir = TempDir::new().unwrap();
         let mut temp_file = NamedTempFile::new().unwrap();
-        
+
         // Write 1KB of test data
         let data = vec![0x42u8; 1024];
         temp_file.write_all(&data).unwrap();
@@ -344,13 +326,13 @@ mod tests {
 
         let source = temp_dir.path().join("source");
         let dest = temp_dir.path().join("dest");
-        
+
         let mut config = CopyConfig::default();
         config.manifest_output_dir = Some(temp_dir.path().join("manifests"));
         config.chunking_strategy = ChunkingStrategy::Fixed { size_kib: 1 };
 
         let generator = ManifestGenerator::new(&source, &dest, &config).unwrap();
-        
+
         let mut file = File::open(temp_file.path()).unwrap();
         let (chunks, windows) = generator.chunk_file(&mut file, 1024).unwrap();
 

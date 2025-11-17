@@ -2,7 +2,11 @@
  * Bandwidth throttling utilities with token bucket rate limiting
  */
 
-use governor::{Quota, RateLimiter as GovernorRateLimiter, clock::DefaultClock, state::{InMemoryState, NotKeyed}};
+use governor::{
+    clock::DefaultClock,
+    state::{InMemoryState, NotKeyed},
+    Quota, RateLimiter as GovernorRateLimiter,
+};
 use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::thread;
@@ -33,9 +37,7 @@ impl BandwidthLimiter {
         let tokens_per_sec = 1000u32;
         let bytes_per_token = max_bytes_per_sec / tokens_per_sec as u64;
 
-        let quota = Quota::per_second(
-            NonZeroU32::new(tokens_per_sec).unwrap()
-        );
+        let quota = Quota::per_second(NonZeroU32::new(tokens_per_sec).unwrap());
 
         Self {
             limiter: Some(Arc::new(GovernorRateLimiter::direct(quota))),
@@ -85,7 +87,7 @@ pub fn apply_limit(bytes_written: u64, max_bandwidth: u64, last_check: &mut Inst
         let bytes_per_sec = bytes_written as f64 / elapsed_secs;
         if bytes_per_sec > max_bandwidth as f64 {
             let sleep_time = Duration::from_secs_f64(
-                (bytes_written as f64 / max_bandwidth as f64) - elapsed_secs
+                (bytes_written as f64 / max_bandwidth as f64) - elapsed_secs,
             );
             if sleep_time > Duration::ZERO {
                 thread::sleep(sleep_time);
@@ -154,7 +156,8 @@ mod tests {
 
         // Should take approximately 2 seconds (2 MB / 1 MB/s)
         // Allow some tolerance for overhead
-        let expected_duration = Duration::from_secs_f64(total_bytes as f64 / bandwidth_limit as f64);
+        let expected_duration =
+            Duration::from_secs_f64(total_bytes as f64 / bandwidth_limit as f64);
         let min_duration = expected_duration.mul_f32(0.8); // 80% of expected
         let max_duration = expected_duration.mul_f32(1.5); // 150% of expected
 
@@ -199,7 +202,8 @@ mod tests {
         let total_bytes = chunk_size * 4 * 2; // 2 MB total
 
         // Should take approximately 1 second
-        let expected_duration = Duration::from_secs_f64(total_bytes as f64 / bandwidth_limit as f64);
+        let expected_duration =
+            Duration::from_secs_f64(total_bytes as f64 / bandwidth_limit as f64);
         let min_duration = expected_duration.mul_f32(0.7);
         let max_duration = expected_duration.mul_f32(1.5);
 

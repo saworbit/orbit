@@ -17,22 +17,13 @@ pub enum BackendError {
     Io(io::Error),
 
     /// Path not found on backend
-    NotFound {
-        path: PathBuf,
-        backend: String,
-    },
+    NotFound { path: PathBuf, backend: String },
 
     /// Permission denied accessing resource
-    PermissionDenied {
-        path: PathBuf,
-        message: String,
-    },
+    PermissionDenied { path: PathBuf, message: String },
 
     /// Authentication failed
-    AuthenticationFailed {
-        backend: String,
-        message: String,
-    },
+    AuthenticationFailed { backend: String, message: String },
 
     /// Connection failed to remote backend
     ConnectionFailed {
@@ -48,38 +39,22 @@ pub enum BackendError {
     },
 
     /// Invalid configuration for backend
-    InvalidConfig {
-        backend: String,
-        message: String,
-    },
+    InvalidConfig { backend: String, message: String },
 
     /// Backend operation not supported
-    Unsupported {
-        backend: String,
-        operation: String,
-    },
+    Unsupported { backend: String, operation: String },
 
     /// Path is invalid or malformed
-    InvalidPath {
-        path: PathBuf,
-        reason: String,
-    },
+    InvalidPath { path: PathBuf, reason: String },
 
     /// Resource already exists (e.g., during exclusive create)
-    AlreadyExists {
-        path: PathBuf,
-    },
+    AlreadyExists { path: PathBuf },
 
     /// Directory is not empty (e.g., during delete)
-    DirectoryNotEmpty {
-        path: PathBuf,
-    },
+    DirectoryNotEmpty { path: PathBuf },
 
     /// Quota or space limit exceeded
-    QuotaExceeded {
-        backend: String,
-        message: String,
-    },
+    QuotaExceeded { backend: String, message: String },
 
     /// Network error during remote operation
     Network {
@@ -88,15 +63,10 @@ pub enum BackendError {
     },
 
     /// Serialization/deserialization error
-    Serialization {
-        message: String,
-    },
+    Serialization { message: String },
 
     /// Generic backend error with context
-    Other {
-        backend: String,
-        message: String,
-    },
+    Other { backend: String, message: String },
 }
 
 impl BackendError {
@@ -171,21 +141,40 @@ impl fmt::Display for BackendError {
             BackendError::AuthenticationFailed { backend, message } => {
                 write!(f, "Authentication failed for {}: {}", backend, message)
             }
-            BackendError::ConnectionFailed { backend, endpoint, source } => {
+            BackendError::ConnectionFailed {
+                backend,
+                endpoint,
+                source,
+            } => {
                 if let Some(src) = source {
-                    write!(f, "Connection to {} ({}) failed: {}", backend, endpoint, src)
+                    write!(
+                        f,
+                        "Connection to {} ({}) failed: {}",
+                        backend, endpoint, src
+                    )
                 } else {
                     write!(f, "Connection to {} ({}) failed", backend, endpoint)
                 }
             }
-            BackendError::Timeout { operation, duration_secs } => {
-                write!(f, "Operation '{}' timed out after {} seconds", operation, duration_secs)
+            BackendError::Timeout {
+                operation,
+                duration_secs,
+            } => {
+                write!(
+                    f,
+                    "Operation '{}' timed out after {} seconds",
+                    operation, duration_secs
+                )
             }
             BackendError::InvalidConfig { backend, message } => {
                 write!(f, "Invalid configuration for {}: {}", backend, message)
             }
             BackendError::Unsupported { backend, operation } => {
-                write!(f, "Operation '{}' not supported by backend {}", operation, backend)
+                write!(
+                    f,
+                    "Operation '{}' not supported by backend {}",
+                    operation, backend
+                )
             }
             BackendError::InvalidPath { path, reason } => {
                 write!(f, "Invalid path {}: {}", path.display(), reason)
@@ -253,9 +242,7 @@ impl From<BackendError> for crate::error::OrbitError {
             BackendError::AuthenticationFailed { message, .. } => {
                 crate::error::OrbitError::Authentication(message)
             }
-            BackendError::NotFound { path, .. } => {
-                crate::error::OrbitError::SourceNotFound(path)
-            }
+            BackendError::NotFound { path, .. } => crate::error::OrbitError::SourceNotFound(path),
             BackendError::PermissionDenied { message, .. } => {
                 crate::error::OrbitError::Protocol(message)
             }
@@ -289,7 +276,10 @@ mod tests {
             backend: "ssh".to_string(),
             message: "invalid credentials".to_string(),
         };
-        assert_eq!(err.to_string(), "Authentication failed for ssh: invalid credentials");
+        assert_eq!(
+            err.to_string(),
+            "Authentication failed for ssh: invalid credentials"
+        );
     }
 
     #[test]

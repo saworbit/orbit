@@ -11,9 +11,9 @@
 
 use orbit::{
     config::{CopyConfig, ErrorMode},
-    error::{OrbitError, ErrorCategory},
-    instrumentation::OperationStats,
     core::CopyStats,
+    error::{ErrorCategory, OrbitError},
+    instrumentation::OperationStats,
 };
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -236,7 +236,10 @@ fn test_error_mode_partial_with_retry() {
 
     let result = orbit::core::retry::with_retry(&config, || flaky.execute());
 
-    assert!(result.is_ok(), "Should succeed with partial mode and retries");
+    assert!(
+        result.is_ok(),
+        "Should succeed with partial mode and retries"
+    );
 
     // Should have retried and eventually succeeded
     assert_eq!(flaky.current_attempt.load(Ordering::SeqCst), 3);
@@ -255,7 +258,8 @@ fn test_stats_tracking() {
         ..Default::default()
     };
 
-    let result = orbit::core::retry::with_retry_and_stats(&config, Some(&stats_tracker), || flaky.execute());
+    let result =
+        orbit::core::retry::with_retry_and_stats(&config, Some(&stats_tracker), || flaky.execute());
 
     assert!(result.is_ok(), "Should succeed");
 
@@ -369,11 +373,7 @@ fn test_transient_io_errors() {
 
     for kind in &transient_kinds {
         let error = OrbitError::Io(std::io::Error::new(*kind, "test"));
-        assert!(
-            error.is_transient(),
-            "{:?} should be transient",
-            kind
-        );
+        assert!(error.is_transient(), "{:?} should be transient", kind);
 
         // Only certain kinds are network errors
         match kind {
@@ -459,7 +459,10 @@ fn test_multiple_error_types_in_sequence() {
         }
     });
 
-    assert!(result.is_ok(), "Should succeed after encountering multiple error types");
+    assert!(
+        result.is_ok(),
+        "Should succeed after encountering multiple error types"
+    );
     assert_eq!(attempt_count.load(Ordering::SeqCst), 3);
 
     let snapshot = stats_tracker.snapshot();
@@ -499,7 +502,10 @@ fn test_concurrent_stats_tracking() {
 
     // Should have recorded 100 operations total (10 threads * 10 operations)
     assert_eq!(snapshot.total_operations, 100);
-    assert_eq!(snapshot.successful_operations + snapshot.failed_operations, 100);
+    assert_eq!(
+        snapshot.successful_operations + snapshot.failed_operations,
+        100
+    );
     // Each thread calls record_retry 10 times (j=0 to 9), so 10 threads * 10 calls = 100 retries
     assert_eq!(snapshot.total_retries, 100);
     // Max retry for single operation should be 9 (the highest j value)

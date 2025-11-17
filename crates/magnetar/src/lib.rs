@@ -166,7 +166,11 @@ pub trait JobStore: Send + Sync {
     /// id = 1
     /// checksum = "abc123"
     /// ```
-    async fn init_from_manifest(&mut self, job_id: i64, manifest: &toml::Value) -> anyhow::Result<()>;
+    async fn init_from_manifest(
+        &mut self,
+        job_id: i64,
+        manifest: &toml::Value,
+    ) -> anyhow::Result<()>;
 
     /// Atomically claim the next pending chunk
     ///
@@ -186,13 +190,9 @@ pub trait JobStore: Send + Sync {
     ) -> anyhow::Result<()>;
 
     /// Mark a chunk as failed with an error message
-    async fn mark_failed(
-        &mut self,
-        job_id: i64,
-        chunk: u64,
-        error: String,
-    ) -> anyhow::Result<()> {
-        self.mark_status(job_id, chunk, JobStatus::Failed, Some(error)).await
+    async fn mark_failed(&mut self, job_id: i64, chunk: u64, error: String) -> anyhow::Result<()> {
+        self.mark_status(job_id, chunk, JobStatus::Failed, Some(error))
+            .await
     }
 
     /// Get all pending chunks for a job (for resumption)
@@ -204,7 +204,12 @@ pub trait JobStore: Send + Sync {
     /// Add dependency relationships between chunks
     ///
     /// The chunk cannot be claimed until all dependencies are Done.
-    async fn add_dependency(&mut self, job_id: i64, chunk: u64, deps: Vec<u64>) -> anyhow::Result<()>;
+    async fn add_dependency(
+        &mut self,
+        job_id: i64,
+        chunk: u64,
+        deps: Vec<u64>,
+    ) -> anyhow::Result<()>;
 
     /// Get all dependencies for a chunk
     async fn get_dependencies(&self, job_id: i64, chunk: u64) -> anyhow::Result<Vec<u64>>;
@@ -278,6 +283,7 @@ impl JobStats {
 /// The backend is selected based on enabled features:
 /// - SQLite (default): .db extension
 /// - redb: .magnetar extension
+#[allow(clippy::needless_return)]
 pub async fn open(path: &str) -> anyhow::Result<Box<dyn JobStore>> {
     #[cfg(feature = "sqlite")]
     if path.ends_with(".db") || path.ends_with(".sqlite") || !path.contains('.') {

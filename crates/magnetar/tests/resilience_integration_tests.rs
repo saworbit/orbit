@@ -86,9 +86,7 @@ async fn test_circuit_breaker_basic_flow() {
 
     // Successful operations
     for i in 0..5 {
-        let result = breaker
-            .call(|| async { Ok::<_, ResilienceError>(i) })
-            .await;
+        let result = breaker.call(|| async { Ok::<_, ResilienceError>(i) }).await;
         assert_eq!(result.unwrap(), i);
     }
 
@@ -148,9 +146,7 @@ async fn test_circuit_breaker_half_open_recovery() {
 
     // Successful operations should close the circuit
     for i in 0..2 {
-        let result = breaker
-            .call(|| async { Ok::<_, ResilienceError>(i) })
-            .await;
+        let result = breaker.call(|| async { Ok::<_, ResilienceError>(i) }).await;
         assert!(result.is_ok());
     }
 

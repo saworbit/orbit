@@ -43,11 +43,7 @@ impl ProgressRegistry {
 
     /// Subscribe to progress updates for a job
     pub async fn subscribe(&self, job_id: &str) -> Option<ProgressReceiver> {
-        self.inner
-            .read()
-            .await
-            .get(job_id)
-            .map(|tx| tx.subscribe())
+        self.inner.read().await.get(job_id).map(|tx| tx.subscribe())
     }
 
     /// Remove a job from the registry

@@ -34,9 +34,9 @@
 //! # }
 //! ```
 
-pub mod types;
 pub mod error;
 pub mod integration;
+pub mod types;
 
 #[cfg(feature = "smb-native")]
 pub mod native;
@@ -45,8 +45,8 @@ pub mod native;
 mod tests;
 
 // Re-export key types
-pub use types::*;
 pub use error::*;
+pub use types::*;
 
 #[cfg(feature = "smb-native")]
 pub use native::NativeSmbClient;
@@ -119,5 +119,7 @@ pub async fn client_for(target: &SmbTarget) -> Result<Box<dyn SmbClient>> {
 
 #[cfg(not(feature = "smb-native"))]
 pub async fn client_for(_target: &SmbTarget) -> Result<Box<dyn SmbClient>> {
-    Err(SmbError::Unsupported("smb-native feature is not enabled. Rebuild with --features smb-native"))
+    Err(SmbError::Unsupported(
+        "smb-native feature is not enabled. Rebuild with --features smb-native",
+    ))
 }

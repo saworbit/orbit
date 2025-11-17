@@ -8,10 +8,10 @@
  * - Staging area support using tempfile
  */
 
+use notify::{Event, RecursiveMode, Watcher};
 use std::path::{Path, PathBuf};
 use sysinfo::Disks;
-use notify::{Watcher, RecursiveMode, Event};
-use tempfile::{TempDir, NamedTempFile};
+use tempfile::{NamedTempFile, TempDir};
 
 use crate::error::{OrbitError, Result};
 
@@ -76,10 +76,11 @@ pub fn ensure_sufficient_space(
     // Find the disk that contains the destination path
     let destination_disk = disks.iter().find(|disk| {
         // Handle both the path itself and its parent directory
-        dest_path.starts_with(disk.mount_point()) ||
-        dest_path.parent()
-            .map(|p| p.starts_with(disk.mount_point()))
-            .unwrap_or(false)
+        dest_path.starts_with(disk.mount_point())
+            || dest_path
+                .parent()
+                .map(|p| p.starts_with(disk.mount_point()))
+                .unwrap_or(false)
     });
 
     if let Some(disk) = destination_disk {
@@ -102,10 +103,16 @@ pub fn ensure_sufficient_space(
         let total = disk.total_space();
         let usage_ratio = (total - available) as f64 / total as f64;
         if usage_ratio > 0.95 {
-            eprintln!("Warning: Disk is more than 95% full ({:.1}% used)", usage_ratio * 100.0);
+            eprintln!(
+                "Warning: Disk is more than 95% full ({:.1}% used)",
+                usage_ratio * 100.0
+            );
         }
     } else {
-        eprintln!("Warning: Could not determine disk for path: {:?}", dest_path);
+        eprintln!(
+            "Warning: Could not determine disk for path: {:?}",
+            dest_path
+        );
     }
 
     Ok(())
@@ -117,15 +124,15 @@ pub fn check_filesystem_integrity(dest_path: &Path) -> Result<()> {
     let check_dir = if dest_path.is_dir() {
         dest_path.to_path_buf()
     } else {
-        dest_path.parent()
+        dest_path
+            .parent()
             .ok_or_else(|| OrbitError::InvalidPath(dest_path.to_path_buf()))?
             .to_path_buf()
     };
 
     // Create directory if it doesn't exist (to test permissions)
     if !check_dir.exists() {
-        std::fs::create_dir_all(&check_dir)
-            .map_err(|e| OrbitError::Io(e))?;
+        std::fs::create_dir_all(&check_dir).map_err(|e| OrbitError::Io(e))?;
     }
 
     // Test write permissions by creating a temporary file
@@ -139,10 +146,9 @@ pub fn check_filesystem_integrity(dest_path: &Path) -> Result<()> {
 
 /// Test write permissions by creating a temporary file
 fn test_write_permissions(dir: &Path) -> Result<()> {
-    NamedTempFile::new_in(dir)
-        .map_err(|e| OrbitError::MetadataFailed(
-            format!("Cannot write to destination directory: {}", e)
-        ))?;
+    NamedTempFile::new_in(dir).map_err(|e| {
+        OrbitError::MetadataFailed(format!("Cannot write to destination directory: {}", e))
+    })?;
     Ok(())
 }
 
@@ -157,7 +163,7 @@ fn check_not_readonly(path: &Path) -> Result<()> {
         let perms = metadata.permissions();
         if perms.readonly() {
             return Err(OrbitError::MetadataFailed(
-                "Destination filesystem is read-only".to_string()
+                "Destination filesystem is read-only".to_string(),
             ));
         }
     }
@@ -167,7 +173,7 @@ fn check_not_readonly(path: &Path) -> Result<()> {
     {
         if metadata.permissions().readonly() {
             return Err(OrbitError::MetadataFailed(
-                "Destination filesystem is read-only".to_string()
+                "Destination filesystem is read-only".to_string(),
             ));
         }
     }
@@ -177,13 +183,10 @@ fn check_not_readonly(path: &Path) -> Result<()> {
 
 /// Create a staging area for safe transfers
 pub fn create_staging_area(base_path: &Path) -> Result<TempDir> {
-    let parent = base_path.parent()
-        .unwrap_or_else(|| Path::new("."));
+    let parent = base_path.parent().unwrap_or_else(|| Path::new("."));
 
     TempDir::new_in(parent)
-        .map_err(|e| OrbitError::Other(
-            format!("Failed to create staging area: {}", e)
-        ))
+        .map_err(|e| OrbitError::Other(format!("Failed to create staging area: {}", e)))
 }
 
 /// Filesystem watcher for monitoring disk space during transfers
@@ -206,9 +209,8 @@ impl DiskWatcher {
             if let Ok(event) = res {
                 callback(event);
             }
-        }).map_err(|e| OrbitError::Other(
-            format!("Failed to create filesystem watcher: {}", e)
-        ))?;
+        })
+        .map_err(|e| OrbitError::Other(format!("Failed to create filesystem watcher: {}", e)))?;
 
         // Watch the parent directory
         let watch_path = if path.is_dir() {
@@ -219,10 +221,9 @@ impl DiskWatcher {
                 .to_path_buf()
         };
 
-        watcher.watch(&watch_path, RecursiveMode::NonRecursive)
-            .map_err(|e| OrbitError::Other(
-                format!("Failed to watch directory: {}", e)
-            ))?;
+        watcher
+            .watch(&watch_path, RecursiveMode::NonRecursive)
+            .map_err(|e| OrbitError::Other(format!("Failed to watch directory: {}", e)))?;
 
         Ok(Self {
             watcher: Box::new(watcher),
@@ -325,11 +326,7 @@ mod tests {
         std::fs::write(source.path().join("test.txt"), b"test data").unwrap();
 
         let config = GuardianConfig::default();
-        let result = validate_directory_transfer(
-            source.path(),
-            dest.path(),
-            &config
-        );
+        let result = validate_directory_transfer(source.path(), dest.path(), &config);
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 9); // "test data" length

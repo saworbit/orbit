@@ -10,10 +10,16 @@ pub mod progress;
 pub mod server_fns;
 pub mod types;
 
+#[cfg(feature = "ssr")]
+mod server;
+
 pub use app::App;
 pub use error::{WebError, WebResult};
 pub use progress::ProgressRegistry;
+#[cfg(feature = "ssr")]
+pub use server::start_server;
 
+#[cfg(feature = "hydrate")]
 use leptos::*;
 
 /// Configuration for the web server

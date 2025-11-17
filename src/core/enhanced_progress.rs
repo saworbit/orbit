@@ -7,11 +7,11 @@
  * - Event-driven updates integrated with existing progress system
  */
 
+use crate::core::progress::{ProgressEvent, ProgressSubscriber};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use crate::core::progress::{ProgressEvent, ProgressSubscriber};
 
 /// Enhanced progress tracker using indicatif
 pub struct EnhancedProgressTracker {
@@ -78,10 +78,9 @@ impl EnhancedProgressTracker {
             let elapsed = state.start_time.elapsed().as_secs_f64();
             if elapsed > 0.0 {
                 let rate = bytes_transferred as f64 / elapsed;
-                state.bar.set_message(format!(
-                    "📁 Transfer ({:.2} MB/s)",
-                    rate / 1_048_576.0
-                ));
+                state
+                    .bar
+                    .set_message(format!("📁 Transfer ({:.2} MB/s)", rate / 1_048_576.0));
             }
         }
     }
@@ -125,16 +124,25 @@ impl EnhancedProgressTracker {
                 }
 
                 match event {
-                    ProgressEvent::TransferStart {    .. } => {
+                    ProgressEvent::TransferStart { .. } => {
                         // This would be handled by start_transfer
                     }
-                    ProgressEvent::TransferProgress { file_id, bytes_transferred, .. } => {
+                    ProgressEvent::TransferProgress {
+                        file_id,
+                        bytes_transferred,
+                        ..
+                    } => {
                         let bars = bars.lock().unwrap();
                         if let Some(state) = bars.get(file_id.as_str()) {
                             state.bar.set_position(bytes_transferred);
                         }
                     }
-                    ProgressEvent::TransferComplete { file_id, total_bytes, duration_ms, .. } => {
+                    ProgressEvent::TransferComplete {
+                        file_id,
+                        total_bytes,
+                        duration_ms,
+                        ..
+                    } => {
                         let mut bars = bars.lock().unwrap();
                         if let Some(state) = bars.remove(file_id.as_str()) {
                             let throughput = if duration_ms > 0 {
@@ -151,7 +159,9 @@ impl EnhancedProgressTracker {
                     ProgressEvent::TransferFailed { file_id, error, .. } => {
                         let mut bars = bars.lock().unwrap();
                         if let Some(state) = bars.remove(file_id.as_str()) {
-                            state.bar.finish_with_message(format!("✗ Failed: {}", error));
+                            state
+                                .bar
+                                .finish_with_message(format!("✗ Failed: {}", error));
                         }
                     }
                     _ => {}

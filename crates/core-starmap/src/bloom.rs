@@ -37,7 +37,7 @@ impl BloomFilter {
         // Calculate optimal bit array size
         // m = -n * ln(p) / (ln(2)^2)
         let num_bits = Self::optimal_num_bits(expected_elements, false_positive_rate);
-        
+
         // Calculate optimal number of hash functions
         // k = (m/n) * ln(2)
         let num_hashes = Self::optimal_num_hashes(num_bits, expected_elements);
@@ -50,7 +50,12 @@ impl BloomFilter {
     }
 
     /// Create a Bloom filter from serialized data
-    pub fn from_bytes(data: &[u8], num_hashes: u32, num_elements: u32, num_bits: usize) -> Result<Self> {
+    pub fn from_bytes(
+        data: &[u8],
+        num_hashes: u32,
+        num_elements: u32,
+        num_bits: usize,
+    ) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::bloom_filter("Empty bloom filter data"));
         }
@@ -165,7 +170,7 @@ impl BloomFilter {
         let n = expected_elements as f64;
         let p = false_positive_rate;
         let ln2_squared = std::f64::consts::LN_2.powi(2);
-        
+
         let m = -(n * p.ln()) / ln2_squared;
         m.ceil() as u32
     }
@@ -174,7 +179,7 @@ impl BloomFilter {
     fn optimal_num_hashes(num_bits: u32, expected_elements: u32) -> u32 {
         let m = num_bits as f64;
         let n = expected_elements as f64;
-        
+
         let k = (m / n) * std::f64::consts::LN_2;
         k.ceil().max(1.0) as u32
     }
@@ -187,7 +192,7 @@ mod tests {
     #[test]
     fn test_bloom_filter_basic() {
         let mut filter = BloomFilter::new(100, 0.01);
-        
+
         let item1 = [1u8; 32];
         let item2 = [2u8; 32];
         let item3 = [3u8; 32];
@@ -233,7 +238,7 @@ mod tests {
     #[test]
     fn test_optimal_sizing() {
         let filter = BloomFilter::new(1000, 0.01);
-        
+
         // With 1000 elements and 1% FPR, should have ~9585 bits and 7 hashes
         assert!(filter.num_bits() > 9000 && filter.num_bits() < 10000);
         assert!(filter.num_hashes() >= 6 && filter.num_hashes() <= 8);
@@ -242,7 +247,7 @@ mod tests {
     #[test]
     fn test_false_positive_rate() {
         let mut filter = BloomFilter::new(100, 0.01);
-        
+
         // Insert 100 items
         for i in 0..100 {
             let item = [i as u8; 32];
@@ -257,7 +262,7 @@ mod tests {
     #[test]
     fn test_no_false_negatives() {
         let mut filter = BloomFilter::new(1000, 0.01);
-        
+
         let mut items = Vec::new();
         for i in 0..500 {
             let mut item = [0u8; 32];
@@ -276,7 +281,7 @@ mod tests {
     #[test]
     fn test_empty_bloom_filter() {
         let filter = BloomFilter::new(100, 0.01);
-        
+
         let item = [0u8; 32];
         assert!(!filter.contains(&item));
         assert_eq!(filter.num_elements(), 0);

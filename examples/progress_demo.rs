@@ -5,11 +5,11 @@
  * CLI rendering and JSON telemetry logging.
  */
 
+use orbit::cli_progress::CliProgressRenderer;
 use orbit::config::CopyConfig;
 use orbit::core::progress::ProgressPublisher;
-use orbit::{copy_file_impl, copy_directory_impl};
-use orbit::cli_progress::CliProgressRenderer;
 use orbit::telemetry::{TelemetryLogger, TelemetryOutput};
+use orbit::{copy_directory_impl, copy_file_impl};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -84,7 +84,10 @@ fn demo_cli_progress(source: &Path, dest: &Path) -> Result<(), Box<dyn std::erro
     // Wait for renderer to finish
     renderer_handle.join().unwrap()?;
 
-    println!("\nCopy Stats: {} files, {} bytes", stats.files_copied, stats.bytes_copied);
+    println!(
+        "\nCopy Stats: {} files, {} bytes",
+        stats.files_copied, stats.bytes_copied
+    );
 
     Ok(())
 }
@@ -153,7 +156,10 @@ fn demo_dual_subscribers(source: &Path, dest: &Path) -> Result<(), Box<dyn std::
     // For this demo, we'll just use one subscriber and manually fan out
     // In a real implementation, you'd extend ProgressPublisher to support multiple subscribers
     println!("Note: For simplicity, this demo uses CLI rendering only.");
-    println!("Telemetry events are being logged to: {}", log_path.display());
+    println!(
+        "Telemetry events are being logged to: {}",
+        log_path.display()
+    );
 
     // Perform directory copy
     let mut config = CopyConfig::default();

@@ -57,6 +57,7 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 | 🧠 **Smart** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
 | 🌐 **Protocol Ready** | Local, **SSH/SFTP**, SMB/CIFS, **S3**, with unified backend API |
+| 🌐 **GUI Ready** | Launch the web dashboard with `orbit serve` (enabled by default) |
 | 📊 **Fully Auditable** | Structured JSON telemetry for every operation |
 | 🧩 **Modular** | Clean architecture with reusable crates |
 | 🌍 **Cross-Platform** | Linux, macOS, Windows with native optimizations |
@@ -751,6 +752,9 @@ cargo build --release
 # With S3 support
 cargo build --release --features s3-native
 
+# CLI-only build (disables the embedded web GUI)
+cargo build --release --no-default-features --features zero-copy
+
 # Install to system
 sudo cp target/release/orbit /usr/local/bin/
 
@@ -1113,6 +1117,18 @@ This structure ensures isolation, testability, and reusability.
 
 ### Quick Start
 
+#### Launch from the Orbit CLI (simplest)
+
+```bash
+# Build with the default (GUI-enabled) feature set
+cargo build --release
+
+# Serve the web UI from the main binary
+./target/release/orbit serve --addr 127.0.0.1:8080
+```
+
+Then open **http://127.0.0.1:8080** in your browser. To build a CLI-only binary, use `cargo build --release --no-default-features --features zero-copy`.
+
 #### Prerequisites
 
 ```bash
@@ -1461,6 +1477,7 @@ cargo clippy
 - **Quick Start:** This README
 - **Web GUI Complete Guide:** [`docs/WEB_GUI.md`](docs/WEB_GUI.md) ⭐ **NEW!**
 - **Web GUI Quick Reference:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **NEW!**
+- **GUI Integration:** [`docs/GUI_INTEGRATION.md`](docs/GUI_INTEGRATION.md)
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
 - **Disk Guardian:** [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**

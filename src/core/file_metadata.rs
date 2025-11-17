@@ -10,15 +10,15 @@
  * - Metadata transformation (path renaming, filtering)
  */
 
+use crate::error::{OrbitError, Result};
+use filetime::{set_file_mtime, set_file_times, FileTime};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::Path;
 use std::time::SystemTime;
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use filetime::{FileTime, set_file_times, set_file_mtime};
-use crate::error::{OrbitError, Result};
 
 #[cfg(unix)]
-use std::os::unix::fs::{PermissionsExt, MetadataExt};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 #[cfg(feature = "extended-metadata")]
 use xattr;
@@ -74,8 +74,8 @@ pub struct FileMetadata {
 /// ACL entry representation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AclEntry {
-    pub principal: String,  // User or group name
-    pub permissions: u32,    // Permission bits
+    pub principal: String, // User or group name
+    pub permissions: u32,  // Permission bits
     pub entry_type: AclType,
 }
 
@@ -102,9 +102,9 @@ impl Default for PreserveFlags {
         Self {
             times: true,
             permissions: true,
-            ownership: false,  // Requires privileges
-            xattrs: false,     // Optional
-            acls: false,       // Optional
+            ownership: false, // Requires privileges
+            xattrs: false,    // Optional
+            acls: false,      // Optional
         }
     }
 }
@@ -134,7 +134,12 @@ impl PreserveFlags {
                     flags.xattrs = true;
                     flags.acls = true;
                 }
-                _ => return Err(OrbitError::MetadataFailed(format!("Unknown preserve flag: {}", part))),
+                _ => {
+                    return Err(OrbitError::MetadataFailed(format!(
+                        "Unknown preserve flag: {}",
+                        part
+                    )))
+                }
             }
         }
 
@@ -209,10 +214,7 @@ impl FileMetadata {
             Ok(names) => {
                 for name in names {
                     if let Ok(Some(value)) = xattr::get(path, &name) {
-                        xattrs.insert(
-                            name.to_string_lossy().to_string(),
-                            value
-                        );
+                        xattrs.insert(name.to_string_lossy().to_string(), value);
                     }
                 }
             }
@@ -262,11 +264,13 @@ impl FileMetadata {
 
             if let Some(accessed) = self.accessed {
                 let atime = FileTime::from_system_time(accessed);
-                set_file_times(dest_path, atime, mtime)
-                    .map_err(|e| OrbitError::MetadataFailed(format!("Failed to set timestamps: {}", e)))?;
+                set_file_times(dest_path, atime, mtime).map_err(|e| {
+                    OrbitError::MetadataFailed(format!("Failed to set timestamps: {}", e))
+                })?;
             } else {
-                set_file_mtime(dest_path, mtime)
-                    .map_err(|e| OrbitError::MetadataFailed(format!("Failed to set mtime: {}", e)))?;
+                set_file_mtime(dest_path, mtime).map_err(|e| {
+                    OrbitError::MetadataFailed(format!("Failed to set mtime: {}", e))
+                })?;
             }
         }
 
@@ -279,8 +283,9 @@ impl FileMetadata {
         #[cfg(unix)]
         if let Some(mode) = self.permissions {
             use std::fs::Permissions;
-            std::fs::set_permissions(dest_path, Permissions::from_mode(mode))
-                .map_err(|e| OrbitError::MetadataFailed(format!("Failed to set permissions: {}", e)))?;
+            std::fs::set_permissions(dest_path, Permissions::from_mode(mode)).map_err(|e| {
+                OrbitError::MetadataFailed(format!("Failed to set permissions: {}", e))
+            })?;
         }
 
         #[cfg(windows)]
@@ -300,16 +305,21 @@ impl FileMetadata {
         {
             if let (Some(uid), Some(gid)) = (self.owner_uid, self.owner_gid) {
                 use std::os::unix::fs::chown;
-                chown(dest_path, Some(uid), Some(gid))
-                    .or_else(|e| {
-                        // Non-fatal warning for permission errors
-                        if e.kind() == std::io::ErrorKind::PermissionDenied {
-                            tracing::warn!("Permission denied setting ownership for {:?}: requires root", dest_path);
-                            Ok(())
-                        } else {
-                            Err(OrbitError::MetadataFailed(format!("Failed to set ownership: {}", e)))
-                        }
-                    })?;
+                chown(dest_path, Some(uid), Some(gid)).or_else(|e| {
+                    // Non-fatal warning for permission errors
+                    if e.kind() == std::io::ErrorKind::PermissionDenied {
+                        tracing::warn!(
+                            "Permission denied setting ownership for {:?}: requires root",
+                            dest_path
+                        );
+                        Ok(())
+                    } else {
+                        Err(OrbitError::MetadataFailed(format!(
+                            "Failed to set ownership: {}",
+                            e
+                        )))
+                    }
+                })?;
             }
         }
 
@@ -337,7 +347,10 @@ impl FileMetadata {
         if let Some(_acls) = &self.acls {
             // ACL implementation would go here
             // Requires platform-specific libraries (acl on Linux, Security API on Windows)
-            tracing::debug!("ACL preservation not yet fully implemented for {:?}", dest_path);
+            tracing::debug!(
+                "ACL preservation not yet fully implemented for {:?}",
+                dest_path
+            );
         }
 
         Ok(())
@@ -353,13 +366,19 @@ impl FileMetadata {
 
         if let Some(modified) = self.modified {
             if let Ok(duration) = modified.duration_since(std::time::UNIX_EPOCH) {
-                map.insert("modified_secs".to_string(), serde_json::json!(duration.as_secs()));
+                map.insert(
+                    "modified_secs".to_string(),
+                    serde_json::json!(duration.as_secs()),
+                );
             }
         }
 
         if let Some(accessed) = self.accessed {
             if let Ok(duration) = accessed.duration_since(std::time::UNIX_EPOCH) {
-                map.insert("accessed_secs".to_string(), serde_json::json!(duration.as_secs()));
+                map.insert(
+                    "accessed_secs".to_string(),
+                    serde_json::json!(duration.as_secs()),
+                );
             }
         }
 
@@ -436,7 +455,8 @@ fn base64_encode(data: &[u8]) -> String {
 fn base64_decode(s: &str) -> Result<Vec<u8>> {
     use base64::Engine;
     let engine = base64::engine::general_purpose::STANDARD;
-    engine.decode(s.as_bytes())
+    engine
+        .decode(s.as_bytes())
         .map_err(|e| OrbitError::MetadataFailed(format!("Base64 decode failed: {}", e)))
 }
 
@@ -455,9 +475,9 @@ pub fn preserve_metadata_default(source_path: &Path, dest_path: &Path) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::io::Write;
     use tempfile::NamedTempFile;
-    use std::fs;
 
     #[test]
     fn test_preserve_flags_parsing() {

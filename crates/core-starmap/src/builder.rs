@@ -1,7 +1,7 @@
 //! Star Map builder for constructing binary indices
 
 use crate::error::{Error, Result};
-use crate::{BloomFilter, ChunkMeta, RankSelectBitmap, WindowMeta, StarMapData};
+use crate::{BloomFilter, ChunkMeta, RankSelectBitmap, StarMapData, WindowMeta};
 use crate::{STARMAP_MAGIC, STARMAP_VERSION};
 
 /// Builder for constructing Star Map binary indices
@@ -162,14 +162,14 @@ impl StarMapBuilder {
 
         // Serialize to bytes with magic header
         let mut buffer = Vec::new();
-        
+
         // Write magic number
         buffer.extend_from_slice(STARMAP_MAGIC);
-        
+
         // Serialize the data structure
         let serialized = bincode::serialize(&starmap_data)
             .map_err(|e| Error::Other(format!("Serialization failed: {}", e)))?;
-        
+
         buffer.extend_from_slice(&serialized);
 
         Ok(buffer)
@@ -265,7 +265,7 @@ mod tests {
 
         let data = builder.build().unwrap();
         assert!(!data.is_empty());
-        
+
         // Check magic number
         assert_eq!(&data[0..8], STARMAP_MAGIC);
     }

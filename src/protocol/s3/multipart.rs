@@ -28,7 +28,7 @@ impl S3Client {
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let config = S3Config::new("my-bucket".to_string());
     /// let client = S3Client::new(config).await?;
-    /// 
+    ///
     /// client.upload_file_multipart(
     ///     Path::new("large-file.bin"),
     ///     "remote/large-file.bin",
@@ -47,42 +47,42 @@ impl S3Client {
         let mut file = File::open(local_path).await?;
         let metadata = file.metadata().await?;
         let file_size = metadata.len();
-        
+
         // Initialize or resume multipart upload
         let (upload_id, mut completed_parts) = if let Some(state) = resume_state {
             // Resume from existing upload
             if let Some(uid) = state.upload_id {
                 (uid, state.completed_parts)
             } else {
-                return Err(S3Error::ResumeState("Missing upload ID in resume state".to_string()));
+                return Err(S3Error::ResumeState(
+                    "Missing upload ID in resume state".to_string(),
+                ));
             }
         } else {
             // Start new multipart upload
             let upload_id = self.initiate_multipart_upload(key).await?;
             (upload_id, Vec::new())
         };
-        
+
         // Calculate parts
         let chunk_size = self.config().chunk_size;
         let total_parts = ((file_size as f64) / (chunk_size as f64)).ceil() as usize;
-        
+
         // Determine which parts still need to be uploaded
-        let uploaded_part_numbers: std::collections::HashSet<i32> = completed_parts
-            .iter()
-            .map(|p| p.part_number)
-            .collect();
-        
+        let uploaded_part_numbers: std::collections::HashSet<i32> =
+            completed_parts.iter().map(|p| p.part_number).collect();
+
         let mut parts_to_upload = Vec::new();
         for part_num in 1..=total_parts {
             if !uploaded_part_numbers.contains(&(part_num as i32)) {
                 parts_to_upload.push(part_num);
             }
         }
-        
+
         // Upload remaining parts with parallelism
         let parallel_uploads = self.config().parallel_operations.min(parts_to_upload.len());
         let mut upload_tasks = Vec::new();
-        
+
         for part_num in parts_to_upload {
             let offset = (part_num - 1) * chunk_size;
             let size = if part_num == total_parts {
@@ -91,52 +91,52 @@ impl S3Client {
             } else {
                 chunk_size
             };
-            
+
             // Read chunk
             file.seek(std::io::SeekFrom::Start(offset as u64)).await?;
             let mut buffer = vec![0u8; size];
             file.read_exact(&mut buffer).await?;
-            
+
             // Upload part
             let client = self.clone_for_multipart();
             let key = key.to_string();
             let upload_id_clone = upload_id.clone();
-            
+
             let task = tokio::spawn(async move {
-                client.upload_part(
-                    &key,
-                    &upload_id_clone,
-                    part_num as i32,
-                    Bytes::from(buffer),
-                ).await
+                client
+                    .upload_part(&key, &upload_id_clone, part_num as i32, Bytes::from(buffer))
+                    .await
             });
-            
+
             upload_tasks.push(task);
-            
+
             // Limit concurrent uploads
             if upload_tasks.len() >= parallel_uploads {
                 // Wait for one to complete
                 if let Some(task) = upload_tasks.pop() {
-                    let part_info = task.await
-                        .map_err(|e| S3Error::MultipartUpload(format!("Task join error: {}", e)))??;
+                    let part_info = task.await.map_err(|e| {
+                        S3Error::MultipartUpload(format!("Task join error: {}", e))
+                    })??;
                     completed_parts.push(part_info);
                 }
             }
         }
-        
+
         // Wait for remaining uploads
         for task in upload_tasks {
-            let part_info = task.await
+            let part_info = task
+                .await
                 .map_err(|e| S3Error::MultipartUpload(format!("Task join error: {}", e)))??;
             completed_parts.push(part_info);
         }
-        
+
         // Sort parts by part number
         completed_parts.sort_by_key(|p| p.part_number);
-        
+
         // Complete the multipart upload
-        self.complete_multipart_upload(key, &upload_id, &completed_parts).await?;
-        
+        self.complete_multipart_upload(key, &upload_id, &completed_parts)
+            .await?;
+
         // Return final resume state
         Ok(ResumeState {
             upload_id: Some(upload_id),
@@ -146,35 +146,37 @@ impl S3Client {
             etag: None,
         })
     }
-    
+
     /// Initiate a multipart upload
     async fn initiate_multipart_upload(&self, key: &str) -> S3Result<String> {
-        let mut request = self.aws_client()
+        let mut request = self
+            .aws_client()
             .create_multipart_upload()
             .bucket(self.bucket())
             .key(key);
-        
+
         // Set storage class
         request = request.storage_class(self.config().storage_class.to_aws());
-        
+
         // Set server-side encryption
         if let Some(sse) = self.config().server_side_encryption.to_aws() {
             request = request.server_side_encryption(sse);
-            
-            if let super::types::S3ServerSideEncryption::AwsKms { key_id: Some(kid) } = 
-                &self.config().server_side_encryption 
+
+            if let super::types::S3ServerSideEncryption::AwsKms { key_id: Some(kid) } =
+                &self.config().server_side_encryption
             {
                 request = request.ssekms_key_id(kid);
             }
         }
-        
+
         let response = request.send().await.map_err(S3Error::from)?;
-        
-        response.upload_id()
+
+        response
+            .upload_id()
             .ok_or_else(|| S3Error::MultipartUpload("No upload ID returned".to_string()))
             .map(|s| s.to_string())
     }
-    
+
     /// Upload a single part
     async fn upload_part(
         &self,
@@ -185,8 +187,9 @@ impl S3Client {
     ) -> S3Result<UploadPartInfo> {
         let size = data.len();
         let byte_stream = ByteStream::from(data);
-        
-        let response = self.aws_client()
+
+        let response = self
+            .aws_client()
             .upload_part()
             .bucket(self.bucket())
             .key(key)
@@ -196,14 +199,15 @@ impl S3Client {
             .send()
             .await
             .map_err(S3Error::from)?;
-        
-        let etag = response.e_tag()
+
+        let etag = response
+            .e_tag()
             .ok_or_else(|| S3Error::MultipartUpload("No ETag returned for part".to_string()))?
             .to_string();
-        
+
         Ok(UploadPartInfo::new(part_number, etag, size))
     }
-    
+
     /// Complete a multipart upload
     async fn complete_multipart_upload(
         &self,
@@ -220,11 +224,11 @@ impl S3Client {
                     .build()
             })
             .collect();
-        
+
         let multipart_upload = CompletedMultipartUpload::builder()
             .set_parts(Some(completed_parts))
             .build();
-        
+
         self.aws_client()
             .complete_multipart_upload()
             .bucket(self.bucket())
@@ -234,10 +238,10 @@ impl S3Client {
             .send()
             .await
             .map_err(S3Error::from)?;
-        
+
         Ok(())
     }
-    
+
     /// Abort a multipart upload
     pub async fn abort_multipart_upload(&self, key: &str, upload_id: &str) -> S3Result<()> {
         self.aws_client()
@@ -248,13 +252,14 @@ impl S3Client {
             .send()
             .await
             .map_err(S3Error::from)?;
-        
+
         Ok(())
     }
-    
+
     /// List parts of a multipart upload (for resume)
     pub async fn list_parts(&self, key: &str, upload_id: &str) -> S3Result<Vec<UploadPartInfo>> {
-        let response = self.aws_client()
+        let response = self
+            .aws_client()
             .list_parts()
             .bucket(self.bucket())
             .key(key)
@@ -262,8 +267,9 @@ impl S3Client {
             .send()
             .await
             .map_err(S3Error::from)?;
-        
-        let parts = response.parts()
+
+        let parts = response
+            .parts()
             .iter()
             .filter_map(|p| {
                 let part_number = p.part_number()?;
@@ -272,10 +278,10 @@ impl S3Client {
                 Some(UploadPartInfo::new(part_number, etag, size))
             })
             .collect();
-        
+
         Ok(parts)
     }
-    
+
     /// Download a large file with range requests and resume support
     ///
     /// # Arguments
@@ -293,7 +299,7 @@ impl S3Client {
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let config = S3Config::new("my-bucket".to_string());
     /// let client = S3Client::new(config).await?;
-    /// 
+    ///
     /// client.download_file_resumable(
     ///     "remote/large-file.bin",
     ///     Path::new("large-file.bin"),
@@ -311,19 +317,19 @@ impl S3Client {
         // Get object metadata to determine size
         let metadata = self.get_metadata(key).await?;
         let total_size = metadata.size;
-        
+
         if resume_offset >= total_size {
             return Err(S3Error::InvalidRange(format!(
                 "Resume offset {} exceeds file size {}",
                 resume_offset, total_size
             )));
         }
-        
+
         // Create parent directories
         if let Some(parent) = local_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        
+
         // Open or create file
         let mut file = if resume_offset > 0 {
             let mut f = tokio::fs::OpenOptions::new()
@@ -336,52 +342,55 @@ impl S3Client {
         } else {
             File::create(local_path).await?
         };
-        
+
         // Download in chunks with parallelism
         let chunk_size = self.config().chunk_size as u64;
         let mut current_offset = resume_offset;
         let parallel_downloads = self.config().parallel_operations;
-        
+
         while current_offset < total_size {
             let mut download_tasks = Vec::new();
-            
+
             // Queue up parallel downloads
             for _ in 0..parallel_downloads {
                 if current_offset >= total_size {
                     break;
                 }
-                
+
                 let end_offset = (current_offset + chunk_size - 1).min(total_size - 1);
                 let client = self.clone_for_multipart();
                 let key = key.to_string();
                 let range = (current_offset, end_offset);
-                
-                let task = tokio::spawn(async move {
-                    client.download_range(&key, range.0, range.1).await
-                });
-                
+
+                let task =
+                    tokio::spawn(
+                        async move { client.download_range(&key, range.0, range.1).await },
+                    );
+
                 download_tasks.push((current_offset, task));
                 current_offset = end_offset + 1;
             }
-            
+
             // Write chunks in order
             for (_offset, task) in download_tasks {
-                let data = task.await
+                let data = task
+                    .await
                     .map_err(|e| S3Error::Network(format!("Task join error: {}", e)))??;
-                
+
                 file.write_all(&data).await?;
             }
         }
-        
+
         file.flush().await?;
         Ok(())
     }
-    
+
     /// Download a byte range from S3
     async fn download_range(&self, key: &str, start: u64, end: u64) -> S3Result<Bytes> {
         let range = format!("bytes={}-{}", start, end);
-        
-        let response = self.aws_client()
+
+        let response = self
+            .aws_client()
             .get_object()
             .bucket(self.bucket())
             .key(key)
@@ -398,14 +407,16 @@ impl S3Client {
                     S3Error::from(e)
                 }
             })?;
-        
-        let body = response.body.collect().await.map_err(|e| {
-            S3Error::Network(format!("Failed to collect response body: {}", e))
-        })?;
-        
+
+        let body = response
+            .body
+            .collect()
+            .await
+            .map_err(|e| S3Error::Network(format!("Failed to collect response body: {}", e)))?;
+
         Ok(body.into_bytes())
     }
-    
+
     /// Clone client for parallel operations
     /// This creates a lightweight clone that shares the underlying HTTP client
     fn clone_for_multipart(&self) -> Self {
@@ -415,19 +426,19 @@ impl S3Client {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::config::S3Config;
+    use super::*;
 
     #[tokio::test]
     async fn test_multipart_methods_exist() {
         let config = S3Config::new("test-bucket".to_string());
         let client = S3Client::new(config).await.unwrap();
-        
+
         // Just verify the methods exist and compile
         // Actual functionality requires integration tests with real S3
         assert_eq!(client.bucket(), "test-bucket");
     }
-    
+
     #[test]
     fn test_resume_state_creation() {
         let state = ResumeState::new("upload123".to_string(), 1000000, 5242880);
@@ -436,7 +447,7 @@ mod tests {
         assert_eq!(state.chunk_size, 5242880);
         assert!(!state.has_progress());
     }
-    
+
     #[test]
     fn test_upload_part_info() {
         let part = UploadPartInfo::new(1, "etag123".to_string(), 5242880);

@@ -2,7 +2,7 @@
  * Integration tests for delta detection and efficient transfers
  */
 
-use orbit::{copy_file, config::CopyConfig, core::delta::CheckMode};
+use orbit::{config::CopyConfig, copy_file, core::delta::CheckMode};
 use std::fs;
 use tempfile::tempdir;
 

@@ -2,8 +2,8 @@
 //!
 //! Run with: cargo run --example dag_dependencies --features sqlite
 
-use magnetar::JobStatus;
 use anyhow::Result;
+use magnetar::JobStatus;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 
     // Set up dependencies
     store.add_dependency(1, 3, vec![1, 2]).await?; // Task 3 depends on 1 and 2
-    store.add_dependency(1, 4, vec![3]).await?;    // Task 4 depends on 3
+    store.add_dependency(1, 4, vec![3]).await?; // Task 4 depends on 3
     println!("✓ Configured dependencies:");
     println!("  Task 3 → depends on [1, 2]");
     println!("  Task 4 → depends on [3]");
@@ -58,7 +58,10 @@ async fn main() -> Result<()> {
                 println!("\n✓ All tasks completed!");
                 break;
             } else {
-                println!("\n⚠ No ready tasks but {} pending - circular dependency?", stats.pending);
+                println!(
+                    "\n⚠ No ready tasks but {} pending - circular dependency?",
+                    stats.pending
+                );
                 break;
             }
         }
@@ -74,7 +77,9 @@ async fn main() -> Result<()> {
                 tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
 
                 // Mark complete
-                store.mark_status(1, chunk.chunk, JobStatus::Done, None).await?;
+                store
+                    .mark_status(1, chunk.chunk, JobStatus::Done, None)
+                    .await?;
                 println!("  ✓ Task {} completed", chunk.chunk);
             }
         }

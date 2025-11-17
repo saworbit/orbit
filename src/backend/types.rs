@@ -1,8 +1,8 @@
 //! Common types for backend abstraction
 
+use bytes::Bytes;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use bytes::Bytes;
 
 #[cfg(feature = "backend-abstraction")]
 use futures::Stream;
@@ -169,13 +169,20 @@ pub type ReadStream = Pin<Box<dyn Stream<Item = std::io::Result<Bytes>> + Send>>
 /// Async write sink for file data
 pub trait WriteStream: Send {
     /// Write bytes to the stream
-    fn write(&mut self, data: Bytes) -> Pin<Box<dyn std::future::Future<Output = std::io::Result<()>> + Send + '_>>;
+    fn write(
+        &mut self,
+        data: Bytes,
+    ) -> Pin<Box<dyn std::future::Future<Output = std::io::Result<()>> + Send + '_>>;
 
     /// Flush any buffered data
-    fn flush(&mut self) -> Pin<Box<dyn std::future::Future<Output = std::io::Result<()>> + Send + '_>>;
+    fn flush(
+        &mut self,
+    ) -> Pin<Box<dyn std::future::Future<Output = std::io::Result<()>> + Send + '_>>;
 
     /// Close the stream
-    fn close(&mut self) -> Pin<Box<dyn std::future::Future<Output = std::io::Result<()>> + Send + '_>>;
+    fn close(
+        &mut self,
+    ) -> Pin<Box<dyn std::future::Future<Output = std::io::Result<()>> + Send + '_>>;
 }
 
 /// Options for list operations

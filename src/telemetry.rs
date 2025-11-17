@@ -6,9 +6,9 @@
  */
 
 use crate::core::progress::{ProgressEvent, ProgressSubscriber};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{self, Write, BufWriter};
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::thread;
 
@@ -92,16 +92,25 @@ impl TelemetryEvent {
     /// Convert ProgressEvent to TelemetryEvent
     pub fn from_progress_event(event: ProgressEvent) -> Self {
         match event {
-            ProgressEvent::TransferStart { file_id, source, dest, total_bytes, timestamp } => {
-                TelemetryEvent::TransferStart {
-                    file_id: file_id.as_str().to_string(),
-                    source: source.display().to_string(),
-                    dest: dest.display().to_string(),
-                    total_bytes,
-                    timestamp,
-                }
-            }
-            ProgressEvent::TransferProgress { file_id, bytes_transferred, total_bytes, timestamp } => {
+            ProgressEvent::TransferStart {
+                file_id,
+                source,
+                dest,
+                total_bytes,
+                timestamp,
+            } => TelemetryEvent::TransferStart {
+                file_id: file_id.as_str().to_string(),
+                source: source.display().to_string(),
+                dest: dest.display().to_string(),
+                total_bytes,
+                timestamp,
+            },
+            ProgressEvent::TransferProgress {
+                file_id,
+                bytes_transferred,
+                total_bytes,
+                timestamp,
+            } => {
                 let progress_pct = if total_bytes > 0 {
                     (bytes_transferred as f64 / total_bytes as f64) * 100.0
                 } else {
@@ -115,7 +124,13 @@ impl TelemetryEvent {
                     timestamp,
                 }
             }
-            ProgressEvent::TransferComplete { file_id, total_bytes, duration_ms, checksum, timestamp } => {
+            ProgressEvent::TransferComplete {
+                file_id,
+                total_bytes,
+                duration_ms,
+                checksum,
+                timestamp,
+            } => {
                 let throughput_mbps = if duration_ms > 0 {
                     (total_bytes as f64 / 1_048_576.0) / (duration_ms as f64 / 1000.0)
                 } else {
@@ -130,35 +145,48 @@ impl TelemetryEvent {
                     timestamp,
                 }
             }
-            ProgressEvent::TransferFailed { file_id, error, bytes_transferred, timestamp } => {
-                TelemetryEvent::TransferFailed {
-                    file_id: file_id.as_str().to_string(),
-                    error,
-                    bytes_transferred,
-                    timestamp,
-                }
-            }
+            ProgressEvent::TransferFailed {
+                file_id,
+                error,
+                bytes_transferred,
+                timestamp,
+            } => TelemetryEvent::TransferFailed {
+                file_id: file_id.as_str().to_string(),
+                error,
+                bytes_transferred,
+                timestamp,
+            },
             ProgressEvent::DirectoryScanStart { path, timestamp } => {
                 TelemetryEvent::DirectoryScanStart {
                     path: path.display().to_string(),
                     timestamp,
                 }
             }
-            ProgressEvent::DirectoryScanProgress { files_found, dirs_found, timestamp } => {
-                TelemetryEvent::DirectoryScanProgress {
-                    files_found,
-                    dirs_found,
-                    timestamp,
-                }
-            }
-            ProgressEvent::DirectoryScanComplete { total_files, total_dirs, timestamp } => {
-                TelemetryEvent::DirectoryScanComplete {
-                    total_files,
-                    total_dirs,
-                    timestamp,
-                }
-            }
-            ProgressEvent::BatchComplete { files_succeeded, files_failed, total_bytes, duration_ms, timestamp } => {
+            ProgressEvent::DirectoryScanProgress {
+                files_found,
+                dirs_found,
+                timestamp,
+            } => TelemetryEvent::DirectoryScanProgress {
+                files_found,
+                dirs_found,
+                timestamp,
+            },
+            ProgressEvent::DirectoryScanComplete {
+                total_files,
+                total_dirs,
+                timestamp,
+            } => TelemetryEvent::DirectoryScanComplete {
+                total_files,
+                total_dirs,
+                timestamp,
+            },
+            ProgressEvent::BatchComplete {
+                files_succeeded,
+                files_failed,
+                total_bytes,
+                duration_ms,
+                timestamp,
+            } => {
                 let avg_throughput_mbps = if duration_ms > 0 {
                     (total_bytes as f64 / 1_048_576.0) / (duration_ms as f64 / 1000.0)
                 } else {
@@ -173,32 +201,43 @@ impl TelemetryEvent {
                     timestamp,
                 }
             }
-            ProgressEvent::ResumeDecision { file_id, decision, from_offset, verified_chunks, reason, timestamp } => {
-                TelemetryEvent::ResumeDecision {
-                    file_id: file_id.as_str().to_string(),
-                    decision,
-                    from_offset,
-                    verified_chunks,
-                    reason,
-                    timestamp,
-                }
-            }
-            ProgressEvent::ChunkVerification { file_id, chunk_id, chunk_size, timestamp } => {
-                TelemetryEvent::ChunkVerification {
-                    file_id: file_id.as_str().to_string(),
-                    chunk_id,
-                    chunk_size,
-                    timestamp,
-                }
-            }
-            ProgressEvent::ChunkVerified { file_id, chunk_id, digest, timestamp } => {
-                TelemetryEvent::ChunkVerified {
-                    file_id: file_id.as_str().to_string(),
-                    chunk_id,
-                    digest,
-                    timestamp,
-                }
-            }
+            ProgressEvent::ResumeDecision {
+                file_id,
+                decision,
+                from_offset,
+                verified_chunks,
+                reason,
+                timestamp,
+            } => TelemetryEvent::ResumeDecision {
+                file_id: file_id.as_str().to_string(),
+                decision,
+                from_offset,
+                verified_chunks,
+                reason,
+                timestamp,
+            },
+            ProgressEvent::ChunkVerification {
+                file_id,
+                chunk_id,
+                chunk_size,
+                timestamp,
+            } => TelemetryEvent::ChunkVerification {
+                file_id: file_id.as_str().to_string(),
+                chunk_id,
+                chunk_size,
+                timestamp,
+            },
+            ProgressEvent::ChunkVerified {
+                file_id,
+                chunk_id,
+                digest,
+                timestamp,
+            } => TelemetryEvent::ChunkVerified {
+                file_id: file_id.as_str().to_string(),
+                chunk_id,
+                digest,
+                timestamp,
+            },
         }
     }
 }

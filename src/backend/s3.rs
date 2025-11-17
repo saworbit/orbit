@@ -48,10 +48,12 @@ pub struct S3Backend {
 impl S3Backend {
     /// Create a new S3 backend from configuration
     pub async fn new(config: S3Config) -> BackendResult<Self> {
-        let client = S3Client::new(config).await.map_err(|e| BackendError::InvalidConfig {
-            backend: "s3".to_string(),
-            message: e.to_string(),
-        })?;
+        let client = S3Client::new(config)
+            .await
+            .map_err(|e| BackendError::InvalidConfig {
+                backend: "s3".to_string(),
+                message: e.to_string(),
+            })?;
 
         Ok(Self {
             client,
@@ -186,18 +188,15 @@ impl Backend for S3Backend {
                         let mut metadata = Metadata::file(size);
 
                         if let Some(last_modified) = object.last_modified() {
-                            if let Ok(system_time) = std::time::SystemTime::try_from(*last_modified) {
+                            if let Ok(system_time) = std::time::SystemTime::try_from(*last_modified)
+                            {
                                 metadata.modified = Some(system_time);
                             }
                         }
 
                         metadata.etag = object.e_tag().map(|s| s.to_string());
 
-                        entries.push(DirEntry::new(
-                            relative_path,
-                            full_path,
-                            metadata,
-                        ));
+                        entries.push(DirEntry::new(relative_path, full_path, metadata));
                     }
                 }
             }
@@ -272,16 +271,19 @@ impl Backend for S3Backend {
         let reader = output.body.into_async_read();
         const CHUNK_SIZE: usize = 64 * 1024; // 64 KB chunks
 
-        let stream = stream::unfold((reader, vec![0u8; CHUNK_SIZE]), |(mut reader, mut buffer)| async move {
-            match reader.read(&mut buffer).await {
-                Ok(0) => None, // EOF
-                Ok(n) => {
-                    let data = Bytes::copy_from_slice(&buffer[..n]);
-                    Some((Ok(data), (reader, buffer)))
+        let stream = stream::unfold(
+            (reader, vec![0u8; CHUNK_SIZE]),
+            |(mut reader, mut buffer)| async move {
+                match reader.read(&mut buffer).await {
+                    Ok(0) => None, // EOF
+                    Ok(n) => {
+                        let data = Bytes::copy_from_slice(&buffer[..n]);
+                        Some((Ok(data), (reader, buffer)))
+                    }
+                    Err(e) => Some((Err(e), (reader, buffer))),
                 }
-                Err(e) => Some((Err(e), (reader, buffer))),
-            }
-        });
+            },
+        );
 
         Ok(Box::pin(stream))
     }
@@ -338,18 +340,24 @@ impl Backend for S3Backend {
             // Delete all objects
             for entry in objects {
                 let entry_key = self.path_to_key(&entry.full_path);
-                self.client.delete(&entry_key).await.map_err(|e| BackendError::Other {
-                    backend: "s3".to_string(),
-                    message: format!("Failed to delete object: {}", e),
-                })?;
+                self.client
+                    .delete(&entry_key)
+                    .await
+                    .map_err(|e| BackendError::Other {
+                        backend: "s3".to_string(),
+                        message: format!("Failed to delete object: {}", e),
+                    })?;
             }
         }
 
         // Delete the object/prefix itself
-        self.client.delete(&key).await.map_err(|e| BackendError::Other {
-            backend: "s3".to_string(),
-            message: format!("Failed to delete object: {}", e),
-        })?;
+        self.client
+            .delete(&key)
+            .await
+            .map_err(|e| BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!("Failed to delete object: {}", e),
+            })?;
 
         Ok(())
     }
@@ -410,20 +418,26 @@ impl Backend for S3Backend {
             })?;
 
         // Delete source
-        self.client.delete(&src_key).await.map_err(|e| BackendError::Other {
-            backend: "s3".to_string(),
-            message: format!("Failed to delete source after rename: {}", e),
-        })?;
+        self.client
+            .delete(&src_key)
+            .await
+            .map_err(|e| BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!("Failed to delete source after rename: {}", e),
+            })?;
 
         Ok(())
     }
 
     async fn exists(&self, path: &Path) -> BackendResult<bool> {
         let key = self.path_to_key(path);
-        self.client.exists(&key).await.map_err(|e| BackendError::Other {
-            backend: "s3".to_string(),
-            message: e.to_string(),
-        })
+        self.client
+            .exists(&key)
+            .await
+            .map_err(|e| BackendError::Other {
+                backend: "s3".to_string(),
+                message: e.to_string(),
+            })
     }
 
     fn backend_name(&self) -> &str {
@@ -450,9 +464,18 @@ mod tests {
             prefix: Some("prefix".to_string()),
         };
 
-        assert_eq!(backend.path_to_key(Path::new("file.txt")), "prefix/file.txt");
-        assert_eq!(backend.path_to_key(Path::new("/file.txt")), "prefix/file.txt");
-        assert_eq!(backend.path_to_key(Path::new("dir/file.txt")), "prefix/dir/file.txt");
+        assert_eq!(
+            backend.path_to_key(Path::new("file.txt")),
+            "prefix/file.txt"
+        );
+        assert_eq!(
+            backend.path_to_key(Path::new("/file.txt")),
+            "prefix/file.txt"
+        );
+        assert_eq!(
+            backend.path_to_key(Path::new("dir/file.txt")),
+            "prefix/dir/file.txt"
+        );
     }
 
     #[test]
@@ -462,7 +485,13 @@ mod tests {
             prefix: Some("prefix".to_string()),
         };
 
-        assert_eq!(backend.key_to_path("prefix/file.txt"), PathBuf::from("file.txt"));
-        assert_eq!(backend.key_to_path("prefix/dir/file.txt"), PathBuf::from("dir/file.txt"));
+        assert_eq!(
+            backend.key_to_path("prefix/file.txt"),
+            PathBuf::from("file.txt")
+        );
+        assert_eq!(
+            backend.key_to_path("prefix/dir/file.txt"),
+            PathBuf::from("dir/file.txt")
+        );
     }
 }

@@ -125,10 +125,7 @@ impl BackendConfig {
 pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
     // Handle simple local paths (no scheme)
     if !uri.contains("://") && !uri.starts_with("s3://") {
-        return Ok((
-            BackendConfig::Local { root: None },
-            PathBuf::from(uri),
-        ));
+        return Ok((BackendConfig::Local { root: None }, PathBuf::from(uri)));
     }
 
     // Parse URL
@@ -183,7 +180,11 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
                 }
             } else if let Some(password) = query_pairs.get("password") {
                 SshAuth::Password(secrecy::SecretString::new(password.clone()))
-            } else if query_pairs.get("agent").map(|v| v == "true").unwrap_or(false) {
+            } else if query_pairs
+                .get("agent")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+            {
                 SshAuth::Agent
             } else {
                 // Default to agent
@@ -271,25 +272,23 @@ pub fn from_env() -> BackendResult<BackendConfig> {
 
     match backend_type.as_str() {
         "local" => {
-            let root = std::env::var("ORBIT_LOCAL_ROOT")
-                .ok()
-                .map(PathBuf::from);
+            let root = std::env::var("ORBIT_LOCAL_ROOT").ok().map(PathBuf::from);
             Ok(BackendConfig::Local { root })
         }
 
         #[cfg(feature = "ssh-backend")]
         "ssh" => {
-            let host = std::env::var("ORBIT_SSH_HOST").map_err(|_| BackendError::InvalidConfig {
-                backend: "ssh".to_string(),
-                message: "ORBIT_SSH_HOST not set".to_string(),
-            })?;
+            let host =
+                std::env::var("ORBIT_SSH_HOST").map_err(|_| BackendError::InvalidConfig {
+                    backend: "ssh".to_string(),
+                    message: "ORBIT_SSH_HOST not set".to_string(),
+                })?;
 
-            let username = std::env::var("ORBIT_SSH_USER").map_err(|_| {
-                BackendError::InvalidConfig {
+            let username =
+                std::env::var("ORBIT_SSH_USER").map_err(|_| BackendError::InvalidConfig {
                     backend: "ssh".to_string(),
                     message: "ORBIT_SSH_USER not set".to_string(),
-                }
-            })?;
+                })?;
 
             let port = std::env::var("ORBIT_SSH_PORT")
                 .ok()
@@ -316,12 +315,11 @@ pub fn from_env() -> BackendResult<BackendConfig> {
 
         #[cfg(feature = "s3-native")]
         "s3" => {
-            let bucket = std::env::var("ORBIT_S3_BUCKET").map_err(|_| {
-                BackendError::InvalidConfig {
+            let bucket =
+                std::env::var("ORBIT_S3_BUCKET").map_err(|_| BackendError::InvalidConfig {
                     backend: "s3".to_string(),
                     message: "ORBIT_S3_BUCKET not set".to_string(),
-                }
-            })?;
+                })?;
 
             let mut s3_config = S3Config::new(bucket);
 

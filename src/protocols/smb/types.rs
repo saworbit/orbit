@@ -27,20 +27,20 @@ use std::time::SystemTime;
 pub struct SmbTarget {
     /// Hostname or IP address (e.g., "fileserver.acme.corp")
     pub host: String,
-    
+
     /// Share name (e.g., "projects")
     pub share: String,
-    
+
     /// Subpath within the share (e.g., "alpha/reports/Q4")
     /// No leading slash
     pub subpath: String,
-    
+
     /// SMB port (default: 445)
     pub port: Option<u16>,
-    
+
     /// Authentication method
     pub auth: SmbAuth,
-    
+
     /// Security/encryption settings
     pub security: SmbSecurity,
 }
@@ -50,18 +50,13 @@ pub struct SmbTarget {
 pub enum SmbAuth {
     /// Anonymous access (no credentials)
     Anonymous,
-    
+
     /// NTLMv2 authentication
-    Ntlmv2 {
-        username: String,
-        password: Secret,
-    },
-    
+    Ntlmv2 { username: String, password: Secret },
+
     /// Kerberos authentication
     /// If principal is None, uses OS credentials (SSO)
-    Kerberos {
-        principal: Option<String>,
-    },
+    Kerberos { principal: Option<String> },
 }
 
 /// Secret wrapper for credentials
@@ -83,7 +78,7 @@ impl Drop for Secret {
             use zeroize::Zeroize;
             self.0.zeroize();
         }
-        
+
         // Best-effort zeroing even without zeroize crate
         #[cfg(not(feature = "smb-native"))]
         {
@@ -175,13 +170,13 @@ bitflags::bitflags! {
     pub struct SmbCapability: u32 {
         /// Multi-channel support (multiple TCP connections)
         const MULTI_CHANNEL   = 0b0001;
-        
+
         /// Durable file handles (survive temporary disconnects)
         const DURABLE_HANDLES = 0b0010;
-        
+
         /// Directory leases (caching)
         const LEASES          = 0b0100;
-        
+
         /// Distributed File System support
         const DFS             = 0b1000;
     }
@@ -196,13 +191,13 @@ pub struct SmbCapability;
 pub struct SmbMetadata {
     /// File size in bytes
     pub size: u64,
-    
+
     /// Is this a directory?
     pub is_dir: bool,
-    
+
     /// Last modified timestamp
     pub modified: Option<SystemTime>,
-    
+
     /// Is the session/tree encrypted?
     pub encrypted: bool,
 }
@@ -245,7 +240,7 @@ mod tests {
         let opportunistic = SmbSecurity::Opportunistic;
         let required = SmbSecurity::RequireEncryption;
         let sign_only = SmbSecurity::SignOnly;
-        
+
         assert_ne!(opportunistic, required);
         assert_ne!(required, sign_only);
         assert_ne!(sign_only, opportunistic);

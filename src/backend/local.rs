@@ -115,76 +115,82 @@ impl LocalBackend {
         entries: &'a mut Vec<DirEntry>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = BackendResult<()>> + Send + 'a>> {
         Box::pin(async move {
-        // Check max depth
-        if let Some(max_depth) = options.max_depth {
-            if current_depth >= max_depth {
-                return Ok(());
-            }
-        }
-
-        // Check max entries
-        if let Some(max_entries) = options.max_entries {
-            if entries.len() >= max_entries {
-                return Ok(());
-            }
-        }
-
-        let resolved = self.resolve_path(path);
-        let mut read_dir = fs::read_dir(&resolved).await.map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                BackendError::NotFound {
-                    path: path.to_path_buf(),
-                    backend: "local".to_string(),
+            // Check max depth
+            if let Some(max_depth) = options.max_depth {
+                if current_depth >= max_depth {
+                    return Ok(());
                 }
-            } else {
-                BackendError::from(e)
             }
-        })?;
 
-        while let Some(entry) = read_dir.next_entry().await.map_err(BackendError::from)? {
-            let entry_path = entry.path();
-            let file_name = entry.file_name();
+            // Check max entries
+            if let Some(max_entries) = options.max_entries {
+                if entries.len() >= max_entries {
+                    return Ok(());
+                }
+            }
 
-            // Skip hidden files if not included
-            if !options.include_hidden {
-                if let Some(name) = file_name.to_str() {
-                    if name.starts_with('.') {
-                        continue;
+            let resolved = self.resolve_path(path);
+            let mut read_dir = fs::read_dir(&resolved).await.map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    BackendError::NotFound {
+                        path: path.to_path_buf(),
+                        backend: "local".to_string(),
+                    }
+                } else {
+                    BackendError::from(e)
+                }
+            })?;
+
+            while let Some(entry) = read_dir.next_entry().await.map_err(BackendError::from)? {
+                let entry_path = entry.path();
+                let file_name = entry.file_name();
+
+                // Skip hidden files if not included
+                if !options.include_hidden {
+                    if let Some(name) = file_name.to_str() {
+                        if name.starts_with('.') {
+                            continue;
+                        }
                     }
                 }
-            }
 
-            let metadata = entry.metadata().await.map_err(BackendError::from)?;
-            let relative_path = entry_path.strip_prefix(base_path).unwrap_or(&entry_path);
+                let metadata = entry.metadata().await.map_err(BackendError::from)?;
+                let relative_path = entry_path.strip_prefix(base_path).unwrap_or(&entry_path);
 
-            let is_symlink = metadata.is_symlink();
-            let should_follow = options.follow_symlinks && is_symlink;
+                let is_symlink = metadata.is_symlink();
+                let should_follow = options.follow_symlinks && is_symlink;
 
-            // Get actual metadata if following symlinks
-            let actual_metadata = if should_follow {
-                fs::metadata(&entry_path)
-                    .await
-                    .map_err(BackendError::from)?
-            } else {
-                metadata.clone()
-            };
+                // Get actual metadata if following symlinks
+                let actual_metadata = if should_follow {
+                    fs::metadata(&entry_path)
+                        .await
+                        .map_err(BackendError::from)?
+                } else {
+                    metadata.clone()
+                };
 
-            let backend_meta = self.convert_metadata(&entry_path, actual_metadata.clone());
+                let backend_meta = self.convert_metadata(&entry_path, actual_metadata.clone());
 
-            entries.push(DirEntry::new(
-                relative_path.to_path_buf(),
-                entry_path.clone(),
-                backend_meta.clone(),
-            ));
+                entries.push(DirEntry::new(
+                    relative_path.to_path_buf(),
+                    entry_path.clone(),
+                    backend_meta.clone(),
+                ));
 
-            // Recurse into directories
-            if options.recursive && actual_metadata.is_dir() {
-                self.list_recursive(&entry_path, base_path, options, current_depth + 1, entries)
+                // Recurse into directories
+                if options.recursive && actual_metadata.is_dir() {
+                    self.list_recursive(
+                        &entry_path,
+                        base_path,
+                        options,
+                        current_depth + 1,
+                        entries,
+                    )
                     .await?;
+                }
             }
-        }
 
-        Ok(())
+            Ok(())
         })
     }
 }
@@ -244,9 +250,7 @@ impl Backend for LocalBackend {
             self.list_recursive(&resolved, &resolved, &options, 0, &mut entries)
                 .await?;
             // Filter to only direct children
-            entries.retain(|e| {
-                e.path.components().count() == 1 || e.path == PathBuf::from("")
-            });
+            entries.retain(|e| e.path.components().count() == 1 || e.path == PathBuf::from(""));
         }
 
         Ok(entries)
@@ -268,16 +272,19 @@ impl Backend for LocalBackend {
         // Create a stream that reads the file in chunks
         const CHUNK_SIZE: usize = 64 * 1024; // 64 KB chunks
 
-        let stream = stream::unfold((file, vec![0u8; CHUNK_SIZE]), |(mut file, mut buffer)| async move {
-            match file.read(&mut buffer).await {
-                Ok(0) => None, // EOF
-                Ok(n) => {
-                    let data = Bytes::copy_from_slice(&buffer[..n]);
-                    Some((Ok(data), (file, buffer)))
+        let stream = stream::unfold(
+            (file, vec![0u8; CHUNK_SIZE]),
+            |(mut file, mut buffer)| async move {
+                match file.read(&mut buffer).await {
+                    Ok(0) => None, // EOF
+                    Ok(n) => {
+                        let data = Bytes::copy_from_slice(&buffer[..n]);
+                        Some((Ok(data), (file, buffer)))
+                    }
+                    Err(e) => Some((Err(e), (file, buffer))),
                 }
-                Err(e) => Some((Err(e), (file, buffer))),
-            }
-        });
+            },
+        );
 
         Ok(Box::pin(stream))
     }
@@ -343,8 +350,7 @@ impl Backend for LocalBackend {
                     .map_err(BackendError::from)?;
             } else {
                 fs::remove_dir(&resolved).await.map_err(|e| {
-                    if e.kind() == std::io::ErrorKind::Other
-                        || e.to_string().contains("not empty")
+                    if e.kind() == std::io::ErrorKind::Other || e.to_string().contains("not empty")
                     {
                         BackendError::DirectoryNotEmpty {
                             path: path.to_path_buf(),
@@ -425,8 +431,18 @@ impl Backend for LocalBackend {
     fn supports(&self, operation: &str) -> bool {
         matches!(
             operation,
-            "stat" | "list" | "read" | "write" | "delete" | "mkdir" | "rename" | "exists"
-            | "set_permissions" | "set_timestamps" | "get_xattrs" | "set_xattrs"
+            "stat"
+                | "list"
+                | "read"
+                | "write"
+                | "delete"
+                | "mkdir"
+                | "rename"
+                | "exists"
+                | "set_permissions"
+                | "set_timestamps"
+                | "get_xattrs"
+                | "set_xattrs"
         )
     }
 
@@ -479,7 +495,7 @@ impl Backend for LocalBackend {
         // Convert to blocking operation since filetime is sync
         let path_clone = resolved.clone();
         tokio::task::spawn_blocking(move || {
-            use filetime::{FileTime, set_file_times, set_file_mtime, set_file_atime};
+            use filetime::{set_file_atime, set_file_mtime, set_file_times, FileTime};
 
             if let (Some(atime_val), Some(mtime_val)) = (atime, mtime) {
                 let ft_atime = FileTime::from_system_time(atime_val);
@@ -514,7 +530,10 @@ impl Backend for LocalBackend {
         })
     }
 
-    async fn get_xattrs(&self, path: &Path) -> BackendResult<std::collections::HashMap<String, Vec<u8>>> {
+    async fn get_xattrs(
+        &self,
+        path: &Path,
+    ) -> BackendResult<std::collections::HashMap<String, Vec<u8>>> {
         #[cfg(feature = "extended-metadata")]
         {
             let resolved = self.resolve_path(path);
@@ -559,7 +578,11 @@ impl Backend for LocalBackend {
         }
     }
 
-    async fn set_xattrs(&self, path: &Path, attrs: &std::collections::HashMap<String, Vec<u8>>) -> BackendResult<()> {
+    async fn set_xattrs(
+        &self,
+        path: &Path,
+        attrs: &std::collections::HashMap<String, Vec<u8>>,
+    ) -> BackendResult<()> {
         #[cfg(feature = "extended-metadata")]
         {
             let resolved = self.resolve_path(path);
@@ -589,7 +612,12 @@ impl Backend for LocalBackend {
         }
     }
 
-    async fn set_ownership(&self, path: &Path, uid: Option<u32>, gid: Option<u32>) -> BackendResult<()> {
+    async fn set_ownership(
+        &self,
+        path: &Path,
+        uid: Option<u32>,
+        gid: Option<u32>,
+    ) -> BackendResult<()> {
         #[cfg(unix)]
         {
             let resolved = self.resolve_path(path);

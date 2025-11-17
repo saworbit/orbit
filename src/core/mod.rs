@@ -3,26 +3,26 @@
  */
 
 // Submodules - organized by responsibility
+pub mod bandwidth;
+pub mod buffered;
 pub mod checksum;
-pub mod resume;
-pub mod metadata;
-pub mod file_metadata;  // Comprehensive metadata preservation
-pub mod transform;      // Metadata and path transformation
-pub mod metadata_ops;   // Metadata preservation orchestration
-pub mod validation;
-pub mod filter;         // Include/exclude filter patterns
+pub mod concurrency;
+pub mod delta;
+pub mod directory;
 pub mod disk_guardian;
-pub mod zero_copy;
+pub mod dry_run; // Dry-run simulation mode
+pub mod enhanced_progress; // Multi-transfer progress bars with indicatif
+pub mod file_metadata; // Comprehensive metadata preservation
+pub mod filter; // Include/exclude filter patterns
+pub mod metadata;
+pub mod metadata_ops; // Metadata preservation orchestration
+pub mod progress;
+pub mod resume;
 pub mod retry;
 pub mod transfer;
-pub mod buffered;
-pub mod bandwidth;
-pub mod directory;
-pub mod progress;
-pub mod delta;
-pub mod enhanced_progress; // Multi-transfer progress bars with indicatif
-pub mod dry_run;          // Dry-run simulation mode
-pub mod concurrency;      // Concurrency control with semaphore
+pub mod transform; // Metadata and path transformation
+pub mod validation;
+pub mod zero_copy; // Concurrency control with semaphore
 
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -85,11 +85,7 @@ impl Default for CopyStats {
 /// compression, zero-copy, or buffered copy based on configuration.
 ///
 /// If `publisher` is provided, progress events will be emitted. Otherwise, no events are emitted.
-pub fn copy_file(
-    source_path: &Path,
-    dest_path: &Path,
-    config: &CopyConfig,
-) -> Result<CopyStats> {
+pub fn copy_file(source_path: &Path, dest_path: &Path, config: &CopyConfig) -> Result<CopyStats> {
     copy_file_impl(source_path, dest_path, config, None)
 }
 
@@ -126,7 +122,10 @@ pub fn copy_file_impl(
 
     // Dry run mode
     if config.dry_run {
-        println!("Would copy: {:?} -> {:?} ({} bytes)", source_path, dest_path, source_size);
+        println!(
+            "Would copy: {:?} -> {:?} ({} bytes)",
+            source_path, dest_path, source_size
+        );
         return Ok(CopyStats {
             bytes_copied: source_size,
             duration: start_time.elapsed(),
@@ -147,12 +146,9 @@ pub fn copy_file_impl(
     let pub_ref = publisher.unwrap_or(&noop_publisher);
 
     // Perform copy with retry logic and metadata preservation
-    retry::with_retry_and_metadata(
-        source_path,
-        dest_path,
-        config,
-        || transfer::perform_copy(source_path, dest_path, source_size, config, pub_ref)
-    )
+    retry::with_retry_and_metadata(source_path, dest_path, config, || {
+        transfer::perform_copy(source_path, dest_path, source_size, config, pub_ref)
+    })
 }
 
 /// Copy a directory recursively with streaming iteration to reduce memory usage

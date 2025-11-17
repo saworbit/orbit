@@ -37,7 +37,6 @@ getrandom = { version = "0.2", features = ["js"] }
 
 # Internal dependencies
 magnetar = { path = "../magnetar" }
-orbit = { path = "../.." }
 
 [features]
 default = []

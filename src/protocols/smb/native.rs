@@ -2,7 +2,7 @@
 //!
 //! This module provides real SMB protocol support using the pure Rust `smb` crate.
 
-use crate::protocols::smb::{types::*, error::SmbError};
+use crate::protocols::smb::{error::SmbError, types::*};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::StreamExt;
@@ -11,9 +11,9 @@ use std::str::FromStr;
 
 #[cfg(feature = "smb-native")]
 use smb::{
-    Client, ClientConfig, UncPath, FileCreateArgs, FileAccessMask, Resource,
-    FileAttributes, CreateOptions,
-    resource::file_util::{ReadAt, WriteAt, GetLen},
+    resource::file_util::{GetLen, ReadAt, WriteAt},
+    Client, ClientConfig, CreateOptions, FileAccessMask, FileAttributes, FileCreateArgs, Resource,
+    UncPath,
 };
 
 /// Native SMB client implementation
@@ -28,11 +28,7 @@ pub struct NativeSmbClient {
 impl NativeSmbClient {
     /// Create a new native SMB client and connect
     pub async fn new(t: &SmbTarget) -> Result<Self, SmbError> {
-        tracing::info!(
-            "Creating SMB client for {}\\{}",
-            t.host,
-            t.share
-        );
+        tracing::info!("Creating SMB client for {}\\{}", t.host, t.share);
 
         // Validate target configuration
         Self::validate_target(t)?;
@@ -89,7 +85,7 @@ impl NativeSmbClient {
         if let Some(port) = t.port {
             if port == 0 {
                 return Err(SmbError::InvalidPath(
-                    "port cannot be 0 (use None for default port 445)".to_string()
+                    "port cannot be 0 (use None for default port 445)".to_string(),
                 ));
             }
             // Note: u16 max is 65535, so no need to check upper bound
@@ -99,7 +95,7 @@ impl NativeSmbClient {
         // Validate no path traversal in subpath
         if t.subpath.contains("..") {
             return Err(SmbError::InvalidPath(
-                "path traversal not allowed in subpath".to_string()
+                "path traversal not allowed in subpath".to_string(),
             ));
         }
 
@@ -130,7 +126,11 @@ impl NativeSmbClient {
 
         // If using a custom port, establish connection with explicit address first
         if port != 445 {
-            tracing::info!("Connecting to {}:{} (non-standard port)", self.target.host, port);
+            tracing::info!(
+                "Connecting to {}:{} (non-standard port)",
+                self.target.host,
+                port
+            );
 
             // Resolve host and create SocketAddr
             let addr = format!("{}:{}", self.target.host, port);
@@ -142,7 +142,10 @@ impl NativeSmbClient {
                 })?
                 .next()
                 .ok_or_else(|| {
-                    SmbError::Connection(format!("No addresses found for host: {}", self.target.host))
+                    SmbError::Connection(format!(
+                        "No addresses found for host: {}",
+                        self.target.host
+                    ))
                 })?;
 
             // Establish connection to custom port
@@ -150,8 +153,16 @@ impl NativeSmbClient {
                 .connect_to_address(&self.target.host, socket_addr)
                 .await
                 .map_err(|e| {
-                    tracing::error!("SMB connection to {}:{} failed: {:?}", self.target.host, port, e);
-                    SmbError::Connection(format!("Failed to connect to custom port {}: {:?}", port, e))
+                    tracing::error!(
+                        "SMB connection to {}:{} failed: {:?}",
+                        self.target.host,
+                        port,
+                        e
+                    );
+                    SmbError::Connection(format!(
+                        "Failed to connect to custom port {}: {:?}",
+                        port, e
+                    ))
                 })?;
         }
 
@@ -165,7 +176,12 @@ impl NativeSmbClient {
             })?;
 
         self.connected = true;
-        tracing::info!("Successfully connected to {}\\{} (port: {})", self.target.host, self.target.share, port);
+        tracing::info!(
+            "Successfully connected to {}\\{} (port: {})",
+            self.target.host,
+            self.target.share,
+            port
+        );
 
         Ok(())
     }
@@ -190,9 +206,8 @@ impl NativeSmbClient {
     fn build_unc_path(&self, rel: &str) -> Result<UncPath, SmbError> {
         let path = self.join(rel);
         let full_path = format!(r"\\{}\{}\{}", self.target.host, self.target.share, path);
-        
-        UncPath::from_str(&full_path)
-            .map_err(|_| SmbError::InvalidPath(full_path))
+
+        UncPath::from_str(&full_path).map_err(|_| SmbError::InvalidPath(full_path))
     }
 
     /// Adaptive chunk sizing for efficient transfers
@@ -219,13 +234,13 @@ impl super::SmbClient for NativeSmbClient {
         }
 
         let unc_path = self.build_unc_path(rel)?;
-        
+
         // Open directory
-        let open_args = FileCreateArgs::make_open_existing(
-            FileAccessMask::new().with_generic_read(true)
-        );
-        
-        let resource = self.client
+        let open_args =
+            FileCreateArgs::make_open_existing(FileAccessMask::new().with_generic_read(true));
+
+        let resource = self
+            .client
             .create_file(&unc_path, &open_args)
             .await
             .map_err(|e| {
@@ -278,13 +293,13 @@ impl super::SmbClient for NativeSmbClient {
         }
 
         let unc_path = self.build_unc_path(rel)?;
-        
+
         // Open file for reading
-        let open_args = FileCreateArgs::make_open_existing(
-            FileAccessMask::new().with_generic_read(true)
-        );
-        
-        let resource = self.client
+        let open_args =
+            FileCreateArgs::make_open_existing(FileAccessMask::new().with_generic_read(true));
+
+        let resource = self
+            .client
             .create_file(&unc_path, &open_args)
             .await
             .map_err(|e| {
@@ -299,13 +314,14 @@ impl super::SmbClient for NativeSmbClient {
         };
 
         // Calculate read range
-        let (mut offset, mut remain) = range
-            .map(|r| (r.start, r.end - r.start))
-            .unwrap_or_else(|| {
-                // Read entire file - get file size first
-                // For now, we'll use a large default
-                (0, u64::MAX)
-            });
+        let (mut offset, mut remain) =
+            range
+                .map(|r| (r.start, r.end - r.start))
+                .unwrap_or_else(|| {
+                    // Read entire file - get file size first
+                    // For now, we'll use a large default
+                    (0, u64::MAX)
+                });
 
         let mut buf = Vec::with_capacity(1 << 20); // 1MB initial capacity
 
@@ -313,16 +329,14 @@ impl super::SmbClient for NativeSmbClient {
         while remain > 0 {
             let want = self.adaptive_chunk_len(1 << 20).await.min(remain as usize);
             let mut chunk = vec![0u8; want];
-            
-            let bytes_read = file.read_at(&mut chunk, offset)
-                .await
-                .map_err(|e| {
-                    tracing::error!("Failed to read file: {:?}", e);
-                    SmbError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("SMB read failed: {:?}", e)
-                    ))
-                })?;
+
+            let bytes_read = file.read_at(&mut chunk, offset).await.map_err(|e| {
+                tracing::error!("Failed to read file: {:?}", e);
+                SmbError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("SMB read failed: {:?}", e),
+                ))
+            })?;
 
             if bytes_read == 0 {
                 break; // EOF
@@ -345,14 +359,13 @@ impl super::SmbClient for NativeSmbClient {
         }
 
         let unc_path = self.build_unc_path(rel)?;
-        
+
         // Open file for writing (create or overwrite)
-        let open_args = FileCreateArgs::make_overwrite(
-            FileAttributes::default(),
-            CreateOptions::default()
-        );
-        
-        let resource = self.client
+        let open_args =
+            FileCreateArgs::make_overwrite(FileAttributes::default(), CreateOptions::default());
+
+        let resource = self
+            .client
             .create_file(&unc_path, &open_args)
             .await
             .map_err(|e| {
@@ -371,15 +384,13 @@ impl super::SmbClient for NativeSmbClient {
         let chunk_len = self.adaptive_chunk_len(1 << 20).await;
 
         for chunk in data.chunks(chunk_len) {
-            file.write_at(chunk, offset)
-                .await
-                .map_err(|e| {
-                    tracing::error!("Failed to write file: {:?}", e);
-                    SmbError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("SMB write failed: {:?}", e)
-                    ))
-                })?;
+            file.write_at(chunk, offset).await.map_err(|e| {
+                tracing::error!("Failed to write file: {:?}", e);
+                SmbError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("SMB write failed: {:?}", e),
+                ))
+            })?;
             offset += chunk.len() as u64;
         }
 
@@ -395,14 +406,15 @@ impl super::SmbClient for NativeSmbClient {
         }
 
         let unc_path = self.build_unc_path(rel)?;
-        
+
         // Create directory
         let open_args = FileCreateArgs::make_create_new(
             FileAttributes::default(),
-            CreateOptions::default().with_directory_file(true)
+            CreateOptions::default().with_directory_file(true),
         );
-        
-        let resource = self.client
+
+        let resource = self
+            .client
             .create_file(&unc_path, &open_args)
             .await
             .map_err(|e| {
@@ -426,12 +438,11 @@ impl super::SmbClient for NativeSmbClient {
 
         // SMB delete requires opening with DELETE access and setting delete disposition
         let unc_path = self.build_unc_path(rel)?;
-        
-        let open_args = FileCreateArgs::make_open_existing(
-            FileAccessMask::new().with_delete(true)
-        );
-        
-        let resource = self.client
+
+        let open_args = FileCreateArgs::make_open_existing(FileAccessMask::new().with_delete(true));
+
+        let resource = self
+            .client
             .create_file(&unc_path, &open_args)
             .await
             .map_err(|e| {
@@ -447,7 +458,9 @@ impl super::SmbClient for NativeSmbClient {
             _ => None,
         };
 
-        tracing::warn!("Delete operation may require additional SMB commands not yet fully implemented");
+        tracing::warn!(
+            "Delete operation may require additional SMB commands not yet fully implemented"
+        );
         Ok(())
     }
 
@@ -466,13 +479,13 @@ impl super::SmbClient for NativeSmbClient {
         }
 
         let unc_path = self.build_unc_path(rel)?;
-        
+
         // Open file/directory to get metadata
-        let open_args = FileCreateArgs::make_open_existing(
-            FileAccessMask::new().with_generic_read(true)
-        );
-        
-        let resource = self.client
+        let open_args =
+            FileCreateArgs::make_open_existing(FileAccessMask::new().with_generic_read(true));
+
+        let resource = self
+            .client
             .create_file(&unc_path, &open_args)
             .await
             .map_err(|e| {
@@ -512,11 +525,15 @@ impl super::SmbClient for NativeSmbClient {
     }
 
     async fn disconnect(&mut self) -> Result<(), SmbError> {
-        tracing::info!("Disconnecting from {}\\{}", self.target.host, self.target.share);
-        
+        tracing::info!(
+            "Disconnecting from {}\\{}",
+            self.target.host,
+            self.target.share
+        );
+
         // The smb crate handles disconnection automatically on drop
         self.connected = false;
-        
+
         Ok(())
     }
 }
@@ -592,7 +609,10 @@ mod tests {
         // Test clamping
         assert_eq!(native_client.adaptive_chunk_len(100_000).await, 256 * 1024); // Min
         assert_eq!(native_client.adaptive_chunk_len(1_000_000).await, 1_000_000); // Within range
-        assert_eq!(native_client.adaptive_chunk_len(5_000_000).await, 2 * 1024 * 1024); // Max
+        assert_eq!(
+            native_client.adaptive_chunk_len(5_000_000).await,
+            2 * 1024 * 1024
+        ); // Max
     }
 
     #[test]

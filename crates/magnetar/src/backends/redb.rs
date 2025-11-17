@@ -129,7 +129,9 @@ impl JobStore for RedbStore {
             // Read state in separate scope to drop borrow
             let state_opt = {
                 let bytes_guard = table.get((job_id, chunk))?;
-                bytes_guard.map(|b| Self::deserialize_state(b.value())).transpose()?
+                bytes_guard
+                    .map(|b| Self::deserialize_state(b.value()))
+                    .transpose()?
             };
 
             if let Some(mut state) = state_opt {
@@ -156,7 +158,9 @@ impl JobStore for RedbStore {
             // Read state in separate scope to drop borrow
             let state_opt = {
                 let bytes_guard = table.get((job_id, chunk))?;
-                bytes_guard.map(|b| Self::deserialize_state(b.value())).transpose()?
+                bytes_guard
+                    .map(|b| Self::deserialize_state(b.value()))
+                    .transpose()?
             };
 
             if let Some(mut state) = state_opt {

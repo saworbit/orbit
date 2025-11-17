@@ -124,12 +124,12 @@ pub async fn stream_pull_batch(
     block_size: u64,
 ) -> Result<Vec<Bytes>, SmbError> {
     let mut results = Vec::with_capacity(block_indices.len());
-    
+
     for &block_ix in block_indices {
         let data = stream_pull(client, rel, block_ix, block_size).await?;
         results.push(data);
     }
-    
+
     Ok(results)
 }
 
@@ -138,42 +138,42 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use std::ops::Range;
-    
+
     // Mock client for testing
     struct MockClient;
-    
+
     #[async_trait]
     impl SmbClient for MockClient {
         async fn connect(&mut self, _: &super::super::SmbTarget) -> Result<(), SmbError> {
             Ok(())
         }
-        
+
         async fn list_dir(&self, _: &str) -> Result<Vec<String>, SmbError> {
             Ok(vec![])
         }
-        
+
         async fn read_file(&self, _: &str, range: Option<Range<u64>>) -> Result<Bytes, SmbError> {
             let range = range.unwrap_or(0..1024);
             let len = (range.end - range.start) as usize;
             Ok(Bytes::from(vec![0u8; len]))
         }
-        
+
         async fn write_file(&self, _: &str, _: Bytes) -> Result<(), SmbError> {
             Ok(())
         }
-        
+
         async fn mkdir(&self, _: &str) -> Result<(), SmbError> {
             Ok(())
         }
-        
+
         async fn remove(&self, _: &str) -> Result<(), SmbError> {
             Ok(())
         }
-        
+
         async fn rename(&self, _: &str, _: &str) -> Result<(), SmbError> {
             Ok(())
         }
-        
+
         async fn metadata(&self, _: &str) -> Result<super::super::SmbMetadata, SmbError> {
             Ok(super::super::SmbMetadata {
                 size: 0,
@@ -182,20 +182,22 @@ mod tests {
                 encrypted: false,
             })
         }
-        
+
         async fn disconnect(&mut self) -> Result<(), SmbError> {
             Ok(())
         }
     }
-    
+
     #[tokio::test]
     async fn test_stream_pull() {
         let client = MockClient;
         let block_size = 4096;
-        let data = stream_pull(&client, "test.bin", 0, block_size).await.unwrap();
+        let data = stream_pull(&client, "test.bin", 0, block_size)
+            .await
+            .unwrap();
         assert_eq!(data.len(), block_size as usize);
     }
-    
+
     #[tokio::test]
     async fn test_stream_push() {
         let client = MockClient;
@@ -203,13 +205,15 @@ mod tests {
         let result = stream_push(&client, "test.bin", 0, data, 4096).await;
         assert!(result.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_stream_pull_batch() {
         let client = MockClient;
         let block_indices = vec![0, 1, 2];
         let block_size = 4096;
-        let results = stream_pull_batch(&client, "test.bin", &block_indices, block_size).await.unwrap();
+        let results = stream_pull_batch(&client, "test.bin", &block_indices, block_size)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].len(), block_size as usize);
     }

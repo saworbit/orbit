@@ -56,18 +56,18 @@
 
 use serde::{Deserialize, Serialize};
 
-pub mod error;
-pub mod builder;
-pub mod reader;
 pub mod bitmap;
 pub mod bloom;
+pub mod builder;
+pub mod error;
+pub mod reader;
 
 // Re-export main types
-pub use error::{Error, Result};
-pub use builder::StarMapBuilder;
-pub use reader::StarMapReader;
 pub use bitmap::RankSelectBitmap;
 pub use bloom::BloomFilter;
+pub use builder::StarMapBuilder;
+pub use error::{Error, Result};
+pub use reader::StarMapReader;
 
 /// Current Star Map format version
 pub const STARMAP_VERSION: u16 = 1;

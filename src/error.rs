@@ -12,63 +12,55 @@ pub type Result<T> = std::result::Result<T, OrbitError>;
 pub enum OrbitError {
     /// Source file or directory not found
     SourceNotFound(PathBuf),
-    
+
     /// Invalid path
     InvalidPath(PathBuf),
-    
+
     /// I/O error
     Io(io::Error),
-    
+
     /// Insufficient disk space
-    InsufficientDiskSpace {
-        required: u64,
-        available: u64,
-    },
-    
+    InsufficientDiskSpace { required: u64, available: u64 },
+
     /// Configuration error
     Config(String),
-    
+
     /// Compression error
     Compression(String),
-    
+
     /// Decompression error
     Decompression(String),
-    
+
     /// Resume error
     Resume(String),
-    
+
     /// Checksum verification failed
-    ChecksumMismatch {
-        expected: String,
-        actual: String,
-    },
-    
+    ChecksumMismatch { expected: String, actual: String },
+
     /// Symbolic link error
     Symlink(String),
-    
+
     /// Parallel processing error
     Parallel(String),
-    
+
     /// Retries exhausted
-    RetriesExhausted {
-        attempts: u32,
-    },
-    
+    RetriesExhausted { attempts: u32 },
+
     /// Zero-copy not supported (triggers fallback to buffered copy)
     ZeroCopyUnsupported,
-    
+
     /// Protocol error (for SMB, S3, etc.)
     Protocol(String),
-    
+
     /// Authentication error
     Authentication(String),
 
     /// Metadata operation failed
     MetadataFailed(String),
-    
+
     /// Audit log error
     AuditLog(String),
-    
+
     /// Generic error with message
     Other(String),
 }
@@ -122,9 +114,15 @@ impl OrbitError {
         use io::ErrorKind::*;
         matches!(
             io_err.kind(),
-            ConnectionRefused | ConnectionReset | ConnectionAborted |
-            NotConnected | BrokenPipe | TimedOut | Interrupted |
-            WouldBlock | WriteZero
+            ConnectionRefused
+                | ConnectionReset
+                | ConnectionAborted
+                | NotConnected
+                | BrokenPipe
+                | TimedOut
+                | Interrupted
+                | WouldBlock
+                | WriteZero
         )
     }
 
@@ -135,8 +133,12 @@ impl OrbitError {
                 use io::ErrorKind::*;
                 matches!(
                     io_err.kind(),
-                    ConnectionRefused | ConnectionReset | ConnectionAborted |
-                    NotConnected | BrokenPipe | TimedOut
+                    ConnectionRefused
+                        | ConnectionReset
+                        | ConnectionAborted
+                        | NotConnected
+                        | BrokenPipe
+                        | TimedOut
                 )
             }
             OrbitError::Protocol(_) => true,
@@ -244,7 +246,10 @@ impl fmt::Display for OrbitError {
             OrbitError::Io(err) => {
                 write!(f, "I/O error: {}", err)
             }
-            OrbitError::InsufficientDiskSpace { required, available } => {
+            OrbitError::InsufficientDiskSpace {
+                required,
+                available,
+            } => {
                 write!(
                     f,
                     "Insufficient disk space: {} bytes required, {} bytes available",
@@ -333,7 +338,8 @@ mod tests {
         assert!(OrbitError::ChecksumMismatch {
             expected: "abc".to_string(),
             actual: "def".to_string(),
-        }.is_fatal());
+        }
+        .is_fatal());
     }
 
     #[test]
@@ -347,7 +353,10 @@ mod tests {
     #[test]
     fn test_zero_copy_unsupported_detection() {
         assert!(OrbitError::ZeroCopyUnsupported.is_zero_copy_unsupported());
-        assert!(!OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test")).is_zero_copy_unsupported());
+        assert!(
+            !OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test"))
+                .is_zero_copy_unsupported()
+        );
     }
 
     #[test]
@@ -370,7 +379,7 @@ mod tests {
             "Zero-copy not supported on this platform/filesystem"
         );
     }
-    
+
     #[test]
     fn test_other_error() {
         let err = OrbitError::Other("custom error message".to_string());
@@ -385,7 +394,9 @@ mod tests {
         assert!(OrbitError::Compression("temp failure".to_string()).is_transient());
         assert!(OrbitError::Decompression("temp failure".to_string()).is_transient());
         assert!(OrbitError::Resume("partial".to_string()).is_transient());
-        assert!(OrbitError::MetadataFailed("permission denied temporarily".to_string()).is_transient());
+        assert!(
+            OrbitError::MetadataFailed("permission denied temporarily".to_string()).is_transient()
+        );
 
         // Non-transient errors
         assert!(!OrbitError::SourceNotFound(PathBuf::from("/tmp")).is_transient());
@@ -405,15 +416,50 @@ mod tests {
 
     #[test]
     fn test_error_categories() {
-        assert_eq!(OrbitError::SourceNotFound(PathBuf::from("/tmp")).category(), ErrorCategory::Validation);
-        assert_eq!(OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test")).category(), ErrorCategory::IoError);
-        assert_eq!(OrbitError::InsufficientDiskSpace { required: 100, available: 50 }.category(), ErrorCategory::Resource);
-        assert_eq!(OrbitError::Config("test".to_string()).category(), ErrorCategory::Configuration);
-        assert_eq!(OrbitError::Compression("test".to_string()).category(), ErrorCategory::Codec);
-        assert_eq!(OrbitError::Resume("test".to_string()).category(), ErrorCategory::Resume);
-        assert_eq!(OrbitError::ChecksumMismatch { expected: "a".to_string(), actual: "b".to_string() }.category(), ErrorCategory::Integrity);
-        assert_eq!(OrbitError::Protocol("test".to_string()).category(), ErrorCategory::Network);
-        assert_eq!(OrbitError::Authentication("test".to_string()).category(), ErrorCategory::Security);
+        assert_eq!(
+            OrbitError::SourceNotFound(PathBuf::from("/tmp")).category(),
+            ErrorCategory::Validation
+        );
+        assert_eq!(
+            OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test")).category(),
+            ErrorCategory::IoError
+        );
+        assert_eq!(
+            OrbitError::InsufficientDiskSpace {
+                required: 100,
+                available: 50
+            }
+            .category(),
+            ErrorCategory::Resource
+        );
+        assert_eq!(
+            OrbitError::Config("test".to_string()).category(),
+            ErrorCategory::Configuration
+        );
+        assert_eq!(
+            OrbitError::Compression("test".to_string()).category(),
+            ErrorCategory::Codec
+        );
+        assert_eq!(
+            OrbitError::Resume("test".to_string()).category(),
+            ErrorCategory::Resume
+        );
+        assert_eq!(
+            OrbitError::ChecksumMismatch {
+                expected: "a".to_string(),
+                actual: "b".to_string()
+            }
+            .category(),
+            ErrorCategory::Integrity
+        );
+        assert_eq!(
+            OrbitError::Protocol("test".to_string()).category(),
+            ErrorCategory::Network
+        );
+        assert_eq!(
+            OrbitError::Authentication("test".to_string()).category(),
+            ErrorCategory::Security
+        );
     }
 
     #[test]

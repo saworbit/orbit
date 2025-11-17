@@ -4,8 +4,8 @@
 //! documents to ensure they conform to the expected structure.
 
 use crate::error::{Error, Result};
-use crate::{FlightPlan, CargoManifest};
-use jsonschema::{Validator, ValidationError};
+use crate::{CargoManifest, FlightPlan};
+use jsonschema::{ValidationError, Validator};
 use serde_json::{json, Value};
 
 /// Validate a Flight Plan against its JSON Schema
@@ -19,10 +19,8 @@ pub fn validate_flight_plan(flight_plan: &FlightPlan) -> Result<()> {
 
     // Perform validation
     if let Err(errors) = compiled.validate(&value) {
-        let error_messages: Vec<String> = errors
-            .map(|e| format_validation_error(&e))
-            .collect();
-        
+        let error_messages: Vec<String> = errors.map(|e| format_validation_error(&e)).collect();
+
         return Err(Error::validation(format!(
             "Flight Plan validation failed:\n  - {}",
             error_messages.join("\n  - ")
@@ -43,10 +41,8 @@ pub fn validate_cargo_manifest(cargo: &CargoManifest) -> Result<()> {
 
     // Perform validation
     if let Err(errors) = compiled.validate(&value) {
-        let error_messages: Vec<String> = errors
-            .map(|e| format_validation_error(&e))
-            .collect();
-        
+        let error_messages: Vec<String> = errors.map(|e| format_validation_error(&e)).collect();
+
         return Err(Error::validation(format!(
             "Cargo Manifest validation failed:\n  - {}",
             error_messages.join("\n  - ")
@@ -306,18 +302,16 @@ fn get_cargo_manifest_schema() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Endpoint, Policy, Encryption, Chunking, WindowMeta};
+    use crate::{Chunking, Encryption, Endpoint, Policy, WindowMeta};
 
     #[test]
     fn test_valid_flight_plan() {
         let source = Endpoint::filesystem("/data/source");
         let target = Endpoint::filesystem("/data/target");
-        let policy = Policy::default_with_encryption(
-            Encryption::aes256_gcm("env:ORBIT_KEY")
-        );
+        let policy = Policy::default_with_encryption(Encryption::aes256_gcm("env:ORBIT_KEY"));
 
         let flight_plan = FlightPlan::new(source, target, policy);
-        
+
         let result = validate_flight_plan(&flight_plan);
         assert!(result.is_ok(), "Validation should pass: {:?}", result.err());
     }
@@ -367,7 +361,7 @@ mod tests {
 
         let result = validate_cargo_manifest(&cargo);
         assert!(result.is_err(), "Should fail validation without windows");
-        
+
         let err_msg = result.unwrap_err().to_string();
         assert!(err_msg.contains("windows") || err_msg.contains("minItems"));
     }
@@ -395,7 +389,7 @@ mod tests {
     #[test]
     fn test_endpoint_type_validation() {
         let valid_types = vec!["fs", "smb", "cifs", "s3", "custom"];
-        
+
         for endpoint_type in valid_types {
             let endpoint_json = json!({
                 "type": endpoint_type,

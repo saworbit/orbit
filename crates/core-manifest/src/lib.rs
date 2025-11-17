@@ -22,21 +22,18 @@
 //! );
 //! ```
 
+pub mod cargo;
 pub mod error;
 pub mod flightplan;
-pub mod cargo;
 pub mod validate;
 
 // Re-export main types for convenience
+pub use cargo::{CargoManifest, Chunking, ChunkingType, Digests, WindowMeta};
 pub use error::{Error, Result};
 pub use flightplan::{
-    FlightPlan, Endpoint, Policy, Encryption, CapacityVector, 
-    Eta, FileRef, EndpointType,
+    CapacityVector, Encryption, Endpoint, EndpointType, Eta, FileRef, FlightPlan, Policy,
 };
-pub use cargo::{
-    CargoManifest, Chunking, ChunkingType, Digests, WindowMeta,
-};
-pub use validate::{validate_flight_plan, validate_cargo_manifest};
+pub use validate::{validate_cargo_manifest, validate_flight_plan};
 
 /// Schema version for Flight Plan
 pub const FLIGHT_PLAN_SCHEMA_VERSION: &str = "orbit.flightplan.v1";

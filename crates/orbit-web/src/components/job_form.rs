@@ -15,9 +15,7 @@ pub fn JobForm() -> impl IntoView {
 
     let create_job_action = create_action(|request: &CreateJobRequest| {
         let request = request.clone();
-        async move {
-            create_job(request).await
-        }
+        async move { create_job(request).await }
     });
 
     let on_submit = move |ev: leptos::ev::SubmitEvent| {

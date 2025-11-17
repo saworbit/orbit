@@ -4,10 +4,11 @@
 //! policy, and references to individual file manifests.
 
 use crate::error::{Error, Result};
-use crate::{FLIGHT_PLAN_SCHEMA_VERSION};
+use crate::FLIGHT_PLAN_SCHEMA_VERSION;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::str::FromStr;
 
 /// Flight Plan: job-level transfer manifest
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -80,9 +81,12 @@ impl EndpointType {
             EndpointType::Custom => "custom",
         }
     }
+}
 
-    /// Parse from string
-    pub fn from_str(s: &str) -> Result<Self> {
+impl FromStr for EndpointType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "fs" => Ok(EndpointType::Filesystem),
             "smb" | "cifs" => Ok(EndpointType::Smb),
@@ -377,8 +381,7 @@ mod tests {
 
     #[test]
     fn test_endpoint_with_fingerprint() {
-        let endpoint = Endpoint::filesystem("/data")
-            .with_fingerprint("abc123");
+        let endpoint = Endpoint::filesystem("/data").with_fingerprint("abc123");
         assert_eq!(endpoint.fingerprint, Some("abc123".to_string()));
     }
 
@@ -390,14 +393,16 @@ mod tests {
             .with_classification("OFFICIAL:Sensitive");
 
         assert_eq!(policy.retention_days, Some(180));
-        assert_eq!(policy.classification, Some("OFFICIAL:Sensitive".to_string()));
+        assert_eq!(
+            policy.classification,
+            Some("OFFICIAL:Sensitive".to_string())
+        );
         assert_eq!(policy.verify_on_arrival, Some(true));
     }
 
     #[test]
     fn test_file_ref_builder() {
-        let file_ref = FileRef::new("data.bin", "sha256:abc123")
-            .with_starmap("sha256:def456");
+        let file_ref = FileRef::new("data.bin", "sha256:abc123").with_starmap("sha256:def456");
 
         assert_eq!(file_ref.path, "data.bin");
         assert_eq!(file_ref.cargo, "sha256:abc123");
@@ -408,34 +413,33 @@ mod tests {
     fn test_finalization() {
         let source = Endpoint::filesystem("/src");
         let target = Endpoint::filesystem("/dst");
-        let policy = Policy::default_with_encryption(
-            Encryption::aes256_gcm("env:KEY")
-        );
+        let policy = Policy::default_with_encryption(Encryption::aes256_gcm("env:KEY"));
 
         let mut flight_plan = FlightPlan::new(source, target, policy);
         assert!(!flight_plan.is_finalized());
 
         flight_plan.finalize("sha256:final_digest".to_string());
         assert!(flight_plan.is_finalized());
-        assert_eq!(flight_plan.job_digest, Some("sha256:final_digest".to_string()));
+        assert_eq!(
+            flight_plan.job_digest,
+            Some("sha256:final_digest".to_string())
+        );
     }
 
     #[test]
     fn test_serialization() {
         let source = Endpoint::filesystem("/src");
         let target = Endpoint::filesystem("/dst");
-        let policy = Policy::default_with_encryption(
-            Encryption::aes256_gcm("env:KEY")
-        );
+        let policy = Policy::default_with_encryption(Encryption::aes256_gcm("env:KEY"));
 
         let flight_plan = FlightPlan::new(source, target, policy);
-        
+
         // Serialize to JSON
         let json = serde_json::to_string(&flight_plan).unwrap();
-        
+
         // Deserialize back
         let deserialized: FlightPlan = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(flight_plan.schema, deserialized.schema);
         assert_eq!(flight_plan.job_id, deserialized.job_id);
     }

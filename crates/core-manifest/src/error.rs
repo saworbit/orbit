@@ -20,28 +20,19 @@ pub enum Error {
 
     /// Manifest validation failed
     #[error("Validation error: {message}")]
-    Validation {
-        message: String,
-    },
+    Validation { message: String },
 
     /// Schema version mismatch
     #[error("Schema version mismatch: expected {expected}, found {found}")]
-    VersionMismatch {
-        expected: String,
-        found: String,
-    },
+    VersionMismatch { expected: String, found: String },
 
     /// Invalid path provided
     #[error("Invalid path: {path}")]
-    InvalidPath {
-        path: PathBuf,
-    },
+    InvalidPath { path: PathBuf },
 
     /// Manifest file not found
     #[error("Manifest not found: {path}")]
-    ManifestNotFound {
-        path: PathBuf,
-    },
+    ManifestNotFound { path: PathBuf },
 
     /// Invalid content ID format
     #[error("Invalid content ID: {0}")]
@@ -49,9 +40,7 @@ pub enum Error {
 
     /// Missing required field
     #[error("Missing required field: {field}")]
-    MissingField {
-        field: String,
-    },
+    MissingField { field: String },
 
     /// Invalid endpoint type
     #[error("Invalid endpoint type: {0}")]
@@ -108,16 +97,12 @@ impl Error {
 
     /// Create an invalid path error
     pub fn invalid_path<P: Into<PathBuf>>(path: P) -> Self {
-        Error::InvalidPath {
-            path: path.into(),
-        }
+        Error::InvalidPath { path: path.into() }
     }
 
     /// Create a manifest not found error
     pub fn manifest_not_found<P: Into<PathBuf>>(path: P) -> Self {
-        Error::ManifestNotFound {
-            path: path.into(),
-        }
+        Error::ManifestNotFound { path: path.into() }
     }
 
     /// Create a missing field error

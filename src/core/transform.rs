@@ -8,10 +8,10 @@
  * - Compression state tracking
  */
 
-use std::path::{Path, PathBuf};
-use regex::Regex;
-use crate::error::{OrbitError, Result};
 use crate::core::file_metadata::FileMetadata;
+use crate::error::{OrbitError, Result};
+use regex::Regex;
+use std::path::{Path, PathBuf};
 
 /// Transformation configuration
 #[derive(Debug, Clone, Default)]
@@ -99,7 +99,8 @@ impl CaseTransform {
             Self::Uppercase => filename.to_uppercase(),
             Self::TitleCase => {
                 // Simple title case: capitalize first letter of each word
-                filename.split_whitespace()
+                filename
+                    .split_whitespace()
                     .map(|word| {
                         let mut chars = word.chars();
                         match chars.next() {
@@ -120,7 +121,10 @@ impl CaseTransform {
             "lower" | "lowercase" => Ok(Self::Lowercase),
             "upper" | "uppercase" => Ok(Self::Uppercase),
             "title" | "titlecase" => Ok(Self::TitleCase),
-            _ => Err(OrbitError::MetadataFailed(format!("Unknown case transform: {}", s))),
+            _ => Err(OrbitError::MetadataFailed(format!(
+                "Unknown case transform: {}",
+                s
+            ))),
         }
     }
 }
@@ -195,17 +199,24 @@ pub fn parse_transform_string(s: &str) -> Result<TransformConfig> {
                 "case" => {
                     config.case_transform = CaseTransform::from_str(value.trim())?;
                 }
-                "strip" => {
-                    match value.trim() {
-                        "xattrs" => config.metadata_filters.push(MetadataFilter::StripXattrs),
-                        "ownership" => config.metadata_filters.push(MetadataFilter::StripOwnership),
-                        "permissions" => config.metadata_filters.push(MetadataFilter::StripPermissions),
-                        _ => return Err(OrbitError::MetadataFailed(format!("Unknown strip target: {}", value))),
+                "strip" => match value.trim() {
+                    "xattrs" => config.metadata_filters.push(MetadataFilter::StripXattrs),
+                    "ownership" => config.metadata_filters.push(MetadataFilter::StripOwnership),
+                    "permissions" => config
+                        .metadata_filters
+                        .push(MetadataFilter::StripPermissions),
+                    _ => {
+                        return Err(OrbitError::MetadataFailed(format!(
+                            "Unknown strip target: {}",
+                            value
+                        )))
                     }
-                }
+                },
                 "normalize" => {
                     if value.trim() == "timestamps" {
-                        config.metadata_filters.push(MetadataFilter::NormalizeTimestamps);
+                        config
+                            .metadata_filters
+                            .push(MetadataFilter::NormalizeTimestamps);
                     }
                 }
                 "encoding" => {
@@ -213,7 +224,12 @@ pub fn parse_transform_string(s: &str) -> Result<TransformConfig> {
                         config.normalize_encoding = true;
                     }
                 }
-                _ => return Err(OrbitError::MetadataFailed(format!("Unknown transform type: {}", transform_type))),
+                _ => {
+                    return Err(OrbitError::MetadataFailed(format!(
+                        "Unknown transform type: {}",
+                        transform_type
+                    )))
+                }
             }
         }
     }
@@ -236,7 +252,10 @@ fn parse_rename_transform(s: &str) -> Result<PathTransform> {
         return PathTransform::new(pattern.trim(), replacement.trim(), false);
     }
 
-    Err(OrbitError::MetadataFailed(format!("Invalid rename pattern: {}", s)))
+    Err(OrbitError::MetadataFailed(format!(
+        "Invalid rename pattern: {}",
+        s
+    )))
 }
 
 /// Apply all transformations to a path
@@ -309,7 +328,12 @@ impl TransformBuilder {
     }
 
     /// Add a path transformation
-    pub fn add_rename(mut self, pattern: &str, replacement: &str, basename_only: bool) -> Result<Self> {
+    pub fn add_rename(
+        mut self,
+        pattern: &str,
+        replacement: &str,
+        basename_only: bool,
+    ) -> Result<Self> {
         let transform = PathTransform::new(pattern, replacement, basename_only)?;
         self.config.path_transforms.push(transform);
         Ok(self)
@@ -400,13 +424,17 @@ mod tests {
         assert_eq!(config.path_transforms.len(), 1);
         assert_eq!(config.case_transform, CaseTransform::Lowercase);
         assert_eq!(config.metadata_filters.len(), 1);
-        assert!(matches!(config.metadata_filters[0], MetadataFilter::StripXattrs));
+        assert!(matches!(
+            config.metadata_filters[0],
+            MetadataFilter::StripXattrs
+        ));
     }
 
     #[test]
     fn test_transform_builder() {
         let config = TransformBuilder::new()
-            .add_rename(r"\.txt$", ".md", true).unwrap()
+            .add_rename(r"\.txt$", ".md", true)
+            .unwrap()
             .case_transform(CaseTransform::Lowercase)
             .add_filter(MetadataFilter::StripXattrs)
             .build();
@@ -419,7 +447,8 @@ mod tests {
     #[test]
     fn test_complete_transformation() {
         let config = TransformBuilder::new()
-            .add_rename(r"\.txt$", ".md", true).unwrap()
+            .add_rename(r"\.txt$", ".md", true)
+            .unwrap()
             .case_transform(CaseTransform::Lowercase)
             .build();
 

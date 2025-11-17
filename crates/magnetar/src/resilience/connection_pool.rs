@@ -7,7 +7,7 @@ use super::error::ResilienceError;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{Semaphore, Mutex};
+use tokio::sync::{Mutex, Semaphore};
 
 /// Configuration for connection pool behavior
 #[derive(Debug, Clone)]
@@ -183,13 +183,10 @@ impl<T: Send + 'static> ConnectionPool<T> {
     /// wait until a connection becomes available or timeout.
     pub async fn acquire(&self) -> Result<T, ResilienceError> {
         // Try to acquire permit with timeout
-        let permit = tokio::time::timeout(
-            self.config.acquire_timeout,
-            self.semaphore.acquire(),
-        )
-        .await
-        .map_err(|_| ResilienceError::Timeout(self.config.acquire_timeout))?
-        .map_err(|_| ResilienceError::PoolExhausted)?;
+        let permit = tokio::time::timeout(self.config.acquire_timeout, self.semaphore.acquire())
+            .await
+            .map_err(|_| ResilienceError::Timeout(self.config.acquire_timeout))?
+            .map_err(|_| ResilienceError::PoolExhausted)?;
 
         // Forget permit - we'll manage it manually
         permit.forget();
@@ -239,8 +236,8 @@ impl<T: Send + 'static> ConnectionPool<T> {
         state.active_count -= 1;
 
         // Check if we should keep this connection
-        let should_keep = state.total_count() <= self.config.max_size
-            && self.factory.is_healthy(&conn).await;
+        let should_keep =
+            state.total_count() <= self.config.max_size && self.factory.is_healthy(&conn).await;
 
         if should_keep {
             state.idle.push(PooledConnection::new(conn));

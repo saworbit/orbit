@@ -1,6 +1,6 @@
 /*!
  * Orbit - Intelligent file transfer library
- * 
+ *
  * Provides high-performance file copying with features including:
  * - Zero-copy system calls for maximum performance
  * - Compression (LZ4, Zstd)
@@ -12,18 +12,18 @@
  * - Progress tracking
  */
 
+pub mod audit;
+pub mod cli_progress;
+pub mod compression;
 pub mod config;
 pub mod core;
 pub mod error;
-pub mod compression;
-pub mod stats;
-pub mod audit;
-pub mod protocol;
-pub mod manifest_integration;
-pub mod telemetry;
-pub mod cli_progress;
 pub mod instrumentation;
 pub mod logging;
+pub mod manifest_integration;
+pub mod protocol;
+pub mod stats;
+pub mod telemetry;
 
 // Native SMB protocol support (feature-gated)
 #[cfg(feature = "smb-native")]
@@ -34,44 +34,41 @@ pub mod protocols;
 pub mod backend;
 
 // Manifest system modules (re-exported from workspace crates)
+pub use orbit_core_audit as manifest_audit;
 pub use orbit_core_manifest as manifest;
 pub use orbit_core_starmap as starmap;
-pub use orbit_core_audit as manifest_audit;
 
 // Re-export commonly used types for convenience
-pub use config::{CopyConfig, CopyMode, CompressionType, SymlinkMode, ChunkingStrategy, ErrorMode, LogLevel};
-pub use error::{OrbitError, Result, ErrorCategory};
-pub use core::{CopyStats, copy_file, copy_directory};
-pub use core::{copy_file_impl, copy_directory_impl}; // For testing with progress events
+pub use config::{
+    ChunkingStrategy, CompressionType, CopyConfig, CopyMode, ErrorMode, LogLevel, SymlinkMode,
+};
 pub use core::zero_copy::{ZeroCopyCapabilities, ZeroCopyResult};
-pub use stats::TransferStats;
-pub use protocol::Protocol;
+pub use core::{copy_directory, copy_file, CopyStats};
+pub use core::{copy_directory_impl, copy_file_impl}; // For testing with progress events
+pub use error::{ErrorCategory, OrbitError, Result};
 pub use instrumentation::{OperationStats, StatsSnapshot};
+pub use protocol::Protocol;
+pub use stats::TransferStats;
 
 // Manifest system convenience exports
 pub mod manifests {
     //! Manifest system for transfer planning, verification, and audit
     //!
     //! Provides Flight Plans, Cargo Manifests, Star Maps, and audit logging.
-    
+
     pub use orbit_core_manifest::{
-        FlightPlan, CargoManifest, Endpoint, Policy, Encryption,
-        WindowMeta, Chunking, Digests, FileRef,
-        validate_flight_plan, validate_cargo_manifest,
+        validate_cargo_manifest, validate_flight_plan, CargoManifest, Chunking, Digests,
+        Encryption, Endpoint, FileRef, FlightPlan, Policy, WindowMeta,
     };
-    
+
     pub use orbit_core_starmap::{
-        StarMapBuilder, StarMapReader, 
-        ChunkMeta, BloomFilter, RankSelectBitmap,
+        BloomFilter, ChunkMeta, RankSelectBitmap, StarMapBuilder, StarMapReader,
     };
-    
-    pub use orbit_core_audit::{
-        TelemetryLogger, TelemetryEvent, EventType, 
-        Beacon, BeaconBuilder,
-    };
-    
+
+    pub use orbit_core_audit::{Beacon, BeaconBuilder, EventType, TelemetryEvent, TelemetryLogger};
+
     // Re-export integration helpers
-    pub use crate::manifest_integration::{ManifestGenerator, should_generate_manifest};
+    pub use crate::manifest_integration::{should_generate_manifest, ManifestGenerator};
 }
 
 // Native SMB protocol convenience exports (feature-gated)
@@ -107,10 +104,10 @@ pub mod smb {
     //! # }
     //! # }
     //! ```
-    
+
     pub use crate::protocols::smb::{
-        SmbTarget, SmbAuth, SmbSecurity, SmbMetadata, SmbCapability,
-        SmbClient, SmbError, Secret, client_for,
+        client_for, Secret, SmbAuth, SmbCapability, SmbClient, SmbError, SmbMetadata, SmbSecurity,
+        SmbTarget,
     };
 }
 
@@ -118,11 +115,11 @@ pub mod smb {
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Check if zero-copy is available on this platform
-/// 
+///
 /// # Example
 /// ```
 /// use orbit::is_zero_copy_available;
-/// 
+///
 /// if is_zero_copy_available() {
 ///     println!("Zero-copy transfers available for maximum performance!");
 /// }
@@ -132,11 +129,11 @@ pub fn is_zero_copy_available() -> bool {
 }
 
 /// Get detailed zero-copy capabilities for this platform
-/// 
+///
 /// # Example
 /// ```
 /// use orbit::get_zero_copy_capabilities;
-/// 
+///
 /// let caps = get_zero_copy_capabilities();
 /// println!("Zero-copy method: {}", caps.method);
 /// println!("Cross-filesystem: {}", caps.cross_filesystem);
@@ -161,10 +158,10 @@ mod tests {
         // Should not panic
         let available = is_zero_copy_available();
         let caps = get_zero_copy_capabilities();
-        
+
         assert_eq!(available, caps.available);
     }
-    
+
     #[cfg(feature = "smb-native")]
     #[test]
     fn test_smb_module_available() {

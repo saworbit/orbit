@@ -63,7 +63,10 @@ impl ResilienceError {
 
     /// Check if this error should contribute to circuit breaker failure count
     pub fn should_trip_breaker(&self) -> bool {
-        !matches!(self, ResilienceError::CircuitOpen | ResilienceError::PoolExhausted)
+        !matches!(
+            self,
+            ResilienceError::CircuitOpen | ResilienceError::PoolExhausted
+        )
     }
 }
 

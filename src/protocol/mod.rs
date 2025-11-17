@@ -1,6 +1,6 @@
 /*!
  * Protocol abstraction layer for Orbit
- * 
+ *
  * Supports multiple storage backends:
  * - Local filesystem
  * - SMB/CIFS network shares (via native implementation in protocols::smb)
@@ -14,9 +14,9 @@ pub mod uri;
 #[cfg(feature = "s3-native")]
 pub mod s3;
 
+use crate::error::Result;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use crate::error::Result;
 
 /// File metadata across protocols
 #[derive(Debug, Clone)]
@@ -32,28 +32,28 @@ pub struct FileMetadata {
 pub trait StorageBackend: Send + Sync {
     /// Open a file for reading
     fn open_read(&self, path: &Path) -> Result<Box<dyn Read + Send>>;
-    
+
     /// Open a file for writing
     fn open_write(&self, path: &Path, append: bool) -> Result<Box<dyn Write + Send>>;
-    
+
     /// Get file metadata
     fn metadata(&self, path: &Path) -> Result<FileMetadata>;
-    
+
     /// Check if path exists
     fn exists(&self, path: &Path) -> Result<bool>;
-    
+
     /// Create directory
     fn create_dir_all(&self, path: &Path) -> Result<()>;
-    
+
     /// List directory contents
     fn read_dir(&self, path: &Path) -> Result<Vec<PathBuf>>;
-    
+
     /// Remove file
     fn remove_file(&self, path: &Path) -> Result<()>;
-    
+
     /// Flush/sync file to storage
     fn sync(&self, path: &Path) -> Result<()>;
-    
+
     /// Get protocol name for logging
     fn protocol_name(&self) -> &'static str;
 }
@@ -87,7 +87,8 @@ impl Protocol {
                 // SMB native implementation is in protocols::smb module
                 // This requires the smb-native feature flag
                 Err(crate::error::OrbitError::Config(
-                    "SMB protocol requires smb-native feature. Use protocols::smb module directly.".to_string()
+                    "SMB protocol requires smb-native feature. Use protocols::smb module directly."
+                        .to_string(),
                 ))
             }
             Protocol::S3 { .. } => {
@@ -102,13 +103,14 @@ impl Protocol {
                 #[cfg(not(feature = "s3-native"))]
                 {
                     Err(crate::error::OrbitError::Config(
-                        "S3 protocol requires s3-native feature. Rebuild with --features s3-native".to_string()
+                        "S3 protocol requires s3-native feature. Rebuild with --features s3-native"
+                            .to_string(),
                     ))
                 }
             }
         }
     }
-    
+
     /// Parse a URI into protocol and path
     pub fn from_uri(uri: &str) -> Result<(Protocol, PathBuf)> {
         uri::parse_uri(uri)
@@ -138,7 +140,7 @@ mod tests {
         }
         assert_eq!(path, PathBuf::from("/path/file.txt"));
     }
-    
+
     #[test]
     fn test_local_backend_creation() {
         let protocol = Protocol::Local;
@@ -162,7 +164,8 @@ mod tests {
     #[test]
     #[cfg(feature = "s3-native")]
     fn test_s3_protocol_with_region() {
-        let (protocol, path) = Protocol::from_uri("s3://my-bucket/file.txt?region=us-west-2").unwrap();
+        let (protocol, path) =
+            Protocol::from_uri("s3://my-bucket/file.txt?region=us-west-2").unwrap();
         match protocol {
             Protocol::S3 { bucket, region, .. } => {
                 assert_eq!(bucket, "my-bucket");

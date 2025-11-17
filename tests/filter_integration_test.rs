@@ -164,7 +164,8 @@ fn test_filter_from_file() {
     let filter_file = temp_filter.path().join("filters.txt");
 
     // Create filter file (order matters: first-match-wins like rsync)
-    fs::write(&filter_file,
+    fs::write(
+        &filter_file,
         "# Include important files (before excludes for higher priority)\n\
          + important.log\n\
          \n\
@@ -173,8 +174,9 @@ fn test_filter_from_file() {
          - *.tmp\n\
          \n\
          # Exclude build directory\n\
-         - build/**\n"
-    ).unwrap();
+         - build/**\n",
+    )
+    .unwrap();
 
     // Create test files
     fs::create_dir_all(src_dir.join("build")).unwrap();

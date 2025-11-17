@@ -9,10 +9,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream;
 use secrecy::{ExposeSecret, SecretString};
+use ssh2::Session;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use ssh2::Session;
 
 /// SSH authentication method
 #[derive(Debug, Clone)]
@@ -27,7 +27,6 @@ pub enum SshAuth {
         /// Optional passphrase for the key
         passphrase: Option<SecretString>,
     },
-
 
     /// SSH agent authentication
     Agent,
@@ -106,10 +105,12 @@ impl SshConfig {
         let host_port: Vec<&str> = parts[1].split(':').collect();
         let host = host_port[0].to_string();
         let port = if host_port.len() > 1 {
-            host_port[1].parse().map_err(|_| BackendError::InvalidConfig {
-                backend: "ssh".to_string(),
-                message: "Invalid port number".to_string(),
-            })?
+            host_port[1]
+                .parse()
+                .map_err(|_| BackendError::InvalidConfig {
+                    backend: "ssh".to_string(),
+                    message: "Invalid port number".to_string(),
+                })?
         } else {
             22
         };
@@ -161,14 +162,12 @@ impl SshBackend {
     /// Connect to SSH server and create backend
     pub async fn connect(config: SshConfig) -> BackendResult<Self> {
         // SSH operations are blocking, so run in blocking task
-        let backend = tokio::task::spawn_blocking(move || {
-            Self::connect_blocking(config)
-        })
-        .await
-        .map_err(|e| BackendError::Other {
-            backend: "ssh".to_string(),
-            message: format!("Task join error: {}", e),
-        })??;
+        let backend = tokio::task::spawn_blocking(move || Self::connect_blocking(config))
+            .await
+            .map_err(|e| BackendError::Other {
+                backend: "ssh".to_string(),
+                message: format!("Task join error: {}", e),
+            })??;
 
         Ok(backend)
     }
@@ -199,11 +198,13 @@ impl SshBackend {
         session.set_compress(config.compress);
 
         // Handshake
-        session.handshake().map_err(|e| BackendError::ConnectionFailed {
-            backend: "ssh".to_string(),
-            endpoint: addr.clone(),
-            source: Some(Box::new(e)),
-        })?;
+        session
+            .handshake()
+            .map_err(|e| BackendError::ConnectionFailed {
+                backend: "ssh".to_string(),
+                endpoint: addr.clone(),
+                source: Some(Box::new(e)),
+            })?;
 
         // Authenticate
         match &config.auth {
@@ -215,7 +216,10 @@ impl SshBackend {
                         message: format!("Password authentication failed: {}", e),
                     })?;
             }
-            SshAuth::KeyFile { key_path, passphrase } => {
+            SshAuth::KeyFile {
+                key_path,
+                passphrase,
+            } => {
                 let pass = passphrase.as_ref().map(|p| p.expose_secret().as_str());
                 session
                     .userauth_pubkey_file(&config.username, None, key_path, pass)
@@ -224,7 +228,10 @@ impl SshBackend {
                         message: format!("Key file authentication failed: {}", e),
                     })?;
             }
-            SshAuth::KeyData { key_data, passphrase } => {
+            SshAuth::KeyData {
+                key_data,
+                passphrase,
+            } => {
                 let pass = passphrase.as_ref().map(|p| p.expose_secret().as_str());
                 session
                     .userauth_pubkey_memory(&config.username, None, key_data.expose_secret(), pass)
@@ -234,25 +241,35 @@ impl SshBackend {
                     })?;
             }
             SshAuth::Agent => {
-                let mut agent = session.agent().map_err(|e| BackendError::AuthenticationFailed {
-                    backend: "ssh".to_string(),
-                    message: format!("Failed to connect to SSH agent: {}", e),
-                })?;
+                let mut agent =
+                    session
+                        .agent()
+                        .map_err(|e| BackendError::AuthenticationFailed {
+                            backend: "ssh".to_string(),
+                            message: format!("Failed to connect to SSH agent: {}", e),
+                        })?;
 
-                agent.connect().map_err(|e| BackendError::AuthenticationFailed {
-                    backend: "ssh".to_string(),
-                    message: format!("Failed to connect to SSH agent: {}", e),
-                })?;
+                agent
+                    .connect()
+                    .map_err(|e| BackendError::AuthenticationFailed {
+                        backend: "ssh".to_string(),
+                        message: format!("Failed to connect to SSH agent: {}", e),
+                    })?;
 
-                agent.list_identities().map_err(|e| BackendError::AuthenticationFailed {
-                    backend: "ssh".to_string(),
-                    message: format!("Failed to list SSH agent identities: {}", e),
-                })?;
+                agent
+                    .list_identities()
+                    .map_err(|e| BackendError::AuthenticationFailed {
+                        backend: "ssh".to_string(),
+                        message: format!("Failed to list SSH agent identities: {}", e),
+                    })?;
 
-                let identities = agent.identities().map_err(|e| BackendError::AuthenticationFailed {
-                    backend: "ssh".to_string(),
-                    message: format!("Failed to get SSH agent identities: {}", e),
-                })?;
+                let identities =
+                    agent
+                        .identities()
+                        .map_err(|e| BackendError::AuthenticationFailed {
+                            backend: "ssh".to_string(),
+                            message: format!("Failed to get SSH agent identities: {}", e),
+                        })?;
 
                 let mut authenticated = false;
                 for identity in identities {
@@ -378,7 +395,13 @@ impl SshBackend {
 
             // Recurse if needed
             if options.recursive && stat.is_dir() {
-                self.list_recursive_blocking(&entry_path, base_path, options, current_depth + 1, entries)?;
+                self.list_recursive_blocking(
+                    &entry_path,
+                    base_path,
+                    options,
+                    current_depth + 1,
+                    entries,
+                )?;
             }
         }
 
@@ -415,11 +438,9 @@ impl Backend for SshBackend {
                 Metadata::symlink(stat.size.unwrap_or(0))
             };
 
-            Ok(metadata
-                .with_modified(
-                    std::time::UNIX_EPOCH
-                        + std::time::Duration::from_secs(stat.mtime.unwrap_or(0)),
-                ))
+            Ok(metadata.with_modified(
+                std::time::UNIX_EPOCH + std::time::Duration::from_secs(stat.mtime.unwrap_or(0)),
+            ))
         })
         .await
         .map_err(|e| BackendError::Other {
@@ -436,7 +457,7 @@ impl Backend for SshBackend {
             let mut entries = Vec::new();
             let backend = SshBackend {
                 config: SshConfig::new("", "", SshAuth::Agent), // Dummy config
-                session: unsafe { std::mem::zeroed() }, // Won't be used
+                session: unsafe { std::mem::zeroed() },         // Won't be used
                 sftp: sftp.clone(),
             };
 
@@ -473,7 +494,8 @@ impl Backend for SshBackend {
             })?;
 
             let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer).map_err(|e| BackendError::Io(e))?;
+            file.read_to_end(&mut buffer)
+                .map_err(|e| BackendError::Io(e))?;
             Ok::<_, BackendError>(Bytes::from(buffer))
         })
         .await
@@ -503,9 +525,7 @@ impl Backend for SshBackend {
 
             // Check if file exists
             if !options.overwrite && sftp.stat(&path).is_ok() {
-                return Err(BackendError::AlreadyExists {
-                    path: path.clone(),
-                });
+                return Err(BackendError::AlreadyExists { path: path.clone() });
             }
 
             let mut file = sftp.create(&path).map_err(|e| BackendError::Other {
@@ -547,10 +567,12 @@ impl Backend for SshBackend {
                 if recursive {
                     // Recursively delete directory contents
                     fn remove_dir_all(sftp: &Sftp, path: &Path) -> BackendResult<()> {
-                        for (entry_path, stat) in sftp.readdir(path).map_err(|e| BackendError::Other {
-                            backend: "ssh".to_string(),
-                            message: format!("Failed to read directory: {}", e),
-                        })? {
+                        for (entry_path, stat) in
+                            sftp.readdir(path).map_err(|e| BackendError::Other {
+                                backend: "ssh".to_string(),
+                                message: format!("Failed to read directory: {}", e),
+                            })?
+                        {
                             if stat.is_dir() {
                                 remove_dir_all(sftp, &entry_path)?;
                             } else {
@@ -569,9 +591,8 @@ impl Backend for SshBackend {
 
                     remove_dir_all(&sftp, &path)?;
                 } else {
-                    sftp.rmdir(&path).map_err(|e| BackendError::DirectoryNotEmpty {
-                        path: path.clone(),
-                    })?;
+                    sftp.rmdir(&path)
+                        .map_err(|e| BackendError::DirectoryNotEmpty { path: path.clone() })?;
                 }
             } else {
                 sftp.unlink(&path).map_err(|e| BackendError::Other {
@@ -595,9 +616,7 @@ impl Backend for SshBackend {
 
         tokio::task::spawn_blocking(move || {
             if sftp.stat(&path).is_ok() {
-                return Err(BackendError::AlreadyExists {
-                    path: path.clone(),
-                });
+                return Err(BackendError::AlreadyExists { path: path.clone() });
             }
 
             if recursive {
@@ -639,15 +658,14 @@ impl Backend for SshBackend {
 
             // Check destination doesn't exist
             if sftp.stat(&dest).is_ok() {
-                return Err(BackendError::AlreadyExists {
-                    path: dest.clone(),
-                });
+                return Err(BackendError::AlreadyExists { path: dest.clone() });
             }
 
-            sftp.rename(&src, &dest, None).map_err(|e| BackendError::Other {
-                backend: "ssh".to_string(),
-                message: format!("Failed to rename: {}", e),
-            })?;
+            sftp.rename(&src, &dest, None)
+                .map_err(|e| BackendError::Other {
+                    backend: "ssh".to_string(),
+                    message: format!("Failed to rename: {}", e),
+                })?;
 
             Ok(())
         })

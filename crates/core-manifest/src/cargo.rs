@@ -7,6 +7,7 @@ use crate::CARGO_MANIFEST_SCHEMA_VERSION;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+use std::str::FromStr;
 
 /// Cargo Manifest: per-file transfer manifest
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -76,13 +77,19 @@ impl ChunkingType {
             ChunkingType::Fixed => "fixed",
         }
     }
+}
 
-    /// Parse from string
-    pub fn from_str(s: &str) -> Result<Self> {
+impl FromStr for ChunkingType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "cdc" => Ok(ChunkingType::Cdc),
             "fixed" => Ok(ChunkingType::Fixed),
-            _ => Err(Error::InvalidChunking(format!("Unknown chunking type: {}", s))),
+            _ => Err(Error::InvalidChunking(format!(
+                "Unknown chunking type: {}",
+                s
+            ))),
         }
     }
 }
@@ -121,11 +128,7 @@ pub struct WindowMeta {
 
 impl CargoManifest {
     /// Create a new Cargo Manifest with minimal required fields
-    pub fn new<S: Into<String>>(
-        path: S,
-        size: u64,
-        chunking: Chunking,
-    ) -> Self {
+    pub fn new<S: Into<String>>(path: S, size: u64, chunking: Chunking) -> Self {
         Self {
             schema: CARGO_MANIFEST_SCHEMA_VERSION.to_string(),
             path: path.into(),
@@ -268,19 +271,19 @@ impl Chunking {
             ChunkingType::Cdc => {
                 if self.avg_kib.is_none() {
                     return Err(Error::InvalidChunking(
-                        "CDC chunking requires avg_kib".to_string()
+                        "CDC chunking requires avg_kib".to_string(),
                     ));
                 }
                 if self.algo.is_none() {
                     return Err(Error::InvalidChunking(
-                        "CDC chunking requires algo".to_string()
+                        "CDC chunking requires algo".to_string(),
                     ));
                 }
             }
             ChunkingType::Fixed => {
                 if self.fixed_kib.is_none() {
                     return Err(Error::InvalidChunking(
-                        "Fixed chunking requires fixed_kib".to_string()
+                        "Fixed chunking requires fixed_kib".to_string(),
                     ));
                 }
             }
@@ -383,7 +386,7 @@ mod tests {
     fn test_invalid_cdc_chunking() {
         let mut chunking = Chunking::cdc(256, "gear");
         chunking.avg_kib = None; // Make it invalid
-        
+
         let result = chunking.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("avg_kib"));
@@ -391,8 +394,7 @@ mod tests {
 
     #[test]
     fn test_window_meta() {
-        let window = WindowMeta::new(0, 0, 64, "abc123".to_string())
-            .with_overlap(4);
+        let window = WindowMeta::new(0, 0, 64, "abc123".to_string()).with_overlap(4);
 
         assert_eq!(window.id, 0);
         assert_eq!(window.first_chunk, 0);
@@ -404,7 +406,7 @@ mod tests {
     #[test]
     fn test_window_contains_chunk() {
         let window = WindowMeta::new(0, 10, 20, "abc123".to_string());
-        
+
         assert!(!window.contains_chunk(9));
         assert!(window.contains_chunk(10));
         assert!(window.contains_chunk(15));
@@ -440,9 +442,9 @@ mod tests {
         let mut manifest = CargoManifest::new("file.bin", 1024, chunking);
 
         assert!(!manifest.is_finalized());
-        
+
         manifest.finalize("sha256:finaldigest".to_string());
-        
+
         assert!(manifest.is_finalized());
         assert_eq!(manifest.file_digest, Some("sha256:finaldigest".to_string()));
     }
@@ -451,7 +453,7 @@ mod tests {
     fn test_validation_empty_path() {
         let chunking = Chunking::fixed(1024);
         let manifest = CargoManifest::new("", 1024, chunking);
-        
+
         let result = manifest.validate();
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("empty"));

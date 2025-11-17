@@ -6,7 +6,7 @@
  */
 
 use std::path::{Path, PathBuf};
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// Dry-run operation tracker
 #[derive(Debug, Clone)]
@@ -232,7 +232,8 @@ impl DryRunSimulator {
             println!("  Directories to create: {}", summary.mkdir_count);
         }
 
-        println!("  Total data size:  {} ({} bytes)",
+        println!(
+            "  Total data size:  {} ({} bytes)",
             format_bytes(summary.total_bytes),
             summary.total_bytes
         );

@@ -74,22 +74,22 @@ mod registry;
 
 // Re-export main types
 pub use error::{BackendError, BackendResult};
-pub use types::{Metadata, DirEntry, ListOptions, WriteOptions};
+pub use types::{DirEntry, ListOptions, Metadata, WriteOptions};
 
 #[cfg(feature = "backend-abstraction")]
 pub use local::LocalBackend;
 
 #[cfg(all(feature = "backend-abstraction", feature = "ssh-backend"))]
-pub use ssh::{SshBackend, SshConfig, SshAuth};
+pub use ssh::{SshAuth, SshBackend, SshConfig};
 
 #[cfg(all(feature = "backend-abstraction", feature = "s3-native"))]
 pub use s3::S3Backend;
 
 #[cfg(feature = "backend-abstraction")]
-pub use config::{BackendConfig, parse_uri};
+pub use config::{parse_uri, BackendConfig};
 
 #[cfg(feature = "backend-abstraction")]
-pub use registry::{BackendRegistry, BackendFactory};
+pub use registry::{BackendFactory, BackendRegistry};
 
 #[cfg(feature = "backend-abstraction")]
 use async_trait::async_trait;
@@ -197,7 +197,12 @@ pub trait Backend: Send + Sync {
     ///
     /// Returns `BackendError::PermissionDenied` if write access is denied.
     /// Returns `BackendError::AlreadyExists` if file exists and overwrite is false.
-    async fn write(&self, path: &Path, data: bytes::Bytes, options: WriteOptions) -> BackendResult<u64>;
+    async fn write(
+        &self,
+        path: &Path,
+        data: bytes::Bytes,
+        options: WriteOptions,
+    ) -> BackendResult<u64>;
 
     /// Delete a file or directory
     ///
@@ -298,7 +303,10 @@ pub trait Backend: Send + Sync {
     ///
     /// Returns `BackendError::NotFound` if the path doesn't exist.
     /// Returns `BackendError::Unsupported` if the backend doesn't support xattrs.
-    async fn get_xattrs(&self, path: &Path) -> BackendResult<std::collections::HashMap<String, Vec<u8>>> {
+    async fn get_xattrs(
+        &self,
+        path: &Path,
+    ) -> BackendResult<std::collections::HashMap<String, Vec<u8>>> {
         let _ = path;
         Err(BackendError::Unsupported {
             backend: self.backend_name().to_string(),
@@ -317,7 +325,11 @@ pub trait Backend: Send + Sync {
     ///
     /// Returns `BackendError::NotFound` if the path doesn't exist.
     /// Returns `BackendError::Unsupported` if the backend doesn't support xattrs.
-    async fn set_xattrs(&self, path: &Path, attrs: &std::collections::HashMap<String, Vec<u8>>) -> BackendResult<()> {
+    async fn set_xattrs(
+        &self,
+        path: &Path,
+        attrs: &std::collections::HashMap<String, Vec<u8>>,
+    ) -> BackendResult<()> {
         let _ = (path, attrs);
         Err(BackendError::Unsupported {
             backend: self.backend_name().to_string(),
@@ -338,7 +350,12 @@ pub trait Backend: Send + Sync {
     /// Returns `BackendError::NotFound` if the path doesn't exist.
     /// Returns `BackendError::Unsupported` if the backend doesn't support ownership.
     /// Returns `BackendError::PermissionDenied` if access is denied (requires privileges).
-    async fn set_ownership(&self, path: &Path, uid: Option<u32>, gid: Option<u32>) -> BackendResult<()> {
+    async fn set_ownership(
+        &self,
+        path: &Path,
+        uid: Option<u32>,
+        gid: Option<u32>,
+    ) -> BackendResult<()> {
         let _ = (path, uid, gid);
         Err(BackendError::Unsupported {
             backend: self.backend_name().to_string(),
@@ -384,8 +401,19 @@ pub trait Backend: Send + Sync {
         // Metadata operations have default implementations that return Unsupported
         matches!(
             operation,
-            "stat" | "list" | "read" | "write" | "delete" | "mkdir" | "rename" | "exists"
-            | "set_permissions" | "set_timestamps" | "get_xattrs" | "set_xattrs" | "set_ownership"
+            "stat"
+                | "list"
+                | "read"
+                | "write"
+                | "delete"
+                | "mkdir"
+                | "rename"
+                | "exists"
+                | "set_permissions"
+                | "set_timestamps"
+                | "get_xattrs"
+                | "set_xattrs"
+                | "set_ownership"
         )
     }
 }

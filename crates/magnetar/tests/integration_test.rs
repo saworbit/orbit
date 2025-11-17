@@ -59,7 +59,9 @@ mod sqlite_tests {
 
         // Claim and complete first chunk
         let chunk1 = store.claim_pending(1).await?.unwrap();
-        store.mark_status(1, chunk1.chunk, JobStatus::Done, None).await?;
+        store
+            .mark_status(1, chunk1.chunk, JobStatus::Done, None)
+            .await?;
 
         // Resume should only return second chunk
         let pending = store.resume_pending(1).await?;
@@ -130,7 +132,9 @@ mod sqlite_tests {
         store.init_from_manifest(1, &manifest).await?;
 
         let chunk = store.claim_pending(1).await?.unwrap();
-        store.mark_failed(1, chunk.chunk, "Test error".to_string()).await?;
+        store
+            .mark_failed(1, chunk.chunk, "Test error".to_string())
+            .await?;
 
         let failed = store.get_by_status(1, JobStatus::Failed).await?;
         assert_eq!(failed.len(), 1);
@@ -164,7 +168,9 @@ mod sqlite_tests {
 
         // Process one chunk
         let chunk = store.claim_pending(1).await?.unwrap();
-        store.mark_status(1, chunk.chunk, JobStatus::Done, None).await?;
+        store
+            .mark_status(1, chunk.chunk, JobStatus::Done, None)
+            .await?;
 
         let stats = store.get_stats(1).await?;
         assert_eq!(stats.total_chunks, 3);

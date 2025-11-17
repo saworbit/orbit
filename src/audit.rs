@@ -65,16 +65,16 @@ pub fn write_audit_log(
     log_path: Option<&Path>,
 ) -> Result<()> {
     let entry = AuditEntry::new(source, destination, stats, status, attempts, error);
-    
+
     let default_path = PathBuf::from("orbit_audit.log");
     let audit_path = log_path.unwrap_or(&default_path);
-    
+
     let mut log_file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(audit_path)
         .map_err(|e| OrbitError::AuditLog(format!("Failed to open audit log: {}", e)))?;
-    
+
     match format {
         AuditFormat::Json => {
             let json = serde_json::to_string(&entry)
@@ -93,7 +93,7 @@ pub fn write_audit_log(
                     "timestamp,source,destination,bytes_copied,duration_ms,checksum,compression_ratio,status,attempts,error"
                 ).map_err(|e| OrbitError::AuditLog(format!("Failed to write CSV header: {}", e)))?;
             }
-            
+
             writeln!(
                 log_file,
                 "{},{:?},{:?},{},{},{},{},{},{},{}",
@@ -103,17 +103,22 @@ pub fn write_audit_log(
                 entry.bytes_copied,
                 entry.duration_ms,
                 entry.checksum.as_deref().unwrap_or(""),
-                entry.compression_ratio.map(|r| r.to_string()).unwrap_or_default(),
+                entry
+                    .compression_ratio
+                    .map(|r| r.to_string())
+                    .unwrap_or_default(),
                 entry.status,
                 entry.attempts,
                 entry.error.as_deref().unwrap_or("")
-            ).map_err(|e| OrbitError::AuditLog(format!("Failed to write CSV entry: {}", e)))?;
+            )
+            .map_err(|e| OrbitError::AuditLog(format!("Failed to write CSV entry: {}", e)))?;
         }
     }
-    
-    log_file.flush()
+
+    log_file
+        .flush()
         .map_err(|e| OrbitError::AuditLog(format!("Failed to flush audit log: {}", e)))?;
-    
+
     Ok(())
 }
 
@@ -122,10 +127,10 @@ pub fn read_audit_log(log_path: &Path, format: AuditFormat) -> Result<Vec<AuditE
     if !log_path.exists() {
         return Ok(Vec::new());
     }
-    
+
     let content = std::fs::read_to_string(log_path)
         .map_err(|e| OrbitError::AuditLog(format!("Failed to read audit log: {}", e)))?;
-    
+
     match format {
         AuditFormat::Json => {
             let entries: Vec<AuditEntry> = content
@@ -136,11 +141,8 @@ pub fn read_audit_log(log_path: &Path, format: AuditFormat) -> Result<Vec<AuditE
         }
         AuditFormat::Csv => {
             // Skip header line for CSV
-            let entries: Vec<AuditEntry> = content
-                .lines()
-                .skip(1)
-                .filter_map(parse_csv_line)
-                .collect();
+            let entries: Vec<AuditEntry> =
+                content.lines().skip(1).filter_map(parse_csv_line).collect();
             Ok(entries)
         }
     }
@@ -152,14 +154,18 @@ fn parse_csv_line(line: &str) -> Option<AuditEntry> {
     if parts.len() < 9 {
         return None;
     }
-    
+
     Some(AuditEntry {
         timestamp: parts[0].to_string(),
         source: PathBuf::from(parts[1].trim_matches('"')),
         destination: PathBuf::from(parts[2].trim_matches('"')),
         bytes_copied: parts[3].parse().ok()?,
         duration_ms: parts[4].parse().ok()?,
-        checksum: if parts[5].is_empty() { None } else { Some(parts[5].to_string()) },
+        checksum: if parts[5].is_empty() {
+            None
+        } else {
+            Some(parts[5].to_string())
+        },
         compression_ratio: parts[6].parse().ok(),
         status: parts[7].to_string(),
         attempts: parts[8].parse().ok()?,
@@ -174,13 +180,13 @@ fn parse_csv_line(line: &str) -> Option<AuditEntry> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::time::Duration;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_write_and_read_json_audit() {
         let temp = NamedTempFile::new().unwrap();
-        
+
         let stats = CopyStats {
             bytes_copied: 1024,
             duration: Duration::from_secs(5),
@@ -191,10 +197,10 @@ mod tests {
             files_failed: 0,
             delta_stats: None,
         };
-        
+
         let source = Path::new("/tmp/source.txt");
         let dest = Path::new("/tmp/dest.txt");
-        
+
         write_audit_log(
             source,
             dest,
@@ -204,18 +210,19 @@ mod tests {
             None,
             AuditFormat::Json,
             Some(temp.path()),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let entries = read_audit_log(temp.path(), AuditFormat::Json).unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].bytes_copied, 1024);
         assert_eq!(entries[0].status, "success");
     }
-    
+
     #[test]
     fn test_write_csv_audit() {
         let temp = NamedTempFile::new().unwrap();
-        
+
         let stats = CopyStats {
             bytes_copied: 2048,
             duration: Duration::from_millis(500),
@@ -226,10 +233,10 @@ mod tests {
             files_failed: 0,
             delta_stats: None,
         };
-        
+
         let source = Path::new("/tmp/source.txt");
         let dest = Path::new("/tmp/dest.txt");
-        
+
         write_audit_log(
             source,
             dest,
@@ -239,8 +246,9 @@ mod tests {
             None,
             AuditFormat::Csv,
             Some(temp.path()),
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         let content = std::fs::read_to_string(temp.path()).unwrap();
         assert!(content.contains("timestamp,source,destination"));
         assert!(content.contains("2048"));

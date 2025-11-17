@@ -1,6 +1,6 @@
 /*!
  * Zero-copy file transfer using platform-specific system calls
- * 
+ *
  * This module provides optimized file copying that bypasses userspace buffers
  * by using kernel-level operations like copy_file_range (Linux), CopyFileExW (Windows),
  * and sendfile (Unix-like systems).
@@ -39,7 +39,7 @@ impl ZeroCopyCapabilities {
                 method: "copy_file_range",
             }
         }
-        
+
         #[cfg(target_os = "windows")]
         {
             Self {
@@ -48,7 +48,7 @@ impl ZeroCopyCapabilities {
                 method: "CopyFileExW",
             }
         }
-        
+
         #[cfg(target_os = "macos")]
         {
             Self {
@@ -57,7 +57,7 @@ impl ZeroCopyCapabilities {
                 method: "copyfile",
             }
         }
-        
+
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         {
             Self {
@@ -134,7 +134,7 @@ pub fn same_filesystem(path1: &Path, path2: &Path) -> io::Result<bool> {
         };
         Ok(meta1.dev() == meta2.dev())
     }
-    
+
     #[cfg(windows)]
     {
         // On Windows, check if drive letters match
@@ -142,7 +142,7 @@ pub fn same_filesystem(path1: &Path, path2: &Path) -> io::Result<bool> {
         let vol2 = get_volume_path(path2)?;
         Ok(vol1 == vol2)
     }
-    
+
     #[cfg(not(any(unix, windows)))]
     {
         // Conservative: assume different filesystems
@@ -167,12 +167,12 @@ fn get_volume_path(path: &Path) -> io::Result<String> {
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use super::{ZeroCopyResult, BandwidthLimiter};
+    use super::{BandwidthLimiter, ZeroCopyResult};
+    use log::debug;
     use std::fs::File;
     use std::io;
     use std::os::unix::io::AsRawFd;
     use std::time::{Duration, Instant};
-    use log::debug;
 
     pub fn copy_file_range_loop(
         source: &File,
@@ -238,7 +238,10 @@ mod linux {
                         limiter.wait_for_capacity(bytes_copied);
                         let throttle_duration = throttle_start.elapsed();
                         if throttle_duration > Duration::from_millis(10) {
-                            debug!("Zero-copy (Linux): Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, bytes_copied);
+                            debug!(
+                                "Zero-copy (Linux): Bandwidth throttle: waited {:?} for {} bytes",
+                                throttle_duration, bytes_copied
+                            );
                         }
                     }
                 }
@@ -255,7 +258,7 @@ mod linux {
 
 #[cfg(target_os = "windows")]
 mod windows {
-    use super::{ZeroCopyResult, BandwidthLimiter};
+    use super::{BandwidthLimiter, ZeroCopyResult};
     use std::fs::File;
 
     pub fn copy_file_ex(
@@ -279,12 +282,12 @@ mod windows {
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use super::{ZeroCopyResult, BandwidthLimiter};
+    use super::{BandwidthLimiter, ZeroCopyResult};
+    use log::debug;
     use std::fs::File;
     use std::io;
     use std::os::unix::io::AsRawFd;
     use std::time::{Duration, Instant};
-    use log::debug;
 
     pub fn copyfile_wrapper(
         source: &File,
@@ -360,7 +363,10 @@ mod macos {
                 limiter.wait_for_capacity(bytes_copied);
                 let throttle_duration = throttle_start.elapsed();
                 if throttle_duration > Duration::from_millis(10) {
-                    debug!("Zero-copy (macOS): Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, bytes_copied);
+                    debug!(
+                        "Zero-copy (macOS): Bandwidth throttle: waited {:?} for {} bytes",
+                        throttle_duration, bytes_copied
+                    );
                 }
             }
         }
@@ -373,16 +379,16 @@ mod macos {
 // Zero-copy heuristics and orchestration
 // ============================================================================
 
-use std::fs::OpenOptions;
-use std::time::Instant;
-use indicatif::{ProgressBar, ProgressStyle};
-use tracing::info;
-use crate::config::CopyConfig;
-use crate::error::{OrbitError, Result};
-use super::CopyStats;
+use super::bandwidth::BandwidthLimiter;
 use super::checksum;
 use super::progress::ProgressPublisher;
-use super::bandwidth::BandwidthLimiter;
+use super::CopyStats;
+use crate::config::CopyConfig;
+use crate::error::{OrbitError, Result};
+use indicatif::{ProgressBar, ProgressStyle};
+use std::fs::OpenOptions;
+use std::time::Instant;
+use tracing::info;
 
 /// Determine if zero-copy should be attempted based on heuristics
 ///
@@ -447,7 +453,10 @@ pub fn try_zero_copy_direct(
     // Setup bandwidth limiter
     let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
     if bandwidth_limiter.is_enabled() {
-        info!("Zero-copy with bandwidth limiting: {} bytes/sec", config.max_bandwidth);
+        info!(
+            "Zero-copy with bandwidth limiting: {} bytes/sec",
+            config.max_bandwidth
+        );
     }
 
     // Emit transfer start event
@@ -472,7 +481,7 @@ pub fn try_zero_copy_direct(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                 .unwrap()
-                .progress_chars("#>-")
+                .progress_chars("#>-"),
         );
         Some(pb)
     } else {
@@ -481,7 +490,13 @@ pub fn try_zero_copy_direct(
 
     // Attempt zero-copy with bandwidth limiting support
     let result = if bandwidth_limiter.is_enabled() {
-        try_zero_copy(&source_file, &dest_file, 0, source_size, Some(&bandwidth_limiter))
+        try_zero_copy(
+            &source_file,
+            &dest_file,
+            0,
+            source_size,
+            Some(&bandwidth_limiter),
+        )
     } else {
         try_zero_copy(&source_file, &dest_file, 0, source_size, None)
     };
@@ -549,29 +564,29 @@ pub fn try_zero_copy_direct(
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
-    
+
     #[test]
     fn test_capabilities_detection() {
         let caps = ZeroCopyCapabilities::detect();
-        
+
         #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         assert!(caps.available);
-        
+
         #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         assert!(!caps.available);
     }
-    
+
     #[test]
     fn test_same_filesystem() {
         let temp1 = NamedTempFile::new().unwrap();
         let temp2 = NamedTempFile::new().unwrap();
-        
+
         // Both temp files should be on the same filesystem
         let result = same_filesystem(temp1.path(), temp2.path());
         assert!(result.is_ok());
         // Note: We can't assert true because temp dirs might be on different mounts
     }
-    
+
     #[cfg(target_os = "linux")]
     #[test]
     fn test_zero_copy_basic() {
@@ -585,20 +600,20 @@ mod tests {
         source.write_all(test_data).unwrap();
         source.flush().unwrap();
         source.seek(SeekFrom::Start(0)).unwrap();
-        
+
         // Attempt zero-copy
         let result = try_zero_copy(
             source.as_file(),
             dest.as_file(),
             0,
             test_data.len() as u64,
-            None,  // No bandwidth limiting in tests
+            None, // No bandwidth limiting in tests
         );
-        
+
         match result {
             ZeroCopyResult::Success(n) => {
                 assert_eq!(n, test_data.len() as u64);
-                
+
                 // Verify data
                 dest.seek(SeekFrom::Start(0)).unwrap();
                 let mut buffer = Vec::new();

@@ -99,7 +99,13 @@ pub struct ObjectVersion {
 
 impl ObjectVersion {
     /// Create a new object version
-    pub fn new(version_id: String, key: String, size: u64, last_modified: SystemTime, etag: String) -> Self {
+    pub fn new(
+        version_id: String,
+        key: String,
+        size: u64,
+        last_modified: SystemTime,
+        etag: String,
+    ) -> Self {
         Self {
             version_id,
             key,
@@ -268,11 +274,7 @@ pub trait VersioningOperations {
     ) -> S3Result<()>;
 
     /// Get metadata for a specific version
-    async fn get_version_metadata(
-        &self,
-        key: &str,
-        version_id: &str,
-    ) -> S3Result<ObjectVersion>;
+    async fn get_version_metadata(&self, key: &str, version_id: &str) -> S3Result<ObjectVersion>;
 
     /// Delete a specific version permanently
     async fn delete_version(&self, key: &str, version_id: &str) -> S3Result<()>;
@@ -365,7 +367,8 @@ impl VersionComparison {
 #[async_trait]
 impl VersioningOperations for S3Client {
     async fn list_object_versions(&self, key: &str) -> S3Result<VersionsListResult> {
-        self.list_object_versions_paginated(key, None, None, None).await
+        self.list_object_versions_paginated(key, None, None, None)
+            .await
     }
 
     async fn list_object_versions_paginated(
@@ -375,7 +378,8 @@ impl VersioningOperations for S3Client {
         version_id_marker: Option<String>,
         max_keys: Option<i32>,
     ) -> S3Result<VersionsListResult> {
-        let mut request = self.aws_client()
+        let mut request = self
+            .aws_client()
             .list_object_versions()
             .bucket(self.bucket())
             .prefix(key);
@@ -402,17 +406,13 @@ impl VersioningOperations for S3Client {
                 let version_id = v.version_id()?.to_string();
                 let key = v.key()?.to_string();
                 let size = v.size().unwrap_or(0) as u64;
-                let last_modified = v.last_modified()
+                let last_modified = v
+                    .last_modified()
                     .and_then(|dt| SystemTime::try_from(*dt).ok())?;
                 let etag = v.e_tag()?.to_string();
 
-                let mut obj_version = ObjectVersion::new(
-                    version_id,
-                    key,
-                    size,
-                    last_modified,
-                    etag,
-                );
+                let mut obj_version =
+                    ObjectVersion::new(version_id, key, size, last_modified, etag);
 
                 obj_version.is_latest = v.is_latest().unwrap_or(false);
                 obj_version.storage_class = v.storage_class().map(|sc| sc.as_str().to_string());
@@ -429,7 +429,8 @@ impl VersioningOperations for S3Client {
             .filter_map(|dm| {
                 let version_id = dm.version_id()?.to_string();
                 let key = dm.key()?.to_string();
-                let last_modified = dm.last_modified()
+                let last_modified = dm
+                    .last_modified()
                     .and_then(|dt| SystemTime::try_from(*dt).ok())?;
 
                 let mut marker = DeleteMarker::new(version_id, key, last_modified);
@@ -457,7 +458,8 @@ impl VersioningOperations for S3Client {
     ) -> S3Result<()> {
         use tokio::io::AsyncWriteExt;
 
-        let response = self.aws_client()
+        let response = self
+            .aws_client()
             .get_object()
             .bucket(self.bucket())
             .key(key)
@@ -475,18 +477,14 @@ impl VersioningOperations for S3Client {
             .await
             .map_err(|e| S3Error::Io(e.to_string()))?;
 
-        file.flush().await
-            .map_err(|e| S3Error::Io(e.to_string()))?;
+        file.flush().await.map_err(|e| S3Error::Io(e.to_string()))?;
 
         Ok(())
     }
 
-    async fn get_version_metadata(
-        &self,
-        key: &str,
-        version_id: &str,
-    ) -> S3Result<ObjectVersion> {
-        let response = self.aws_client()
+    async fn get_version_metadata(&self, key: &str, version_id: &str) -> S3Result<ObjectVersion> {
+        let response = self
+            .aws_client()
             .head_object()
             .bucket(self.bucket())
             .key(key)
@@ -496,23 +494,15 @@ impl VersioningOperations for S3Client {
             .map_err(S3Error::from)?;
 
         let size = response.content_length().unwrap_or(0) as u64;
-        let last_modified = response.last_modified()
+        let last_modified = response
+            .last_modified()
             .and_then(|dt| SystemTime::try_from(*dt).ok())
             .unwrap_or_else(SystemTime::now);
-        let etag = response.e_tag()
-            .unwrap_or("unknown")
-            .to_string();
-        let version_id_str = response.version_id()
-            .unwrap_or(version_id)
-            .to_string();
+        let etag = response.e_tag().unwrap_or("unknown").to_string();
+        let version_id_str = response.version_id().unwrap_or(version_id).to_string();
 
-        let mut version = ObjectVersion::new(
-            version_id_str,
-            key.to_string(),
-            size,
-            last_modified,
-            etag,
-        );
+        let mut version =
+            ObjectVersion::new(version_id_str, key.to_string(), size, last_modified, etag);
 
         version.storage_class = response.storage_class().map(|sc| sc.as_str().to_string());
 
@@ -544,33 +534,29 @@ impl VersioningOperations for S3Client {
         // Copy the old version to become the new current version
         // Include version ID in the copy source string
         let source = format!("{}/{}?versionId={}", self.bucket(), key, version_id);
-        let mut request = self.aws_client()
+        let mut request = self
+            .aws_client()
             .copy_object()
             .bucket(self.bucket())
             .copy_source(source)
             .key(target_key);
 
         if let Some(storage_class) = opts.storage_class {
-            request = request.storage_class(
-                aws_sdk_s3::types::StorageClass::from(storage_class.as_str())
-            );
+            request = request.storage_class(aws_sdk_s3::types::StorageClass::from(
+                storage_class.as_str(),
+            ));
         }
 
         if let Some(metadata) = opts.metadata {
-            request = request
-                .metadata_directive(aws_sdk_s3::types::MetadataDirective::Replace);
+            request = request.metadata_directive(aws_sdk_s3::types::MetadataDirective::Replace);
             for (k, v) in metadata {
                 request = request.metadata(k, v);
             }
         }
 
-        let response = request.send()
-            .await
-            .map_err(S3Error::from)?;
+        let response = request.send().await.map_err(S3Error::from)?;
 
-        let new_version_id = response.version_id()
-            .unwrap_or("unknown")
-            .to_string();
+        let new_version_id = response.version_id().unwrap_or("unknown").to_string();
 
         Ok(new_version_id)
     }
@@ -586,10 +572,14 @@ impl VersioningOperations for S3Client {
 
         let size_diff = version2.size as i64 - version1.size as i64;
         let time_diff = if version2.last_modified > version1.last_modified {
-            version2.last_modified.duration_since(version1.last_modified)
+            version2
+                .last_modified
+                .duration_since(version1.last_modified)
                 .unwrap_or_default()
         } else {
-            version1.last_modified.duration_since(version2.last_modified)
+            version1
+                .last_modified
+                .duration_since(version2.last_modified)
                 .unwrap_or_default()
         };
         let etags_match = version1.etag == version2.etag;
@@ -610,7 +600,7 @@ impl VersioningOperations for S3Client {
             .versioning_configuration(
                 aws_sdk_s3::types::VersioningConfiguration::builder()
                     .status(aws_sdk_s3::types::BucketVersioningStatus::Enabled)
-                    .build()
+                    .build(),
             )
             .send()
             .await
@@ -626,7 +616,7 @@ impl VersioningOperations for S3Client {
             .versioning_configuration(
                 aws_sdk_s3::types::VersioningConfiguration::builder()
                     .status(aws_sdk_s3::types::BucketVersioningStatus::Suspended)
-                    .build()
+                    .build(),
             )
             .send()
             .await
@@ -636,7 +626,8 @@ impl VersioningOperations for S3Client {
     }
 
     async fn get_versioning_status(&self) -> S3Result<VersioningStatus> {
-        let response = self.aws_client()
+        let response = self
+            .aws_client()
             .get_bucket_versioning()
             .bucket(self.bucket())
             .send()
@@ -644,8 +635,12 @@ impl VersioningOperations for S3Client {
             .map_err(S3Error::from)?;
 
         match response.status() {
-            Some(aws_sdk_s3::types::BucketVersioningStatus::Enabled) => Ok(VersioningStatus::Enabled),
-            Some(aws_sdk_s3::types::BucketVersioningStatus::Suspended) => Ok(VersioningStatus::Suspended),
+            Some(aws_sdk_s3::types::BucketVersioningStatus::Enabled) => {
+                Ok(VersioningStatus::Enabled)
+            }
+            Some(aws_sdk_s3::types::BucketVersioningStatus::Suspended) => {
+                Ok(VersioningStatus::Suspended)
+            }
             _ => Ok(VersioningStatus::Disabled),
         }
     }
@@ -720,8 +715,20 @@ mod tests {
     #[test]
     fn test_version_comparison_identical() {
         let now = SystemTime::now();
-        let v1 = ObjectVersion::new("v1".to_string(), "key".to_string(), 100, now, "etag".to_string());
-        let v2 = ObjectVersion::new("v2".to_string(), "key".to_string(), 100, now, "etag".to_string());
+        let v1 = ObjectVersion::new(
+            "v1".to_string(),
+            "key".to_string(),
+            100,
+            now,
+            "etag".to_string(),
+        );
+        let v2 = ObjectVersion::new(
+            "v2".to_string(),
+            "key".to_string(),
+            100,
+            now,
+            "etag".to_string(),
+        );
 
         let comparison = VersionComparison {
             size_diff: 0,

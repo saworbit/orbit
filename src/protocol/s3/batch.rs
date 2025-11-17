@@ -89,7 +89,7 @@ use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{Semaphore, RwLock};
+use tokio::sync::{RwLock, Semaphore};
 use tokio::time::{sleep, Instant};
 
 /// Configuration for batch operations
@@ -387,14 +387,15 @@ impl BatchOperations for S3Client {
                 })
                 .collect();
 
-            let response = self.aws_client()
+            let response = self
+                .aws_client()
                 .delete_objects()
                 .bucket(self.bucket())
                 .delete(
                     aws_sdk_s3::types::Delete::builder()
                         .set_objects(Some(delete_objects))
                         .build()
-                        .expect("Failed to build delete request")
+                        .expect("Failed to build delete request"),
                 )
                 .send()
                 .await;
@@ -408,11 +409,7 @@ impl BatchOperations for S3Client {
                         failed += 1;
                         if let Some(key) = error.key() {
                             let message = error.message().unwrap_or("Unknown error");
-                            errors.push(BatchError::new(
-                                key.to_string(),
-                                message.to_string(),
-                                0,
-                            ));
+                            errors.push(BatchError::new(key.to_string(), message.to_string(), 0));
                         }
                     }
                 }
@@ -503,22 +500,22 @@ impl BatchOperations for S3Client {
                     let mut retry_count = 0;
                     loop {
                         let source = format!("{}/{}", client.bucket(), source_key);
-                        let mut request = client.aws_client()
+                        let mut request = client
+                            .aws_client()
                             .copy_object()
                             .bucket(client.bucket())
                             .copy_source(&source)
                             .key(&dest_key);
 
                         if let Some(storage_class) = &options.storage_class {
-                            request = request.storage_class(
-                                aws_sdk_s3::types::StorageClass::from(storage_class.as_str())
-                            );
+                            request = request.storage_class(aws_sdk_s3::types::StorageClass::from(
+                                storage_class.as_str(),
+                            ));
                         }
 
                         if let Some(ref meta) = options.metadata {
-                            request = request.metadata_directive(
-                                aws_sdk_s3::types::MetadataDirective::Replace
-                            );
+                            request = request
+                                .metadata_directive(aws_sdk_s3::types::MetadataDirective::Replace);
                             for (k, v) in meta {
                                 request = request.metadata(k, v);
                             }
@@ -582,7 +579,8 @@ impl BatchOperations for S3Client {
         };
 
         // Copy to self with new storage class
-        self.batch_copy_with_options(keys, "", options, config).await
+        self.batch_copy_with_options(keys, "", options, config)
+            .await
     }
 
     async fn batch_update_metadata(
@@ -597,7 +595,8 @@ impl BatchOperations for S3Client {
         };
 
         // Copy to self with new metadata
-        self.batch_copy_with_options(keys, "", options, config).await
+        self.batch_copy_with_options(keys, "", options, config)
+            .await
     }
 }
 

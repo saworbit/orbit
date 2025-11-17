@@ -31,7 +31,10 @@ impl TransferState {
     }
 
     fn transfer_rate_mbps(&self) -> f64 {
-        let elapsed = self.last_update.duration_since(self.start_time).as_secs_f64();
+        let elapsed = self
+            .last_update
+            .duration_since(self.start_time)
+            .as_secs_f64();
         if elapsed > 0.0 {
             (self.bytes_transferred as f64 / 1_048_576.0) / elapsed
         } else {
@@ -40,7 +43,10 @@ impl TransferState {
     }
 
     fn eta_seconds(&self) -> Option<u64> {
-        let elapsed = self.last_update.duration_since(self.start_time).as_secs_f64();
+        let elapsed = self
+            .last_update
+            .duration_since(self.start_time)
+            .as_secs_f64();
         if elapsed > 0.0 && self.bytes_transferred > 0 {
             let rate = self.bytes_transferred as f64 / elapsed;
             let remaining_bytes = self.total_bytes.saturating_sub(self.bytes_transferred);
@@ -84,7 +90,13 @@ impl CliProgressRenderer {
     /// Handle a single progress event
     fn handle_event(&mut self, event: ProgressEvent) -> io::Result<()> {
         match event {
-            ProgressEvent::TransferStart { file_id, source, dest, total_bytes, .. } => {
+            ProgressEvent::TransferStart {
+                file_id,
+                source,
+                dest,
+                total_bytes,
+                ..
+            } => {
                 let state = TransferState {
                     _source: source.display().to_string(),
                     _dest: dest.display().to_string(),
@@ -100,10 +112,15 @@ impl CliProgressRenderer {
                     println!("   Size: {}", format_bytes(total_bytes));
                 }
 
-                self.active_transfers.insert(file_id.as_str().to_string(), state);
+                self.active_transfers
+                    .insert(file_id.as_str().to_string(), state);
             }
 
-            ProgressEvent::TransferProgress { file_id, bytes_transferred, .. } => {
+            ProgressEvent::TransferProgress {
+                file_id,
+                bytes_transferred,
+                ..
+            } => {
                 if let Some(state) = self.active_transfers.get_mut(file_id.as_str()) {
                     state.bytes_transferred = bytes_transferred;
                     state.last_update = Instant::now();
@@ -112,7 +129,10 @@ impl CliProgressRenderer {
                     print!("\r   ");
                     print_progress_bar(state.progress_pct(), 40);
                     print!(" {:>6.1}%  ", state.progress_pct());
-                    print!("{:>10}/s  ", format_bytes((state.transfer_rate_mbps() * 1_048_576.0) as u64));
+                    print!(
+                        "{:>10}/s  ",
+                        format_bytes((state.transfer_rate_mbps() * 1_048_576.0) as u64)
+                    );
 
                     if let Some(eta) = state.eta_seconds() {
                         print!("ETA: {}", format_duration(eta));
@@ -122,7 +142,13 @@ impl CliProgressRenderer {
                 }
             }
 
-            ProgressEvent::TransferComplete { file_id, total_bytes, duration_ms, checksum, .. } => {
+            ProgressEvent::TransferComplete {
+                file_id,
+                total_bytes,
+                duration_ms,
+                checksum,
+                ..
+            } => {
                 if let Some(_state) = self.active_transfers.remove(file_id.as_str()) {
                     let throughput_mbps = if duration_ms > 0 {
                         (total_bytes as f64 / 1_048_576.0) / (duration_ms as f64 / 1000.0)
@@ -130,7 +156,8 @@ impl CliProgressRenderer {
                         0.0
                     };
 
-                    println!("\r   ✓ Complete: {} in {}ms ({:.2} MB/s)",
+                    println!(
+                        "\r   ✓ Complete: {} in {}ms ({:.2} MB/s)",
                         format_bytes(total_bytes),
                         duration_ms,
                         throughput_mbps
@@ -144,9 +171,15 @@ impl CliProgressRenderer {
                 }
             }
 
-            ProgressEvent::TransferFailed { file_id, error, bytes_transferred, .. } => {
+            ProgressEvent::TransferFailed {
+                file_id,
+                error,
+                bytes_transferred,
+                ..
+            } => {
                 if let Some(_state) = self.active_transfers.remove(file_id.as_str()) {
-                    println!("\r   ✗ Failed: {} after {} - {}",
+                    println!(
+                        "\r   ✗ Failed: {} after {} - {}",
                         file_id.as_str(),
                         format_bytes(bytes_transferred),
                         error
@@ -158,18 +191,38 @@ impl CliProgressRenderer {
                 println!("\n📂 Scanning directory: {}", path.display());
             }
 
-            ProgressEvent::DirectoryScanProgress { files_found, dirs_found, .. } => {
+            ProgressEvent::DirectoryScanProgress {
+                files_found,
+                dirs_found,
+                ..
+            } => {
                 if self.verbose {
-                    print!("\r   Found: {} files, {} directories", files_found, dirs_found);
+                    print!(
+                        "\r   Found: {} files, {} directories",
+                        files_found, dirs_found
+                    );
                     io::stdout().flush()?;
                 }
             }
 
-            ProgressEvent::DirectoryScanComplete { total_files, total_dirs, .. } => {
-                println!("\r   ✓ Scan complete: {} files, {} directories", total_files, total_dirs);
+            ProgressEvent::DirectoryScanComplete {
+                total_files,
+                total_dirs,
+                ..
+            } => {
+                println!(
+                    "\r   ✓ Scan complete: {} files, {} directories",
+                    total_files, total_dirs
+                );
             }
 
-            ProgressEvent::BatchComplete { files_succeeded, files_failed, total_bytes, duration_ms, .. } => {
+            ProgressEvent::BatchComplete {
+                files_succeeded,
+                files_failed,
+                total_bytes,
+                duration_ms,
+                ..
+            } => {
                 let throughput_mbps = if duration_ms > 0 {
                     (total_bytes as f64 / 1_048_576.0) / (duration_ms as f64 / 1000.0)
                 } else {
@@ -181,19 +234,34 @@ impl CliProgressRenderer {
                 if files_failed > 0 {
                     println!("   Failed: {} files", files_failed);
                 }
-                println!("   Total: {} in {}ms ({:.2} MB/s)",
+                println!(
+                    "   Total: {} in {}ms ({:.2} MB/s)",
                     format_bytes(total_bytes),
                     duration_ms,
                     throughput_mbps
                 );
             }
 
-            ProgressEvent::ResumeDecision { file_id, decision, from_offset, verified_chunks, reason, .. } => {
+            ProgressEvent::ResumeDecision {
+                file_id,
+                decision,
+                from_offset,
+                verified_chunks,
+                reason,
+                ..
+            } => {
                 if self.verbose {
-                    println!("\n🔄 Resume Decision for {}: {}", file_id.as_str(), decision);
+                    println!(
+                        "\n🔄 Resume Decision for {}: {}",
+                        file_id.as_str(),
+                        decision
+                    );
                     if from_offset > 0 {
-                        println!("   Offset: {} ({} chunks verified)",
-                            format_bytes(from_offset), verified_chunks);
+                        println!(
+                            "   Offset: {} ({} chunks verified)",
+                            format_bytes(from_offset),
+                            verified_chunks
+                        );
                     }
                     if let Some(r) = reason {
                         println!("   Reason: {}", r);
@@ -201,14 +269,24 @@ impl CliProgressRenderer {
                 }
             }
 
-            ProgressEvent::ChunkVerification {  chunk_id, chunk_size, .. } => {
+            ProgressEvent::ChunkVerification {
+                chunk_id,
+                chunk_size,
+                ..
+            } => {
                 if self.verbose {
-                    print!("\r   Verifying chunk {}: {}", chunk_id, format_bytes(chunk_size));
+                    print!(
+                        "\r   Verifying chunk {}: {}",
+                        chunk_id,
+                        format_bytes(chunk_size)
+                    );
                     io::stdout().flush()?;
                 }
             }
 
-            ProgressEvent::ChunkVerified {  chunk_id, digest, .. } => {
+            ProgressEvent::ChunkVerified {
+                chunk_id, digest, ..
+            } => {
                 if self.verbose {
                     println!("\r   ✓ Chunk {} verified: {}", chunk_id, &digest[..16]);
                 }

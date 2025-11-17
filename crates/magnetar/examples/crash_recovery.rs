@@ -4,8 +4,8 @@
 //!
 //! This example simulates a crash mid-processing and demonstrates resumption.
 
-use magnetar::JobStatus;
 use anyhow::Result;
+use magnetar::JobStatus;
 
 async fn simulate_processing(simulate_crash: bool) -> Result<()> {
     let mut store = magnetar::open("recovery_example.db").await?;
@@ -61,13 +61,18 @@ async fn simulate_processing(simulate_crash: bool) -> Result<()> {
 
         // Simulate crash after processing 2 chunks on first run
         if simulate_crash && processed == 2 {
-            println!("\n💥 SIMULATED CRASH! (chunk {} was processing but not marked done)", chunk.chunk);
+            println!(
+                "\n💥 SIMULATED CRASH! (chunk {} was processing but not marked done)",
+                chunk.chunk
+            );
             println!("   On resume, this chunk will be claimed again.\n");
             return Ok(());
         }
 
         // Mark complete
-        store.mark_status(100, chunk.chunk, JobStatus::Done, None).await?;
+        store
+            .mark_status(100, chunk.chunk, JobStatus::Done, None)
+            .await?;
         println!("✓ Chunk {} completed", chunk.chunk);
 
         processed += 1;

@@ -2,10 +2,10 @@
  * Resume functionality for interrupted transfers with chunk-level verification
  */
 
-use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use crate::error::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 /// Resume information for interrupted transfers with chunk-level tracking
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -37,7 +37,10 @@ pub struct ResumeInfo {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResumeDecision {
     /// Resume from the saved offset (fast-forward)
-    Resume { from_offset: u64, verified_chunks: usize },
+    Resume {
+        from_offset: u64,
+        verified_chunks: usize,
+    },
 
     /// Re-validate existing data before resuming
     Revalidate { reason: String },
@@ -61,8 +64,11 @@ pub fn load_resume_info(destination_path: &Path, compressed: bool) -> Result<Res
 
     // Try JSON format first (new format)
     if let Ok(info) = serde_json::from_str::<ResumeInfo>(&resume_data) {
-        println!("Loaded resume info: {} bytes, {} chunks verified",
-            info.bytes_copied, info.verified_chunks.len());
+        println!(
+            "Loaded resume info: {} bytes, {} chunks verified",
+            info.bytes_copied,
+            info.verified_chunks.len()
+        );
         return Ok(info);
     }
 
@@ -140,10 +146,7 @@ fn get_resume_file_path(destination_path: &Path, compressed: bool) -> PathBuf {
 ///
 /// This function compares the resume information with the actual destination file
 /// to make an intelligent decision about how to proceed.
-pub fn decide_resume_strategy(
-    destination_path: &Path,
-    resume_info: &ResumeInfo,
-) -> ResumeDecision {
+pub fn decide_resume_strategy(destination_path: &Path, resume_info: &ResumeInfo) -> ResumeDecision {
     // If no resume data, start fresh
     if resume_info.bytes_copied == 0 {
         return ResumeDecision::StartFresh;
@@ -162,7 +165,8 @@ pub fn decide_resume_strategy(
     let current_size = dest_metadata.len();
 
     // Get current file modification time
-    let current_mtime = dest_metadata.modified()
+    let current_mtime = dest_metadata
+        .modified()
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs());
@@ -284,11 +288,7 @@ pub fn validate_chunks(
 /// Calculate and store chunk digest for a newly copied chunk
 ///
 /// This is called during the copy process to track verified chunks.
-pub fn record_chunk_digest(
-    chunk_id: u32,
-    chunk_data: &[u8],
-    resume_info: &mut ResumeInfo,
-) {
+pub fn record_chunk_digest(chunk_id: u32, chunk_data: &[u8], resume_info: &mut ResumeInfo) {
     let hash = blake3::hash(chunk_data);
     let digest_hex = hex::encode(hash.as_bytes());
     resume_info.verified_chunks.insert(chunk_id, digest_hex);
@@ -303,18 +303,18 @@ mod tests {
     fn test_save_and_load_resume_info() {
         let dir = tempdir().unwrap();
         let dest = dir.path().join("test.txt");
-        
+
         save_resume_info(&dest, 1024, None, false).unwrap();
         let info = load_resume_info(&dest, false).unwrap();
-        
+
         assert_eq!(info.bytes_copied, 1024);
         assert_eq!(info.compressed_bytes, None);
-        
+
         cleanup_resume_info(&dest, false);
         let info2 = load_resume_info(&dest, false).unwrap();
         assert_eq!(info2.bytes_copied, 0);
     }
-    
+
     #[test]
     fn test_compressed_resume_info() {
         let dir = tempdir().unwrap();
@@ -370,7 +370,8 @@ mod tests {
         drop(file);
 
         let metadata = std::fs::metadata(&dest).unwrap();
-        let mtime = metadata.modified()
+        let mtime = metadata
+            .modified()
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_secs());
@@ -383,7 +384,10 @@ mod tests {
         let decision = decide_resume_strategy(&dest, &resume_info);
 
         match decision {
-            ResumeDecision::Resume { from_offset, verified_chunks } => {
+            ResumeDecision::Resume {
+                from_offset,
+                verified_chunks,
+            } => {
                 assert_eq!(from_offset, 1024);
                 assert_eq!(verified_chunks, 0);
             }
@@ -453,10 +457,8 @@ mod tests {
 
         // Validate chunks
         let (publisher, _subscriber) = super::super::progress::ProgressPublisher::unbounded();
-        let file_id = super::super::progress::FileId::new(
-            &std::path::PathBuf::from("source"),
-            &dest,
-        );
+        let file_id =
+            super::super::progress::FileId::new(&std::path::PathBuf::from("source"), &dest);
 
         let failures = validate_chunks(&dest, &resume_info, 1024, &publisher, &file_id).unwrap();
         assert_eq!(failures, 0);
@@ -484,10 +486,8 @@ mod tests {
 
         // Validate chunks (should fail)
         let (publisher, _subscriber) = super::super::progress::ProgressPublisher::unbounded();
-        let file_id = super::super::progress::FileId::new(
-            &std::path::PathBuf::from("source"),
-            &dest,
-        );
+        let file_id =
+            super::super::progress::FileId::new(&std::path::PathBuf::from("source"), &dest);
 
         let failures = validate_chunks(&dest, &resume_info, 1024, &publisher, &file_id).unwrap();
         assert_eq!(failures, 1);

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 /// Telemetry logger for append-only event logging
@@ -65,9 +66,12 @@ impl EventType {
             EventType::Custom => "custom",
         }
     }
+}
 
-    /// Parse event type from string
-    pub fn from_str(s: &str) -> Result<Self> {
+impl FromStr for EventType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "plan" => Ok(EventType::Plan),
             "job_start" => Ok(EventType::JobStart),

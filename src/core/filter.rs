@@ -1,8 +1,8 @@
+use glob::Pattern as GlobPattern;
+use regex::Regex;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use glob::Pattern as GlobPattern;
-use regex::Regex;
 use thiserror::Error;
 
 /// Errors that can occur during filter operations
@@ -124,18 +124,16 @@ impl FilterRule {
         let normalized_path = path_str.replace('\\', "/");
 
         let base_matches = match &self.filter_type {
-            FilterType::Glob(_) => {
-                self.glob_pattern
-                    .as_ref()
-                    .map(|p| p.matches(&normalized_path))
-                    .unwrap_or(false)
-            }
-            FilterType::Regex(_) => {
-                self.regex_pattern
-                    .as_ref()
-                    .map(|r| r.is_match(&normalized_path))
-                    .unwrap_or(false)
-            }
+            FilterType::Glob(_) => self
+                .glob_pattern
+                .as_ref()
+                .map(|p| p.matches(&normalized_path))
+                .unwrap_or(false),
+            FilterType::Regex(_) => self
+                .regex_pattern
+                .as_ref()
+                .map(|r| r.is_match(&normalized_path))
+                .unwrap_or(false),
             FilterType::Path(exact) => {
                 // Normalize both paths for comparison
                 let normalized_exact = exact.replace('\\', "/");
@@ -228,14 +226,20 @@ impl FilterList {
 
     /// Add an include regex pattern
     pub fn include_regex(&mut self, pattern: &str) -> Result<(), FilterError> {
-        let rule = FilterRule::new(FilterAction::Include, FilterType::Regex(pattern.to_string()))?;
+        let rule = FilterRule::new(
+            FilterAction::Include,
+            FilterType::Regex(pattern.to_string()),
+        )?;
         self.add_rule(rule);
         Ok(())
     }
 
     /// Add an exclude regex pattern
     pub fn exclude_regex(&mut self, pattern: &str) -> Result<(), FilterError> {
-        let rule = FilterRule::new(FilterAction::Exclude, FilterType::Regex(pattern.to_string()))?;
+        let rule = FilterRule::new(
+            FilterAction::Exclude,
+            FilterType::Regex(pattern.to_string()),
+        )?;
         self.add_rule(rule);
         Ok(())
     }
@@ -476,10 +480,8 @@ mod tests {
 
     #[test]
     fn test_glob_matching() {
-        let rule = FilterRule::new(
-            FilterAction::Include,
-            FilterType::Glob("*.txt".to_string()),
-        ).unwrap();
+        let rule =
+            FilterRule::new(FilterAction::Include, FilterType::Glob("*.txt".to_string())).unwrap();
 
         assert!(rule.matches(Path::new("file.txt")));
         assert!(rule.matches(Path::new("test.txt")));
@@ -491,7 +493,8 @@ mod tests {
         let rule = FilterRule::new(
             FilterAction::Exclude,
             FilterType::Glob("target/**".to_string()),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(rule.matches(Path::new("target/debug")));
         assert!(rule.matches(Path::new("target/release/build")));
@@ -503,7 +506,8 @@ mod tests {
         let rule = FilterRule::new(
             FilterAction::Include,
             FilterType::Regex(r"^src/.*\.rs$".to_string()),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(rule.matches(Path::new("src/main.rs")));
         assert!(rule.matches(Path::new("src/lib.rs")));
@@ -515,7 +519,8 @@ mod tests {
         let rule = FilterRule::new(
             FilterAction::Include,
             FilterType::Path("src/main.rs".to_string()),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(rule.matches(Path::new("src/main.rs")));
         assert!(!rule.matches(Path::new("src/lib.rs")));
@@ -523,12 +528,9 @@ mod tests {
 
     #[test]
     fn test_negation() {
-        let rule = FilterRule::new(
-            FilterAction::Include,
-            FilterType::Glob("*.txt".to_string()),
-        )
-        .unwrap()
-        .negated();
+        let rule = FilterRule::new(FilterAction::Include, FilterType::Glob("*.txt".to_string()))
+            .unwrap()
+            .negated();
 
         assert!(rule.matches(Path::new("file.txt")));
         assert_eq!(rule.action(), FilterAction::Exclude);
@@ -541,7 +543,10 @@ mod tests {
         filter.exclude_glob("src/**").unwrap();
 
         // First rule matches, so included even though second rule would exclude
-        assert_eq!(filter.evaluate(Path::new("src/main.rs")), FilterDecision::Include);
+        assert_eq!(
+            filter.evaluate(Path::new("src/main.rs")),
+            FilterDecision::Include
+        );
     }
 
     #[test]
@@ -551,13 +556,22 @@ mod tests {
         filter.include_glob("*.rs").unwrap();
 
         // First rule matches and excludes
-        assert_eq!(filter.evaluate(Path::new("target/debug")), FilterDecision::Exclude);
+        assert_eq!(
+            filter.evaluate(Path::new("target/debug")),
+            FilterDecision::Exclude
+        );
 
         // Second rule matches and includes
-        assert_eq!(filter.evaluate(Path::new("main.rs")), FilterDecision::Include);
+        assert_eq!(
+            filter.evaluate(Path::new("main.rs")),
+            FilterDecision::Include
+        );
 
         // No match
-        assert_eq!(filter.evaluate(Path::new("README.md")), FilterDecision::NoMatch);
+        assert_eq!(
+            filter.evaluate(Path::new("README.md")),
+            FilterDecision::NoMatch
+        );
     }
 
     #[test]
@@ -569,10 +583,22 @@ mod tests {
         filter.include_glob("**/*.rs").unwrap();
         filter.exclude_glob("target/**").unwrap();
 
-        assert_eq!(filter.evaluate(Path::new("test.tmp")), FilterDecision::Exclude);
-        assert_eq!(filter.evaluate(Path::new("debug.log")), FilterDecision::Exclude);
-        assert_eq!(filter.evaluate(Path::new("src/main.rs")), FilterDecision::Include);
-        assert_eq!(filter.evaluate(Path::new("target/debug/build")), FilterDecision::Exclude);
+        assert_eq!(
+            filter.evaluate(Path::new("test.tmp")),
+            FilterDecision::Exclude
+        );
+        assert_eq!(
+            filter.evaluate(Path::new("debug.log")),
+            FilterDecision::Exclude
+        );
+        assert_eq!(
+            filter.evaluate(Path::new("src/main.rs")),
+            FilterDecision::Include
+        );
+        assert_eq!(
+            filter.evaluate(Path::new("target/debug/build")),
+            FilterDecision::Exclude
+        );
     }
 
     #[test]

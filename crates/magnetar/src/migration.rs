@@ -33,8 +33,13 @@ where
 
     // Sequential migration (async doesn't play well with rayon)
     for state in states {
-        to.mark_status(state.job_id, state.chunk, state.status, Some(state.checksum.clone()))
-            .await?;
+        to.mark_status(
+            state.job_id,
+            state.chunk,
+            state.status,
+            Some(state.checksum.clone()),
+        )
+        .await?;
     }
 
     Ok(())
@@ -91,8 +96,12 @@ impl<S1: JobStore, S2: JobStore> JobStore for DualStore<S1, S2> {
         checksum: Option<String>,
     ) -> Result<()> {
         // Write to both
-        self.primary.mark_status(job_id, chunk, status, checksum.clone()).await?;
-        self.secondary.mark_status(job_id, chunk, status, checksum).await?;
+        self.primary
+            .mark_status(job_id, chunk, status, checksum.clone())
+            .await?;
+        self.secondary
+            .mark_status(job_id, chunk, status, checksum)
+            .await?;
         Ok(())
     }
 
@@ -104,7 +113,11 @@ impl<S1: JobStore, S2: JobStore> JobStore for DualStore<S1, S2> {
         }
     }
 
-    async fn get_by_status(&self, job_id: i64, status: crate::JobStatus) -> Result<Vec<crate::JobState>> {
+    async fn get_by_status(
+        &self,
+        job_id: i64,
+        status: crate::JobStatus,
+    ) -> Result<Vec<crate::JobState>> {
         if self.read_from_primary {
             self.primary.get_by_status(job_id, status).await
         } else {
@@ -113,7 +126,9 @@ impl<S1: JobStore, S2: JobStore> JobStore for DualStore<S1, S2> {
     }
 
     async fn add_dependency(&mut self, job_id: i64, chunk: u64, deps: Vec<u64>) -> Result<()> {
-        self.primary.add_dependency(job_id, chunk, deps.clone()).await?;
+        self.primary
+            .add_dependency(job_id, chunk, deps.clone())
+            .await?;
         self.secondary.add_dependency(job_id, chunk, deps).await?;
         Ok(())
     }
@@ -169,7 +184,9 @@ impl<S1: JobStore, S2: JobStore> JobStore for DualStore<S1, S2> {
     ) -> Result<i64> {
         // Create the job in the primary store only
         // The secondary store is read-only during migration
-        self.primary.new_job(source, destination, compress, verify, parallel).await
+        self.primary
+            .new_job(source, destination, compress, verify, parallel)
+            .await
     }
 
     async fn delete_job(&mut self, job_id: i64) -> Result<()> {

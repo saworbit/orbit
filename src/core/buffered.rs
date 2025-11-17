@@ -3,19 +3,22 @@
  */
 
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write, Seek, SeekFrom};
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
 use indicatif::{ProgressBar, ProgressStyle};
 
+use super::bandwidth::BandwidthLimiter;
+use super::checksum::StreamingHasher;
+use super::progress::ProgressPublisher;
+use super::resume::{
+    cleanup_resume_info, decide_resume_strategy, load_resume_info, record_chunk_digest,
+    save_resume_info_full, validate_chunks, ResumeDecision, ResumeInfo,
+};
+use super::CopyStats;
 use crate::config::CopyConfig;
 use crate::error::Result;
-use super::CopyStats;
-use super::checksum::StreamingHasher;
-use super::resume::{ResumeInfo, load_resume_info, save_resume_info_full, cleanup_resume_info, decide_resume_strategy, ResumeDecision, record_chunk_digest, validate_chunks};
-use super::bandwidth::BandwidthLimiter;
-use super::progress::ProgressPublisher;
 use tracing::{debug, info};
 
 /// Buffered copy with streaming checksum (original implementation)
@@ -36,7 +39,10 @@ pub fn copy_buffered(
     // Setup bandwidth limiter with token bucket algorithm
     let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
     if bandwidth_limiter.is_enabled() {
-        info!("Bandwidth limiting enabled: {} bytes/sec", config.max_bandwidth);
+        info!(
+            "Bandwidth limiting enabled: {} bytes/sec",
+            config.max_bandwidth
+        );
     }
 
     // Emit transfer start event
@@ -55,7 +61,8 @@ pub fn copy_buffered(
 
     // Get source file metadata for resume decision
     let source_metadata = std::fs::metadata(source_path)?;
-    let source_mtime = source_metadata.modified()
+    let source_mtime = source_metadata
+        .modified()
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs());
@@ -73,7 +80,10 @@ pub fn copy_buffered(
 
     // Emit resume decision event
     match &resume_decision {
-        ResumeDecision::Resume { from_offset, verified_chunks } => {
+        ResumeDecision::Resume {
+            from_offset,
+            verified_chunks,
+        } => {
             publisher.publish_resume_decision(
                 &file_id,
                 "Resume".to_string(),
@@ -101,21 +111,18 @@ pub fn copy_buffered(
             );
         }
         ResumeDecision::StartFresh => {
-            publisher.publish_resume_decision(
-                &file_id,
-                "StartFresh".to_string(),
-                0,
-                0,
-                None,
-            );
+            publisher.publish_resume_decision(&file_id, "StartFresh".to_string(), 0, 0, None);
         }
     }
 
     // Determine start offset based on decision
     let start_offset = match resume_decision {
         ResumeDecision::Resume { from_offset, .. } => {
-            println!("Resuming from byte {} ({} chunks verified)",
-                from_offset, resume_info.verified_chunks.len());
+            println!(
+                "Resuming from byte {} ({} chunks verified)",
+                from_offset,
+                resume_info.verified_chunks.len()
+            );
             from_offset
         }
         ResumeDecision::Revalidate { ref reason } => {
@@ -150,7 +157,7 @@ pub fn copy_buffered(
             .write(true)
             .append(start_offset > 0)
             .truncate(start_offset == 0)
-            .open(dest_path)?
+            .open(dest_path)?,
     );
 
     // Setup progress bar
@@ -160,7 +167,7 @@ pub fn copy_buffered(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                 .unwrap()
-                .progress_chars("#>-")
+                .progress_chars("#>-"),
         );
         pb.set_position(start_offset);
         Some(pb)
@@ -176,12 +183,26 @@ pub fn copy_buffered(
     };
 
     // Validate existing chunks if in Revalidate mode
-    if matches!(resume_decision, ResumeDecision::Revalidate { .. }) && resume_info.verified_chunks.len() > 0 {
-        println!("Validating {} existing chunks...", resume_info.verified_chunks.len());
-        match validate_chunks(dest_path, &resume_info, config.chunk_size, publisher, &file_id) {
+    if matches!(resume_decision, ResumeDecision::Revalidate { .. })
+        && resume_info.verified_chunks.len() > 0
+    {
+        println!(
+            "Validating {} existing chunks...",
+            resume_info.verified_chunks.len()
+        );
+        match validate_chunks(
+            dest_path,
+            &resume_info,
+            config.chunk_size,
+            publisher,
+            &file_id,
+        ) {
             Ok(failures) => {
                 if failures > 0 {
-                    println!("Warning: {} chunks failed validation, will be re-verified", failures);
+                    println!(
+                        "Warning: {} chunks failed validation, will be re-verified",
+                        failures
+                    );
                     resume_info.verified_chunks.clear();
                 } else {
                     println!("All chunks validated successfully");
@@ -253,7 +274,10 @@ pub fn copy_buffered(
 
             // Log throttle events for monitoring
             if throttle_duration > Duration::from_millis(10) {
-                debug!("Bandwidth throttle: waited {:?} for {} bytes", throttle_duration, n);
+                debug!(
+                    "Bandwidth throttle: waited {:?} for {} bytes",
+                    throttle_duration, n
+                );
             }
         }
     }

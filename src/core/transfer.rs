@@ -5,15 +5,15 @@
 use std::path::Path;
 use std::time::Instant;
 
-use crate::config::{CopyConfig, CompressionType};
-use crate::error::{OrbitError, Result};
-use crate::compression;
-use super::CopyStats;
-use super::zero_copy;
 use super::buffered;
+use super::delta::{self, DeltaConfig};
 use super::progress::ProgressPublisher;
 use super::validation;
-use super::delta::{self, DeltaConfig};
+use super::zero_copy;
+use super::CopyStats;
+use crate::compression;
+use crate::config::{CompressionType, CopyConfig};
+use crate::error::{OrbitError, Result};
 
 /// Internal copy implementation (called by retry logic)
 ///
@@ -66,7 +66,13 @@ fn copy_direct(
 
     if use_zero_copy {
         // Try zero-copy first
-        match zero_copy::try_zero_copy_direct(source_path, dest_path, source_size, config, publisher) {
+        match zero_copy::try_zero_copy_direct(
+            source_path,
+            dest_path,
+            source_size,
+            config,
+            publisher,
+        ) {
             Ok(stats) => {
                 if config.show_progress {
                     println!("✓ Zero-copy transfer completed");
@@ -110,11 +116,8 @@ fn copy_with_delta_integration(
         manifest_path: config.delta_manifest_path.clone(),
     };
 
-    let (delta_stats, checksum) = delta::copy_with_delta_fallback(
-        source_path,
-        dest_path,
-        &delta_config,
-    )?;
+    let (delta_stats, checksum) =
+        delta::copy_with_delta_fallback(source_path, dest_path, &delta_config)?;
 
     let duration = start.elapsed();
 

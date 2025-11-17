@@ -65,10 +65,7 @@ pub enum ProgressEvent {
     },
 
     /// Directory scan started
-    DirectoryScanStart {
-        path: PathBuf,
-        timestamp: u64,
-    },
+    DirectoryScanStart { path: PathBuf, timestamp: u64 },
 
     /// Directory scan progress
     DirectoryScanProgress {

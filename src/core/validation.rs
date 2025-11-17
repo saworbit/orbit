@@ -2,12 +2,12 @@
  * Validation logic for copy operations
  */
 
+use super::delta::{self, CheckMode};
+use super::disk_guardian::{self, GuardianConfig};
+use crate::config::{CopyConfig, CopyMode};
+use crate::error::{OrbitError, Result};
 use std::path::Path;
 use sysinfo::Disks;
-use crate::config::{CopyMode, CopyConfig};
-use crate::error::{OrbitError, Result};
-use super::disk_guardian::{self, GuardianConfig};
-use super::delta::{CheckMode, self};
 
 /// Validate that sufficient disk space is available (basic check)
 ///
@@ -17,9 +17,9 @@ use super::delta::{CheckMode, self};
 pub fn validate_disk_space(destination_path: &Path, required_size: u64) -> Result<()> {
     let disks = Disks::new_with_refreshed_list();
 
-    let destination_disk = disks.iter().find(|disk| {
-        destination_path.starts_with(disk.mount_point())
-    });
+    let destination_disk = disks
+        .iter()
+        .find(|disk| destination_path.starts_with(disk.mount_point()));
 
     if let Some(disk) = destination_disk {
         if disk.available_space() < required_size {
@@ -49,11 +49,7 @@ pub fn validate_disk_space_enhanced(
     let default_config = GuardianConfig::default();
     let guardian_config = config.unwrap_or(&default_config);
 
-    disk_guardian::ensure_transfer_safety(
-        destination_path,
-        required_size,
-        guardian_config
-    )
+    disk_guardian::ensure_transfer_safety(destination_path, required_size, guardian_config)
 }
 
 /// Determine if a file should be copied based on the copy mode
@@ -62,16 +58,16 @@ pub fn should_copy_file(source_path: &Path, dest_path: &Path, mode: CopyMode) ->
     if !dest_path.exists() {
         return Ok(true);
     }
-    
+
     match mode {
         CopyMode::Copy => Ok(true),
         CopyMode::Sync | CopyMode::Update => {
             let source_meta = std::fs::metadata(source_path)?;
             let dest_meta = std::fs::metadata(dest_path)?;
-            
+
             // Copy if source is newer or different size
-            Ok(source_meta.modified()? > dest_meta.modified()? 
-               || source_meta.len() != dest_meta.len())
+            Ok(source_meta.modified()? > dest_meta.modified()?
+                || source_meta.len() != dest_meta.len())
         }
         CopyMode::Mirror => Ok(true),
     }
@@ -107,11 +103,9 @@ pub fn files_need_transfer(
     match check_mode {
         CheckMode::ModTime => {
             Ok(source_meta.modified()? > dest_meta.modified()?
-               || source_meta.len() != dest_meta.len())
+                || source_meta.len() != dest_meta.len())
         }
-        CheckMode::Size => {
-            Ok(source_meta.len() != dest_meta.len())
-        }
+        CheckMode::Size => Ok(source_meta.len() != dest_meta.len()),
         CheckMode::Checksum | CheckMode::Delta => {
             if source_meta.len() != dest_meta.len() {
                 return Ok(true);
@@ -144,42 +138,42 @@ pub fn should_use_delta_transfer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
     use std::thread;
     use std::time::Duration;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_should_copy_copy_mode() {
         let source = NamedTempFile::new().unwrap();
         let dest = NamedTempFile::new().unwrap();
-        
+
         assert!(should_copy_file(source.path(), dest.path(), CopyMode::Copy).unwrap());
     }
-    
+
     #[test]
     fn test_should_copy_sync_mode_newer() {
         let mut source = NamedTempFile::new().unwrap();
         let mut dest = NamedTempFile::new().unwrap();
-        
+
         dest.write_all(b"old").unwrap();
         dest.flush().unwrap();
-        
+
         thread::sleep(Duration::from_millis(100));
-        
+
         source.write_all(b"new").unwrap();
         source.flush().unwrap();
-        
+
         assert!(should_copy_file(source.path(), dest.path(), CopyMode::Sync).unwrap());
     }
-    
+
     #[test]
     fn test_matches_exclude_pattern() {
         let path = Path::new("/tmp/test.tmp");
         let patterns = vec!["*.tmp".to_string(), "*.log".to_string()];
-        
+
         assert!(matches_exclude_pattern(path, &patterns));
-        
+
         let path2 = Path::new("/tmp/test.txt");
         assert!(!matches_exclude_pattern(path2, &patterns));
     }

@@ -111,6 +111,9 @@ log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 
+# Web GUI integration (optional)
+orbit-web = { path = "crates/orbit-web", optional = true, default-features = false, features = ["ssr"] }
+
 # Random for backoff jitter
 rand = "0.8"
 
@@ -160,6 +163,7 @@ tempfile = "3.10"
 criterion = "0.5"
 assert_fs = "1.1"
 predicates = "3.1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [lib]
 name = "orbit"
@@ -190,7 +194,7 @@ codegen-units = 1
 panic = "abort"
 
 [features]
-default = ["zero-copy"]
+default = ["zero-copy", "gui"]
 
 # Zero-copy system calls for maximum performance
 zero-copy = []
@@ -210,6 +214,9 @@ ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:b
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
 
+# Web GUI (enabled by default)
+gui = ["dep:orbit-web", "orbit-web/ssr", "dep:tokio"]
+
 # Delta manifest persistence with SQLite
 delta-manifest = ["dep:rusqlite"]
 
@@ -220,4 +227,4 @@ extended-metadata = ["dep:xattr"]
 unicode-normalization = ["dep:unicode-normalization"]
 
 # Full feature set
-full = ["zero-copy", "protocols", "smb-native", "s3-native", "ssh-backend", "backend-abstraction", "delta-manifest", "extended-metadata"]
+full = ["zero-copy", "protocols", "smb-native", "s3-native", "ssh-backend", "backend-abstraction", "delta-manifest", "extended-metadata", "gui"]

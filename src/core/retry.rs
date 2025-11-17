@@ -6,18 +6,15 @@ use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
-use tracing::{debug, info, warn, error as log_error, instrument};
+use tracing::{debug, error as log_error, info, instrument, warn};
 
+use super::CopyStats;
 use crate::config::{CopyConfig, ErrorMode};
 use crate::error::{OrbitError, Result};
 use crate::instrumentation::OperationStats;
-use super::CopyStats;
 
 /// Execute a copy operation with retry logic and exponential backoff
-pub fn with_retry<F>(
-    config: &CopyConfig,
-    operation: F,
-) -> Result<CopyStats>
+pub fn with_retry<F>(config: &CopyConfig, operation: F) -> Result<CopyStats>
 where
     F: FnMut() -> Result<CopyStats>,
 {
@@ -138,7 +135,9 @@ where
     log_error!(
         "All {} retry attempts exhausted. Last error: {}",
         config.retry_attempts,
-        last_error.as_ref().map_or("none".to_string(), |e| e.to_string())
+        last_error
+            .as_ref()
+            .map_or("none".to_string(), |e| e.to_string())
     );
 
     // Record the actual error that caused the failure, not the RetriesExhausted wrapper
@@ -294,9 +293,7 @@ mod tests {
             ..Default::default()
         };
 
-        let result = with_retry(&config, || {
-            Err(OrbitError::Other("test error".to_string()))
-        });
+        let result = with_retry(&config, || Err(OrbitError::Other("test error".to_string())));
 
         // Should return Ok with zero stats when skipping
         assert!(result.is_ok());

@@ -175,7 +175,9 @@ impl CircuitBreaker {
                     // Sleep with exponential backoff before retrying
                     tokio::time::sleep(backoff).await;
                     backoff = std::cmp::min(
-                        Duration::from_secs_f64(backoff.as_secs_f64() * self.config.backoff_multiplier),
+                        Duration::from_secs_f64(
+                            backoff.as_secs_f64() * self.config.backoff_multiplier,
+                        ),
                         self.config.max_backoff,
                     );
                 }
@@ -345,7 +347,9 @@ mod tests {
 
         // Successful calls should close the circuit
         for _ in 0..2 {
-            let result = breaker.call(|| async { Ok::<_, ResilienceError>(()) }).await;
+            let result = breaker
+                .call(|| async { Ok::<_, ResilienceError>(()) })
+                .await;
             assert!(result.is_ok());
         }
 

@@ -14,6 +14,10 @@ All notable changes to Orbit will be documented in this file.
   - Added comprehensive test coverage for job creation lifecycle
 
 ### Added
+- **GUI Integration**
+  - New `orbit serve` subcommand to launch the web dashboard with GUI enabled by default via the `gui` feature
+  - Shared `orbit_web::start_server` entry point reused by the CLI and `orbit-web` binary
+  - Documentation updates for GUI integration and a smoke test for the `/api/health` endpoint
 - **Magnetar Job Management**
   - New `new_job()` method in JobStore trait for creating jobs with auto-generated IDs
   - Jobs metadata table with source, destination, compress, verify, and parallel settings

@@ -2,13 +2,13 @@
  * Delta transfer implementation - actual file copying with delta algorithm
  */
 
-use super::{DeltaConfig, DeltaStats, HashAlgorithm};
-use super::types::DeltaInstruction;
-use super::algorithm::{SignatureIndex, generate_delta, generate_delta_rolling};
+use super::algorithm::{generate_delta, generate_delta_rolling, SignatureIndex};
 use super::checksum::{generate_signatures, generate_signatures_parallel};
+use super::types::DeltaInstruction;
+use super::{DeltaConfig, DeltaStats, HashAlgorithm};
 use crate::error::Result;
 use std::fs::File;
-use std::io::{Read, Write, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 /// Perform delta transfer between source and destination
@@ -70,24 +70,27 @@ pub fn copy_with_delta(
 }
 
 /// Apply delta instructions to reconstruct a file
-fn apply_delta(
-    old_path: &Path,
-    new_path: &Path,
-    instructions: &[DeltaInstruction],
-) -> Result<()> {
+fn apply_delta(old_path: &Path, new_path: &Path, instructions: &[DeltaInstruction]) -> Result<()> {
     let mut old_file = File::open(old_path)?;
     let mut new_file = File::create(new_path)?;
 
     for instruction in instructions {
         match instruction {
-            DeltaInstruction::Copy { src_offset, dest_offset: _, length } => {
+            DeltaInstruction::Copy {
+                src_offset,
+                dest_offset: _,
+                length,
+            } => {
                 // Copy block from old file
                 let mut buffer = vec![0u8; *length];
                 old_file.seek(SeekFrom::Start(*src_offset))?;
                 old_file.read_exact(&mut buffer)?;
                 new_file.write_all(&buffer)?;
             }
-            DeltaInstruction::Data { dest_offset: _, bytes } => {
+            DeltaInstruction::Data {
+                dest_offset: _,
+                bytes,
+            } => {
                 // Write new data
                 new_file.write_all(bytes)?;
             }
@@ -163,8 +166,8 @@ pub fn copy_with_delta_fallback(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn test_full_copy_as_delta() {

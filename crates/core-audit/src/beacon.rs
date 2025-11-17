@@ -193,11 +193,7 @@ impl BeaconBuilder {
     }
 
     /// Add metadata field
-    pub fn with_metadata<S: Into<String>>(
-        mut self,
-        key: S,
-        value: serde_json::Value,
-    ) -> Self {
+    pub fn with_metadata<S: Into<String>>(mut self, key: S, value: serde_json::Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
     }
@@ -258,9 +254,12 @@ mod tests {
 
         assert_eq!(beacon.job_id, "job-123");
         assert_eq!(beacon.signer, Some("CN=ORBIT-SIGNER".to_string()));
-        
+
         let policy = beacon.policy.unwrap();
-        assert_eq!(policy.classification, Some("OFFICIAL:Sensitive".to_string()));
+        assert_eq!(
+            policy.classification,
+            Some("OFFICIAL:Sensitive".to_string())
+        );
         assert_eq!(policy.retention_days, Some(180));
         assert_eq!(policy.encryption, Some("aes256-gcm".to_string()));
     }

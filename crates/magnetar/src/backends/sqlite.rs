@@ -7,7 +7,7 @@ use crate::{JobState, JobStats, JobStatus, JobStore};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteRow};
-use sqlx::{Row, migrate::MigrateDatabase};
+use sqlx::{migrate::MigrateDatabase, Row};
 use std::str::FromStr;
 
 /// SQLite-backed job store
@@ -28,8 +28,12 @@ impl SqliteStore {
         };
 
         // Create database if it doesn't exist
-        if !sqlx::Sqlite::database_exists(&db_url).await.unwrap_or(false) {
-            sqlx::Sqlite::create_database(&db_url).await
+        if !sqlx::Sqlite::database_exists(&db_url)
+            .await
+            .unwrap_or(false)
+        {
+            sqlx::Sqlite::create_database(&db_url)
+                .await
                 .context("Failed to create database")?;
         }
 
@@ -97,7 +101,7 @@ impl JobStore for SqliteStore {
 
             sqlx::query(
                 "INSERT INTO chunks (job_id, chunk, checksum, status) VALUES (?, ?, ?, 'pending')
-                 ON CONFLICT (job_id, chunk) DO UPDATE SET checksum = excluded.checksum"
+                 ON CONFLICT (job_id, chunk) DO UPDATE SET checksum = excluded.checksum",
             )
             .bind(job_id)
             .bind(chunk as i64)
@@ -123,7 +127,7 @@ impl JobStore for SqliteStore {
                  ORDER BY chunk ASC
                  LIMIT 1
              )
-             RETURNING job_id, chunk, checksum, status, error"
+             RETURNING job_id, chunk, checksum, status, error",
         )
         .bind(job_id)
         .fetch_optional(&mut *tx)
@@ -155,14 +159,12 @@ impl JobStore for SqliteStore {
             .execute(&self.pool)
             .await?;
         } else {
-            sqlx::query(
-                "UPDATE chunks SET status = ? WHERE job_id = ? AND chunk = ?"
-            )
-            .bind(status.to_string())
-            .bind(job_id)
-            .bind(chunk as i64)
-            .execute(&self.pool)
-            .await?;
+            sqlx::query("UPDATE chunks SET status = ? WHERE job_id = ? AND chunk = ?")
+                .bind(status.to_string())
+                .bind(job_id)
+                .bind(chunk as i64)
+                .execute(&self.pool)
+                .await?;
         }
 
         Ok(())
@@ -170,7 +172,7 @@ impl JobStore for SqliteStore {
 
     async fn mark_failed(&mut self, job_id: i64, chunk: u64, error: String) -> Result<()> {
         sqlx::query(
-            "UPDATE chunks SET status = 'failed', error = ? WHERE job_id = ? AND chunk = ?"
+            "UPDATE chunks SET status = 'failed', error = ? WHERE job_id = ? AND chunk = ?",
         )
         .bind(error)
         .bind(job_id)
@@ -185,7 +187,7 @@ impl JobStore for SqliteStore {
         let rows = sqlx::query(
             "SELECT job_id, chunk, checksum, status, error FROM chunks
              WHERE job_id = ? AND status = 'pending'
-             ORDER BY chunk ASC"
+             ORDER BY chunk ASC",
         )
         .bind(job_id)
         .fetch_all(&self.pool)
@@ -198,7 +200,7 @@ impl JobStore for SqliteStore {
         let rows = sqlx::query(
             "SELECT job_id, chunk, checksum, status, error FROM chunks
              WHERE job_id = ? AND status = ?
-             ORDER BY chunk ASC"
+             ORDER BY chunk ASC",
         )
         .bind(job_id)
         .bind(status.to_string())
@@ -214,7 +216,7 @@ impl JobStore for SqliteStore {
         for dep in deps {
             sqlx::query(
                 "INSERT INTO dependencies (job_id, chunk, depends_on) VALUES (?, ?, ?)
-                 ON CONFLICT DO NOTHING"
+                 ON CONFLICT DO NOTHING",
             )
             .bind(job_id)
             .bind(chunk as i64)
@@ -228,13 +230,12 @@ impl JobStore for SqliteStore {
     }
 
     async fn get_dependencies(&self, job_id: i64, chunk: u64) -> Result<Vec<u64>> {
-        let rows = sqlx::query(
-            "SELECT depends_on FROM dependencies WHERE job_id = ? AND chunk = ?"
-        )
-        .bind(job_id)
-        .bind(chunk as i64)
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query("SELECT depends_on FROM dependencies WHERE job_id = ? AND chunk = ?")
+                .bind(job_id)
+                .bind(chunk as i64)
+                .fetch_all(&self.pool)
+                .await?;
 
         Ok(rows
             .iter()
@@ -254,7 +255,7 @@ impl JobStore for SqliteStore {
                  AND d.chunk = c.chunk
                  AND dc.status != 'done'
              )
-             ORDER BY c.chunk ASC"
+             ORDER BY c.chunk ASC",
         )
         .bind(job_id)
         .fetch_all(&self.pool)
@@ -269,7 +270,7 @@ impl JobStore for SqliteStore {
     async fn get_chunk(&self, job_id: i64, chunk: u64) -> Result<Option<JobState>> {
         let row = sqlx::query(
             "SELECT job_id, chunk, checksum, status, error FROM chunks
-             WHERE job_id = ? AND chunk = ?"
+             WHERE job_id = ? AND chunk = ?",
         )
         .bind(job_id)
         .bind(chunk as i64)
@@ -290,7 +291,7 @@ impl JobStore for SqliteStore {
                 SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
                 SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) as done,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
-             FROM chunks WHERE job_id = ?"
+             FROM chunks WHERE job_id = ?",
         )
         .bind(job_id)
         .fetch_one(&self.pool)
@@ -311,7 +312,7 @@ impl JobStore for SqliteStore {
         use polars::prelude::*;
 
         let rows = sqlx::query(
-            "SELECT job_id, chunk, checksum, status, error FROM chunks ORDER BY job_id, chunk"
+            "SELECT job_id, chunk, checksum, status, error FROM chunks ORDER BY job_id, chunk",
         )
         .fetch_all(&self.pool)
         .await?;

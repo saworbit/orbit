@@ -3,10 +3,8 @@
 use leptos::*;
 
 #[component]
-pub fn ProgressBar(
-    #[prop(into)] percent: f64,
-) -> impl IntoView {
-    let width_style = move || format!("width: {}%", percent.min(100.0).max(0.0));
+pub fn ProgressBar(#[prop(into)] percent: f64) -> impl IntoView {
+    let width_style = move || format!("width: {}%", percent.clamp(0.0, 100.0));
 
     let color_class = move || {
         if percent >= 100.0 {

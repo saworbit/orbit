@@ -54,7 +54,8 @@ impl RollingChecksum {
     pub fn roll(&mut self, old_byte: u8, new_byte: u8) {
         // Remove the old byte
         self.a = (self.a + ADLER_MOD - old_byte as u32) % ADLER_MOD;
-        self.b = (self.b + ADLER_MOD - (self.window_size as u32 * old_byte as u32) % ADLER_MOD) % ADLER_MOD;
+        self.b = (self.b + ADLER_MOD - (self.window_size as u32 * old_byte as u32) % ADLER_MOD)
+            % ADLER_MOD;
 
         // Add the new byte
         self.a = (self.a + new_byte as u32) % ADLER_MOD;
@@ -240,12 +241,9 @@ mod tests {
         let data = b"this is test data for block signatures";
         let block_size = 10;
 
-        let signatures = generate_signatures(
-            &data[..],
-            block_size,
-            super::super::HashAlgorithm::Blake3,
-        )
-        .unwrap();
+        let signatures =
+            generate_signatures(&data[..], block_size, super::super::HashAlgorithm::Blake3)
+                .unwrap();
 
         // Data is 38 bytes: Should have 4 blocks: 10, 10, 10, 8 bytes
         assert_eq!(signatures.len(), 4);
@@ -272,12 +270,8 @@ mod tests {
     #[test]
     fn test_generate_signatures_empty() {
         let data = b"";
-        let signatures = generate_signatures(
-            &data[..],
-            1024,
-            super::super::HashAlgorithm::Blake3,
-        )
-        .unwrap();
+        let signatures =
+            generate_signatures(&data[..], 1024, super::super::HashAlgorithm::Blake3).unwrap();
 
         assert_eq!(signatures.len(), 0);
     }

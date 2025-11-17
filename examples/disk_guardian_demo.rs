@@ -8,13 +8,10 @@
  * - Staging area for safe transfers
  */
 
-use std::path::Path;
 use orbit::core::disk_guardian::{
-    ensure_transfer_safety,
-    GuardianConfig,
-    create_staging_area,
-    estimate_directory_size,
+    create_staging_area, ensure_transfer_safety, estimate_directory_size, GuardianConfig,
 };
+use std::path::Path;
 
 #[allow(unused_imports)]
 use orbit::core::disk_guardian::DiskWatcher;
@@ -36,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example 2: Custom safety margins
     println!("\n2. Custom safety margin (25%):");
     let custom_config = GuardianConfig {
-        safety_margin_percent: 0.25, // 25% safety margin
+        safety_margin_percent: 0.25,       // 25% safety margin
         min_free_space: 500 * 1024 * 1024, // 500 MB minimum free
         check_integrity: true,
         enable_watching: false,
@@ -63,7 +60,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match estimate_directory_size(Path::new("src")) {
         Ok(size) => {
             println!("   ✓ Source directory size: {} bytes", size);
-            println!("   ✓ Human-readable: {:.2} MB", size as f64 / (1024.0 * 1024.0));
+            println!(
+                "   ✓ Human-readable: {:.2} MB",
+                size as f64 / (1024.0 * 1024.0)
+            );
         }
         Err(e) => println!("   ✗ Failed to estimate size: {}", e),
     }

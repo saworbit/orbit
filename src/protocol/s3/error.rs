@@ -1,7 +1,7 @@
 //! Error types for S3 operations
 
-use thiserror::Error;
 use std::io;
+use thiserror::Error;
 
 /// Result type alias for S3 operations
 pub type S3Result<T> = Result<T, S3Error>;
@@ -111,12 +111,12 @@ impl S3Error {
         S3Error::Sdk(error.to_string())
     }
 
-/// Check if error is retryable
+    /// Check if error is retryable
     pub fn is_retryable(&self) -> bool {
         match self {
             S3Error::Network(_) | S3Error::Timeout(_) | S3Error::RateLimitExceeded(_) => true,
             S3Error::Service { code, .. } => is_retryable_code(code),
-            S3Error::Io(_) => true,  // I/O errors are generally retryable
+            S3Error::Io(_) => true, // I/O errors are generally retryable
             _ => false,
         }
     }
@@ -125,7 +125,10 @@ impl S3Error {
     pub fn is_transient(&self) -> bool {
         matches!(
             self,
-            S3Error::Network(_) | S3Error::Timeout(_) | S3Error::RateLimitExceeded(_) | S3Error::Io(_)
+            S3Error::Network(_)
+                | S3Error::Timeout(_)
+                | S3Error::RateLimitExceeded(_)
+                | S3Error::Io(_)
         )
     }
 }
@@ -164,7 +167,7 @@ where
             }
             aws_sdk_s3::error::SdkError::ServiceError(e) => {
                 let err_str = format!("{:?}", e);
-                
+
                 // Check for common error patterns
                 if err_str.contains("NoSuchKey") {
                     S3Error::Service {

@@ -145,9 +145,7 @@ impl RetryPolicy {
     /// Calculate delay for a given attempt number
     pub fn calculate_delay(&self, attempt: u32) -> Duration {
         let base_delay = match self.backoff {
-            BackoffStrategy::Linear => {
-                self.initial_delay * attempt
-            }
+            BackoffStrategy::Linear => self.initial_delay * attempt,
             BackoffStrategy::Exponential | BackoffStrategy::ExponentialWithJitter => {
                 let multiplier = 2_u32.pow(attempt - 1);
                 self.initial_delay * multiplier
@@ -272,12 +270,12 @@ pub fn is_retryable_error(error: &S3Error) -> bool {
         // Network/transient errors - retryable
         S3Error::Sdk(e) => {
             let err_str = e.to_lowercase();
-            err_str.contains("timeout") ||
-            err_str.contains("connection") ||
-            err_str.contains("throttl") ||
-            err_str.contains("slow down") ||
-            err_str.contains("503") ||
-            err_str.contains("500")
+            err_str.contains("timeout")
+                || err_str.contains("connection")
+                || err_str.contains("throttl")
+                || err_str.contains("slow down")
+                || err_str.contains("503")
+                || err_str.contains("500")
         }
 
         // IO errors - potentially retryable
@@ -292,9 +290,14 @@ pub fn is_retryable_error(error: &S3Error) -> bool {
 
         // Service errors - check if retryable
         S3Error::Service { code, .. } => {
-            matches!(code.as_str(),
-                "RequestTimeout" | "ServiceUnavailable" | "InternalError" |
-                "SlowDown" | "RequestTimeTooSkewed")
+            matches!(
+                code.as_str(),
+                "RequestTimeout"
+                    | "ServiceUnavailable"
+                    | "InternalError"
+                    | "SlowDown"
+                    | "RequestTimeTooSkewed"
+            )
         }
 
         // Network, timeout, rate limit - retryable
@@ -306,10 +309,7 @@ pub fn is_retryable_error(error: &S3Error) -> bool {
 }
 
 /// Execute an operation with retry logic
-pub async fn with_retry<F, Fut, T>(
-    policy: RetryPolicy,
-    mut operation: F,
-) -> S3Result<T>
+pub async fn with_retry<F, Fut, T>(policy: RetryPolicy, mut operation: F) -> S3Result<T>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = S3Result<T>>,
@@ -348,7 +348,6 @@ where
                 return Ok(result);
             }
             Err(e) => {
-
                 // Record failure
                 if let Some(cb) = &circuit_breaker {
                     cb.record_failure().await;

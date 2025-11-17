@@ -18,11 +18,8 @@ use super::{SshBackend, SshConfig};
 use super::S3Backend;
 
 /// Factory function type for creating backends
-pub type BackendFactory = Arc<
-    dyn Fn(&BackendConfig) -> BoxFuture<BackendResult<Box<dyn Backend>>>
-        + Send
-        + Sync,
->;
+pub type BackendFactory =
+    Arc<dyn Fn(&BackendConfig) -> BoxFuture<BackendResult<Box<dyn Backend>>> + Send + Sync>;
 
 /// Box future for async factory functions
 pub type BoxFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;

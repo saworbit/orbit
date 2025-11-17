@@ -5,18 +5,15 @@
  * data movement, inspired by rsync's delta algorithm with rclone-style checks.
  */
 
-pub mod types;
-pub mod checksum;
 pub mod algorithm;
+pub mod checksum;
 pub mod transfer;
+pub mod types;
 
-pub use types::{
-    CheckMode, DeltaConfig, HashAlgorithm, BlockSignature,
-    DeltaStats
-};
+pub use types::{BlockSignature, CheckMode, DeltaConfig, DeltaStats, HashAlgorithm};
 // DeltaInstruction is module-internal
-pub(crate) use types::DeltaInstruction;
 pub use transfer::{copy_with_delta, copy_with_delta_fallback};
+pub(crate) use types::DeltaInstruction;
 
 use crate::error::Result;
 use std::path::Path;
@@ -73,8 +70,8 @@ pub fn should_use_delta(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn test_should_use_delta_whole_file_forced() {
