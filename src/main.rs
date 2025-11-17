@@ -368,7 +368,7 @@ impl From<AuditFormatArg> for AuditFormat {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum CheckModeArg {
-    #[value(alias = "modtime", alias = "mod-time")]
+    #[value(name = "modtime", alias = "mod-time")]
     ModTime,
     Size,
     Checksum,
