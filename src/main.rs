@@ -160,8 +160,8 @@ struct Cli {
     manifest_dir: Option<PathBuf>,
 
     // Delta detection options
-    /// Check mode for change detection (modtime, size, checksum, delta)
-    #[arg(long, value_enum, default_value = "modtime", global = true)]
+    /// Check mode for change detection (mod-time, size, checksum, delta)
+    #[arg(long, value_enum, default_value_t = CheckModeArg::ModTime, global = true)]
     check: CheckModeArg,
 
     /// Block size for delta algorithm (in KB)
@@ -368,6 +368,7 @@ impl From<AuditFormatArg> for AuditFormat {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum CheckModeArg {
+    #[value(alias = "modtime", alias = "mod-time")]
     ModTime,
     Size,
     Checksum,
