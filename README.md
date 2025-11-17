@@ -1139,6 +1139,42 @@ Tips:
 
 ⚠️ **Alpha Status:** Backend fully compiling and production-ready. Interactive UI coming in beta.1.
 
+#### Automated Startup Scripts (Easiest Way)
+
+We provide automated startup scripts that handle all setup for you:
+
+**Unix/Linux/macOS:**
+```bash
+cd crates/orbit-web
+chmod +x start-nebula.sh
+./start-nebula.sh
+```
+
+**Windows:**
+```cmd
+cd crates\orbit-web
+start-nebula.bat
+```
+
+**What the scripts do:**
+- ✅ Check for Rust/Cargo installation
+- ✅ Install wasm32-unknown-unknown target if missing
+- ✅ Generate JWT secret automatically (or use your `ORBIT_JWT_SECRET`)
+- ✅ Create data directories
+- ✅ Build the project (only if needed)
+- ✅ Display all API endpoints and default credentials
+- ✅ Start the server
+
+**Environment Variables (Optional):**
+```bash
+# Customize before running the script
+export ORBIT_JWT_SECRET=your-secret-key-minimum-32-chars
+export ORBIT_MAGNETAR_DB=/path/to/magnetar.db
+export ORBIT_USER_DB=/path/to/users.db
+export ORBIT_HOST=0.0.0.0
+export ORBIT_PORT=3000
+```
+
 #### API Testing with curl
 
 ```bash

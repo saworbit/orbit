@@ -246,6 +246,48 @@ CREATE TABLE users (
 - ✅ Default admin creation
 - ✅ SQLite persistence
 
+## 🚀 **Automated Startup Scripts**
+
+For the easiest way to get Nebula running, we provide automated startup scripts for all platforms:
+
+### Unix/Linux/macOS: `start-nebula.sh`
+```bash
+cd crates/orbit-web
+chmod +x start-nebula.sh
+./start-nebula.sh
+```
+
+### Windows: `start-nebula.bat`
+```cmd
+cd crates\orbit-web
+start-nebula.bat
+```
+
+### Features
+- ✅ Checks for Rust/Cargo installation
+- ✅ Automatically installs wasm32-unknown-unknown target if missing
+- ✅ Generates secure JWT secret if not provided (with security warning)
+- ✅ Creates data directories for databases
+- ✅ Sets all environment variables
+- ✅ Builds the project only if needed (smart detection)
+- ✅ Displays comprehensive startup information:
+  - Web interface URL
+  - API endpoints
+  - WebSocket endpoint
+  - Database paths
+  - Default credentials with security warning
+- ✅ Launches the server
+
+### Environment Variables (Optional)
+Both scripts respect these environment variables if set:
+- `ORBIT_JWT_SECRET` - JWT signing secret (auto-generated if not set)
+- `ORBIT_MAGNETAR_DB` - Path to Magnetar database (default: `data/magnetar.db`)
+- `ORBIT_USER_DB` - Path to user database (default: `data/users.db`)
+- `ORBIT_HOST` - Server host (default: `127.0.0.1`)
+- `ORBIT_PORT` - Server port (default: `8080`)
+
+**Security Note:** The scripts will warn you if using auto-generated JWT secrets or default credentials in production.
+
 ## 📈 **Performance Characteristics**
 
 - **WebSocket Latency:** <500ms for event delivery

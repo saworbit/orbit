@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0-alpha.2] - 2025-11-17
 
+### Added
+- **Automated startup scripts** - Cross-platform scripts for easy server launch
+  - `start-nebula.sh` for Unix/Linux/macOS with prerequisite checking, auto-installation, JWT generation, and smart building
+  - `start-nebula.bat` for Windows with equivalent functionality
+  - Automatic wasm32-unknown-unknown target installation if missing
+  - Secure JWT secret generation if not provided
+  - Data directory creation and environment variable setup
+  - Comprehensive startup information display with API endpoints, credentials, and security warnings
+
 ### Fixed
 - **Leptos ServerFnError type annotations** - Replaced `.ok_or_else()` and `.map_err()` with explicit `match` statements to resolve type inference issues in server functions
   - Fixed 6 functions in `src/api/jobs.rs` (list_jobs, get_job_stats, create_job, delete_job, run_job, cancel_job)
