@@ -1077,6 +1077,16 @@ This structure ensures isolation, testability, and reusability.
 
 **Orbit Web** provides a modern, reactive web interface for orchestrating file transfers with real-time progress tracking. Built as a separate, modular crate, it offers a powerful alternative to CLI-based workflows while maintaining the same reliability and performance of Orbit's core engine.
 
+### How to launch the GUI from the CLI
+
+1) Build with defaults (GUI enabled): `cargo build --release`
+2) Start the server: `./target/release/orbit serve --addr 127.0.0.1:8080`
+3) Open `http://127.0.0.1:8080` in your browser.
+
+Tips:
+- CLI-only build: `cargo build --release --no-default-features --features zero-copy`
+- Development with hot reload: `cd crates/orbit-web && cargo leptos watch`
+
 ### Why Use the Web GUI?
 
 - **Visual Monitoring** — See all transfers at a glance with real-time progress
