@@ -75,10 +75,10 @@ impl User {
 
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
-        let password_hash = argon2
-            .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?
-            .to_string();
+        let password_hash = match argon2.hash_password(password.as_bytes(), &salt) {
+            Ok(hash) => hash.to_string(),
+            Err(e) => return Err(format!("Password hashing failed: {}", e).into()),
+        };
 
         Ok(User {
             id: Uuid::new_v4().to_string(),
