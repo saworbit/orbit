@@ -23,7 +23,7 @@ pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Err
         .json()
         .init();
 
-    tracing::info!("Starting Orbit Nebula web server v1.0.0");
+    tracing::info!("Starting Orbit Nebula web server v1.0.0-alpha.2");
     tracing::info!("Magnetar DB: {}", config.magnetar_db);
     tracing::info!("User DB: {}", config.user_db);
 
@@ -47,7 +47,7 @@ pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Err
                 axum::Json(serde_json::json!({
                     "status": "ok",
                     "service": "orbit-web",
-                    "version": "1.0.0"
+                    "version": "1.0.0-alpha.2"
                 }))
             }),
         )

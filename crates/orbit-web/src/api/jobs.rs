@@ -1,10 +1,6 @@
 //! Job management API endpoints (Leptos server functions)
 
-use crate::{
-    auth::Claims,
-    error::{WebError, WebResult},
-    state::{AppState, OrbitEvent},
-};
+use crate::state::{AppState, OrbitEvent};
 use leptos::*;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
@@ -40,11 +36,13 @@ pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
     use axum::extract::State;
 
     // Get app state from context
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
     // Query Magnetar database for all jobs (using runtime query for MVP)
-    let rows = sqlx::query(
+    let rows = match sqlx::query(
         r#"
         SELECT
             id, source, destination, status, progress,
@@ -56,8 +54,10 @@ pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
         "#
     )
     .fetch_all(&state.magnetar_pool)
-    .await
-    .map_err(|e| ServerFnError::<()>::ServerError(e.to_string()))?;
+    .await {
+        Ok(r) => r,
+        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+    };
 
     let jobs: Vec<JobInfo> = rows
         .into_iter()
@@ -83,10 +83,12 @@ pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
 pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
     use axum::extract::State;
 
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
-    let row = sqlx::query(
+    let row = match sqlx::query(
         r#"
         SELECT
             id, source, destination, status, progress,
@@ -98,8 +100,10 @@ pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
     )
     .bind(job_id)
     .fetch_one(&state.magnetar_pool)
-    .await
-    .map_err(|e| ServerFnError::<()>::ServerError(e.to_string()))?;
+    .await {
+        Ok(r) => r,
+        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+    };
 
     let job = JobInfo {
         id: row.get(0),
@@ -122,19 +126,21 @@ pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
 pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError> {
     use axum::extract::State;
 
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
     // Validate inputs
     if request.source.is_empty() || request.destination.is_empty() {
-        return Err(ServerFnError::<()>::ServerError(
+        return Err(ServerFnError::ServerError(
             "Source and destination are required".to_string(),
         ));
     }
 
     // Insert job into Magnetar database
     let now = chrono::Utc::now().timestamp();
-    let result = sqlx::query(
+    let result = match sqlx::query(
         r#"
         INSERT INTO jobs (source, destination, status, progress, total_chunks, completed_chunks, failed_chunks, created_at, updated_at)
         VALUES (?, ?, 'pending', 0.0, 0, 0, 0, ?, ?)
@@ -145,8 +151,10 @@ pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError>
     .bind(now)
     .bind(now)
     .execute(&state.magnetar_pool)
-    .await
-    .map_err(|e| ServerFnError::<()>::ServerError(e.to_string()))?;
+    .await {
+        Ok(r) => r,
+        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+    };
 
     let job_id = result.last_insert_rowid();
 
@@ -167,14 +175,18 @@ pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError>
 pub async fn delete_job(job_id: i64) -> Result<(), ServerFnError> {
     use axum::extract::State;
 
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
-    sqlx::query("DELETE FROM jobs WHERE id = ?")
+    match sqlx::query("DELETE FROM jobs WHERE id = ?")
         .bind(job_id)
         .execute(&state.magnetar_pool)
-        .await
-        .map_err(|e| ServerFnError::<()>::ServerError(e.to_string()))?;
+        .await {
+            Ok(_) => {},
+            Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+        };
 
     tracing::info!("Deleted job {}", job_id);
 
@@ -186,17 +198,21 @@ pub async fn delete_job(job_id: i64) -> Result<(), ServerFnError> {
 pub async fn run_job(job_id: i64) -> Result<(), ServerFnError> {
     use axum::extract::State;
 
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
     // Update job status to running
     let now = chrono::Utc::now().timestamp();
-    sqlx::query("UPDATE jobs SET status = 'running', updated_at = ? WHERE id = ?")
+    match sqlx::query("UPDATE jobs SET status = 'running', updated_at = ? WHERE id = ?")
         .bind(now)
         .bind(job_id)
         .execute(&state.magnetar_pool)
-        .await
-        .map_err(|e| ServerFnError::<()>::ServerError(e.to_string()))?;
+        .await {
+            Ok(_) => {},
+            Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+        };
 
     // Emit event
     state.emit_event(OrbitEvent::job_updated(
@@ -216,16 +232,20 @@ pub async fn run_job(job_id: i64) -> Result<(), ServerFnError> {
 pub async fn cancel_job(job_id: i64) -> Result<(), ServerFnError> {
     use axum::extract::State;
 
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
     let now = chrono::Utc::now().timestamp();
-    sqlx::query("UPDATE jobs SET status = 'cancelled', updated_at = ? WHERE id = ?")
+    match sqlx::query("UPDATE jobs SET status = 'cancelled', updated_at = ? WHERE id = ?")
         .bind(now)
         .bind(job_id)
         .execute(&state.magnetar_pool)
-        .await
-        .map_err(|e| ServerFnError::<()>::ServerError(e.to_string()))?;
+        .await {
+            Ok(_) => {},
+            Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+        };
 
     state.emit_event(OrbitEvent::job_updated(
         job_id.to_string(),

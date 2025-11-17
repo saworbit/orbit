@@ -75,7 +75,7 @@ pub async fn require_auth(
 
 /// Axum middleware to require specific role
 pub fn require_role(required_role: Role) -> impl Fn(Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, StatusCode>> + Send>> + Clone {
-    move |mut request: Request, next: Next| {
+    move |request: Request, next: Next| {
         let required = required_role;
         Box::pin(async move {
             // Get claims from request extensions (added by require_auth)

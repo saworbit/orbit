@@ -2,12 +2,12 @@
 
 use crate::{
     auth::{authenticate_user, LoginForm, UserInfo},
-    error::{WebError, WebResult},
+    error::WebError,
     state::AppState,
 };
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{extract::State, http::StatusCode, Json};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sqlx::Row;
 
 /// Login response

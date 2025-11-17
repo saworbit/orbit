@@ -2,7 +2,6 @@
 
 use crate::api::{list_jobs, JobInfo};
 use leptos::*;
-use leptos_router::*;
 
 /// Dashboard component
 #[component]

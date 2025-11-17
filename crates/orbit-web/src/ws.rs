@@ -1,7 +1,7 @@
 //! WebSocket handler for real-time event broadcasting
 
 use crate::{
-    auth::{Claims, Role},
+    auth::Claims,
     state::{AppState, OrbitEvent},
 };
 use axum::{

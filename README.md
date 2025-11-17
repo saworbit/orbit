@@ -1065,7 +1065,7 @@ Orbit is built from clean, reusable crates:
 | 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | ✅ **NEW!** |
 | 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | ✅ **NEW!** |
 | 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
-| 🌐 `orbit-web` | Enterprise web control center (Nebula) | ✅ **v1.0.0-alpha.1** |
+| 🌐 `orbit-web` | Enterprise web control center (Nebula) | ✅ **v1.0.0-alpha.2** |
 | 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
 | 🧪 `wormhole` | Forward-error correction | 🚧 Dev |
 
@@ -1073,18 +1073,18 @@ This structure ensures isolation, testability, and reusability.
 
 ---
 
-## 🖥️ Web GUI - Nebula (v1.0.0-alpha.1)
+## 🖥️ Web GUI - Nebula (v1.0.0-alpha.2)
 
 **Orbit Nebula** is a complete ground-up rewrite of the web interface, transforming it from a basic polling dashboard into an enterprise-grade, real-time data orchestration control center. Built with production-ready authentication, WebSocket streaming, and a comprehensive security stack.
 
-### Status: v1.0.0-alpha.1 (MVP Foundation - 95% Complete)
+### Status: v1.0.0-alpha.2 (100% Backend Complete - Fully Compiling)
 
 **Codename:** Nebula
-**What's New:** Complete rewrite with ~2,000 lines of production Rust implementing JWT auth, real-time events, RESTful APIs, and comprehensive security.
+**What's New:** Complete rewrite with ~2,000 lines of production Rust implementing JWT auth, real-time events, RESTful APIs, and comprehensive security. **Alpha.2 achieves clean compilation with 0 errors and 0 warnings.**
 
 ### How to launch the GUI from the CLI
 
-⚠️ **Note:** v1.0.0-alpha.1 is API-focused. Full interactive UI coming in beta.1.
+⚠️ **Note:** v1.0.0-alpha.2 is API-focused with production-ready backend. Full interactive UI coming in beta.1.
 
 1) Build with defaults (GUI enabled): `cargo build --release`
 2) Start the server: `./target/release/orbit serve --addr 127.0.0.1:8080`
@@ -1104,7 +1104,7 @@ Tips:
 - **RESTful API** — Complete backend API ready for custom frontends
 - **Crash Recovery** — Resume monitoring after disconnects via Magnetar persistence
 
-### What's Implemented (v1.0.0-alpha.1)
+### What's Implemented (v1.0.0-alpha.2)
 
 #### ✅ 1. Authentication & Security (100% Complete)
 - **JWT Authentication** — 24-hour token expiration with automatic validation
@@ -1135,9 +1135,9 @@ Tips:
 - **Backend Configuration** — Thread-safe storage for S3/SMB credentials
 - **Crash Recovery** — Automatic state restoration on server restart
 
-### Quick Start (v1.0.0-alpha.1)
+### Quick Start (v1.0.0-alpha.2)
 
-⚠️ **Alpha Status:** Backend APIs are production-ready. Interactive UI coming in beta.1.
+⚠️ **Alpha Status:** Backend fully compiling and production-ready. Interactive UI coming in beta.1.
 
 #### API Testing with curl
 
@@ -1198,7 +1198,7 @@ cd crates/orbit-web
 cargo leptos watch
 ```
 
-### Architecture (v1.0.0-alpha.1)
+### Architecture (v1.0.0-alpha.2)
 
 Built with enterprise-grade Rust technologies:
 
@@ -1219,7 +1219,7 @@ Built with enterprise-grade Rust technologies:
 - **API-Driven** — Backend APIs can be consumed by any frontend
 - **Production Security** — JWT, Argon2, RBAC, httpOnly cookies from day one
 
-### API Reference (v1.0.0-alpha.1)
+### API Reference (v1.0.0-alpha.2)
 
 #### Authentication Endpoints
 
@@ -1273,7 +1273,7 @@ Cookie: orbit_token=<jwt>
 # Receives events for all jobs (filtered by role permissions)
 ```
 
-### Configuration (v1.0.0-alpha.1)
+### Configuration (v1.0.0-alpha.2)
 
 **Required Environment Variables:**
 ```bash
@@ -1301,10 +1301,11 @@ export RUST_LOG=info,orbit_web=debug
 
 ### Nebula Roadmap
 
-**v1.0.0-alpha.2** (1-2 hours) - Compilation Fixes
-- Fix Leptos server function type annotations
-- Clean up unused imports
-- Test basic server startup
+**✅ v1.0.0-alpha.2** (COMPLETED) - Compilation Fixes
+- ✅ Fixed Leptos server function type annotations
+- ✅ Cleaned up unused imports
+- ✅ Tested compilation and basic server startup
+- ✅ 0 errors, 0 warnings
 
 **v1.0.0-beta.1** (4-6 hours) - Interactive UI
 - Complete interactive dashboard with live updates
@@ -1332,7 +1333,8 @@ export RUST_LOG=info,orbit_web=debug
 - Mobile-optimized views
 
 📖 **Complete Documentation:**
-- **MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **NEW!**
+- **MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **v1.0.0-alpha.2**
+- **Changelog:** [`crates/orbit-web/CHANGELOG.md`](crates/orbit-web/CHANGELOG.md) ⭐ **NEW!**
 - **Full README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **UPDATED!**
 - **API Docs:** Run `cargo doc --open -p orbit-web`
 
@@ -1465,8 +1467,9 @@ cargo clippy
 
 ### User Guides
 - **Quick Start:** This README
-- **Nebula MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **v1.0.0-alpha.1**
-- **Nebula README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **v1.0.0-alpha.1**
+- **Nebula MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **v1.0.0-alpha.2**
+- **Nebula Changelog:** [`crates/orbit-web/CHANGELOG.md`](crates/orbit-web/CHANGELOG.md) ⭐ **NEW!**
+- **Nebula README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **v1.0.0-alpha.2**
 - **Web GUI (v0.5.0):** [`docs/WEB_GUI.md`](docs/WEB_GUI.md) (deprecated, see Nebula docs)
 - **GUI Integration:** [`docs/GUI_INTEGRATION.md`](docs/GUI_INTEGRATION.md)
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)

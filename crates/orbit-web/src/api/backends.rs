@@ -1,9 +1,6 @@
 //! Backend configuration API endpoints
 
-use crate::{
-    error::{WebError, WebResult},
-    state::{AppState, BackendConfig, BackendType},
-};
+use crate::state::{AppState, BackendConfig, BackendType};
 use leptos::*;
 use serde::{Deserialize, Serialize};
 
@@ -39,8 +36,10 @@ impl From<BackendConfig> for BackendInfo {
 pub async fn list_backends() -> Result<Vec<BackendInfo>, ServerFnError> {
     use axum::extract::State;
 
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
     let backends = state.backends.read().await;
     let backend_list: Vec<BackendInfo> = backends
@@ -56,13 +55,16 @@ pub async fn list_backends() -> Result<Vec<BackendInfo>, ServerFnError> {
 pub async fn get_backend(backend_id: String) -> Result<BackendInfo, ServerFnError> {
     use axum::extract::State;
 
-    let State(state): State<AppState> = use_context::<State<AppState>>()
-        .ok_or_else(|| ServerFnError::<()>::ServerError("App state not found".to_string()))?;
+    let State(state): State<AppState> = match use_context::<State<AppState>>() {
+        Some(s) => s,
+        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+    };
 
     let backends = state.backends.read().await;
-    let config = backends
-        .get(&backend_id)
-        .ok_or_else(|| ServerFnError::<()>::ServerError("Backend not found".to_string()))?;
+    let config = match backends.get(&backend_id) {
+        Some(c) => c,
+        None => return Err(ServerFnError::ServerError("Backend not found".to_string())),
+    };
 
     Ok(BackendInfo::from(config.clone()))
 }

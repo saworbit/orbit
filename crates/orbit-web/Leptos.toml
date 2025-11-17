@@ -1,8 +1,8 @@
-# Leptos configuration for Orbit Nebula v1.0.0
+# Leptos configuration for Orbit Nebula v1.0.0-alpha.2
 
 [package]
 name = "orbit-web"
-version = "1.0.0"
+version = "1.0.0-alpha.2"
 
 # Output configuration
 output-name = "orbit-web"

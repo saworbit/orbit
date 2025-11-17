@@ -1,6 +1,6 @@
 [package]
 name = "orbit-web"
-version = "1.0.0"
+version = "1.0.0-alpha.2"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
 description = "Nebula: Next-gen real-time web control center for Orbit"
