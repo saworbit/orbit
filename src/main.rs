@@ -601,8 +601,18 @@ fn serve_gui(addr: SocketAddr) -> Result<()> {
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
 
+    // Create WebConfig from environment variables or defaults
+    let config = orbit_web::WebConfig {
+        host: addr.ip().to_string(),
+        port: addr.port(),
+        magnetar_db: std::env::var("ORBIT_MAGNETAR_DB")
+            .unwrap_or_else(|_| "magnetar.db".to_string()),
+        user_db: std::env::var("ORBIT_USER_DB")
+            .unwrap_or_else(|_| "orbit-web-users.db".to_string()),
+    };
+
     runtime
-        .block_on(orbit_web::start_server(addr))
+        .block_on(orbit_web::start_server(config))
         .map_err(|e| OrbitError::Other(format!("Failed to start GUI server: {}", e)))
 }
 
