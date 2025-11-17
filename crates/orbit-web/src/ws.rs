@@ -166,11 +166,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_serialization() {
-        let event = OrbitEvent::job_updated(
-            "test-job-123".to_string(),
-            "processing".to_string(),
-            0.5,
-        );
+        let event =
+            OrbitEvent::job_updated("test-job-123".to_string(), "processing".to_string(), 0.5);
 
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("JobUpdated"));

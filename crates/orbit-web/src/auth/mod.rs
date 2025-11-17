@@ -12,7 +12,7 @@ pub use middleware::{
 };
 pub use models::{Claims, LoginForm, Role, User, UserInfo};
 
-use sqlx::{SqlitePool, Row};
+use sqlx::{Row, SqlitePool};
 
 /// Initialize the user database schema
 pub async fn init_user_db(pool: &SqlitePool) -> Result<(), sqlx::Error> {
@@ -78,7 +78,7 @@ pub async fn authenticate_user(
         SELECT id, username, password_hash, role, created_at
         FROM users
         WHERE username = ?
-        "#
+        "#,
     )
     .bind(&login.username)
     .fetch_one(pool)

@@ -47,10 +47,14 @@ impl IntoResponse for WebError {
             WebError::Forbidden(_) => (StatusCode::FORBIDDEN, self.to_string()),
             WebError::NotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             WebError::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
-            WebError::Database(_) | WebError::Io(_) | WebError::Internal(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
-            }
-            WebError::Jwt(_) => (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string()),
+            WebError::Database(_) | WebError::Io(_) | WebError::Internal(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
+            WebError::Jwt(_) => (
+                StatusCode::UNAUTHORIZED,
+                "Invalid or expired token".to_string(),
+            ),
             WebError::Json(_) => (StatusCode::BAD_REQUEST, "Invalid JSON".to_string()),
         };
 

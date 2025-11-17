@@ -6,11 +6,7 @@ use axum::{
     Router,
 };
 use leptos::*;
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-    services::ServeDir,
-};
+use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
 /// Run the Axum + Leptos server
 pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Error>> {

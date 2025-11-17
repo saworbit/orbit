@@ -21,12 +21,12 @@ pub enum Role {
 impl Role {
     /// Check if role has permission for an operation
     pub fn has_permission(&self, required: Role) -> bool {
-        match (self, required) {
-            (Role::Admin, _) => true,
-            (Role::Operator, Role::Operator | Role::Viewer) => true,
-            (Role::Viewer, Role::Viewer) => true,
-            _ => false,
-        }
+        matches!(
+            (self, required),
+            (Role::Admin, _)
+                | (Role::Operator, Role::Operator | Role::Viewer)
+                | (Role::Viewer, Role::Viewer)
+        )
     }
 
     /// Convert role to string for database storage
@@ -37,14 +37,17 @@ impl Role {
             Role::Viewer => "Viewer",
         }
     }
+}
 
-    /// Parse role from string
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for Role {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Admin" => Some(Role::Admin),
-            "Operator" => Some(Role::Operator),
-            "Viewer" => Some(Role::Viewer),
-            _ => None,
+            "Admin" => Ok(Role::Admin),
+            "Operator" => Ok(Role::Operator),
+            "Viewer" => Ok(Role::Viewer),
+            _ => Err(format!("Invalid role: {}", s)),
         }
     }
 }
@@ -52,22 +55,26 @@ impl Role {
 /// User account
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
-    pub id: String,  // UUID as string for SQLite compatibility
+    pub id: String, // UUID as string for SQLite compatibility
     pub username: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
-    pub role: String,  // Stored as string, converted to Role enum
-    pub created_at: i64,  // Unix timestamp
+    pub role: String,    // Stored as string, converted to Role enum
+    pub created_at: i64, // Unix timestamp
 }
 
 impl User {
     /// Get user role as enum
     pub fn get_role(&self) -> Role {
-        Role::from_str(&self.role).unwrap_or(Role::Viewer)
+        self.role.parse().unwrap_or(Role::Viewer)
     }
 
     /// Create new user with hashed password
-    pub fn new(username: String, password: &str, role: Role) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(
+        username: String,
+        password: &str,
+        role: Role,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         use argon2::{
             password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
             Argon2,
@@ -118,7 +125,7 @@ pub struct LoginForm {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,      // Subject (user ID)
-    pub username: String,  // Username for display
+    pub username: String, // Username for display
     pub role: String,     // User role
     pub exp: usize,       // Expiration timestamp
 }
@@ -138,7 +145,7 @@ impl Claims {
 
     /// Get role as enum
     pub fn get_role(&self) -> Role {
-        Role::from_str(&self.role).unwrap_or(Role::Viewer)
+        self.role.parse().unwrap_or(Role::Viewer)
     }
 
     /// Check if token has expired

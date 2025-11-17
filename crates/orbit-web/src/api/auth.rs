@@ -81,7 +81,7 @@ pub async fn me_handler(
         SELECT id, username, password_hash, role, created_at
         FROM users
         WHERE id = ?
-        "#
+        "#,
     )
     .bind(&claims.sub)
     .fetch_one(&state.user_pool)

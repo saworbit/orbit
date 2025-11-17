@@ -38,7 +38,11 @@ pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
     // Get app state from context
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     // Query Magnetar database for all jobs (using runtime query for MVP)
@@ -51,10 +55,11 @@ pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
         FROM jobs
         ORDER BY created_at DESC
         LIMIT 100
-        "#
+        "#,
     )
     .fetch_all(&state.magnetar_pool)
-    .await {
+    .await
+    {
         Ok(r) => r,
         Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
     };
@@ -85,7 +90,11 @@ pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
 
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     let row = match sqlx::query(
@@ -96,11 +105,12 @@ pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
             created_at, updated_at
         FROM jobs
         WHERE id = ?
-        "#
+        "#,
     )
     .bind(job_id)
     .fetch_one(&state.magnetar_pool)
-    .await {
+    .await
+    {
         Ok(r) => r,
         Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
     };
@@ -128,7 +138,11 @@ pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError>
 
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     // Validate inputs
@@ -165,7 +179,12 @@ pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError>
         0.0,
     ));
 
-    tracing::info!("Created job {} ({} -> {})", job_id, request.source, request.destination);
+    tracing::info!(
+        "Created job {} ({} -> {})",
+        job_id,
+        request.source,
+        request.destination
+    );
 
     Ok(job_id)
 }
@@ -177,16 +196,21 @@ pub async fn delete_job(job_id: i64) -> Result<(), ServerFnError> {
 
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     match sqlx::query("DELETE FROM jobs WHERE id = ?")
         .bind(job_id)
         .execute(&state.magnetar_pool)
-        .await {
-            Ok(_) => {},
-            Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-        };
+        .await
+    {
+        Ok(_) => {}
+        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+    };
 
     tracing::info!("Deleted job {}", job_id);
 
@@ -200,7 +224,11 @@ pub async fn run_job(job_id: i64) -> Result<(), ServerFnError> {
 
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     // Update job status to running
@@ -209,10 +237,11 @@ pub async fn run_job(job_id: i64) -> Result<(), ServerFnError> {
         .bind(now)
         .bind(job_id)
         .execute(&state.magnetar_pool)
-        .await {
-            Ok(_) => {},
-            Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-        };
+        .await
+    {
+        Ok(_) => {}
+        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+    };
 
     // Emit event
     state.emit_event(OrbitEvent::job_updated(
@@ -234,7 +263,11 @@ pub async fn cancel_job(job_id: i64) -> Result<(), ServerFnError> {
 
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     let now = chrono::Utc::now().timestamp();
@@ -242,10 +275,11 @@ pub async fn cancel_job(job_id: i64) -> Result<(), ServerFnError> {
         .bind(now)
         .bind(job_id)
         .execute(&state.magnetar_pool)
-        .await {
-            Ok(_) => {},
-            Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-        };
+        .await
+    {
+        Ok(_) => {}
+        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
+    };
 
     state.emit_event(OrbitEvent::job_updated(
         job_id.to_string(),

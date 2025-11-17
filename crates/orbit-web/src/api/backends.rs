@@ -38,7 +38,11 @@ pub async fn list_backends() -> Result<Vec<BackendInfo>, ServerFnError> {
 
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     let backends = state.backends.read().await;
@@ -57,7 +61,11 @@ pub async fn get_backend(backend_id: String) -> Result<BackendInfo, ServerFnErro
 
     let State(state): State<AppState> = match use_context::<State<AppState>>() {
         Some(s) => s,
-        None => return Err(ServerFnError::ServerError("App state not found".to_string())),
+        None => {
+            return Err(ServerFnError::ServerError(
+                "App state not found".to_string(),
+            ))
+        }
     };
 
     let backends = state.backends.read().await;

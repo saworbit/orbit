@@ -45,7 +45,8 @@ pub fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error
 
 /// Extract JWT from cookie jar
 pub fn extract_jwt_from_cookies(jar: &CookieJar) -> Option<String> {
-    jar.get("orbit_token").map(|cookie| cookie.value().to_string())
+    jar.get("orbit_token")
+        .map(|cookie| cookie.value().to_string())
 }
 
 /// Axum middleware to require authentication
@@ -55,12 +56,10 @@ pub async fn require_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     // Extract JWT from cookies
-    let token = extract_jwt_from_cookies(&jar)
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let token = extract_jwt_from_cookies(&jar).ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Validate token
-    let claims = validate_token(&token)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let claims = validate_token(&token).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     // Check if expired
     if claims.is_expired() {
@@ -74,7 +73,14 @@ pub async fn require_auth(
 }
 
 /// Axum middleware to require specific role
-pub fn require_role(required_role: Role) -> impl Fn(Request, Next) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Response, StatusCode>> + Send>> + Clone {
+pub fn require_role(
+    required_role: Role,
+) -> impl Fn(
+    Request,
+    Next,
+) -> std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<Response, StatusCode>> + Send>,
+> + Clone {
     move |request: Request, next: Next| {
         let required = required_role;
         Box::pin(async move {
