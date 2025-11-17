@@ -28,11 +28,12 @@ impl AppState {
         magnetar_db_path: &str,
         user_db_path: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        // Initialize Magnetar database pool
-        let magnetar_pool = SqlitePool::connect(&format!("sqlite:{}", magnetar_db_path)).await?;
+        // Initialize Magnetar database pool (create if doesn't exist)
+        let magnetar_pool =
+            SqlitePool::connect(&format!("sqlite:{}?mode=rwc", magnetar_db_path)).await?;
 
-        // Initialize user database pool
-        let user_pool = SqlitePool::connect(&format!("sqlite:{}", user_db_path)).await?;
+        // Initialize user database pool (create if doesn't exist)
+        let user_pool = SqlitePool::connect(&format!("sqlite:{}?mode=rwc", user_db_path)).await?;
 
         // Initialize user database schema
         crate::auth::init_user_db(&user_pool).await?;
