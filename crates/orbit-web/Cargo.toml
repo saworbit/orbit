@@ -1,52 +1,71 @@
 [package]
 name = "orbit-web"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
-description = "Web GUI for Orbit file transfer orchestration"
+description = "Nebula: Next-gen real-time web control center for Orbit"
 license = "Apache-2.0"
 
 [dependencies]
-# Web framework
-axum = { version = "0.7", features = ["ws"] }
-tokio = { version = "1", features = ["full"] }
-tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
-tower = "0.5"
+# Core Orbit crates (re-exported types)
+magnetar = { path = "../magnetar", features = ["sqlite", "resilience"] }
+orbit-core-manifest = { path = "../core-manifest" }
+orbit-core-starmap = { path = "../core-starmap" }
+orbit-core-audit = { path = "../core-audit" }
+
+# Web stack
+axum = { version = "0.7", features = ["ws", "multipart"] }
+axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
+leptos = "0.6"
+leptos_meta = "0.6"
+leptos_router = "0.6"
+leptos_axum = "0.6"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "fs", "compression-gzip"] }
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = "0.7"
+tokio-stream = "0.1"
+
+# Auth
+argon2 = "0.5"
+jsonwebtoken = "9.0"
+rand_core = { version = "0.6", features = ["std"] }
+
+# Database
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "chrono", "uuid"] }
+
+# Real-time
+futures = "0.3"
+serde_json = "1.0"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 toml = "0.8"
 
-# Leptos full-stack framework
-leptos = { version = "0.6", features = ["ssr"] }
-leptos_axum = "0.6"
-leptos_meta = "0.6"
-leptos_router = "0.6"
+# UI / Charts (basic for MVP)
+plotters = { version = "0.3", default-features = false, features = ["line_series"] }
+chrono = { version = "0.4", features = ["serde"] }
 
-# Utilities
-uuid = { version = "1", features = ["v4", "serde"] }
+# Misc
+uuid = { version = "1.0", features = ["v4", "serde"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-anyhow = "1.0"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 thiserror = "1.0"
+anyhow = "1.0"
 
-# WASM support - force getrandom 0.2 which has the "js" feature
-# The "js" feature only activates on wasm32 targets, so it's safe for all platforms
+# WASM support
 getrandom = { version = "0.2", features = ["js"] }
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
 
-# Internal dependencies
-magnetar = { path = "../magnetar" }
+# Additional dependencies
+time = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
 
 [features]
-default = []
+default = ["ssr"]
+ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr", "leptos_axum/default"]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
-ssr = [
-    "leptos/ssr",
-    "leptos_meta/ssr",
-    "leptos_router/ssr",
-    "leptos_axum/default",
-]
 
 [[bin]]
 name = "orbit-web"

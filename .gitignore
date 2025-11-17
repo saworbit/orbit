@@ -35,3 +35,4 @@ orbit_audit.log
 # Orbit audit logs (unless specifically tracked)
 orbit_audit.log
 audit.log
+nul
