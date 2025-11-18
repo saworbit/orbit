@@ -27,19 +27,31 @@ impl AppState {
     pub async fn new(
         magnetar_db_path: &str,
         user_db_path: &str,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> Result<Self, Box<dyn std::error::Error + Send>> {
         // Initialize Magnetar database pool (create if doesn't exist)
-        let magnetar_pool =
-            SqlitePool::connect(&format!("sqlite:{}?mode=rwc", magnetar_db_path)).await?;
+        let magnetar_pool = SqlitePool::connect(&format!("sqlite:{}?mode=rwc", magnetar_db_path))
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 
         // Initialize user database pool (create if doesn't exist)
-        let user_pool = SqlitePool::connect(&format!("sqlite:{}?mode=rwc", user_db_path)).await?;
+        let user_pool = SqlitePool::connect(&format!("sqlite:{}?mode=rwc", user_db_path))
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 
         // Initialize user database schema
-        crate::auth::init_user_db(&user_pool).await?;
+        crate::auth::init_user_db(&user_pool)
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 
         // Create default admin user if needed
-        crate::auth::ensure_default_admin(&user_pool).await?;
+        crate::auth::ensure_default_admin(&user_pool)
+            .await
+            .map_err(|e| {
+                Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string(),
+                )) as Box<dyn std::error::Error + Send>
+            })?;
 
         // Create broadcast channel for events (capacity: 1000 events)
         let (event_tx, _) = broadcast::channel(1000);

@@ -11,7 +11,14 @@ async fn orbit_web_health_endpoint_responds() {
     let addr = listener.local_addr().expect("read local addr");
     drop(listener);
 
-    let server = tokio::spawn(orbit_web::start_server(addr));
+    let config = orbit_web::WebConfig {
+        host: addr.ip().to_string(),
+        port: addr.port(),
+        magnetar_db: "test-magnetar.db".to_string(),
+        user_db: "test-users.db".to_string(),
+    };
+
+    let server = tokio::spawn(orbit_web::start_server(config));
 
     tokio::time::sleep(Duration::from_millis(500)).await;
 

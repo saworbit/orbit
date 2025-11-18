@@ -9,7 +9,7 @@ use leptos::*;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 
 /// Run the Axum + Leptos server
-pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Error + Send>> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -65,8 +65,12 @@ pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Err
     tracing::info!("   Health: http://{}/api/health", addr);
 
     // Run server
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 
     Ok(())
 }

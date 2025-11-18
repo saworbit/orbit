@@ -51,6 +51,6 @@ impl Default for WebConfig {
 
 /// Start the web server
 #[cfg(feature = "ssr")]
-pub async fn start_server(config: WebConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn start_server(config: WebConfig) -> Result<(), Box<dyn std::error::Error + Send>> {
     server::run_server(config).await
 }
