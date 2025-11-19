@@ -1,0 +1,50 @@
+# ORBIT Filter Example: Backup Configuration
+# This filter is optimized for backing up a Rust project
+# Usage: orbit --source /project --dest /backup --filter-from backup.orbitfilter
+
+# Include all source code
++ **/*.rs
++ **/*.toml
++ **/*.md
++ **/*.txt
++ **/*.json
++ **/*.yaml
++ **/*.yml
+
+# Include configuration files
++ .gitignore
++ .github/**
++ .vscode/**
+
+# Exclude build artifacts
+- target/**
+- **/target/**
+
+# Exclude editor and OS files
+- **/.DS_Store
+- **/Thumbs.db
+- **/*.swp
+- **/*~
+
+# Exclude temporary and cache files
+- **/*.tmp
+- **/*.temp
+- **/*.cache
+- **/__pycache__/**
+- **/.pytest_cache/**
+- **/node_modules/**
+
+# Exclude log files
+- **/*.log
+- **/logs/**
+
+# Exclude binary files (optional)
+# - **/*.exe
+# - **/*.dll
+# - **/*.so
+
+# Include specific files by path
+# include path: important/specific_file.txt
+
+# Exclude using regex (advanced)
+# - regex: ^test_\d+\.txt$

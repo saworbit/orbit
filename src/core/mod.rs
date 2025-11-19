@@ -17,6 +17,7 @@ pub mod filter; // Include/exclude filter patterns
 pub mod metadata;
 pub mod metadata_ops; // Metadata preservation orchestration
 pub mod progress;
+pub mod resilient_sync; // Crash-proof sync with Magnetar integration
 pub mod resume;
 pub mod retry;
 pub mod transfer;

@@ -1,0 +1,32 @@
+# ORBIT Filter Example: Mirror Configuration
+# For exact replication of a data directory
+# Usage: orbit --source /data --dest /replica --mode mirror --filter-from mirror.orbitfilter
+
+# Include everything by default
++ **
+
+# Exclude system and hidden files
+- **/.DS_Store
+- **/Thumbs.db
+- **/.Spotlight-V100/**
+- **/.Trashes/**
+- **/System Volume Information/**
+
+# Exclude common temporary files
+- **/*.tmp
+- **/*.temp
+- **/*.bak
+- **/*.old
+
+# Exclude lock files
+- **/*.lock
+- **/*.lck
+
+# Protect certain files from deletion (won't be deleted in mirror mode)
+# Note: These won't be synced but also won't be deleted
+# - .protected/**
+
+# Exclude large media files if bandwidth is limited
+# - **/*.mp4
+# - **/*.mov
+# - **/*.avi
