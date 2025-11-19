@@ -1,3 +1,0 @@
-2025-06-02 06:30:52.672823800 UTC | "D:\\test\\source\\example.txt" -> "D:\\test\\output\\copy.txt" | size=22 bytes | sha256=c9b70e06133d5602b85346bcd576c7413803054aa2590def7e4a7f060bc4238a | duration=416.40µs | compressed=false
-2025-06-02 06:32:14.789212800 UTC | "D:\\test\\source\\example.txt" -> "D:\\test\\output\\copy.lz4" | size=22 bytes | sha256=c9b70e06133d5602b85346bcd576c7413803054aa2590def7e4a7f060bc4238a | duration=285.10µs | compressed=true
-2025-06-02 06:33:00.909077500 UTC | "D:\\test\\output\\copy.lz4" -> "D:\\test\\output\\copy-decompressed.txt" | size=22 bytes | sha256=c9b70e06133d5602b85346bcd576c7413803054aa2590def7e4a7f060bc4238a | duration=296.00µs | compressed=false

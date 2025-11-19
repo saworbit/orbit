@@ -21,18 +21,29 @@
 Thumbs.db
 
 # Orbit-specific test files and artifacts
-test.txt
-test_backup.txt
-test_compressed.txt
-test_stats.txt
-test_stats_backup.txt
-orbit_audit.log
+test*.txt
+*_backup.txt
+sample_*.txt
 *.orbit_resume
 *.orbit_resume_compressed
 *.tmp.lz4
 *.tmp.zst
 
-# Orbit audit logs (unless specifically tracked)
+# Orbit audit logs
 orbit_audit.log
 audit.log
+*.jsonl
+
+# Windows null device artifact
 nul
+
+# Development artifacts (should not be in root)
+*.patch
+clippy.txt
+COMMIT_MESSAGE.txt
+test_output.txt
+
+# Database files
+*.db
+*.db-journal
+jobs.db
