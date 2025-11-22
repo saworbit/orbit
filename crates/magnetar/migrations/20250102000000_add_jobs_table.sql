@@ -8,7 +8,11 @@ CREATE TABLE IF NOT EXISTS jobs (
     compress BOOLEAN NOT NULL DEFAULT 0,
     verify BOOLEAN NOT NULL DEFAULT 0,
     parallel INTEGER,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'running', 'completed', 'failed')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+    progress REAL NOT NULL DEFAULT 0.0,
+    total_chunks INTEGER NOT NULL DEFAULT 0,
+    completed_chunks INTEGER NOT NULL DEFAULT 0,
+    failed_chunks INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

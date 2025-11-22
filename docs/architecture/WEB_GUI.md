@@ -2,9 +2,12 @@
 
 **Modern web interface for orchestrating Orbit file transfers with real-time monitoring**
 
+> **Current Version:** v1.0.0-alpha.3 - Interactive Dashboard Complete
+
 ## Table of Contents
 
 - [Overview](#overview)
+- [Current Status](#current-status)
 - [Architecture](#architecture)
 - [Installation & Setup](#installation--setup)
 - [Quick Start](#quick-start)
@@ -22,7 +25,34 @@
 
 ## Overview
 
-**Orbit Web** is a full-stack Rust web application that provides a modern, reactive interface for managing Orbit file transfers. Built with Leptos and Axum, it combines server-side rendering with client-side reactivity for optimal performance and user experience.
+**Orbit Web** (codename: **Nebula**) is a full-stack Rust web application that provides a modern, reactive interface for managing Orbit file transfers. Built with Axum backend and a modern JavaScript/CSS frontend, it delivers a professional dashboard experience with real-time updates.
+
+---
+
+## Current Status
+
+### v1.0.0-alpha.3 Highlights
+
+- **Modern Dark Theme Dashboard** - Professional UI with gradient accents
+- **Sidebar Navigation** - Overview, Jobs, API Explorer, WebSocket Monitor
+- **Interactive Login** - Loading states, error handling, proper page transitions
+- **Jobs Dashboard** - Status badges, progress bars, auto-refresh
+- **Built-in API Explorer** - Test endpoints directly from the browser
+- **WebSocket Monitor** - Real-time event visualization
+- **Demo Scripts** - Easily populate test data for demonstrations
+
+### Quick Demo
+
+```batch
+# Windows
+cd crates\orbit-web
+start-nebula.bat
+
+# Create demo jobs (in another terminal)
+create-demo-jobs-api.bat
+```
+
+Then open http://localhost:8080 and login with `admin` / `orbit2025`
 
 ### Key Benefits
 
@@ -246,34 +276,66 @@ Run the compiled binary directly:
 
 ## User Interface
 
-### Dashboard
+### Dashboard (v1.0.0-alpha.3)
 
-The main dashboard provides a comprehensive view of all transfer operations:
+The modern dashboard provides a comprehensive control center with sidebar navigation:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Orbit Web                              Dashboard | About    │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌──────────────────┐  ┌──────────────────────────────────┐ │
-│  │  Create New Job  │  │  Active Jobs                     │ │
-│  │                  │  │                                  │ │
-│  │  Source Path:    │  │  ┌────┬─────────┬────────┬─────┐ │ │
-│  │  [___________]   │  │  │ ID │ Source  │ Status │ ... │ │ │
-│  │                  │  │  ├────┼─────────┼────────┼─────┤ │ │
-│  │  Dest Path:      │  │  │ 1  │ Job 1   │ Done   │ ███ │ │ │
-│  │  [___________]   │  │  │ 2  │ Job 2   │ Active │ ▓▓░ │ │ │
-│  │                  │  │  └────┴─────────┴────────┴─────┘ │ │
-│  │  [✓] Compress    │  │                                  │ │
-│  │  [✓] Verify      │  │  Refresh                         │ │
-│  │                  │  │                                  │ │
-│  │  Workers: 4      │  └──────────────────────────────────┘ │
-│  │  [====|====]     │                                        │
-│  │                  │                                        │
-│  │  [Create Job]    │                                        │
-│  └──────────────────┘                                        │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│ ┌─────────────┐  ┌─────────────────────────────────────────────────┐ │
+│ │             │  │ Dashboard                                        │ │
+│ │ Orbit       │  │ Real-time system monitoring and control          │ │
+│ │ Nebula      │  │                                                   │ │
+│ │             │  │ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ │ │
+│ │─────────────│  │ │ Online  │ │ 2       │ │ 5       │ │ Live    │ │ │
+│ │ 📊 Overview │  │ │ Server  │ │ Active  │ │ Done    │ │ WS      │ │ │
+│ │ 📋 Jobs     │  │ └─────────┘ └─────────┘ └─────────┘ └─────────┘ │ │
+│ │ 🔌 API      │  │                                                   │ │
+│ │ ⚡ WebSocket│  │ Recent Activity                        [Refresh] │ │
+│ │             │  │ ┌──────┬──────────┬──────────┬────────┬────────┐ │ │
+│ │             │  │ │ ID   │ Source   │ Dest     │ Status │ Prog   │ │ │
+│ │             │  │ ├──────┼──────────┼──────────┼────────┼────────┤ │ │
+│ │─────────────│  │ │ 1... │ /data/.. │ s3://... │ ✓ Done │ ████   │ │ │
+│ │ [A] Admin   │  │ │ 2... │ /backup  │ \\nas\.. │ ● Run  │ ▓▓░░   │ │ │
+│ │ Administrator│ │ │ 3... │ /photos  │ s3://... │ ○ Pend │ ░░░░   │ │ │
+│ │ [Sign Out]  │  │ └──────┴──────────┴──────────┴────────┴────────┘ │ │
+│ └─────────────┘  └─────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+### Login Page
+
+Professional authentication UI with branded styling:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                                                                      │
+│                         Orbit Nebula                                 │
+│                   Data Orchestration Control Center                  │
+│                                                                      │
+│                   ┌────────────────────────┐                         │
+│                   │                        │                         │
+│                   │  Username              │                         │
+│                   │  [________________]    │                         │
+│                   │                        │                         │
+│                   │  Password              │                         │
+│                   │  [________________]    │                         │
+│                   │                        │                         │
+│                   │  [    Sign In     ]    │                         │
+│                   │                        │                         │
+│                   │  Default: admin /      │                         │
+│                   │          orbit2025     │                         │
+│                   └────────────────────────┘                         │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Dashboard Sections
+
+**Overview** - Stats grid and recent activity table
+**Jobs** - Full job listing with status and progress
+**API Explorer** - Built-in endpoint testing interface
+**WebSocket Monitor** - Real-time event stream visualization
 
 ### Job Creation Form
 

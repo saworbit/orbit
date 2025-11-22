@@ -4825,7 +4825,7 @@ dependencies = [
 
 [[package]]
 name = "orbit-web"
-version = "1.0.0-alpha.2"
+version = "1.0.0-rc.1"
 dependencies = [
  "anyhow",
  "argon2",

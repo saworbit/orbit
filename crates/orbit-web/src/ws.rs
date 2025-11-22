@@ -23,8 +23,9 @@ pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
     jar: CookieJar,
-    Path(job_id): Path<Option<String>>,
+    job_id: Option<Path<String>>,
 ) -> Response {
+    let job_id = job_id.map(|Path(id)| id);
     // Extract and validate JWT from cookies
     let token = match crate::auth::extract_jwt_from_cookies(&jar) {
         Some(t) => t,

@@ -4,25 +4,39 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
-- **Job ID Alignment** - Fixed inconsistency in Orbit Web API job ID handling
-  - `create_job` now returns numeric job IDs (e.g., "1", "2", "3") instead of UUIDs
-  - Added `jobs` metadata table to Magnetar with auto-incrementing INTEGER primary key
-  - Implemented `new_job()` method in JobStore trait for auto-generated job IDs
-  - All API endpoints now use consistent numeric ID format throughout the stack
-  - Updated `delete_job()` to clean up jobs metadata table
-  - Added comprehensive test coverage for job creation lifecycle
-
 ### Added
+- **Nebula Web Dashboard v1.0.0-alpha.3** - Complete interactive dashboard UI
+  - Modern dark theme with gradient accents and professional styling
+  - Sidebar navigation (Overview, Jobs, API Explorer, WebSocket Monitor)
+  - Stats grid with live indicators (Server Status, Active Transfers, Completed, WebSocket)
+  - Interactive login page with loading states and error handling
+  - Jobs table with status badges (completed/running/pending/failed) and progress bars
+  - Built-in API Explorer for testing endpoints directly from the dashboard
+  - WebSocket Monitor for real-time event visualization
+  - Demo job scripts (`create-demo-jobs.bat`, `create-demo-jobs-api.bat`)
+
 - **GUI Integration**
   - New `orbit serve` subcommand to launch the web dashboard with GUI enabled by default via the `gui` feature
   - Shared `orbit_web::start_server` entry point reused by the CLI and `orbit-web` binary
   - Documentation updates for GUI integration and a smoke test for the `/api/health` endpoint
+
 - **Magnetar Job Management**
   - New `new_job()` method in JobStore trait for creating jobs with auto-generated IDs
   - Jobs metadata table with source, destination, compress, verify, and parallel settings
   - Database migration `20250102000000_add_jobs_table.sql`
   - Support for SQLite AUTOINCREMENT job IDs (redb backend shows appropriate error)
+  - Extended jobs table schema with progress tracking columns (progress, total_chunks, completed_chunks, failed_chunks)
+
+### Fixed
+- **Job ID Alignment** - Fixed inconsistency in Orbit Web API job ID handling
+  - `create_job` now returns numeric job IDs (e.g., "1", "2", "3") instead of UUIDs
+  - Added `jobs` metadata table to Magnetar with auto-incrementing INTEGER primary key
+  - All API endpoints now use consistent numeric ID format throughout the stack
+  - Updated `delete_job()` to clean up jobs metadata table
+  - Added comprehensive test coverage for job creation lifecycle
+
+- **Login Screen Visibility** - Login page properly hides after authentication
+- **Login Response Parsing** - Fixed nested JSON response handling (`data.user || data`)
 
 ## [0.5.0] - 2025-11-10
 
