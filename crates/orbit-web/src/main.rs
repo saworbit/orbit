@@ -6,7 +6,7 @@ use orbit_web::{start_server, WebConfig};
 use std::env;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send>> {
     // Load configuration from environment variables
     let config = WebConfig {
         host: env::var("ORBIT_WEB_HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
