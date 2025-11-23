@@ -194,7 +194,7 @@ codegen-units = 1
 panic = "abort"
 
 [features]
-default = ["zero-copy", "gui"]
+default = ["zero-copy", "gui", "backend-abstraction", "s3-native", "ssh-backend", "smb-native"]
 
 # Zero-copy system calls for maximum performance
 zero-copy = []
@@ -202,13 +202,13 @@ zero-copy = []
 # Protocol support (experimental)
 protocols = []
 
-# Native SMB2/3 client (pure Rust, async) - disabled by default
+# Native SMB2/3 client (pure Rust, async)
 smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes", "dep:futures"]
 
-# Native S3 client (pure Rust, async) - disabled by default
+# Native S3 client (pure Rust, async)
 s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes"]
 
-# SSH backend support - disabled by default
+# SSH backend support
 ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes"]
 
 # Unified backend abstraction layer - enables async backends with extensibility

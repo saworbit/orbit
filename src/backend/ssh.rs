@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream;
 use secrecy::{ExposeSecret, SecretString};
-use ssh2::Session;
+use ssh2::{Session, Sftp};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -156,6 +156,7 @@ impl SshConfig {
 pub struct SshBackend {
     config: SshConfig,
     session: Arc<Session>,
+    sftp: Arc<Sftp>,
 }
 
 impl SshBackend {
@@ -220,24 +221,12 @@ impl SshBackend {
                 key_path,
                 passphrase,
             } => {
-                let pass = passphrase.as_ref().map(|p| p.expose_secret().as_str());
+                let pass: Option<&str> = passphrase.as_ref().map(|p| p.expose_secret().as_ref());
                 session
                     .userauth_pubkey_file(&config.username, None, key_path, pass)
                     .map_err(|e| BackendError::AuthenticationFailed {
                         backend: "ssh".to_string(),
                         message: format!("Key file authentication failed: {}", e),
-                    })?;
-            }
-            SshAuth::KeyData {
-                key_data,
-                passphrase,
-            } => {
-                let pass = passphrase.as_ref().map(|p| p.expose_secret().as_str());
-                session
-                    .userauth_pubkey_memory(&config.username, None, key_data.expose_secret(), pass)
-                    .map_err(|e| BackendError::AuthenticationFailed {
-                        backend: "ssh".to_string(),
-                        message: format!("Key data authentication failed: {}", e),
                     })?;
             }
             SshAuth::Agent => {
@@ -304,8 +293,8 @@ impl SshBackend {
 
         Ok(Self {
             config,
-            session,
-            sftp,
+            session: Arc::new(session),
+            sftp: Arc::new(sftp),
         })
     }
 
@@ -336,7 +325,7 @@ impl SshBackend {
         metadata
     }
 
-    /// List directory recursively
+    /// List directory recursively (wrapper that uses standalone impl)
     fn list_recursive_blocking(
         &self,
         path: &Path,
@@ -345,68 +334,108 @@ impl SshBackend {
         current_depth: usize,
         entries: &mut Vec<DirEntry>,
     ) -> BackendResult<()> {
-        // Check limits
-        if let Some(max_depth) = options.max_depth {
-            if current_depth >= max_depth {
-                return Ok(());
-            }
-        }
-
-        if let Some(max_entries) = options.max_entries {
-            if entries.len() >= max_entries {
-                return Ok(());
-            }
-        }
-
-        // Read directory
-        let dir_entries = self.sftp.readdir(path).map_err(|e| {
-            if e.code() == ssh2::ErrorCode::Session(-31) {
-                // SFTP_NO_SUCH_FILE
-                BackendError::NotFound {
-                    path: path.to_path_buf(),
-                    backend: "ssh".to_string(),
-                }
-            } else {
-                BackendError::Other {
-                    backend: "ssh".to_string(),
-                    message: format!("Failed to read directory: {}", e),
-                }
-            }
-        })?;
-
-        for (entry_path, stat) in dir_entries {
-            // Skip hidden files if needed
-            if !options.include_hidden {
-                if let Some(name) = entry_path.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with('.') {
-                        continue;
-                    }
-                }
-            }
-
-            let relative_path = entry_path.strip_prefix(base_path).unwrap_or(&entry_path);
-            let metadata = self.convert_metadata(&entry_path, &stat);
-
-            entries.push(DirEntry::new(
-                relative_path.to_path_buf(),
-                entry_path.clone(),
-                metadata.clone(),
-            ));
-
-            // Recurse if needed
-            if options.recursive && stat.is_dir() {
-                self.list_recursive_blocking(
-                    &entry_path,
-                    base_path,
-                    options,
-                    current_depth + 1,
-                    entries,
-                )?;
-            }
-        }
-
-        Ok(())
+        list_recursive_blocking_impl(&self.sftp, path, base_path, options, current_depth, entries)
     }
+}
+
+/// Convert ssh2::FileStat to backend Metadata (standalone function)
+fn convert_stat_to_metadata(stat: &ssh2::FileStat) -> Metadata {
+    let is_file = stat.is_file();
+    let is_dir = stat.is_dir();
+    let size = stat.size.unwrap_or(0);
+
+    let mut metadata = if is_file {
+        Metadata::file(size)
+    } else if is_dir {
+        Metadata::directory()
+    } else {
+        Metadata::symlink(size)
+    };
+
+    if let Some(mtime) = stat.mtime {
+        metadata.modified = Some(std::time::UNIX_EPOCH + std::time::Duration::from_secs(mtime));
+    }
+
+    if let Some(atime) = stat.atime {
+        metadata.accessed = Some(std::time::UNIX_EPOCH + std::time::Duration::from_secs(atime));
+    }
+
+    metadata.permissions = stat.perm.map(|p| p & 0o777);
+
+    metadata
+}
+
+/// List directory recursively (standalone function for use in spawn_blocking)
+fn list_recursive_blocking_impl(
+    sftp: &Sftp,
+    path: &Path,
+    base_path: &Path,
+    options: &ListOptions,
+    current_depth: usize,
+    entries: &mut Vec<DirEntry>,
+) -> BackendResult<()> {
+    // Check limits
+    if let Some(max_depth) = options.max_depth {
+        if current_depth >= max_depth {
+            return Ok(());
+        }
+    }
+
+    if let Some(max_entries) = options.max_entries {
+        if entries.len() >= max_entries {
+            return Ok(());
+        }
+    }
+
+    // Read directory
+    let dir_entries = sftp.readdir(path).map_err(|e| {
+        if e.code() == ssh2::ErrorCode::Session(-31) {
+            // SFTP_NO_SUCH_FILE
+            BackendError::NotFound {
+                path: path.to_path_buf(),
+                backend: "ssh".to_string(),
+            }
+        } else {
+            BackendError::Other {
+                backend: "ssh".to_string(),
+                message: format!("Failed to read directory: {}", e),
+            }
+        }
+    })?;
+
+    for (entry_path, stat) in dir_entries {
+        // Skip hidden files if needed
+        if !options.include_hidden {
+            if let Some(name) = entry_path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with('.') {
+                    continue;
+                }
+            }
+        }
+
+        let relative_path = entry_path.strip_prefix(base_path).unwrap_or(&entry_path);
+        let metadata = convert_stat_to_metadata(&stat);
+
+        entries.push(DirEntry::new(
+            relative_path.to_path_buf(),
+            entry_path.clone(),
+            metadata.clone(),
+        ));
+
+        // Recurse if needed
+        if options.recursive && stat.is_dir() {
+            list_recursive_blocking_impl(
+                sftp,
+                &entry_path,
+                base_path,
+                options,
+                current_depth + 1,
+                entries,
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 #[async_trait]
@@ -455,13 +484,7 @@ impl Backend for SshBackend {
 
         tokio::task::spawn_blocking(move || {
             let mut entries = Vec::new();
-            let backend = SshBackend {
-                config: SshConfig::new("", "", SshAuth::Agent), // Dummy config
-                session: unsafe { std::mem::zeroed() },         // Won't be used
-                sftp: sftp.clone(),
-            };
-
-            backend.list_recursive_blocking(&path, &path, &options, 0, &mut entries)?;
+            list_recursive_blocking_impl(&sftp, &path, &path, &options, 0, &mut entries)?;
             Ok(entries)
         })
         .await
@@ -538,8 +561,12 @@ impl Backend for SshBackend {
             // Set permissions if specified
             if let Some(perms) = options.permissions {
                 file.setstat(ssh2::FileStat {
+                    size: None,
+                    uid: None,
+                    gid: None,
                     perm: Some(perms),
-                    ..Default::default()
+                    atime: None,
+                    mtime: None,
                 })
                 .ok();
             }

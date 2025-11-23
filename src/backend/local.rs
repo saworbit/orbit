@@ -7,7 +7,7 @@ use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::stream;
+use futures::{stream, StreamExt};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

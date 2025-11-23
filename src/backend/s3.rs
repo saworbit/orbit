@@ -72,29 +72,42 @@ impl S3Backend {
 
     /// Convert a Path to an S3 key
     fn path_to_key(&self, path: &Path) -> String {
-        let path_str = path.to_string_lossy().replace('\\', "/");
-        let key = path_str.trim_start_matches('/');
-
-        if let Some(prefix) = &self.prefix {
-            format!("{}/{}", prefix.trim_end_matches('/'), key)
-        } else {
-            key.to_string()
-        }
+        path_to_key_impl(path, self.prefix.as_deref())
     }
 
     /// Convert an S3 key to a Path (strip prefix if present)
     fn key_to_path(&self, key: &str) -> PathBuf {
-        if let Some(prefix) = &self.prefix {
-            let prefix = prefix.trim_end_matches('/');
-            if let Some(stripped) = key.strip_prefix(prefix) {
-                PathBuf::from(stripped.trim_start_matches('/'))
-            } else {
-                PathBuf::from(key)
-            }
+        key_to_path_impl(key, self.prefix.as_deref())
+    }
+}
+
+/// Convert a Path to an S3 key with optional prefix (standalone for testing)
+fn path_to_key_impl(path: &Path, prefix: Option<&str>) -> String {
+    let path_str = path.to_string_lossy().replace('\\', "/");
+    let key = path_str.trim_start_matches('/');
+
+    if let Some(prefix) = prefix {
+        format!("{}/{}", prefix.trim_end_matches('/'), key)
+    } else {
+        key.to_string()
+    }
+}
+
+/// Convert an S3 key to a Path with optional prefix (standalone for testing)
+fn key_to_path_impl(key: &str, prefix: Option<&str>) -> PathBuf {
+    if let Some(prefix) = prefix {
+        let prefix = prefix.trim_end_matches('/');
+        if let Some(stripped) = key.strip_prefix(prefix) {
+            PathBuf::from(stripped.trim_start_matches('/'))
         } else {
             PathBuf::from(key)
         }
+    } else {
+        PathBuf::from(key)
     }
+}
+
+impl S3Backend {
 
     /// Convert S3ObjectMetadata to backend Metadata
     fn convert_metadata(&self, s3_meta: crate::protocol::s3::S3ObjectMetadata) -> Metadata {
@@ -459,39 +472,53 @@ mod tests {
 
     #[test]
     fn test_path_to_key() {
-        let backend = S3Backend {
-            client: unsafe { std::mem::zeroed() }, // Won't be used in this test
-            prefix: Some("prefix".to_string()),
-        };
+        let prefix = Some("prefix");
 
         assert_eq!(
-            backend.path_to_key(Path::new("file.txt")),
+            path_to_key_impl(Path::new("file.txt"), prefix),
             "prefix/file.txt"
         );
         assert_eq!(
-            backend.path_to_key(Path::new("/file.txt")),
+            path_to_key_impl(Path::new("/file.txt"), prefix),
             "prefix/file.txt"
         );
         assert_eq!(
-            backend.path_to_key(Path::new("dir/file.txt")),
+            path_to_key_impl(Path::new("dir/file.txt"), prefix),
             "prefix/dir/file.txt"
         );
     }
 
     #[test]
     fn test_key_to_path() {
-        let backend = S3Backend {
-            client: unsafe { std::mem::zeroed() },
-            prefix: Some("prefix".to_string()),
-        };
+        let prefix = Some("prefix");
 
         assert_eq!(
-            backend.key_to_path("prefix/file.txt"),
+            key_to_path_impl("prefix/file.txt", prefix),
             PathBuf::from("file.txt")
         );
         assert_eq!(
-            backend.key_to_path("prefix/dir/file.txt"),
+            key_to_path_impl("prefix/dir/file.txt", prefix),
             PathBuf::from("dir/file.txt")
+        );
+    }
+
+    #[test]
+    fn test_path_to_key_no_prefix() {
+        assert_eq!(
+            path_to_key_impl(Path::new("file.txt"), None),
+            "file.txt"
+        );
+        assert_eq!(
+            path_to_key_impl(Path::new("/file.txt"), None),
+            "file.txt"
+        );
+    }
+
+    #[test]
+    fn test_key_to_path_no_prefix() {
+        assert_eq!(
+            key_to_path_impl("file.txt", None),
+            PathBuf::from("file.txt")
         );
     }
 }

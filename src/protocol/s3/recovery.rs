@@ -527,22 +527,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_with_success() {
-        let policy = RetryPolicy::default();
-        let mut attempts = 0;
+        use std::sync::atomic::{AtomicU32, Ordering};
 
-        let result = with_retry(policy, || async {
-            attempts += 1;
-            if attempts < 3 {
-                Err(S3Error::Other("Transient error".to_string()))
-            } else {
-                Ok(42)
+        let policy = RetryPolicy::default();
+        let attempts = AtomicU32::new(0);
+
+        let result = with_retry(policy, || {
+            let current = attempts.fetch_add(1, Ordering::SeqCst) + 1;
+            async move {
+                if current < 3 {
+                    Err(S3Error::Network("Transient error".to_string()))
+                } else {
+                    Ok(42)
+                }
             }
         })
         .await;
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
-        assert_eq!(attempts, 3);
+        assert_eq!(attempts.load(Ordering::SeqCst), 3);
     }
 
     #[test]

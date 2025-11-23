@@ -173,13 +173,13 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
             let auth = if let Some(key_path) = query_pairs.get("key") {
                 let passphrase = query_pairs
                     .get("passphrase")
-                    .map(|p| secrecy::SecretString::new(p.clone()));
+                    .map(|p| secrecy::SecretString::new(p.clone().into_boxed_str()));
                 SshAuth::KeyFile {
                     key_path: PathBuf::from(key_path),
                     passphrase,
                 }
             } else if let Some(password) = query_pairs.get("password") {
-                SshAuth::Password(secrecy::SecretString::new(password.clone()))
+                SshAuth::Password(secrecy::SecretString::new(password.clone().into_boxed_str()))
             } else if query_pairs
                 .get("agent")
                 .map(|v| v == "true")
@@ -298,13 +298,13 @@ pub fn from_env() -> BackendResult<BackendConfig> {
             let auth = if let Ok(key_path) = std::env::var("ORBIT_SSH_KEY") {
                 let passphrase = std::env::var("ORBIT_SSH_PASSPHRASE")
                     .ok()
-                    .map(secrecy::SecretString::new);
+                    .map(|p| secrecy::SecretString::new(p.into_boxed_str()));
                 SshAuth::KeyFile {
                     key_path: PathBuf::from(key_path),
                     passphrase,
                 }
             } else if let Ok(password) = std::env::var("ORBIT_SSH_PASSWORD") {
-                SshAuth::Password(secrecy::SecretString::new(password))
+                SshAuth::Password(secrecy::SecretString::new(password.into_boxed_str()))
             } else {
                 SshAuth::Agent
             };

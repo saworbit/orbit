@@ -420,9 +420,72 @@ pub trait Backend: Send + Sync {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_module_compiles() {
         // Basic test to ensure module compiles
         assert!(true);
+    }
+
+    /// Smoke test: Verify LocalBackend is available with default features
+    #[test]
+    #[cfg(feature = "backend-abstraction")]
+    fn test_local_backend_available() {
+        let backend = LocalBackend::new();
+        assert_eq!(backend.backend_name(), "local");
+    }
+
+    /// Smoke test: Verify S3Backend type is available with default features
+    #[test]
+    #[cfg(all(feature = "backend-abstraction", feature = "s3-native"))]
+    fn test_s3_backend_type_available() {
+        // Just verify the type exists and can be referenced
+        fn _assert_s3_backend_exists(_: &S3Backend) {}
+    }
+
+    /// Smoke test: Verify SshBackend types are available with default features
+    #[test]
+    #[cfg(all(feature = "backend-abstraction", feature = "ssh-backend"))]
+    fn test_ssh_backend_types_available() {
+        // Verify SshConfig and SshAuth types exist
+        let _config = SshConfig::new("example.com", "user", SshAuth::Agent);
+        assert_eq!(_config.port, 22);
+    }
+
+    /// Smoke test: Verify backend config can parse non-local URIs
+    #[test]
+    #[cfg(all(feature = "backend-abstraction", feature = "s3-native"))]
+    fn test_parse_s3_uri_config() {
+        let uri = "s3://my-bucket/path/to/file";
+        let result = parse_uri(uri);
+        assert!(result.is_ok());
+        let (config, path) = result.unwrap();
+        match config {
+            BackendConfig::S3 { config: s3_config, .. } => {
+                assert_eq!(s3_config.bucket, "my-bucket");
+            }
+            _ => panic!("Expected S3 config"),
+        }
+        assert!(path.to_string_lossy().contains("path/to/file"));
+    }
+
+    /// Smoke test: Verify backend config can parse SSH URIs
+    #[test]
+    #[cfg(all(feature = "backend-abstraction", feature = "ssh-backend"))]
+    fn test_parse_ssh_uri_config() {
+        let uri = "ssh://user@example.com:22/path/to/file";
+        let result = parse_uri(uri);
+        assert!(result.is_ok());
+        let (config, path) = result.unwrap();
+        match config {
+            BackendConfig::Ssh(ssh_config) => {
+                assert_eq!(ssh_config.host, "example.com");
+                assert_eq!(ssh_config.username, "user");
+                assert_eq!(ssh_config.port, 22);
+            }
+            _ => panic!("Expected SSH config"),
+        }
+        assert!(path.to_string_lossy().contains("path/to/file"));
     }
 }
