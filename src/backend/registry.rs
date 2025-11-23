@@ -12,10 +12,13 @@ use std::sync::{Arc, RwLock};
 use super::LocalBackend;
 
 #[cfg(all(feature = "backend-abstraction", feature = "ssh-backend"))]
-use super::{SshBackend, SshConfig};
+use super::SshBackend;
 
 #[cfg(all(feature = "backend-abstraction", feature = "s3-native"))]
 use super::S3Backend;
+
+#[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
+use super::SmbBackend;
 
 /// Factory function type for creating backends
 pub type BackendFactory =
@@ -137,6 +140,27 @@ impl BackendRegistry {
                         _ => Err(BackendError::InvalidConfig {
                             backend: "s3".to_string(),
                             message: "Invalid configuration for S3 backend".to_string(),
+                        }),
+                    }
+                })
+            }),
+        );
+
+        // SMB backend
+        #[cfg(feature = "smb-native")]
+        self.register(
+            "smb",
+            Arc::new(|config| {
+                let config = config.clone();
+                Box::pin(async move {
+                    match config {
+                        BackendConfig::Smb(smb_config) => {
+                            let backend = SmbBackend::new(smb_config).await?;
+                            Ok(Box::new(backend) as Box<dyn Backend>)
+                        }
+                        _ => Err(BackendError::InvalidConfig {
+                            backend: "smb".to_string(),
+                            message: "Invalid configuration for SMB backend".to_string(),
                         }),
                     }
                 })

@@ -69,6 +69,9 @@ mod ssh;
 #[cfg(all(feature = "backend-abstraction", feature = "s3-native"))]
 mod s3;
 
+#[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
+mod smb;
+
 #[cfg(feature = "backend-abstraction")]
 mod config;
 
@@ -87,6 +90,9 @@ pub use ssh::{SshAuth, SshBackend, SshConfig};
 
 #[cfg(all(feature = "backend-abstraction", feature = "s3-native"))]
 pub use s3::S3Backend;
+
+#[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
+pub use smb::{SmbBackend, SmbConfig};
 
 #[cfg(feature = "backend-abstraction")]
 pub use config::{parse_uri, BackendConfig};
@@ -488,6 +494,37 @@ mod tests {
                 assert_eq!(ssh_config.port, 22);
             }
             _ => panic!("Expected SSH config"),
+        }
+        assert!(path.to_string_lossy().contains("path/to/file"));
+    }
+
+    /// Smoke test: Verify SmbBackend types are available with default features
+    #[test]
+    #[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
+    fn test_smb_backend_types_available() {
+        // Verify SmbConfig type exists and can be constructed
+        let config = SmbConfig::new("fileserver", "share")
+            .with_username("user")
+            .with_password("pass");
+        assert_eq!(config.host, "fileserver");
+        assert_eq!(config.share, "share");
+    }
+
+    /// Smoke test: Verify backend config can parse SMB URIs
+    #[test]
+    #[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
+    fn test_parse_smb_uri_config() {
+        let uri = "smb://user:pass@fileserver/share/path/to/file";
+        let result = parse_uri(uri);
+        assert!(result.is_ok());
+        let (config, path) = result.unwrap();
+        match config {
+            BackendConfig::Smb(smb_config) => {
+                assert_eq!(smb_config.host, "fileserver");
+                assert_eq!(smb_config.share, "share");
+                assert_eq!(smb_config.username, Some("user".to_string()));
+            }
+            _ => panic!("Expected SMB config"),
         }
         assert!(path.to_string_lossy().contains("path/to/file"));
     }
