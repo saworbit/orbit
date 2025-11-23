@@ -124,14 +124,22 @@ impl Drop for Secret {
 ///
 /// // Performance-optimized: disable encryption on trusted network
 /// let perf_target = SmbTarget {
+///     host: "fileserver".to_string(),
+///     share: "data".to_string(),
+///     subpath: String::new(),
+///     port: None,
+///     auth: SmbAuth::Anonymous,
 ///     security: SmbSecurity::SignOnly,
-///     ..secure_target
 /// };
 ///
 /// // Flexible: use encryption if available
 /// let compat_target = SmbTarget {
+///     host: "fileserver".to_string(),
+///     share: "shared".to_string(),
+///     subpath: String::new(),
+///     port: None,
+///     auth: SmbAuth::Anonymous,
 ///     security: SmbSecurity::Opportunistic,
-///     ..secure_target
 /// };
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

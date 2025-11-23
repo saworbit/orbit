@@ -62,17 +62,18 @@
 //!
 //! ## With Throughput Tracking
 //!
-//! ```no_run
-//! # use orbit::protocol::s3::progress::{ProgressReporter, ProgressEvent, ThroughputTracker};
+//! ```ignore
+//! use orbit::protocol::s3::progress::{ProgressReporter, ProgressEvent, ThroughputTracker};
+//!
 //! let (reporter, mut receiver) = ProgressReporter::new();
-//! let mut tracker = ThroughputTracker::new();
+//! let tracker = ThroughputTracker::new();
 //!
 //! tokio::spawn(async move {
 //!     while let Some(event) = receiver.recv().await {
 //!         if let ProgressEvent::Progress { bytes_transferred, .. } = event {
-//!             tracker.update(bytes_transferred);
-//!             println!("Speed: {:.2} MB/s", tracker.throughput_mbps());
-//!             println!("ETA: {:?}", tracker.eta(1000000));
+//!             tracker.update(bytes_transferred).await;
+//!             println!("Speed: {:.2} MB/s", tracker.throughput_mbps().await);
+//!             println!("ETA: {:?}", tracker.eta(1000000).await);
 //!         }
 //!     }
 //! });

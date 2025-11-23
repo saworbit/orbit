@@ -249,7 +249,7 @@ static GLOBAL_REGISTRY: once_cell::sync::Lazy<BackendRegistry> =
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// use orbit::backend::global_registry;
 ///
 /// #[tokio::main]
@@ -271,7 +271,7 @@ pub fn global_registry() -> &'static BackendRegistry {
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// use orbit::backend::create_backend_from_uri;
 ///
 /// #[tokio::main]

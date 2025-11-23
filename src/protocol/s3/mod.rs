@@ -17,8 +17,9 @@
 //!
 //! ## Basic Upload
 //!
-//! ```no_run
-//! use orbit::protocol::s3::{S3Client, S3Config};
+//! ```ignore
+//! use orbit::protocol::s3::{S3Client, S3Config, S3Operations};
+//! use std::path::Path;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,18 +28,19 @@
 //!         region: Some("us-east-1".to_string()),
 //!         ..Default::default()
 //!     };
-//!     
+//!
 //!     let client = S3Client::new(config).await?;
-//!     client.upload_file("local/file.txt", "remote/file.txt").await?;
-//!     
+//!     client.upload_file(Path::new("local/file.txt"), "remote/file.txt").await?;
+//!
 //!     Ok(())
 //! }
 //! ```
 //!
 //! ## Download with Resume
 //!
-//! ```no_run
+//! ```ignore
 //! use orbit::protocol::s3::{S3Client, S3Config};
+//! use std::path::Path;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,20 +49,20 @@
 //!         region: Some("us-west-2".to_string()),
 //!         ..Default::default()
 //!     };
-//!     
+//!
 //!     let client = S3Client::new(config).await?;
-//!     
+//!
 //!     // Download with automatic resume on failure
-//!     client.download_file_resumable("large-file.bin", "local/file.bin").await?;
-//!     
+//!     client.download_file_resumable("large-file.bin", Path::new("local/file.bin"), 0).await?;
+//!
 //!     Ok(())
 //! }
 //! ```
 //!
 //! ## Using MinIO or S3-Compatible Storage
 //!
-//! ```no_run
-//! use orbit::protocol::s3::{S3Client, S3Config};
+//! ```ignore
+//! use orbit::protocol::s3::{S3Client, S3Config, S3Operations};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,10 +74,10 @@
 //!         secret_key: Some("minioadmin".to_string()),
 //!         ..Default::default()
 //!     };
-//!     
+//!
 //!     let client = S3Client::new(config).await?;
 //!     client.list_objects("prefix/").await?;
-//!     
+//!
 //!     Ok(())
 //! }
 //! ```

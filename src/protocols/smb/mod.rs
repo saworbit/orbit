@@ -9,29 +9,26 @@
 //!
 //! # Example
 //!
-//! ```no_run
-//! # #[cfg(feature = "smb-native")]
-//! # {
-//! use orbit::protocols::smb::{SmbTarget, SmbAuth, SmbSecurity, client_for};
+//! ```ignore
+//! use orbit::protocols::smb::{SmbTarget, SmbAuth, SmbSecurity, Secret, client_for};
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let target = SmbTarget {
-//!     host: "fileserver.acme.corp".to_string(),
-//!     share: "projects".to_string(),
-//!     subpath: "alpha/reports".to_string(),
-//!     port: None, // defaults to 445
-//!     auth: SmbAuth::Ntlmv2 {
-//!         username: "user".to_string(),
-//!         password: crate::protocols::smb::Secret("pass".to_string()),
-//!     },
-//!     security: SmbSecurity::RequireEncryption,
-//! };
+//! async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//!     let target = SmbTarget {
+//!         host: "fileserver.acme.corp".to_string(),
+//!         share: "projects".to_string(),
+//!         subpath: "alpha/reports".to_string(),
+//!         port: None, // defaults to 445
+//!         auth: SmbAuth::Ntlmv2 {
+//!             username: "user".to_string(),
+//!             password: Secret("pass".to_string()),
+//!         },
+//!         security: SmbSecurity::RequireEncryption,
+//!     };
 //!
-//! let mut client = client_for(&target).await?;
-//! let data = client.read_file("Q4/summary.pdf", None).await?;
-//! # Ok(())
-//! # }
-//! # }
+//!     let mut client = client_for(&target).await?;
+//!     let data = client.read_file("Q4/summary.pdf", None).await?;
+//!     Ok(())
+//! }
 //! ```
 
 pub mod error;

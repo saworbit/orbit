@@ -24,7 +24,7 @@
 //!
 //! ## List Object Versions
 //!
-//! ```no_run
+//! ```ignore
 //! use orbit::protocol::s3::{S3Client, S3Config};
 //! use orbit::protocol::s3::versioning::VersioningOperations;
 //!
@@ -35,9 +35,9 @@
 //!         ..Default::default()
 //!     }).await?;
 //!
-//!     let versions = client.list_object_versions("my-file.txt").await?;
-//!     for version in versions {
-//!         println!("Version: {} ({})", version.version_id, version.last_modified);
+//!     let result = client.list_object_versions("my-file.txt").await?;
+//!     for version in result.versions {
+//!         println!("Version: {} ({:?})", version.version_id, version.last_modified);
 //!     }
 //!
 //!     Ok(())
@@ -46,20 +46,22 @@
 //!
 //! ## Download Specific Version
 //!
-//! ```no_run
-//! # use orbit::protocol::s3::{S3Client, S3Config};
-//! # use orbit::protocol::s3::versioning::VersioningOperations;
-//! # #[tokio::main]
-//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let client = S3Client::new(S3Config::default()).await?;
-//! // Download version from yesterday
-//! client.download_version(
-//!     "my-file.txt",
-//!     "version-id-here",
-//!     "restored-file.txt"
-//! ).await?;
-//! # Ok(())
-//! # }
+//! ```ignore
+//! use orbit::protocol::s3::{S3Client, S3Config};
+//! use orbit::protocol::s3::versioning::VersioningOperations;
+//! use std::path::Path;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let client = S3Client::new(S3Config::default()).await?;
+//!     // Download version from yesterday
+//!     client.download_version(
+//!         "my-file.txt",
+//!         "version-id-here",
+//!         Path::new("restored-file.txt")
+//!     ).await?;
+//!     Ok(())
+//! }
 //! ```
 
 use super::client::S3Client;

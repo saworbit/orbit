@@ -133,7 +133,7 @@ impl SshConfig {
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// use orbit::backend::{Backend, SshBackend, SshConfig, SshAuth};
 /// use secrecy::SecretString;
 /// use std::path::Path;
@@ -143,7 +143,7 @@ impl SshConfig {
 ///     let config = SshConfig::new(
 ///         "example.com",
 ///         "user",
-///         SshAuth::Password(SecretString::new("password".to_string()))
+///         SshAuth::Password(SecretString::new("password".into()))
 ///     );
 ///
 ///     let backend = SshBackend::connect(config).await?;

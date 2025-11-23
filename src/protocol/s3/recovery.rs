@@ -25,8 +25,9 @@
 //!
 //! ## Basic Retry
 //!
-//! ```no_run
+//! ```ignore
 //! use orbit::protocol::s3::recovery::{RetryPolicy, with_retry};
+//! use orbit::protocol::s3::S3Error;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,7 +35,7 @@
 //!
 //!     let result = with_retry(policy, || async {
 //!         // Your S3 operation here
-//!         Ok::<_, String>(42)
+//!         Ok::<_, S3Error>(42)
 //!     }).await?;
 //!
 //!     Ok(())

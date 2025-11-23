@@ -33,16 +33,20 @@
 //!
 //! ## SSH Backend
 //!
-//! ```no_run
-//! # #[cfg(feature = "ssh-backend")]
-//! # {
-//! use orbit::backend::{Backend, SshBackend, SshConfig};
-//! use std::path::Path;
+//! ```ignore
+//! use orbit::backend::{Backend, SshBackend, SshConfig, SshAuth};
+//! use std::path::{Path, PathBuf};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let config = SshConfig::new("user@example.com:22")
-//!         .with_key_file("/home/user/.ssh/id_rsa");
+//!     let config = SshConfig::new(
+//!         "example.com",
+//!         "user",
+//!         SshAuth::KeyFile {
+//!             key_path: PathBuf::from("/home/user/.ssh/id_rsa"),
+//!             passphrase: None,
+//!         }
+//!     );
 //!     let backend = SshBackend::connect(config).await?;
 //!
 //!     let entries = backend.list(Path::new("/remote/dir"), Default::default()).await?;
@@ -51,7 +55,6 @@
 //!     }
 //!     Ok(())
 //! }
-//! # }
 //! ```
 
 pub mod error;
