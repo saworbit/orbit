@@ -19,6 +19,7 @@ use std::path::Path;
 use crate::backend::{Backend, BackendResult};
 
 /// Metadata preservation operation
+#[derive(Default)]
 pub struct MetadataPreserver {
     /// Flags controlling what metadata to preserve
     pub preserve_flags: PreserveFlags,
@@ -28,16 +29,6 @@ pub struct MetadataPreserver {
 
     /// Strictness mode (fail on any error vs. warn and continue)
     pub strict: bool,
-}
-
-impl Default for MetadataPreserver {
-    fn default() -> Self {
-        Self {
-            preserve_flags: PreserveFlags::default(),
-            transform_config: None,
-            strict: false,
-        }
-    }
 }
 
 impl MetadataPreserver {
@@ -133,6 +124,7 @@ impl MetadataPreserver {
 
     /// Apply metadata to a backend
     #[cfg(feature = "backend-abstraction")]
+    #[allow(clippy::collapsible_if)]
     async fn apply_to_backend(
         &self,
         metadata: &FileMetadata,
@@ -225,6 +217,7 @@ impl MetadataPreserver {
 }
 
 /// Verify that metadata was correctly preserved
+#[allow(clippy::collapsible_if)]
 pub fn verify_metadata(source: &Path, dest: &Path, flags: PreserveFlags) -> Result<bool> {
     let source_meta = FileMetadata::from_path(source)?;
     let dest_meta = FileMetadata::from_path(dest)?;

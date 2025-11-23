@@ -131,7 +131,7 @@ pub fn copy_directory_impl(
     // Bounded channel prevents scanner from overwhelming copiers
     // Buffer size: use parallel threads as baseline, bounded between 16-1000
     let buffer_size = if config.parallel > 0 {
-        config.parallel.max(16).min(1000)
+        config.parallel.clamp(16, 1000)
     } else {
         100
     };

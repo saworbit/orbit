@@ -166,7 +166,7 @@ impl DeleteMarker {
 }
 
 /// Result of listing object versions
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VersionsListResult {
     /// Object versions
     pub versions: Vec<ObjectVersion>,
@@ -210,18 +210,6 @@ impl VersionsListResult {
     /// Check if object is currently deleted
     pub fn is_deleted(&self) -> bool {
         self.delete_markers.iter().any(|dm| dm.is_latest)
-    }
-}
-
-impl Default for VersionsListResult {
-    fn default() -> Self {
-        Self {
-            versions: Vec::new(),
-            delete_markers: Vec::new(),
-            next_key_marker: None,
-            next_version_id_marker: None,
-            is_truncated: false,
-        }
     }
 }
 

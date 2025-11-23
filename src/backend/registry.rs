@@ -264,6 +264,7 @@ impl Default for BackendRegistry {
 }
 
 /// Global backend registry instance
+#[allow(dead_code)]
 static GLOBAL_REGISTRY: once_cell::sync::Lazy<BackendRegistry> =
     once_cell::sync::Lazy::new(BackendRegistry::new);
 
@@ -287,6 +288,7 @@ static GLOBAL_REGISTRY: once_cell::sync::Lazy<BackendRegistry> =
 ///     Ok(())
 /// }
 /// ```
+#[allow(dead_code)]
 pub fn global_registry() -> &'static BackendRegistry {
     &GLOBAL_REGISTRY
 }
@@ -305,6 +307,7 @@ pub fn global_registry() -> &'static BackendRegistry {
 ///     Ok(())
 /// }
 /// ```
+#[allow(dead_code)]
 pub async fn create_backend_from_uri(
     uri: &str,
 ) -> BackendResult<(Box<dyn Backend>, std::path::PathBuf)> {

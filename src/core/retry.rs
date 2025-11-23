@@ -152,7 +152,7 @@ where
         }
     }
 
-    Err(last_error.unwrap_or_else(|| OrbitError::RetriesExhausted {
+    Err(last_error.unwrap_or(OrbitError::RetriesExhausted {
         attempts: config.retry_attempts,
     }))
 }

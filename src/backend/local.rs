@@ -7,7 +7,7 @@ use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{stream, StreamExt};
+use futures::stream;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -512,7 +512,7 @@ impl Backend for LocalBackend {
             }
         })
         .await
-        .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+        .map_err(|e| BackendError::Io(std::io::Error::other(e)))?
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 BackendError::NotFound {
@@ -565,7 +565,7 @@ impl Backend for LocalBackend {
                 }
             })
             .await
-            .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+            .map_err(|e| BackendError::Io(std::io::Error::other(e)))?
         }
 
         #[cfg(not(feature = "extended-metadata"))]
@@ -599,7 +599,7 @@ impl Backend for LocalBackend {
                 Ok(())
             })
             .await
-            .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+            .map_err(|e| BackendError::Io(std::io::Error::other(e)))?
         }
 
         #[cfg(not(feature = "extended-metadata"))]
@@ -629,7 +629,7 @@ impl Backend for LocalBackend {
                 chown(&path_clone, uid, gid)
             })
             .await
-            .map_err(|e| BackendError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+            .map_err(|e| BackendError::Io(std::io::Error::other(e)))?
             .map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     BackendError::NotFound {
@@ -661,6 +661,7 @@ impl Backend for LocalBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
     use tempfile::TempDir;
     use tokio::io::AsyncWriteExt;
 

@@ -111,6 +111,7 @@ impl Default for PreserveFlags {
 
 impl PreserveFlags {
     /// Parse from comma-separated string (e.g., "times,perms,owners,xattrs")
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
         let mut flags = Self {
             times: false,

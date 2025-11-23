@@ -115,6 +115,7 @@ impl CaseTransform {
     }
 
     /// Parse from string
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "none" => Ok(Self::None),
@@ -240,8 +241,8 @@ pub fn parse_transform_string(s: &str) -> Result<TransformConfig> {
 /// Parse rename transformation from various formats
 fn parse_rename_transform(s: &str) -> Result<PathTransform> {
     // Support sed-like syntax: s/pattern/replacement/ or s/pattern/replacement/g
-    if s.starts_with("s/") {
-        let parts: Vec<&str> = s[2..].split('/').collect();
+    if let Some(stripped) = s.strip_prefix("s/") {
+        let parts: Vec<&str> = stripped.split('/').collect();
         if parts.len() >= 2 {
             return PathTransform::new(parts[0], parts[1], false);
         }

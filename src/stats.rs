@@ -32,8 +32,10 @@ impl TransferStats {
             return Ok(Self::default());
         }
 
-        let mut stats = Self::default();
-        stats.total_operations = entries.len();
+        let mut stats = Self {
+            total_operations: entries.len(),
+            ..Default::default()
+        };
 
         let mut fastest = 0.0_f64;
         let mut slowest = f64::MAX;

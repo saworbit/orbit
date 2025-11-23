@@ -116,7 +116,7 @@ impl NativeSmbClient {
         let (username, password) = match &self.target.auth {
             SmbAuth::Anonymous => ("", String::new()),
             SmbAuth::Ntlmv2 { username, password } => (username.as_str(), password.0.clone()),
-            SmbAuth::Kerberos { principal } => {
+            SmbAuth::Kerberos { principal: _ } => {
                 // For Kerberos, we'd use the principal, but the smb crate
                 // handles this through the ClientConfig
                 tracing::warn!("Kerberos not yet fully implemented, falling back to NTLM");
@@ -245,7 +245,7 @@ impl super::SmbClient for NativeSmbClient {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to open directory: {:?}", e);
-                SmbError::NotFound(format!("{}", rel))
+                SmbError::NotFound(rel.to_string())
             })?;
 
         // Ensure it's a directory
@@ -304,7 +304,7 @@ impl super::SmbClient for NativeSmbClient {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to open file: {:?}", e);
-                SmbError::NotFound(format!("{}", rel))
+                SmbError::NotFound(rel.to_string())
             })?;
 
         // Ensure it's a file
@@ -332,10 +332,7 @@ impl super::SmbClient for NativeSmbClient {
 
             let bytes_read = file.read_at(&mut chunk, offset).await.map_err(|e| {
                 tracing::error!("Failed to read file: {:?}", e);
-                SmbError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("SMB read failed: {:?}", e),
-                ))
+                SmbError::Io(std::io::Error::other(format!("SMB read failed: {:?}", e)))
             })?;
 
             if bytes_read == 0 {
@@ -370,7 +367,7 @@ impl super::SmbClient for NativeSmbClient {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to create/open file: {:?}", e);
-                SmbError::Permission(format!("{}", rel))
+                SmbError::Permission(rel.to_string())
             })?;
 
         // Ensure it's a file
@@ -386,10 +383,7 @@ impl super::SmbClient for NativeSmbClient {
         for chunk in data.chunks(chunk_len) {
             file.write_at(chunk, offset).await.map_err(|e| {
                 tracing::error!("Failed to write file: {:?}", e);
-                SmbError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("SMB write failed: {:?}", e),
-                ))
+                SmbError::Io(std::io::Error::other(format!("SMB write failed: {:?}", e)))
             })?;
             offset += chunk.len() as u64;
         }
@@ -419,7 +413,7 @@ impl super::SmbClient for NativeSmbClient {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to create directory: {:?}", e);
-                SmbError::Permission(format!("{}", rel))
+                SmbError::Permission(rel.to_string())
             })?;
 
         // Close the directory handle
@@ -447,7 +441,7 @@ impl super::SmbClient for NativeSmbClient {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to open for delete: {:?}", e);
-                SmbError::Permission(format!("{}", rel))
+                SmbError::Permission(rel.to_string())
             })?;
 
         // Set delete disposition and close
@@ -464,7 +458,7 @@ impl super::SmbClient for NativeSmbClient {
         Ok(())
     }
 
-    async fn rename(&self, from_rel: &str, to_rel: &str) -> Result<(), SmbError> {
+    async fn rename(&self, _from_rel: &str, _to_rel: &str) -> Result<(), SmbError> {
         if !self.connected {
             return Err(SmbError::Connection("not connected".to_string()));
         }
@@ -490,7 +484,7 @@ impl super::SmbClient for NativeSmbClient {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to open for metadata: {:?}", e);
-                SmbError::NotFound(format!("{}", rel))
+                SmbError::NotFound(rel.to_string())
             })?;
 
         let (is_dir, size) = match &resource {

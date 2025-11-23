@@ -167,19 +167,13 @@ fn files_differ_by_signature(source_path: &Path, dest_path: &Path) -> Result<boo
 
     // Generate signatures for source file
     let source_reader = BufReader::new(&source_file);
-    let source_sigs = delta_checksum::generate_signatures(
-        source_reader,
-        BLOCK_SIZE,
-        HashAlgorithm::Blake3,
-    )?;
+    let source_sigs =
+        delta_checksum::generate_signatures(source_reader, BLOCK_SIZE, HashAlgorithm::Blake3)?;
 
     // Generate signatures for destination file
     let dest_reader = BufReader::new(&dest_file);
-    let dest_sigs = delta_checksum::generate_signatures(
-        dest_reader,
-        BLOCK_SIZE,
-        HashAlgorithm::Blake3,
-    )?;
+    let dest_sigs =
+        delta_checksum::generate_signatures(dest_reader, BLOCK_SIZE, HashAlgorithm::Blake3)?;
 
     // Compare number of blocks
     if source_sigs.len() != dest_sigs.len() {
@@ -274,7 +268,10 @@ mod tests {
 
         // Checksum mode should detect files are identical and skip transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Checksum).unwrap();
-        assert!(!needs_transfer, "Identical files should not need transfer in Checksum mode");
+        assert!(
+            !needs_transfer,
+            "Identical files should not need transfer in Checksum mode"
+        );
     }
 
     #[test]
@@ -289,7 +286,10 @@ mod tests {
 
         // Checksum mode should detect files differ and require transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Checksum).unwrap();
-        assert!(needs_transfer, "Different files should need transfer in Checksum mode");
+        assert!(
+            needs_transfer,
+            "Different files should need transfer in Checksum mode"
+        );
     }
 
     #[test]
@@ -304,7 +304,10 @@ mod tests {
 
         // Checksum mode should detect size difference and require transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Checksum).unwrap();
-        assert!(needs_transfer, "Files with different sizes should need transfer");
+        assert!(
+            needs_transfer,
+            "Files with different sizes should need transfer"
+        );
     }
 
     #[test]
@@ -335,7 +338,10 @@ mod tests {
 
         // Delta mode should detect files are identical and skip transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Delta).unwrap();
-        assert!(!needs_transfer, "Identical small files should not need transfer in Delta mode");
+        assert!(
+            !needs_transfer,
+            "Identical small files should not need transfer in Delta mode"
+        );
     }
 
     #[test]
@@ -350,7 +356,10 @@ mod tests {
 
         // Delta mode should detect files differ and require transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Delta).unwrap();
-        assert!(needs_transfer, "Different small files should need transfer in Delta mode");
+        assert!(
+            needs_transfer,
+            "Different small files should need transfer in Delta mode"
+        );
     }
 
     #[test]
@@ -366,7 +375,10 @@ mod tests {
 
         // Delta mode should detect files are identical and skip transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Delta).unwrap();
-        assert!(!needs_transfer, "Identical large files should not need transfer in Delta mode");
+        assert!(
+            !needs_transfer,
+            "Identical large files should not need transfer in Delta mode"
+        );
     }
 
     #[test]
@@ -387,7 +399,10 @@ mod tests {
 
         // Delta mode should detect files differ and require transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Delta).unwrap();
-        assert!(needs_transfer, "Different large files should need transfer in Delta mode");
+        assert!(
+            needs_transfer,
+            "Different large files should need transfer in Delta mode"
+        );
     }
 
     #[test]
@@ -405,7 +420,10 @@ mod tests {
 
         // Delta mode should detect size difference and require transfer
         let needs_transfer = files_need_transfer(&source, &dest, CheckMode::Delta).unwrap();
-        assert!(needs_transfer, "Files with different sizes should need transfer");
+        assert!(
+            needs_transfer,
+            "Files with different sizes should need transfer"
+        );
     }
 
     #[test]

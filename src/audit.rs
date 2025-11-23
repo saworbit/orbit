@@ -54,6 +54,7 @@ impl AuditEntry {
 }
 
 /// Write an audit log entry
+#[allow(clippy::too_many_arguments)]
 pub fn write_audit_log(
     source: &Path,
     destination: &Path,

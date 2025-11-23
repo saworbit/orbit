@@ -186,7 +186,7 @@ pub trait WriteStream: Send {
 }
 
 /// Options for list operations
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ListOptions {
     /// List recursively into subdirectories
     pub recursive: bool,
@@ -202,18 +202,6 @@ pub struct ListOptions {
 
     /// Maximum number of entries to return (None = unlimited)
     pub max_entries: Option<usize>,
-}
-
-impl Default for ListOptions {
-    fn default() -> Self {
-        Self {
-            recursive: false,
-            max_depth: None,
-            include_hidden: false,
-            follow_symlinks: false,
-            max_entries: None,
-        }
-    }
 }
 
 impl ListOptions {

@@ -154,6 +154,7 @@ impl SshConfig {
 /// }
 /// ```
 pub struct SshBackend {
+    #[allow(dead_code)]
     config: SshConfig,
     session: Arc<Session>,
     sftp: Arc<Sftp>,
@@ -221,7 +222,7 @@ impl SshBackend {
                 key_path,
                 passphrase,
             } => {
-                let pass: Option<&str> = passphrase.as_ref().map(|p| p.expose_secret().as_ref());
+                let pass: Option<&str> = passphrase.as_ref().map(|p| p.expose_secret());
                 session
                     .userauth_pubkey_file(&config.username, None, key_path, pass)
                     .map_err(|e| BackendError::AuthenticationFailed {
@@ -299,7 +300,8 @@ impl SshBackend {
     }
 
     /// Convert ssh2::FileStat to backend Metadata
-    fn convert_metadata(&self, path: &Path, stat: &ssh2::FileStat) -> Metadata {
+    #[allow(dead_code)]
+    fn convert_metadata(&self, _path: &Path, stat: &ssh2::FileStat) -> Metadata {
         let is_file = stat.is_file();
         let is_dir = stat.is_dir();
         let size = stat.size.unwrap_or(0);
@@ -326,6 +328,7 @@ impl SshBackend {
     }
 
     /// List directory recursively (wrapper that uses standalone impl)
+    #[allow(dead_code)]
     fn list_recursive_blocking(
         &self,
         path: &Path,
@@ -517,8 +520,7 @@ impl Backend for SshBackend {
             })?;
 
             let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer)
-                .map_err(|e| BackendError::Io(e))?;
+            file.read_to_end(&mut buffer).map_err(BackendError::Io)?;
             Ok::<_, BackendError>(Bytes::from(buffer))
         })
         .await
@@ -619,7 +621,7 @@ impl Backend for SshBackend {
                     remove_dir_all(&sftp, &path)?;
                 } else {
                     sftp.rmdir(&path)
-                        .map_err(|e| BackendError::DirectoryNotEmpty { path: path.clone() })?;
+                        .map_err(|_e| BackendError::DirectoryNotEmpty { path: path.clone() })?;
                 }
             } else {
                 sftp.unlink(&path).map_err(|e| BackendError::Other {

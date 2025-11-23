@@ -335,6 +335,7 @@ impl S3Client {
             let mut f = tokio::fs::OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(false) // Keep existing content when resuming
                 .open(local_path)
                 .await?;
             f.seek(std::io::SeekFrom::Start(resume_offset)).await?;

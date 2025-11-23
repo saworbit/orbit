@@ -305,6 +305,7 @@ pub struct ThroughputTracker {
     last_update: RwLock<Instant>,
     bytes_transferred: RwLock<u64>,
     last_bytes: RwLock<u64>,
+    #[allow(dead_code)]
     smoothing_window: Duration,
 }
 

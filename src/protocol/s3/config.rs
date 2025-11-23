@@ -245,7 +245,7 @@ fn is_valid_bucket_name(name: &str) -> bool {
     let len = name.len();
 
     // Length check: 3-63 characters
-    if len < 3 || len > 63 {
+    if !(3..=63).contains(&len) {
         return false;
     }
 

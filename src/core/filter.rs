@@ -46,18 +46,13 @@ pub enum FilterType {
 }
 
 /// Action to take when a filter matches
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FilterAction {
     /// Include the matching file/directory
+    #[default]
     Include,
     /// Exclude the matching file/directory
     Exclude,
-}
-
-impl Default for FilterAction {
-    fn default() -> Self {
-        FilterAction::Include
-    }
 }
 
 /// A single filter rule with pattern and action
@@ -347,17 +342,17 @@ impl FilterList {
         let line = line.trim();
 
         // Check for negation prefix
-        let (negated, line) = if line.starts_with('!') {
-            (true, line[1..].trim())
+        let (negated, line) = if let Some(stripped) = line.strip_prefix('!') {
+            (true, stripped.trim())
         } else {
             (false, line)
         };
 
         // Parse action prefix
-        let (action, pattern) = if line.starts_with("+ ") {
-            (FilterAction::Include, &line[2..])
-        } else if line.starts_with("- ") {
-            (FilterAction::Exclude, &line[2..])
+        let (action, pattern) = if let Some(rest) = line.strip_prefix("+ ") {
+            (FilterAction::Include, rest)
+        } else if let Some(rest) = line.strip_prefix("- ") {
+            (FilterAction::Exclude, rest)
         } else if let Some(rest) = line.strip_prefix("include ") {
             (FilterAction::Include, rest)
         } else if let Some(rest) = line.strip_prefix("exclude ") {

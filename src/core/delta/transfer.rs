@@ -116,7 +116,7 @@ fn full_copy_as_delta(
     let mut stats = DeltaStats::new();
     stats.total_bytes = source_size;
     stats.bytes_transferred = source_size;
-    stats.total_blocks = (source_size + config.block_size as u64 - 1) / config.block_size as u64;
+    stats.total_blocks = source_size.div_ceil(config.block_size as u64);
     stats.blocks_transferred = stats.total_blocks;
     stats.blocks_matched = 0;
     stats.bytes_saved = 0;

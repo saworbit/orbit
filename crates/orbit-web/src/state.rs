@@ -50,10 +50,7 @@ impl AppState {
         crate::auth::ensure_default_admin(&user_pool)
             .await
             .map_err(|e| {
-                Box::new(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    e.to_string(),
-                )) as Box<dyn std::error::Error + Send>
+                Box::new(std::io::Error::other(e.to_string())) as Box<dyn std::error::Error + Send>
             })?;
 
         // Initialize jobs table in magnetar database (INTEGER for timestamps as Unix epoch)
@@ -130,8 +127,10 @@ impl AppState {
                 let created_at: i64 = row.get(6);
                 let updated_at: i64 = row.get(7);
 
-                let nodes: Vec<PipelineNode> = serde_json::from_str(&nodes_json).unwrap_or_default();
-                let edges: Vec<PipelineEdge> = serde_json::from_str(&edges_json).unwrap_or_default();
+                let nodes: Vec<PipelineNode> =
+                    serde_json::from_str(&nodes_json).unwrap_or_default();
+                let edges: Vec<PipelineEdge> =
+                    serde_json::from_str(&edges_json).unwrap_or_default();
                 let status = match status_str.as_str() {
                     "ready" => PipelineStatus::Ready,
                     "running" => PipelineStatus::Running,
@@ -141,16 +140,19 @@ impl AppState {
                     _ => PipelineStatus::Draft,
                 };
 
-                pipelines_guard.insert(id.clone(), Pipeline {
-                    id,
-                    name,
-                    description,
-                    nodes,
-                    edges,
-                    status,
-                    created_at,
-                    updated_at,
-                });
+                pipelines_guard.insert(
+                    id.clone(),
+                    Pipeline {
+                        id,
+                        name,
+                        description,
+                        nodes,
+                        edges,
+                        status,
+                        created_at,
+                        updated_at,
+                    },
+                );
             }
             tracing::info!("Loaded {} pipelines from database", pipelines_guard.len());
         }
@@ -402,7 +404,8 @@ impl Pipeline {
     /// Remove a node and all connected edges
     pub fn remove_node(&mut self, node_id: &str) {
         self.nodes.retain(|n| n.id != node_id);
-        self.edges.retain(|e| e.source_node_id != node_id && e.target_node_id != node_id);
+        self.edges
+            .retain(|e| e.source_node_id != node_id && e.target_node_id != node_id);
         self.updated_at = chrono::Utc::now().timestamp();
     }
 
@@ -417,12 +420,12 @@ impl Pipeline {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum PipelineStatus {
-    Draft,      // Being edited, not ready to run
-    Ready,      // Validated and ready to execute
-    Running,    // Currently executing
-    Completed,  // Successfully finished
-    Failed,     // Execution failed
-    Paused,     // Execution paused
+    Draft,     // Being edited, not ready to run
+    Ready,     // Validated and ready to execute
+    Running,   // Currently executing
+    Completed, // Successfully finished
+    Failed,    // Execution failed
+    Paused,    // Execution paused
 }
 
 impl std::fmt::Display for PipelineStatus {

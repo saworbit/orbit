@@ -471,7 +471,9 @@ mod tests {
         assert!(result.is_ok());
         let (config, path) = result.unwrap();
         match config {
-            BackendConfig::S3 { config: s3_config, .. } => {
+            BackendConfig::S3 {
+                config: s3_config, ..
+            } => {
                 assert_eq!(s3_config.bucket, "my-bucket");
             }
             _ => panic!("Expected S3 config"),

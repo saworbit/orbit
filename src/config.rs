@@ -239,10 +239,11 @@ impl Default for CopyConfig {
 }
 
 /// Copy mode determines how files are copied
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum CopyMode {
     /// Copy all files unconditionally
+    #[default]
     Copy,
 
     /// Only copy if source is newer or different size
@@ -255,17 +256,12 @@ pub enum CopyMode {
     Mirror,
 }
 
-impl Default for CopyMode {
-    fn default() -> Self {
-        CopyMode::Copy
-    }
-}
-
 /// Compression type for file transfers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum CompressionType {
     /// No compression
+    #[default]
     None,
 
     /// LZ4 compression (fast)
@@ -276,17 +272,12 @@ pub enum CompressionType {
     Zstd { level: i32 },
 }
 
-impl Default for CompressionType {
-    fn default() -> Self {
-        CompressionType::None
-    }
-}
-
 /// Symbolic link handling mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SymlinkMode {
     /// Skip symbolic links
+    #[default]
     Skip,
 
     /// Follow symbolic links and copy target
@@ -296,17 +287,12 @@ pub enum SymlinkMode {
     Preserve,
 }
 
-impl Default for SymlinkMode {
-    fn default() -> Self {
-        SymlinkMode::Skip
-    }
-}
-
 /// Error handling mode determines behavior on errors
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ErrorMode {
     /// Abort on first error
+    #[default]
     Abort,
 
     /// Skip failed files and continue
@@ -316,14 +302,8 @@ pub enum ErrorMode {
     Partial,
 }
 
-impl Default for ErrorMode {
-    fn default() -> Self {
-        ErrorMode::Abort
-    }
-}
-
 /// Log level for diagnostic output
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     /// Only errors
@@ -333,6 +313,7 @@ pub enum LogLevel {
     Warn,
 
     /// Info, warnings, and errors
+    #[default]
     Info,
 
     /// Debug and above
@@ -340,12 +321,6 @@ pub enum LogLevel {
 
     /// All messages including traces
     Trace,
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Info
-    }
 }
 
 impl LogLevel {

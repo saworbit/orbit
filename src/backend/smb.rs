@@ -399,12 +399,10 @@ impl Backend for SmbBackend {
         let client = self.client.read().await;
 
         // Check if file exists when overwrite is false
-        if !options.overwrite {
-            if let Ok(_) = client.metadata(&smb_path).await {
-                return Err(BackendError::AlreadyExists {
-                    path: path.to_path_buf(),
-                });
-            }
+        if !options.overwrite && client.metadata(&smb_path).await.is_ok() {
+            return Err(BackendError::AlreadyExists {
+                path: path.to_path_buf(),
+            });
         }
 
         // Create parent directories if requested
@@ -663,14 +661,8 @@ mod tests {
 
         let helper = TestHelper { config };
 
-        assert_eq!(
-            helper.path_to_smb_path(Path::new("file.txt")),
-            "file.txt"
-        );
-        assert_eq!(
-            helper.path_to_smb_path(Path::new("/file.txt")),
-            "file.txt"
-        );
+        assert_eq!(helper.path_to_smb_path(Path::new("file.txt")), "file.txt");
+        assert_eq!(helper.path_to_smb_path(Path::new("/file.txt")), "file.txt");
         assert_eq!(
             helper.path_to_smb_path(Path::new("dir/file.txt")),
             "dir\\file.txt"

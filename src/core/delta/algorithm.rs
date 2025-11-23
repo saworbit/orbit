@@ -30,10 +30,7 @@ impl SignatureIndex {
         let block_size = signatures.first().map(|s| s.length).unwrap_or(0);
 
         for sig in signatures {
-            weak_hash_map
-                .entry(sig.weak_hash)
-                .or_insert_with(Vec::new)
-                .push(sig);
+            weak_hash_map.entry(sig.weak_hash).or_default().push(sig);
         }
 
         Self {
@@ -160,7 +157,7 @@ pub fn generate_delta_rolling<R: Read>(
     }
 
     stats.total_bytes = buffer.len() as u64;
-    stats.total_blocks = ((buffer.len() + block_size - 1) / block_size) as u64;
+    stats.total_blocks = buffer.len().div_ceil(block_size) as u64;
 
     let mut pos = 0;
     let mut dest_offset = 0u64;

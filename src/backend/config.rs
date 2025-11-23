@@ -204,7 +204,9 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
                     passphrase,
                 }
             } else if let Some(password) = query_pairs.get("password") {
-                SshAuth::Password(secrecy::SecretString::new(password.clone().into_boxed_str()))
+                SshAuth::Password(secrecy::SecretString::new(
+                    password.clone().into_boxed_str(),
+                ))
             } else if query_pairs
                 .get("agent")
                 .map(|v| v == "true")
@@ -379,6 +381,7 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
 /// - `ORBIT_SSH_HOST`, `ORBIT_SSH_USER`, `ORBIT_SSH_KEY` - SSH config
 /// - `ORBIT_S3_BUCKET`, `ORBIT_S3_REGION`, `ORBIT_S3_ENDPOINT` - S3 config
 /// - `ORBIT_SMB_HOST`, `ORBIT_SMB_SHARE`, `ORBIT_SMB_USER`, `ORBIT_SMB_PASSWORD` - SMB config
+#[allow(dead_code)]
 pub fn from_env() -> BackendResult<BackendConfig> {
     let backend_type = std::env::var("ORBIT_BACKEND_TYPE")
         .unwrap_or_else(|_| "local".to_string())
@@ -582,8 +585,7 @@ mod tests {
     #[test]
     #[cfg(feature = "smb-native")]
     fn test_parse_smb_uri_with_security() {
-        let (config, _) =
-            parse_uri("smb://server/share?security=require_encryption").unwrap();
+        let (config, _) = parse_uri("smb://server/share?security=require_encryption").unwrap();
         if let BackendConfig::Smb(smb_config) = config {
             assert_eq!(smb_config.host, "server");
             assert_eq!(smb_config.share, "share");

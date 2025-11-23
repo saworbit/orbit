@@ -43,7 +43,7 @@ impl ManifestGenerator {
             .unwrap_or_else(|| PathBuf::from("/var/lib/orbit/manifests").join(&job_id));
 
         // Create output directory
-        std::fs::create_dir_all(&output_dir).map_err(|e| OrbitError::Io(e))?;
+        std::fs::create_dir_all(&output_dir).map_err(OrbitError::Io)?;
 
         // Create endpoints
         let source_endpoint = Endpoint::filesystem(source.to_string_lossy().to_string());
@@ -76,10 +76,10 @@ impl ManifestGenerator {
     /// Generate manifest for a single file
     pub fn generate_file_manifest(&mut self, file_path: &Path, relative_path: &str) -> Result<()> {
         // Open file
-        let mut file = File::open(file_path).map_err(|e| OrbitError::Io(e))?;
+        let mut file = File::open(file_path).map_err(OrbitError::Io)?;
 
         // Get file size
-        let metadata = file.metadata().map_err(|e| OrbitError::Io(e))?;
+        let metadata = file.metadata().map_err(OrbitError::Io)?;
         let file_size = metadata.len();
 
         // Accumulate total bytes
@@ -137,7 +137,7 @@ impl ManifestGenerator {
             .map_err(|e| OrbitError::Other(format!("Star map build error: {}", e)))?;
 
         // Generate file names
-        let safe_name = relative_path.replace('/', "_").replace('\\', "_");
+        let safe_name = relative_path.replace(['/', '\\'], "_");
         let cargo_filename = format!("{}.cargo.json", safe_name);
         let starmap_filename = format!("{}.starmap.bin", safe_name);
 
@@ -149,7 +149,7 @@ impl ManifestGenerator {
 
         // Save star map
         let starmap_path = self.output_dir.join(&starmap_filename);
-        std::fs::write(&starmap_path, starmap_data).map_err(|e| OrbitError::Io(e))?;
+        std::fs::write(&starmap_path, starmap_data).map_err(OrbitError::Io)?;
 
         // Add file reference to flight plan
         self.flight_plan
@@ -194,11 +194,10 @@ impl ManifestGenerator {
         let mut buffer = vec![0u8; chunk_size];
 
         // Read and chunk the file
-        file.seek(SeekFrom::Start(0))
-            .map_err(|e| OrbitError::Io(e))?;
+        file.seek(SeekFrom::Start(0)).map_err(OrbitError::Io)?;
 
         loop {
-            let bytes_read = file.read(&mut buffer).map_err(|e| OrbitError::Io(e))?;
+            let bytes_read = file.read(&mut buffer).map_err(OrbitError::Io)?;
 
             if bytes_read == 0 {
                 break;

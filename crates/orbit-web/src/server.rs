@@ -269,12 +269,14 @@ async fn list_backends_handler(
                 crate::state::BackendType::Local { root_path } => {
                     ("Local".to_string(), format!("Path: {}", root_path))
                 }
-                crate::state::BackendType::S3 { bucket, region } => {
-                    ("S3".to_string(), format!("Bucket: {}, Region: {}", bucket, region))
-                }
-                crate::state::BackendType::SMB { host, share } => {
-                    ("SMB".to_string(), format!("Host: {}, Share: {}", host, share))
-                }
+                crate::state::BackendType::S3 { bucket, region } => (
+                    "S3".to_string(),
+                    format!("Bucket: {}, Region: {}", bucket, region),
+                ),
+                crate::state::BackendType::SMB { host, share } => (
+                    "SMB".to_string(),
+                    format!("Host: {}, Share: {}", host, share),
+                ),
             };
             BackendInfoResponse {
                 id: config.id.clone(),
@@ -332,7 +334,10 @@ async fn create_backend_handler(
             ))?;
             (
                 BackendType::S3 { bucket, region },
-                BackendCredentials::S3 { access_key, secret_key },
+                BackendCredentials::S3 {
+                    access_key,
+                    secret_key,
+                },
             )
         }
         "smb" | "SMB" => {
@@ -433,9 +438,13 @@ async fn list_dir_handler(
 ) -> Result<Json<Vec<FileEntry>>, (axum::http::StatusCode, String)> {
     let path = request.path.unwrap_or_else(|| {
         #[cfg(windows)]
-        { "C:\\".to_string() }
+        {
+            "C:\\".to_string()
+        }
         #[cfg(not(windows))]
-        { "/".to_string() }
+        {
+            "/".to_string()
+        }
     });
 
     tracing::info!("Listing directory: {}", path);
@@ -564,16 +573,15 @@ pub struct UserInfo {
 async fn list_users_handler(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<UserInfo>>, (axum::http::StatusCode, String)> {
-    let rows = sqlx::query(
-        "SELECT id, username, role, created_at FROM users ORDER BY created_at DESC",
-    )
-    .fetch_all(&state.user_pool)
-    .await
-    .map_err(|e| {
-        let msg = format!("Failed to list users: {}", e);
-        tracing::error!("{}", msg);
-        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
-    })?;
+    let rows =
+        sqlx::query("SELECT id, username, role, created_at FROM users ORDER BY created_at DESC")
+            .fetch_all(&state.user_pool)
+            .await
+            .map_err(|e| {
+                let msg = format!("Failed to list users: {}", e);
+                tracing::error!("{}", msg);
+                (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
+            })?;
 
     let users: Vec<UserInfo> = rows
         .iter()
@@ -622,7 +630,7 @@ async fn create_user_handler(
     )
     .bind(&request.username)
     .bind(&password_hash)
-    .bind(&request.role.to_lowercase())
+    .bind(request.role.to_lowercase())
     .bind(now)
     .execute(&state.user_pool)
     .await
@@ -639,7 +647,11 @@ async fn create_user_handler(
         }
     })?;
 
-    tracing::info!("Created user: {} with role: {}", request.username, request.role);
+    tracing::info!(
+        "Created user: {} with role: {}",
+        request.username,
+        request.role
+    );
     Ok(Json("User created".to_string()))
 }
 
@@ -684,7 +696,7 @@ async fn update_user_handler(
         }
 
         sqlx::query("UPDATE users SET role = ? WHERE id = ?")
-            .bind(&role.to_lowercase())
+            .bind(role.to_lowercase())
             .bind(request.user_id)
             .execute(&state.user_pool)
             .await
@@ -721,16 +733,15 @@ async fn delete_user_handler(
         })?;
 
     // Check if user is admin
-    let user_role: Option<String> =
-        sqlx::query_scalar("SELECT role FROM users WHERE id = ?")
-            .bind(request.user_id)
-            .fetch_optional(&state.user_pool)
-            .await
-            .map_err(|e| {
-                let msg = format!("Failed to get user role: {}", e);
-                tracing::error!("{}", msg);
-                (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
-            })?;
+    let user_role: Option<String> = sqlx::query_scalar("SELECT role FROM users WHERE id = ?")
+        .bind(request.user_id)
+        .fetch_optional(&state.user_pool)
+        .await
+        .map_err(|e| {
+            let msg = format!("Failed to get user role: {}", e);
+            tracing::error!("{}", msg);
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
+        })?;
 
     if let Some(role) = user_role {
         if role == "admin" && admin_count <= 1 {
@@ -780,21 +791,36 @@ async fn upload_file_handler(
     let mut file_name: Option<String> = None;
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
-        (axum::http::StatusCode::BAD_REQUEST, format!("Multipart error: {}", e))
+        (
+            axum::http::StatusCode::BAD_REQUEST,
+            format!("Multipart error: {}", e),
+        )
     })? {
         let name = field.name().unwrap_or("").to_string();
 
         match name.as_str() {
             "path" => {
                 target_path = Some(field.text().await.map_err(|e| {
-                    (axum::http::StatusCode::BAD_REQUEST, format!("Failed to read path: {}", e))
+                    (
+                        axum::http::StatusCode::BAD_REQUEST,
+                        format!("Failed to read path: {}", e),
+                    )
                 })?);
             }
             "file" => {
                 file_name = field.file_name().map(|s| s.to_string());
-                file_data = Some(field.bytes().await.map_err(|e| {
-                    (axum::http::StatusCode::BAD_REQUEST, format!("Failed to read file: {}", e))
-                })?.to_vec());
+                file_data = Some(
+                    field
+                        .bytes()
+                        .await
+                        .map_err(|e| {
+                            (
+                                axum::http::StatusCode::BAD_REQUEST,
+                                format!("Failed to read file: {}", e),
+                            )
+                        })?
+                        .to_vec(),
+                );
             }
             _ => {}
         }
@@ -820,16 +846,26 @@ async fn upload_file_handler(
     // Ensure target directory exists
     if let Some(parent) = full_path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
-            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create directory: {}", e))
+            (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to create directory: {}", e),
+            )
         })?;
     }
 
     // Write file
     std::fs::write(&full_path, &file_data).map_err(|e| {
-        (axum::http::StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to write file: {}", e))
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to write file: {}", e),
+        )
     })?;
 
-    tracing::info!("Uploaded file: {} ({} bytes)", full_path.display(), file_data.len());
+    tracing::info!(
+        "Uploaded file: {} ({} bytes)",
+        full_path.display(),
+        file_data.len()
+    );
     Ok(Json(format!("Uploaded: {}", full_path.display())))
 }
 
@@ -930,10 +966,7 @@ async fn create_pipeline_handler(
 ) -> Result<Json<String>, (axum::http::StatusCode, String)> {
     use crate::state::Pipeline;
 
-    let pipeline = Pipeline::new(
-        request.name,
-        request.description.unwrap_or_default(),
-    );
+    let pipeline = Pipeline::new(request.name, request.description.unwrap_or_default());
     let id = pipeline.id.clone();
 
     // Save to database
@@ -1007,10 +1040,12 @@ async fn update_pipeline_handler(
             "completed" => PipelineStatus::Completed,
             "failed" => PipelineStatus::Failed,
             "paused" => PipelineStatus::Paused,
-            _ => return Err((
-                axum::http::StatusCode::BAD_REQUEST,
-                format!("Invalid status: {}", status),
-            )),
+            _ => {
+                return Err((
+                    axum::http::StatusCode::BAD_REQUEST,
+                    format!("Invalid status: {}", status),
+                ))
+            }
         };
     }
     pipeline.updated_at = chrono::Utc::now().timestamp();
@@ -1100,10 +1135,12 @@ async fn add_node_handler(
         "merge" => PipelineNodeType::Merge,
         "split" => PipelineNodeType::Split,
         "conditional" => PipelineNodeType::Conditional,
-        _ => return Err((
-            axum::http::StatusCode::BAD_REQUEST,
-            format!("Invalid node type: {}", request.node_type),
-        )),
+        _ => {
+            return Err((
+                axum::http::StatusCode::BAD_REQUEST,
+                format!("Invalid node type: {}", request.node_type),
+            ))
+        }
     };
 
     let mut node = PipelineNode::new(node_type, request.name, request.x, request.y);
@@ -1160,7 +1197,9 @@ async fn update_node_handler(
         "Pipeline not found".to_string(),
     ))?;
 
-    let node = pipeline.nodes.iter_mut()
+    let node = pipeline
+        .nodes
+        .iter_mut()
         .find(|n| n.id == request.node_id)
         .ok_or((
             axum::http::StatusCode::NOT_FOUND,
@@ -1195,7 +1234,11 @@ async fn update_node_handler(
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
         })?;
 
-    tracing::info!("Updated node {} in pipeline {}", request.node_id, request.pipeline_id);
+    tracing::info!(
+        "Updated node {} in pipeline {}",
+        request.node_id,
+        request.pipeline_id
+    );
     Ok(Json("Node updated".to_string()))
 }
 
@@ -1243,7 +1286,11 @@ async fn remove_node_handler(
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
         })?;
 
-    tracing::info!("Removed node {} from pipeline {}", request.node_id, request.pipeline_id);
+    tracing::info!(
+        "Removed node {} from pipeline {}",
+        request.node_id,
+        request.pipeline_id
+    );
     Ok(Json("Node removed".to_string()))
 }
 
@@ -1282,9 +1329,9 @@ async fn add_edge_handler(
         "Pipeline not found".to_string(),
     ))?;
 
-    pipeline.add_edge(edge).map_err(|e| {
-        (axum::http::StatusCode::BAD_REQUEST, e)
-    })?;
+    pipeline
+        .add_edge(edge)
+        .map_err(|e| (axum::http::StatusCode::BAD_REQUEST, e))?;
 
     // Save to database
     let edges_json = serde_json::to_string(&pipeline.edges).unwrap_or_else(|_| "[]".to_string());
@@ -1346,7 +1393,11 @@ async fn remove_edge_handler(
             (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
         })?;
 
-    tracing::info!("Removed edge {} from pipeline {}", request.edge_id, request.pipeline_id);
+    tracing::info!(
+        "Removed edge {} from pipeline {}",
+        request.edge_id,
+        request.pipeline_id
+    );
     Ok(Json("Edge removed".to_string()))
 }
 

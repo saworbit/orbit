@@ -82,9 +82,10 @@ pub struct S3ListResult {
 }
 
 /// S3 storage classes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum S3StorageClass {
     /// Standard storage class
+    #[default]
     Standard,
 
     /// Reduced redundancy (deprecated but still available)
@@ -144,12 +145,6 @@ impl S3StorageClass {
     }
 }
 
-impl Default for S3StorageClass {
-    fn default() -> Self {
-        S3StorageClass::Standard
-    }
-}
-
 impl std::fmt::Display for S3StorageClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -166,7 +161,7 @@ impl std::fmt::Display for S3StorageClass {
 }
 
 /// S3 server-side encryption options
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum S3ServerSideEncryption {
     /// AES256 encryption
     Aes256,
@@ -175,6 +170,7 @@ pub enum S3ServerSideEncryption {
     AwsKms { key_id: Option<String> },
 
     /// No encryption
+    #[default]
     None,
 }
 
@@ -188,12 +184,6 @@ impl S3ServerSideEncryption {
             }
             S3ServerSideEncryption::None => None,
         }
-    }
-}
-
-impl Default for S3ServerSideEncryption {
-    fn default() -> Self {
-        S3ServerSideEncryption::None
     }
 }
 

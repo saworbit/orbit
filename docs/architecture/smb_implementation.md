@@ -50,21 +50,25 @@ This document describes the SMB/CIFS network share support added in Orbit v0.4.0
 - URI parsing (smb://server/share/path)
 - Local filesystem backend
 - SMB backend architecture
-- Authentication support (username/password)
+- Authentication support (username/password via NTLMv2)
 - Path translation (/ to \ for SMB)
 - Connection management
 - Error handling
+- **Backend Abstraction Layer** (`SmbBackend` implementing `Backend` trait)
+- **Real SMB library integration** (smb crate v0.10.3)
+- **SMB3 encryption** (RequireEncryption, SignOnly, Opportunistic modes)
+- **Custom port support**
+- **Streaming directory operations**
+- **Full async I/O support**
 
 ### ⏳ In Progress
 
-- Real SMB library integration
 - Connection pooling
 - Kerberos authentication
-- Advanced SMB3 features
+- Integration testing with real servers
 
 ### 📋 Planned
 
-- SMB3 encryption
 - Multi-channel support
 - DFS support
 - Performance optimization
@@ -801,6 +805,10 @@ orbit -s file2 -d smb://server/share/file2
 - [x] Async I/O with proper trait support
 - [x] Comprehensive error handling
 - [x] Unit tests complete
+- [x] **Backend Abstraction Layer** (`SmbBackend` implementing unified `Backend` trait)
+- [x] **URI-based configuration** (`smb://user:pass@server/share/path?security=...`)
+- [x] **Environment variable configuration** (`ORBIT_SMB_*`)
+- [x] **Backend registry integration**
 - [ ] Integration testing with real servers
 - [ ] Performance benchmarking
 
@@ -811,7 +819,6 @@ orbit -s file2 -d smb://server/share/file2
 - [ ] Enhanced error messages
 - [ ] Windows UNC path support
 - [ ] Extensive real-world testing
-- [ ] Documentation improvements
 
 ### v0.5.2 - Enterprise Features
 - [ ] Kerberos/GSSAPI support
@@ -822,7 +829,7 @@ orbit -s file2 -d smb://server/share/file2
 - [ ] Session resumption
 
 ### v0.6.0 - Cloud Protocols
-- [ ] S3 support
+- [x] S3 support (completed)
 - [ ] Azure Blob support
 - [ ] Google Cloud Storage support
 - [ ] Multi-cloud abstraction

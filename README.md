@@ -605,20 +605,18 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 |----------|--------|--------------|-------------|
 | 🗂️ **Local** | ✅ Stable | Built-in | Local filesystem with zero-copy optimization |
 | 🔐 **SSH/SFTP** | 🚧 WIP | `ssh-backend` | Remote filesystem access via SSH/SFTP (implementation in progress) |
-| 🌐 **SMB/CIFS** | 🟡 Ready* | `smb-native` | Native SMB2/3 client (pure Rust, no dependencies) |
+| 🌐 **SMB/CIFS** | ✅ **Stable** | `smb-native` | Native SMB2/3 client (pure Rust, no dependencies) |
 | ☁️ **S3** | ✅ **Stable** | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
 | ☁️ **Azure Blob** | 🚧 Planned | - | Microsoft Azure Blob Storage |
 | ☁️ **GCS** | 🚧 Planned | - | Google Cloud Storage |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
-
-**\*SMB Status:** Implementation complete (~1,900 lines) but blocked by upstream dependency conflict. See [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md) for details.
 
 #### 🆕 Unified Backend Abstraction (v0.4.1)
 
 **NEW!** Write once, run on any storage backend. The backend abstraction provides a consistent async API across all storage types:
 
 ```rust
-use orbit::backend::{Backend, LocalBackend, SshBackend, S3Backend};
+use orbit::backend::{Backend, LocalBackend, SshBackend, S3Backend, SmbBackend, SmbConfig};
 
 // All backends implement the same trait
 async fn copy_file<B: Backend>(backend: &B, src: &Path, dest: &Path) -> Result<()> {
@@ -631,10 +629,13 @@ async fn copy_file<B: Backend>(backend: &B, src: &Path, dest: &Path) -> Result<(
 let local = LocalBackend::new();
 let ssh = SshBackend::connect(config).await?;
 let s3 = S3Backend::new(s3_config).await?;
+let smb = SmbBackend::new(SmbConfig::new("server", "share")
+    .with_username("user")
+    .with_password("pass")).await?;
 ```
 
 **Features:**
-- ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, etc.
+- ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, `smb://user@server/share/path`, etc.
 - ✅ **Streaming I/O**: Memory-efficient for large files
 - ✅ **Metadata operations**: Set permissions, timestamps, xattrs, ownership
 - ✅ **Extensibility**: Plugin system for custom backends

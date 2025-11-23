@@ -108,7 +108,6 @@ fn key_to_path_impl(key: &str, prefix: Option<&str>) -> PathBuf {
 }
 
 impl S3Backend {
-
     /// Convert S3ObjectMetadata to backend Metadata
     fn convert_metadata(&self, s3_meta: crate::protocol::s3::S3ObjectMetadata) -> Metadata {
         let mut metadata = Metadata::file(s3_meta.size);
@@ -305,12 +304,10 @@ impl Backend for S3Backend {
         let key = self.path_to_key(path);
 
         // Check if exists
-        if !options.overwrite {
-            if self.client.exists(&key).await.unwrap_or(false) {
-                return Err(BackendError::AlreadyExists {
-                    path: path.to_path_buf(),
-                });
-            }
+        if !options.overwrite && self.client.exists(&key).await.unwrap_or(false) {
+            return Err(BackendError::AlreadyExists {
+                path: path.to_path_buf(),
+            });
         }
 
         // Upload using PutObject
@@ -504,14 +501,8 @@ mod tests {
 
     #[test]
     fn test_path_to_key_no_prefix() {
-        assert_eq!(
-            path_to_key_impl(Path::new("file.txt"), None),
-            "file.txt"
-        );
-        assert_eq!(
-            path_to_key_impl(Path::new("/file.txt"), None),
-            "file.txt"
-        );
+        assert_eq!(path_to_key_impl(Path::new("file.txt"), None), "file.txt");
+        assert_eq!(path_to_key_impl(Path::new("/file.txt"), None), "file.txt");
     }
 
     #[test]

@@ -184,7 +184,7 @@ pub fn copy_buffered(
 
     // Validate existing chunks if in Revalidate mode
     if matches!(resume_decision, ResumeDecision::Revalidate { .. })
-        && resume_info.verified_chunks.len() > 0
+        && !resume_info.verified_chunks.is_empty()
     {
         println!(
             "Validating {} existing chunks...",

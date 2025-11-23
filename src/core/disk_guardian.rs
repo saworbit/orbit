@@ -132,7 +132,7 @@ pub fn check_filesystem_integrity(dest_path: &Path) -> Result<()> {
 
     // Create directory if it doesn't exist (to test permissions)
     if !check_dir.exists() {
-        std::fs::create_dir_all(&check_dir).map_err(|e| OrbitError::Io(e))?;
+        std::fs::create_dir_all(&check_dir).map_err(OrbitError::Io)?;
     }
 
     // Test write permissions by creating a temporary file

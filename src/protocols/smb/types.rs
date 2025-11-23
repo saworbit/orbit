@@ -171,7 +171,6 @@ pub enum SmbSecurity {
     SignOnly,
 }
 
-/// SMB capability flags
 #[cfg(feature = "smb-native")]
 bitflags::bitflags! {
     /// SMB3 capability flags
