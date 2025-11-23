@@ -5,6 +5,17 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **SMB/CIFS Backend Abstraction** - Full `Backend` trait implementation for SMB network shares
+  - `SmbBackend` implementing unified `Backend` trait (`src/backend/smb.rs`)
+  - URI-based configuration: `smb://[user[:pass]@]host[:port]/share/path`
+  - Security modes: `RequireEncryption`, `SignOnly`, `Opportunistic` (via `?security=` query param)
+  - Environment variable configuration (`ORBIT_SMB_HOST`, `ORBIT_SMB_SHARE`, `ORBIT_SMB_USER`, etc.)
+  - Custom port support for non-standard SMB configurations
+  - Backend registry integration for dynamic backend creation
+  - Full async I/O with tokio integration
+  - Streaming directory operations
+  - Comprehensive error mapping to unified `BackendError` types
+
 - **Nebula Web Dashboard v1.0.0-alpha.3** - Complete interactive dashboard UI
   - Modern dark theme with gradient accents and professional styling
   - Sidebar navigation (Overview, Jobs, API Explorer, WebSocket Monitor)
