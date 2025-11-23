@@ -5,6 +5,23 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Audit Logging Integration** - Structured audit logging for copy operations (`src/audit.rs`)
+  - `AuditLogger` struct for thread-safe, append-only audit log writing
+  - `AuditEvent` struct matching README specification with all required fields:
+    - `timestamp`, `job`, `source`, `destination`, `protocol`
+    - `bytes_transferred`, `duration_ms`, `compression`, `compression_ratio`
+    - `checksum_algorithm`, `checksum_match`, `status`, `retries`
+    - Optional fields: `storage_class`, `multipart_parts`, `starmap_node`, `files_count`
+  - JSON Lines format (default) and CSV format support via `AuditFormat` enum
+  - Automatic audit event emission at copy operation lifecycle points:
+    - Start event (with expected bytes)
+    - Completion event (success with metrics or failure with error details)
+  - Integration with `copy_file` and `copy_directory` pipelines
+  - Builder pattern for `AuditEvent` construction
+  - Graceful error handling (audit failures don't abort copy operations)
+  - Configurable via `CopyConfig.audit_log_path` and `CopyConfig.audit_format`
+  - Comprehensive unit tests (11) and integration tests (9)
+
 - **SMB/CIFS Backend Abstraction** - Full `Backend` trait implementation for SMB network shares
   - `SmbBackend` implementing unified `Backend` trait (`src/backend/smb.rs`)
   - URI-based configuration: `smb://[user[:pass]@]host[:port]/share/path`

@@ -706,37 +706,38 @@ orbit --source /local/data --dest smb://server/backup \
 
 ### 📊 Audit and Telemetry
 
-Every operation emits structured audit events for full observability.
+Every copy operation automatically emits structured audit events for full observability and compliance tracking.
 
-**Example Audit Log:**
-```json
-{
-  "timestamp": "2025-10-25T16:42:19Z",
-  "job": "cloud-backup",
-  "source": "/local/data/",
-  "destination": "s3://my-bucket/backups/",
-  "protocol": "s3",
-  "bytes_transferred": 104857600,
-  "duration_ms": 2341,
-  "compression": "zstd:1",
-  "compression_ratio": 2.3,
-  "checksum_algorithm": "sha256",
-  "checksum_match": true,
-  "storage_class": "INTELLIGENT_TIERING",
-  "multipart_parts": 20,
-  "status": "success",
-  "retries": 0,
-  "starmap_node": "orbit.node.cloud-backup"
-}
+**Enable Audit Logging:**
+```bash
+# Via CLI flag
+orbit copy /source /dest --audit-log ./audit.log
+
+# Via configuration file
+audit_format = "json"
+audit_log_path = "/var/log/orbit_audit.log"
 ```
 
+**Example Audit Log (JSON Lines):**
+```json
+{"timestamp":"2025-10-25T16:42:19Z","job":"orbit-1a2b3c4d-5e6f","source":"/local/data/","destination":"s3://my-bucket/backups/","protocol":"s3","bytes_transferred":104857600,"duration_ms":2341,"compression":"zstd","compression_ratio":2.3,"checksum_algorithm":"blake3","checksum_match":true,"storage_class":"INTELLIGENT_TIERING","multipart_parts":20,"status":"success","retries":0,"starmap_node":"orbit.node.cloud-backup"}
+```
+
+**Audit Event Lifecycle:**
+1. **started** — Emitted when operation begins (with expected bytes)
+2. **progress** — Optional periodic updates during long transfers
+3. **success/failure** — Final status with complete metrics
+
 **Audit Features:**
-- JSON Lines format (machine-parseable)
-- Timestamped with nanosecond precision
-- Full job context and metadata
-- Protocol-specific metrics
-- Ready for ELK, Loki, Datadog ingestion
-- Starmap node correlation
+- **JSON Lines format** — One event per line, machine-parseable
+- **CSV format** — Alternative format for spreadsheet analysis
+- **ISO 8601 timestamps** — With timezone for global deployments
+- **Job correlation** — Unique job IDs link related events
+- **Full metrics** — Bytes, duration, compression ratio, checksum status
+- **Protocol-specific fields** — Storage class, multipart parts (S3)
+- **Graceful degradation** — Audit failures don't abort copy operations
+- **Ready for ingestion** — ELK, Loki, Datadog, Splunk compatible
+- **Starmap node correlation** — For distributed transfer tracking
 
 ---
 

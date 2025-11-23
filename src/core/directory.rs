@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use crossbeam_channel::bounded;
 use rayon::prelude::*;
@@ -20,6 +20,7 @@ use super::metadata::preserve_metadata;
 use super::progress::ProgressPublisher;
 use super::validation::matches_exclude_pattern;
 use super::CopyStats;
+use crate::audit::AuditLogger;
 use crate::config::{CopyConfig, CopyMode, SymlinkMode};
 use crate::error::{OrbitError, Result};
 
@@ -54,6 +55,15 @@ pub fn copy_directory(
     copy_directory_impl(source_dir, dest_dir, config, None)
 }
 
+/// Generate a unique job ID for audit event correlation
+fn generate_job_id() -> String {
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("orbit-dir-{:x}-{:04x}", timestamp, rand::random::<u16>())
+}
+
 /// Internal implementation of copy_directory with optional progress publisher
 pub fn copy_directory_impl(
     source_dir: &Path,
@@ -68,6 +78,21 @@ pub fn copy_directory_impl(
     }
 
     let start_time = Instant::now();
+    let job_id = generate_job_id();
+
+    // Initialize audit logger if audit log path is configured
+    let audit_logger: Option<Arc<Mutex<AuditLogger>>> =
+        if config.audit_log_path.is_some() || config.verbose {
+            match AuditLogger::new(config.audit_log_path.as_deref(), config.audit_format) {
+                Ok(logger) => Some(Arc::new(Mutex::new(logger))),
+                Err(e) => {
+                    tracing::warn!("Failed to initialize audit logger: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
 
     // Setup concurrency limiter for controlling parallel transfers
     let concurrency_limiter = if config.parallel > 0 {
@@ -94,6 +119,15 @@ pub fn copy_directory_impl(
     }
 
     disk_guardian::ensure_transfer_safety(dest_dir, estimated_size, &guardian_config)?;
+
+    // Emit start audit event
+    if let Some(ref logger) = audit_logger {
+        if let Ok(mut log) = logger.lock() {
+            if let Err(e) = log.emit_start(&job_id, source_dir, dest_dir, "local", estimated_size) {
+                tracing::warn!("Failed to emit audit start event: {}", e);
+            }
+        }
+    }
 
     // Use provided publisher or create a no-op one
     let noop_publisher = ProgressPublisher::noop();
@@ -242,6 +276,27 @@ pub fn copy_directory_impl(
     println!("  Duration: {:?}", final_stats.duration);
     if config.copy_mode == CopyMode::Mirror {
         println!("  Files deleted: {}", deleted_count);
+    }
+
+    // Emit completion audit event
+    if let Some(ref logger) = audit_logger {
+        if let Ok(mut log) = logger.lock() {
+            let error_msg = if final_stats.files_failed > 0 {
+                Some(format!("{} files failed to copy", final_stats.files_failed))
+            } else {
+                None
+            };
+            let _ = log.emit_from_stats(
+                &job_id,
+                &source_dir,
+                &dest_dir,
+                "local",
+                &final_stats,
+                config.compression,
+                0,
+                error_msg.as_deref(),
+            );
+        }
     }
 
     if final_stats.files_failed > 0 {

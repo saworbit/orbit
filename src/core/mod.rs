@@ -28,6 +28,7 @@ pub mod zero_copy; // Concurrency control with semaphore
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use crate::audit::AuditLogger;
 use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
 use validation::should_copy_file;
@@ -99,17 +100,55 @@ pub fn copy_file_impl(
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
 
+    // Generate a unique job ID for audit correlation
+    let job_id = generate_job_id();
+
+    // Initialize audit logger if audit log path is configured
+    let mut audit_logger = if config.audit_log_path.is_some() || config.verbose {
+        match AuditLogger::new(config.audit_log_path.as_deref(), config.audit_format) {
+            Ok(logger) => Some(logger),
+            Err(e) => {
+                // Log warning but don't fail the copy operation
+                tracing::warn!("Failed to initialize audit logger: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Validate source exists
     if !source_path.exists() {
-        return Err(OrbitError::SourceNotFound(source_path.to_path_buf()));
+        let err = OrbitError::SourceNotFound(source_path.to_path_buf());
+        // Emit failure audit event
+        if let Some(ref mut logger) = audit_logger {
+            let _ = logger.emit_failure(
+                &job_id,
+                source_path,
+                dest_path,
+                "local",
+                0,
+                start_time.elapsed().as_millis() as u64,
+                0,
+                &err.to_string(),
+            );
+        }
+        return Err(err);
     }
 
     let source_metadata = std::fs::metadata(source_path)?;
     let source_size = source_metadata.len();
 
+    // Emit start audit event
+    if let Some(ref mut logger) = audit_logger {
+        if let Err(e) = logger.emit_start(&job_id, source_path, dest_path, "local", source_size) {
+            tracing::warn!("Failed to emit audit start event: {}", e);
+        }
+    }
+
     // Check if we should copy based on mode
     if !should_copy_file(source_path, dest_path, config.copy_mode)? {
-        return Ok(CopyStats {
+        let stats = CopyStats {
             bytes_copied: 0,
             duration: start_time.elapsed(),
             checksum: None,
@@ -118,7 +157,23 @@ pub fn copy_file_impl(
             files_skipped: 1,
             files_failed: 0,
             delta_stats: None,
-        });
+        };
+
+        // Emit skip audit event
+        if let Some(ref mut logger) = audit_logger {
+            let _ = logger.emit_from_stats(
+                &job_id,
+                source_path,
+                dest_path,
+                "local",
+                &stats,
+                config.compression,
+                0,
+                None,
+            );
+        }
+
+        return Ok(stats);
     }
 
     // Dry run mode
@@ -127,7 +182,7 @@ pub fn copy_file_impl(
             "Would copy: {:?} -> {:?} ({} bytes)",
             source_path, dest_path, source_size
         );
-        return Ok(CopyStats {
+        let stats = CopyStats {
             bytes_copied: source_size,
             duration: start_time.elapsed(),
             checksum: None,
@@ -136,20 +191,105 @@ pub fn copy_file_impl(
             files_skipped: 0,
             files_failed: 0,
             delta_stats: None,
-        });
+        };
+
+        // Emit dry-run audit event
+        if let Some(ref mut logger) = audit_logger {
+            let _ = logger.emit_from_stats(
+                &job_id,
+                source_path,
+                dest_path,
+                "local",
+                &stats,
+                config.compression,
+                0,
+                None,
+            );
+        }
+
+        return Ok(stats);
     }
 
     // Validate disk space
-    validation::validate_disk_space(dest_path, source_size)?;
+    if let Err(e) = validation::validate_disk_space(dest_path, source_size) {
+        if let Some(ref mut logger) = audit_logger {
+            let _ = logger.emit_failure(
+                &job_id,
+                source_path,
+                dest_path,
+                "local",
+                0,
+                start_time.elapsed().as_millis() as u64,
+                0,
+                &e.to_string(),
+            );
+        }
+        return Err(e);
+    }
 
     // Use provided publisher or create a no-op one
     let noop_publisher = progress::ProgressPublisher::noop();
     let pub_ref = publisher.unwrap_or(&noop_publisher);
 
     // Perform copy with retry logic and metadata preservation
-    retry::with_retry_and_metadata(source_path, dest_path, config, || {
+    let result = retry::with_retry_and_metadata(source_path, dest_path, config, || {
         transfer::perform_copy(source_path, dest_path, source_size, config, pub_ref)
-    })
+    });
+
+    // Emit completion audit event
+    if let Some(ref mut logger) = audit_logger {
+        match &result {
+            Ok(stats) => {
+                let _ = logger.emit_from_stats(
+                    &job_id,
+                    source_path,
+                    dest_path,
+                    "local",
+                    stats,
+                    config.compression,
+                    0,
+                    None,
+                );
+            }
+            Err(e) => {
+                let stats = CopyStats {
+                    bytes_copied: 0,
+                    duration: start_time.elapsed(),
+                    checksum: None,
+                    compression_ratio: None,
+                    files_copied: 0,
+                    files_skipped: 0,
+                    files_failed: 1,
+                    delta_stats: None,
+                };
+                let _ = logger.emit_from_stats(
+                    &job_id,
+                    source_path,
+                    dest_path,
+                    "local",
+                    &stats,
+                    config.compression,
+                    config.retry_attempts,
+                    Some(&e.to_string()),
+                );
+            }
+        }
+    }
+
+    result
+}
+
+/// Generate a unique job ID for audit event correlation
+fn generate_job_id() -> String {
+    use std::time::SystemTime;
+
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+
+    // Simple but unique job ID combining timestamp and random component
+    format!("orbit-{:x}-{:04x}", timestamp, rand::random::<u16>())
 }
 
 /// Copy a directory recursively with streaming iteration to reduce memory usage
