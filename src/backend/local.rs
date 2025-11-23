@@ -672,6 +672,7 @@ mod tests {
         // Create a test file
         let mut file = fs::File::create(&file_path).await.unwrap();
         file.write_all(b"test data").await.unwrap();
+        file.flush().await.unwrap();
         drop(file);
 
         let backend = LocalBackend::new();
