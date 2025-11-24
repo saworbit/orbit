@@ -761,15 +761,12 @@ audit_log_path = "/var/log/orbit_audit.log"
 ### Install
 
 ```bash
-# From source
+# From source (includes S3, SMB, SSH backends by default)
 git clone https://github.com/saworbit/orbit.git
 cd orbit
 cargo build --release
 
-# With S3 support
-cargo build --release --features s3-native
-
-# CLI-only build (disables the embedded web GUI)
+# CLI-only build (disables the embedded web GUI and network backends)
 cargo build --release --no-default-features --features zero-copy
 
 # Install to system
@@ -778,6 +775,8 @@ sudo cp target/release/orbit /usr/local/bin/
 # Or with cargo
 cargo install --path .
 ```
+
+> **Note:** S3 support is enabled by default. No additional feature flags are needed for cloud storage operations.
 
 ### Optional Features
 
@@ -1510,20 +1509,20 @@ Pull requests welcome! See `CONTRIBUTING.md` for code style and guidelines.
 ### Development
 
 ```bash
-# Clone and build
+# Clone and build (includes S3, SMB, SSH by default)
 git clone https://github.com/saworbit/orbit.git
 cd orbit
 cargo build
 
-# Run tests
+# Run tests (includes S3 backend tests)
 cargo test
 
-# Run with S3 support
-cargo build --features s3-native
-cargo test --features s3-native
+# Run with all features (adds extended-metadata, delta-manifest)
+cargo build --features full
+cargo test --features full
 
-# Run with SMB (when available)
-cargo build --features smb-native
+# Minimal build (no network backends or GUI)
+cargo build --no-default-features --features zero-copy
 
 # Format and lint
 cargo fmt
