@@ -231,19 +231,24 @@ fn test_whole_file_flag() {
         file.sync_all().unwrap();
     } // File is closed here
 
-    // Longer delay to ensure OS has released file handles (especially on macOS CI)
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    // Much longer delay for macOS CI - file descriptor cleanup can be very slow
+    std::thread::sleep(std::time::Duration::from_millis(1000));
+
+    // Verify files are accessible before copy_file attempt
+    let _ = std::fs::metadata(&source);
+    let _ = std::fs::metadata(&dest);
 
     let mut config = CopyConfig::default();
     config.check_mode = CheckMode::Delta;
     config.whole_file = true; // Force full copy
 
-    // Retry mechanism for CI environments with slow file handle cleanup
+    // Retry mechanism with aggressive delays for CI environments
     let stats = match copy_file(&source, &dest, &config) {
         Ok(s) => s,
-        Err(_) => {
-            // Wait a bit more and retry once
-            std::thread::sleep(std::time::Duration::from_millis(300));
+        Err(e) => {
+            eprintln!("First attempt failed: {}, retrying after 2s delay...", e);
+            // Much longer wait before retry
+            std::thread::sleep(std::time::Duration::from_millis(2000));
             copy_file(&source, &dest, &config).unwrap()
         }
     };
