@@ -54,6 +54,8 @@ impl FlakyOperation {
                 files_skipped: 0,
                 files_failed: 0,
                 delta_stats: None,
+                chunks_resumed: 0,
+                bytes_skipped: 0,
             })
         }
     }
@@ -300,6 +302,8 @@ fn test_stats_tracking_with_failures() {
             files_skipped: 0,
             files_failed: 0,
             delta_stats: None,
+            chunks_resumed: 0,
+            bytes_skipped: 0,
         })
     });
     assert!(result1.is_ok());
@@ -454,6 +458,8 @@ fn test_multiple_error_types_in_sequence() {
                 files_skipped: 0,
                 files_failed: 0,
                 delta_stats: None,
+                chunks_resumed: 0,
+                bytes_skipped: 0,
             }),
             _ => unreachable!(),
         }
