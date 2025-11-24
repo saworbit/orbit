@@ -204,7 +204,14 @@ fn test_whole_file_flag() {
 
     let data = vec![0xEE; 100 * 1024];
     fs::write(&source, &data).unwrap();
+
+    // Add a small delay to ensure file is fully written on macOS
+    std::thread::sleep(std::time::Duration::from_millis(10));
+
     fs::write(&dest, &data).unwrap();
+
+    // Add another small delay to ensure file is ready
+    std::thread::sleep(std::time::Duration::from_millis(10));
 
     let mut config = CopyConfig::default();
     config.check_mode = CheckMode::Delta;
