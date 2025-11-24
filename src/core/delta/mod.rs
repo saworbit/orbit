@@ -11,10 +11,11 @@ pub mod transfer;
 pub mod types;
 
 pub use types::{
-    BlockSignature, CheckMode, DeltaConfig, DeltaStats, HashAlgorithm, PartialManifest,
+    BlockSignature, CheckMode, DeltaConfig, DeltaStats, HashAlgorithm, ManifestDb, ManifestEntry,
+    PartialManifest,
 };
 // DeltaInstruction is module-internal
-pub use transfer::{copy_with_delta, copy_with_delta_fallback};
+pub use transfer::{copy_with_delta, copy_with_delta_fallback, update_manifest_if_configured};
 pub(crate) use types::DeltaInstruction;
 
 use crate::error::Result;

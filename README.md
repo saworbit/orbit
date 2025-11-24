@@ -473,6 +473,39 @@ copy_file(&src, &dest, &config)?;
 
 For large data migrations, enable retries at higher levels to leverage resumes. Disable resume with `config.delta_resume_enabled = false` if not needed.
 
+**Manifest Generation (NEW!):**
+
+When `update_manifest` is enabled and a `manifest_path` is provided, Orbit will emit or update a manifest database post-transfer, tracking file metadata and checksums. Use `ignore_existing` to skip updates if the manifest already exists.
+
+```rust
+use orbit::core::delta::{DeltaConfig, copy_with_delta_fallback, ManifestDb};
+use std::path::PathBuf;
+
+let mut config = DeltaConfig::default();
+config.update_manifest = true;
+config.manifest_path = Some(PathBuf::from("transfer_manifest.json"));
+config.ignore_existing = false;  // Update existing manifest (default)
+
+// Delta transfer with automatic manifest update
+let (stats, checksum) = copy_with_delta_fallback(&src, &dest, &config)?;
+
+if stats.manifest_updated {
+    println!("Manifest updated with checksum: {:?}", checksum);
+}
+
+// Load manifest for custom analytics or auditing
+let manifest = ManifestDb::load(&PathBuf::from("transfer_manifest.json"))?;
+for (path, entry) in manifest.iter() {
+    println!("{}: {} bytes, delta_used={}", path.display(), entry.size, entry.delta_used);
+}
+```
+
+**Manifest Features:**
+- **Automatic Updates** — Manifests are updated after successful delta or fallback transfers
+- **Entry Tracking** — Each file entry includes source path, destination path, checksum, size, modification time, and delta statistics
+- **JSON Format** — Human-readable and machine-parseable manifest format
+- **Validation** — `config.validate_manifest()` ensures proper configuration before transfer
+
 **Performance:**
 - 1GB file with 5% changes: **10x faster** (3s vs 30s), **95% less data** (50MB vs 1GB)
 - Identical files: **99% savings** with minimal CPU overhead

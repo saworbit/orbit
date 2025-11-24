@@ -149,7 +149,31 @@ impl Default for DeltaConfig {
     }
 }
 
+/// Error type for manifest configuration validation
+#[derive(Debug, Clone)]
+pub struct ManifestConfigError(pub String);
+
+impl std::fmt::Display for ManifestConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Manifest configuration error: {}", self.0)
+    }
+}
+
+impl std::error::Error for ManifestConfigError {}
+
 impl DeltaConfig {
+    /// Validate manifest configuration
+    ///
+    /// Returns an error if `update_manifest` is true but `manifest_path` is None.
+    pub fn validate_manifest(&self) -> Result<(), ManifestConfigError> {
+        if self.update_manifest && self.manifest_path.is_none() {
+            return Err(ManifestConfigError(
+                "update_manifest is enabled but manifest_path is not set".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Create a new delta config with the specified check mode
     pub fn with_check_mode(mut self, mode: CheckMode) -> Self {
         self.check_mode = mode;
@@ -275,6 +299,9 @@ pub struct DeltaStats {
 
     /// Whether this transfer was resumed from a partial manifest
     pub was_resumed: bool,
+
+    /// Whether the manifest database was updated after transfer
+    pub manifest_updated: bool,
 }
 
 /// Partial manifest for tracking delta transfer progress
@@ -499,6 +526,169 @@ impl fmt::Display for DeltaStats {
     }
 }
 
+/// Entry in the manifest database tracking file transfer metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifestEntry {
+    /// Source file path
+    pub source_path: PathBuf,
+
+    /// Destination file path
+    pub dest_path: PathBuf,
+
+    /// File checksum (BLAKE3 hex string)
+    pub checksum: String,
+
+    /// File size in bytes
+    pub size: u64,
+
+    /// File modification time
+    #[serde(with = "system_time_serde")]
+    pub modified: SystemTime,
+
+    /// Transfer timestamp
+    #[serde(with = "system_time_serde")]
+    pub transferred_at: SystemTime,
+
+    /// Whether delta transfer was used
+    pub delta_used: bool,
+
+    /// Bytes saved via delta (0 if full copy)
+    pub bytes_saved: u64,
+}
+
+impl ManifestEntry {
+    /// Create a new manifest entry
+    pub fn new(
+        source_path: PathBuf,
+        dest_path: PathBuf,
+        checksum: String,
+        size: u64,
+        modified: SystemTime,
+    ) -> Self {
+        Self {
+            source_path,
+            dest_path,
+            checksum,
+            size,
+            modified,
+            transferred_at: SystemTime::now(),
+            delta_used: false,
+            bytes_saved: 0,
+        }
+    }
+
+    /// Set delta transfer info
+    pub fn with_delta_info(mut self, bytes_saved: u64) -> Self {
+        self.delta_used = true;
+        self.bytes_saved = bytes_saved;
+        self
+    }
+}
+
+/// Manifest database for tracking file transfers
+///
+/// This provides a simple JSON-file backed storage for manifest entries.
+/// Future versions may use SQLite for better performance with large manifests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifestDb {
+    /// Schema version for compatibility
+    pub version: u32,
+
+    /// Database creation timestamp
+    #[serde(with = "system_time_serde")]
+    pub created_at: SystemTime,
+
+    /// Last update timestamp
+    #[serde(with = "system_time_serde")]
+    pub updated_at: SystemTime,
+
+    /// File entries indexed by destination path
+    pub entries: std::collections::HashMap<PathBuf, ManifestEntry>,
+}
+
+impl Default for ManifestDb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ManifestDb {
+    /// Current manifest database version
+    pub const VERSION: u32 = 1;
+
+    /// Create a new empty manifest database
+    pub fn new() -> Self {
+        let now = SystemTime::now();
+        Self {
+            version: Self::VERSION,
+            created_at: now,
+            updated_at: now,
+            entries: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Open an existing manifest database or create a new one
+    pub fn open_or_create(path: &std::path::Path) -> std::io::Result<Self> {
+        if path.exists() {
+            Self::load(path)
+        } else {
+            Ok(Self::new())
+        }
+    }
+
+    /// Load manifest database from disk
+    pub fn load(path: &std::path::Path) -> std::io::Result<Self> {
+        let contents = std::fs::read_to_string(path)?;
+        serde_json::from_str(&contents).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid manifest database: {}", e),
+            )
+        })
+    }
+
+    /// Save manifest database to disk
+    pub fn save(&self, path: &std::path::Path) -> std::io::Result<()> {
+        let contents = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, contents)
+    }
+
+    /// Insert or update an entry in the manifest
+    pub fn insert_or_update(&mut self, entry: ManifestEntry) {
+        self.entries.insert(entry.dest_path.clone(), entry);
+        self.updated_at = SystemTime::now();
+    }
+
+    /// Get an entry by destination path
+    pub fn get_entry(&self, dest_path: &std::path::Path) -> Option<&ManifestEntry> {
+        self.entries.get(dest_path)
+    }
+
+    /// Remove an entry by destination path
+    pub fn remove_entry(&mut self, dest_path: &std::path::Path) -> Option<ManifestEntry> {
+        let entry = self.entries.remove(dest_path);
+        if entry.is_some() {
+            self.updated_at = SystemTime::now();
+        }
+        entry
+    }
+
+    /// Get number of entries in the manifest
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Check if manifest is empty
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Iterate over all entries
+    pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &ManifestEntry)> {
+        self.entries.iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -541,6 +731,7 @@ mod tests {
             chunks_resumed: 0,
             bytes_skipped: 0,
             was_resumed: false,
+            manifest_updated: false,
         };
 
         stats.calculate_savings_ratio();
@@ -560,6 +751,7 @@ mod tests {
             chunks_resumed: 0,
             bytes_skipped: 0,
             was_resumed: false,
+            manifest_updated: false,
         };
 
         let stats2 = DeltaStats {
@@ -573,6 +765,7 @@ mod tests {
             chunks_resumed: 0,
             bytes_skipped: 0,
             was_resumed: false,
+            manifest_updated: false,
         };
 
         stats1.merge(&stats2);
@@ -580,5 +773,200 @@ mod tests {
         assert_eq!(stats1.blocks_matched, 110);
         assert_eq!(stats1.total_bytes, 150_000_000);
         assert_eq!(stats1.bytes_saved, 110_000_000);
+    }
+
+    #[test]
+    fn test_delta_config_validate_manifest() {
+        // Valid: update_manifest false, no path needed
+        let config = DeltaConfig::default();
+        assert!(config.validate_manifest().is_ok());
+
+        // Valid: update_manifest true with path
+        let config = DeltaConfig::default()
+            .with_manifest_updates(true)
+            .with_manifest_path(PathBuf::from("manifest.json"));
+        assert!(config.validate_manifest().is_ok());
+
+        // Invalid: update_manifest true without path
+        let mut config = DeltaConfig::default();
+        config.update_manifest = true;
+        config.manifest_path = None;
+        assert!(config.validate_manifest().is_err());
+    }
+
+    #[test]
+    fn test_manifest_entry_creation() {
+        let entry = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "abc123".to_string(),
+            1024,
+            SystemTime::now(),
+        );
+
+        assert_eq!(entry.source_path, PathBuf::from("/source/file.txt"));
+        assert_eq!(entry.dest_path, PathBuf::from("/dest/file.txt"));
+        assert_eq!(entry.checksum, "abc123");
+        assert_eq!(entry.size, 1024);
+        assert!(!entry.delta_used);
+        assert_eq!(entry.bytes_saved, 0);
+    }
+
+    #[test]
+    fn test_manifest_entry_with_delta_info() {
+        let entry = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "abc123".to_string(),
+            1024,
+            SystemTime::now(),
+        )
+        .with_delta_info(500);
+
+        assert!(entry.delta_used);
+        assert_eq!(entry.bytes_saved, 500);
+    }
+
+    #[test]
+    fn test_manifest_db_new() {
+        let db = ManifestDb::new();
+        assert_eq!(db.version, ManifestDb::VERSION);
+        assert!(db.is_empty());
+        assert_eq!(db.len(), 0);
+    }
+
+    #[test]
+    fn test_manifest_db_insert_and_get() {
+        let mut db = ManifestDb::new();
+
+        let entry = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "abc123".to_string(),
+            1024,
+            SystemTime::now(),
+        );
+
+        db.insert_or_update(entry);
+        assert_eq!(db.len(), 1);
+
+        let retrieved = db.get_entry(&PathBuf::from("/dest/file.txt"));
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().checksum, "abc123");
+    }
+
+    #[test]
+    fn test_manifest_db_update_existing() {
+        let mut db = ManifestDb::new();
+
+        let entry1 = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "abc123".to_string(),
+            1024,
+            SystemTime::now(),
+        );
+
+        db.insert_or_update(entry1);
+
+        // Update with new checksum
+        let entry2 = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "def456".to_string(),
+            2048,
+            SystemTime::now(),
+        );
+
+        db.insert_or_update(entry2);
+        assert_eq!(db.len(), 1); // Still 1 entry
+
+        let retrieved = db.get_entry(&PathBuf::from("/dest/file.txt"));
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().checksum, "def456");
+        assert_eq!(retrieved.unwrap().size, 2048);
+    }
+
+    #[test]
+    fn test_manifest_db_remove_entry() {
+        let mut db = ManifestDb::new();
+
+        let entry = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "abc123".to_string(),
+            1024,
+            SystemTime::now(),
+        );
+
+        db.insert_or_update(entry);
+        assert_eq!(db.len(), 1);
+
+        let removed = db.remove_entry(&PathBuf::from("/dest/file.txt"));
+        assert!(removed.is_some());
+        assert_eq!(db.len(), 0);
+
+        // Removing non-existent entry returns None
+        let removed_again = db.remove_entry(&PathBuf::from("/dest/file.txt"));
+        assert!(removed_again.is_none());
+    }
+
+    #[test]
+    fn test_manifest_db_save_and_load() {
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("test_manifest.json");
+
+        // Create and populate db
+        let mut db = ManifestDb::new();
+        let entry = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "abc123".to_string(),
+            1024,
+            SystemTime::now(),
+        );
+        db.insert_or_update(entry);
+
+        // Save to disk
+        db.save(&db_path).unwrap();
+        assert!(db_path.exists());
+
+        // Load from disk
+        let loaded_db = ManifestDb::load(&db_path).unwrap();
+        assert_eq!(loaded_db.len(), 1);
+
+        let retrieved = loaded_db.get_entry(&PathBuf::from("/dest/file.txt"));
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().checksum, "abc123");
+    }
+
+    #[test]
+    fn test_manifest_db_open_or_create() {
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("new_manifest.json");
+
+        // Create new db when file doesn't exist
+        let db = ManifestDb::open_or_create(&db_path).unwrap();
+        assert!(db.is_empty());
+
+        // Now save it
+        let mut db = db;
+        let entry = ManifestEntry::new(
+            PathBuf::from("/source/file.txt"),
+            PathBuf::from("/dest/file.txt"),
+            "abc123".to_string(),
+            1024,
+            SystemTime::now(),
+        );
+        db.insert_or_update(entry);
+        db.save(&db_path).unwrap();
+
+        // Open existing db
+        let loaded_db = ManifestDb::open_or_create(&db_path).unwrap();
+        assert_eq!(loaded_db.len(), 1);
     }
 }

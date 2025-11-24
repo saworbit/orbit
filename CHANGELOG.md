@@ -5,6 +5,17 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Manifest Generation in Delta Transfers** - Integrated manifest emission and updates in delta transfer logic (`src/core/delta/types.rs`, `src/core/delta/transfer.rs`)
+  - `ManifestDb` struct for JSON-backed manifest database storage
+  - `ManifestEntry` struct for tracking file transfer metadata (source path, dest path, checksum, size, mtime, delta stats)
+  - `update_manifest_if_configured()` helper function encapsulates manifest update logic
+  - Integration in `copy_with_delta()` and `copy_with_delta_fallback()` — manifests automatically updated on successful transfers
+  - `DeltaConfig.validate_manifest()` method ensures proper configuration (update_manifest requires manifest_path)
+  - New `DeltaStats.manifest_updated` field for observability
+  - Respects `ignore_existing` option to skip manifest updates if file already exists
+  - 12 new unit tests covering manifest creation, save/load, validation, and integration
+  - README documentation with usage examples for manifest-driven audits and analytics
+
 - **Delta Resume Handling** - Partial manifest support for interrupted delta transfers (`src/core/delta/types.rs`, `src/core/delta/transfer.rs`)
   - `PartialManifest` struct for tracking delta transfer progress with JSON serialization
   - Resume capability via `{dest}.delta.partial.json` manifest files
