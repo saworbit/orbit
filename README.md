@@ -74,8 +74,20 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 - **Smart Retry Logic** — Exponential backoff with jitter to avoid thundering herd
 - **Error Classification** — Distinguishes transient (retry-worthy) from fatal errors
 - **Flexible Error Modes** — Abort, Skip, or Partial (keep incomplete files for resume)
-- **Statistics Tracking** — Real-time metrics on operations, retries, and error types
+- **Default Statistics Tracking** — Retry metrics (attempts, successes, failures) are collected and emitted automatically during copy operations
 - **Structured Logging** — Tracing integration for detailed diagnostics
+
+**Default Retry Metrics:**
+
+Retry metrics are now collected and emitted by default for all `copy_file` operations, enhancing observability for data migration, transport, and storage workflows. When retries or failures occur, you'll see output like:
+
+```
+[orbit] Retry metrics: 2 retries, 1 successful, 0 failed, 0 skipped
+```
+
+Control emission with the `ORBIT_STATS` environment variable:
+- `ORBIT_STATS=off` — Disable default emission (for high-volume transfers)
+- `ORBIT_STATS=verbose` — Always emit, even for successful operations with no retries
 
 **Error Modes:**
 - **Abort** (default) — Stop on first error for maximum safety
@@ -95,6 +107,29 @@ orbit --source /data --dest /backup --recursive \
 orbit -s /source -d /dest -R \
       --error-mode skip \
       --verbose
+
+# Disable stats emission for high-volume batch transfers
+ORBIT_STATS=off orbit --source /data --dest /backup --recursive
+```
+
+**Programmatic Statistics Tracking:**
+
+For aggregated metrics across batch operations, pass a custom `OperationStats` instance:
+
+```rust
+use orbit::{CopyConfig, OperationStats, copy_file_with_stats};
+
+// For aggregated stats across multiple files:
+let stats = OperationStats::new();
+for file in &files {
+    copy_file_with_stats(&file.src, &file.dest, &config, Some(&stats))?;
+}
+stats.emit(); // Emit once after all operations
+
+// Get detailed snapshot for programmatic access
+let snapshot = stats.snapshot();
+println!("Success rate: {:.1}%", snapshot.success_rate());
+println!("Total retries: {}", snapshot.total_retries);
 ```
 
 **Error Categories Tracked:**

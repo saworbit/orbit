@@ -511,3 +511,131 @@ fn test_concurrent_stats_tracking() {
     // Max retry for single operation should be 9 (the highest j value)
     assert_eq!(snapshot.max_retries_for_single_op, 9);
 }
+
+#[test]
+fn test_copy_file_with_stats_tracking() {
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.txt");
+    let dest = dir.path().join("dest.txt");
+
+    std::fs::write(&source, b"test data for stats tracking").unwrap();
+
+    let stats = OperationStats::new();
+    let config = orbit::config::CopyConfig::default();
+
+    let result = orbit::copy_file_with_stats(&source, &dest, &config, Some(&stats));
+    assert!(result.is_ok());
+
+    let snapshot = stats.snapshot();
+    // Should have recorded 1 successful operation
+    assert_eq!(snapshot.successful_operations, 1);
+    assert_eq!(snapshot.failed_operations, 0);
+    assert_eq!(snapshot.total_retries, 0); // No retries needed for successful copy
+}
+
+#[test]
+fn test_copy_file_default_stats_success() {
+    use tempfile::tempdir;
+
+    // Set environment to disable emission during test to avoid output noise
+    std::env::set_var("ORBIT_STATS", "off");
+
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("source.txt");
+    let dest = dir.path().join("dest.txt");
+
+    std::fs::write(&source, b"test data").unwrap();
+
+    let config = orbit::config::CopyConfig::default();
+
+    // This uses default stats tracking internally
+    let result = orbit::copy_file(&source, &dest, &config);
+    assert!(result.is_ok());
+
+    let stats = result.unwrap();
+    assert_eq!(stats.bytes_copied, 9);
+    assert_eq!(stats.files_copied, 1);
+
+    // Clean up env var
+    std::env::remove_var("ORBIT_STATS");
+}
+
+#[test]
+fn test_stats_emit_only_on_noteworthy_events() {
+    let stats = OperationStats::new();
+
+    // Record only successful operations - emit() should not produce stderr output
+    stats.record_success();
+
+    let snapshot = stats.snapshot();
+    assert_eq!(snapshot.total_retries, 0);
+    assert_eq!(snapshot.failed_operations, 0);
+    assert_eq!(snapshot.skipped_operations, 0);
+
+    // This should be safe to call - it won't emit because there are no noteworthy events
+    // (unless ORBIT_STATS=verbose is set)
+    stats.emit();
+}
+
+#[test]
+fn test_stats_emit_with_retries() {
+    let stats = OperationStats::new();
+
+    // Record some retries and a success
+    stats.record_retry(1);
+    stats.record_retry(2);
+    stats.record_success();
+
+    let snapshot = stats.snapshot();
+    assert_eq!(snapshot.total_retries, 2);
+    assert_eq!(snapshot.successful_operations, 1);
+
+    // emit() will output because there are retries
+    // For testing purposes, we just verify the method doesn't panic
+    stats.emit();
+}
+
+#[test]
+fn test_stats_has_activity() {
+    let stats = OperationStats::new();
+
+    // Initially no activity
+    assert!(!stats.has_activity());
+
+    // Record an operation
+    stats.record_success();
+    assert!(stats.has_activity());
+}
+
+#[test]
+fn test_aggregated_stats_across_multiple_files() {
+    use tempfile::tempdir;
+
+    // Set environment to disable emission during test
+    std::env::set_var("ORBIT_STATS", "off");
+
+    let dir = tempdir().unwrap();
+    let stats = OperationStats::new();
+    let config = orbit::config::CopyConfig::default();
+
+    // Copy multiple files using the same stats tracker
+    for i in 0..5 {
+        let source = dir.path().join(format!("source_{}.txt", i));
+        let dest = dir.path().join(format!("dest_{}.txt", i));
+        std::fs::write(&source, format!("content {}", i)).unwrap();
+
+        let result = orbit::copy_file_with_stats(&source, &dest, &config, Some(&stats));
+        assert!(result.is_ok());
+    }
+
+    let snapshot = stats.snapshot();
+    // Should have recorded 5 successful operations
+    assert_eq!(snapshot.successful_operations, 5);
+    assert_eq!(snapshot.total_operations, 5);
+    assert_eq!(snapshot.failed_operations, 0);
+
+    // Clean up env var
+    std::env::remove_var("ORBIT_STATS");
+}

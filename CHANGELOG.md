@@ -5,6 +5,17 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Default Retry Metrics Emission** - Retry statistics are now collected and emitted by default during `copy_file` operations (`src/core/mod.rs`, `src/instrumentation.rs`)
+  - `OperationStats::emit()` method for automatic metrics output to stderr
+  - `OperationStats::has_activity()` method to check if any operations were recorded
+  - `copy_file_with_stats()` function for custom statistics tracking across batch operations
+  - `copy_file_impl_with_stats()` internal function for full control over progress and stats
+  - Environment variable control: `ORBIT_STATS=off` disables emission, `ORBIT_STATS=verbose` always emits
+  - Default behavior: Only emits when noteworthy events occur (retries, failures, skips)
+  - Integration with retry module: Stats are passed to `with_retry_and_metadata_stats()` automatically
+  - New integration tests for default stats tracking and aggregated batch operations
+  - README documentation updates with programmatic usage examples
+
 - **Audit Logging Integration** - Structured audit logging for copy operations (`src/audit.rs`)
   - `AuditLogger` struct for thread-safe, append-only audit log writing
   - `AuditEvent` struct matching README specification with all required fields:

@@ -43,8 +43,8 @@ pub use config::{
     ChunkingStrategy, CompressionType, CopyConfig, CopyMode, ErrorMode, LogLevel, SymlinkMode,
 };
 pub use core::zero_copy::{ZeroCopyCapabilities, ZeroCopyResult};
-pub use core::{copy_directory, copy_file, CopyStats};
-pub use core::{copy_directory_impl, copy_file_impl}; // For testing with progress events
+pub use core::{copy_directory, copy_file, copy_file_with_stats, CopyStats};
+pub use core::{copy_directory_impl, copy_file_impl, copy_file_impl_with_stats}; // For testing with progress events
 pub use error::{ErrorCategory, OrbitError, Result};
 pub use instrumentation::{OperationStats, StatsSnapshot};
 pub use protocol::Protocol;

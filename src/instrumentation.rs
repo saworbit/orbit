@@ -137,6 +137,61 @@ impl OperationStats {
             elapsed_secs: self.inner.start_time.elapsed().as_secs(),
         }
     }
+
+    /// Emit statistics to stderr if any retries, failures, or notable events occurred.
+    ///
+    /// This method is called automatically when using default statistics tracking
+    /// in copy operations. It only outputs if there's something noteworthy to report.
+    ///
+    /// Behavior can be controlled via the `ORBIT_STATS` environment variable:
+    /// - `ORBIT_STATS=off` or `ORBIT_STATS=0` - Disable default emission
+    /// - `ORBIT_STATS=verbose` - Always emit, even for successful operations with no retries
+    pub fn emit(&self) {
+        // Check if emission is disabled via environment variable
+        if let Ok(val) = std::env::var("ORBIT_STATS") {
+            let val_lower = val.to_lowercase();
+            if val_lower == "off" || val_lower == "0" || val_lower == "false" {
+                return;
+            }
+        }
+
+        let snapshot = self.snapshot();
+
+        // Determine if we should emit based on verbosity setting
+        let verbose = std::env::var("ORBIT_STATS")
+            .map(|v| v.to_lowercase() == "verbose")
+            .unwrap_or(false);
+
+        // Only emit if there's something noteworthy (retries, failures, skips)
+        // or if verbose mode is enabled
+        let has_noteworthy_events = snapshot.total_retries > 0
+            || snapshot.failed_operations > 0
+            || snapshot.skipped_operations > 0;
+
+        if !has_noteworthy_events && !verbose {
+            return;
+        }
+
+        // Emit to stderr with tracing if available, otherwise eprintln
+        let summary = snapshot.format_summary();
+        tracing::info!(target: "orbit::stats", "{}", summary);
+
+        // Also emit to stderr for visibility in non-tracing contexts
+        if snapshot.total_retries > 0 || snapshot.failed_operations > 0 {
+            eprintln!(
+                "[orbit] Retry metrics: {} retries, {} successful, {} failed, {} skipped",
+                snapshot.total_retries,
+                snapshot.successful_operations,
+                snapshot.failed_operations,
+                snapshot.skipped_operations
+            );
+        }
+    }
+
+    /// Check if any operations have been recorded
+    pub fn has_activity(&self) -> bool {
+        self.inner.total_operations.load(Ordering::Relaxed) > 0
+    }
 }
 
 impl Default for OperationStats {
@@ -334,5 +389,54 @@ mod tests {
 
         let snapshot = stats.snapshot();
         assert_eq!(snapshot.successful_operations, 200);
+    }
+
+    #[test]
+    fn test_has_activity() {
+        let stats = OperationStats::new();
+        assert!(!stats.has_activity());
+
+        stats.record_success();
+        assert!(stats.has_activity());
+    }
+
+    #[test]
+    fn test_emit_no_panic_on_success_only() {
+        // Test that emit() doesn't panic when there are only successes
+        let stats = OperationStats::new();
+        stats.record_success();
+
+        // Should not emit anything (no retries, failures, or skips)
+        // but should not panic
+        stats.emit();
+    }
+
+    #[test]
+    fn test_emit_with_noteworthy_events() {
+        let stats = OperationStats::new();
+        stats.record_retry(1);
+        stats.record_success();
+
+        // emit() should work without panicking
+        stats.emit();
+
+        let snapshot = stats.snapshot();
+        assert_eq!(snapshot.total_retries, 1);
+    }
+
+    #[test]
+    fn test_emit_env_var_off() {
+        // Disable emission via environment variable
+        std::env::set_var("ORBIT_STATS", "off");
+
+        let stats = OperationStats::new();
+        stats.record_retry(1);
+        stats.record_failure(&OrbitError::Other("test".to_string()));
+
+        // Should not emit anything due to env var
+        stats.emit();
+
+        // Clean up
+        std::env::remove_var("ORBIT_STATS");
     }
 }
