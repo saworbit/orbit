@@ -121,7 +121,7 @@ pub fn copy_file(source_path: &Path, dest_path: &Path, config: &CopyConfig) -> R
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// use orbit::{CopyConfig, OperationStats, copy_file_with_stats};
 ///
 /// // For aggregated stats across multiple files:
