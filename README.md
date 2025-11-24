@@ -311,8 +311,23 @@ breaker.execute(|| {
 
 **NEW in v0.4.1!** Comprehensive file metadata preservation with transformation capabilities for cross-platform transfers and reproducible builds.
 
+**Default Metadata Support:**
+- **Timestamps** — Access time (atime), modification time (mtime), creation time (ctime)
+- **Permissions** — Unix mode bits, Windows file attributes
+
+**Extended Metadata Support** (requires `extended-metadata` feature):
+- **Ownership** — User ID (UID) and Group ID (GID) on Unix systems
+- **Extended Attributes (xattrs)** — User-defined metadata on supported filesystems
+
+To enable extended metadata preservation:
+```toml
+[dependencies]
+orbit = { version = "0.5.0", features = ["extended-metadata"] }
+```
+
+> **Note:** Extended attributes have platform limitations (e.g., partial or no support on Windows, requires compatible filesystem on Unix). Ownership preservation typically requires root/administrator privileges.
+
 **Features:**
-- **Complete Attribute Support** — Timestamps (atime, mtime, ctime), permissions, ownership (UID/GID), extended attributes (xattrs)
 - **Selective Preservation** — Choose exactly what to preserve: `times,perms,owners,xattrs`
 - **Path Transformations** — Regex-based renaming with sed-like syntax: `s/old/new/`
 - **Case Conversion** — Lowercase, uppercase, or titlecase filename normalization
@@ -355,11 +370,11 @@ orbit --source /critical --dest /backup \
 ```
 
 **Preservation Flags:**
-- `times` — Access and modification timestamps
-- `perms` — Unix permissions (mode bits)
-- `owners` — User and group ownership (UID/GID)
-- `xattrs` — Extended attributes (requires `extended-metadata` feature)
-- `all` — Preserve everything
+- `times` — Access and modification timestamps (default)
+- `perms` — Unix permissions (mode bits) (default)
+- `owners` — User and group ownership (UID/GID) (requires privileges)
+- `xattrs` — Extended attributes (requires `extended-metadata` feature, Unix-like systems only)
+- `all` — Preserve everything (full support requires `extended-metadata` feature)
 
 **Transformation Options:**
 - `rename:pattern=replacement` — Regex-based path renaming
@@ -762,6 +777,30 @@ sudo cp target/release/orbit /usr/local/bin/
 
 # Or with cargo
 cargo install --path .
+```
+
+### Optional Features
+
+Orbit provides several optional Cargo features for extended functionality:
+
+| Feature | Description | Use Case |
+|---------|-------------|----------|
+| `extended-metadata` | Enables xattr preservation and ownership (Unix/Linux/macOS only) | Unix data migrations requiring xattr fidelity |
+| `s3-native` | Amazon S3 and compatible storage (enabled by default) | Cloud storage operations |
+| `smb-native` | Native SMB2/3 client (enabled by default) | Network share access |
+| `ssh-backend` | SSH/SFTP remote access (enabled by default) | Remote server transfers |
+| `gui` | Web-based control center (enabled by default) | Visual monitoring and management |
+| `delta-manifest` | SQLite-backed delta manifest persistence | Efficient incremental syncs |
+
+```bash
+# Build with extended metadata support (Unix/Linux/macOS only)
+cargo build --release --features extended-metadata
+
+# Build with all features (Unix/Linux/macOS for full xattr support)
+cargo build --release --features full
+
+# Minimal build (no network backends or GUI)
+cargo build --release --no-default-features --features zero-copy
 ```
 
 ### Basic Usage
