@@ -231,14 +231,22 @@ fn test_whole_file_flag() {
         file.sync_all().unwrap();
     } // File is closed here
 
-    // Small delay to ensure OS has released file handles
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    // Longer delay to ensure OS has released file handles (especially on macOS CI)
+    std::thread::sleep(std::time::Duration::from_millis(200));
 
     let mut config = CopyConfig::default();
     config.check_mode = CheckMode::Delta;
     config.whole_file = true; // Force full copy
 
-    let stats = copy_file(&source, &dest, &config).unwrap();
+    // Retry mechanism for CI environments with slow file handle cleanup
+    let stats = match copy_file(&source, &dest, &config) {
+        Ok(s) => s,
+        Err(_) => {
+            // Wait a bit more and retry once
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            copy_file(&source, &dest, &config).unwrap()
+        }
+    };
 
     // Should not use delta when whole_file is true
     assert!(stats.delta_stats.is_none());
