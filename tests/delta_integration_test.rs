@@ -203,27 +203,14 @@ fn test_whole_file_flag() {
     let dest = dir.path().join("dest.txt");
 
     let data = vec![0xEE; 100 * 1024];
-
-    // Use simple writes without explicit sync - may avoid macOS file locking issues
     fs::write(&source, &data).unwrap();
     fs::write(&dest, &data).unwrap();
-
-    // Extended delay for macOS CI file descriptor cleanup
-    std::thread::sleep(std::time::Duration::from_secs(2));
 
     let mut config = CopyConfig::default();
     config.check_mode = CheckMode::Delta;
     config.whole_file = true; // Force full copy
 
-    // Retry mechanism for macOS CI
-    let stats = match copy_file(&source, &dest, &config) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("First attempt failed: {}, retrying after 3s delay...", e);
-            std::thread::sleep(std::time::Duration::from_secs(3));
-            copy_file(&source, &dest, &config).unwrap()
-        }
-    };
+    let stats = copy_file(&source, &dest, &config).unwrap();
 
     // Should not use delta when whole_file is true
     assert!(stats.delta_stats.is_none());
