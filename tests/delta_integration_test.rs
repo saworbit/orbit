@@ -198,57 +198,29 @@ fn test_check_mode_size() {
 
 #[test]
 fn test_whole_file_flag() {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-
     let dir = tempdir().unwrap();
     let source = dir.path().join("source.txt");
     let dest = dir.path().join("dest.txt");
 
     let data = vec![0xEE; 100 * 1024];
 
-    // Write and explicitly sync source file
-    {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&source)
-            .unwrap();
-        file.write_all(&data).unwrap();
-        file.sync_all().unwrap();
-    } // File is closed here
+    // Use simple writes without explicit sync - may avoid macOS file locking issues
+    fs::write(&source, &data).unwrap();
+    fs::write(&dest, &data).unwrap();
 
-    // Write and explicitly sync dest file
-    {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&dest)
-            .unwrap();
-        file.write_all(&data).unwrap();
-        file.sync_all().unwrap();
-    } // File is closed here
-
-    // Much longer delay for macOS CI - file descriptor cleanup can be very slow
-    std::thread::sleep(std::time::Duration::from_millis(1000));
-
-    // Verify files are accessible before copy_file attempt
-    let _ = std::fs::metadata(&source);
-    let _ = std::fs::metadata(&dest);
+    // Extended delay for macOS CI file descriptor cleanup
+    std::thread::sleep(std::time::Duration::from_secs(2));
 
     let mut config = CopyConfig::default();
     config.check_mode = CheckMode::Delta;
     config.whole_file = true; // Force full copy
 
-    // Retry mechanism with aggressive delays for CI environments
+    // Retry mechanism for macOS CI
     let stats = match copy_file(&source, &dest, &config) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("First attempt failed: {}, retrying after 2s delay...", e);
-            // Much longer wait before retry
-            std::thread::sleep(std::time::Duration::from_millis(2000));
+            eprintln!("First attempt failed: {}, retrying after 3s delay...", e);
+            std::thread::sleep(std::time::Duration::from_secs(3));
             copy_file(&source, &dest, &config).unwrap()
         }
     };
