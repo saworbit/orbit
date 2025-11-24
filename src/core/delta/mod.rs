@@ -10,7 +10,9 @@ pub mod checksum;
 pub mod transfer;
 pub mod types;
 
-pub use types::{BlockSignature, CheckMode, DeltaConfig, DeltaStats, HashAlgorithm};
+pub use types::{
+    BlockSignature, CheckMode, DeltaConfig, DeltaStats, HashAlgorithm, PartialManifest,
+};
 // DeltaInstruction is module-internal
 pub use transfer::{copy_with_delta, copy_with_delta_fallback};
 pub(crate) use types::DeltaInstruction;
@@ -27,6 +29,19 @@ pub fn should_use_delta(
     // Don't use delta if whole_file is forced
     if config.whole_file {
         return Ok(false);
+    }
+
+    // Check if a valid partial manifest exists - if so, prioritize delta for resume
+    if config.resume_enabled {
+        let manifest_path = PartialManifest::manifest_path_for(dest_path);
+        if manifest_path.exists() {
+            if let Ok(manifest) = PartialManifest::load(&manifest_path) {
+                if manifest.is_valid_for(source_path, dest_path) {
+                    // Valid manifest exists, prioritize delta for resume
+                    return Ok(true);
+                }
+            }
+        }
     }
 
     // Don't use delta if destination doesn't exist

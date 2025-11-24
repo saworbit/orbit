@@ -470,6 +470,8 @@ pub fn files_need_transfer(
                 hash_algorithm: HashAlgorithm::Blake3,
                 parallel_hashing: true,
                 manifest_path: None,
+                resume_enabled: true,
+                chunk_size: block_size,
             };
 
             // If delta is applicable, check using delta algorithm

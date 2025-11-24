@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::path::PathBuf;
+use std::time::SystemTime;
 
 /// Detection mode for determining which files to transfer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,6 +114,22 @@ pub struct DeltaConfig {
 
     /// Manifest database path (optional)
     pub manifest_path: Option<std::path::PathBuf>,
+
+    /// Enable resume capability for interrupted delta transfers
+    #[serde(default = "default_resume_enabled")]
+    pub resume_enabled: bool,
+
+    /// Chunk size for resume tracking (default: 1MB, must be <= block_size)
+    #[serde(default = "default_chunk_size")]
+    pub chunk_size: usize,
+}
+
+fn default_resume_enabled() -> bool {
+    true
+}
+
+fn default_chunk_size() -> usize {
+    1024 * 1024 // 1MB
 }
 
 impl Default for DeltaConfig {
@@ -125,6 +143,8 @@ impl Default for DeltaConfig {
             hash_algorithm: HashAlgorithm::Blake3,
             parallel_hashing: true,
             manifest_path: None,
+            resume_enabled: true,
+            chunk_size: 1024 * 1024, // 1MB
         }
     }
 }
@@ -157,6 +177,18 @@ impl DeltaConfig {
     /// Set manifest path
     pub fn with_manifest_path(mut self, path: std::path::PathBuf) -> Self {
         self.manifest_path = Some(path);
+        self
+    }
+
+    /// Enable/disable resume capability
+    pub fn with_resume_enabled(mut self, enabled: bool) -> Self {
+        self.resume_enabled = enabled;
+        self
+    }
+
+    /// Set chunk size for resume tracking
+    pub fn with_chunk_size(mut self, size: usize) -> Self {
+        self.chunk_size = size;
         self
     }
 }
@@ -234,6 +266,198 @@ pub struct DeltaStats {
 
     /// Compression ratio (bytes_saved / total_bytes)
     pub savings_ratio: f64,
+
+    /// Number of chunks resumed from partial manifest
+    pub chunks_resumed: u64,
+
+    /// Bytes skipped due to resume (already processed)
+    pub bytes_skipped: u64,
+
+    /// Whether this transfer was resumed from a partial manifest
+    pub was_resumed: bool,
+}
+
+/// Partial manifest for tracking delta transfer progress
+///
+/// This enables resume capability for interrupted delta transfers.
+/// The manifest is stored as a temp file (e.g., `{dest}.delta.partial.json`)
+/// and cleaned up on successful completion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PartialManifest {
+    /// Source file path
+    pub source_path: PathBuf,
+
+    /// Destination file path
+    pub dest_path: PathBuf,
+
+    /// Chunk size used for tracking
+    pub chunk_size: usize,
+
+    /// List of processed chunks: (chunk_index, BLAKE3 hash hex string)
+    pub processed_chunks: Vec<(usize, String)>,
+
+    /// Bytes written so far (diff applied up to this point)
+    pub diff_applied_up_to: u64,
+
+    /// Source file size at start of transfer
+    pub source_size: u64,
+
+    /// Source file modification time at start (for validation)
+    #[serde(with = "system_time_serde")]
+    pub source_mtime: SystemTime,
+
+    /// Destination file size at start of transfer
+    pub dest_size: u64,
+
+    /// Block size used for delta algorithm
+    pub block_size: usize,
+
+    /// Final checksum (populated when complete)
+    pub checksum: Option<String>,
+
+    /// Version of the manifest format (for future compatibility)
+    pub version: u32,
+}
+
+/// Serde support for SystemTime
+mod system_time_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    pub fn serialize<S>(time: &SystemTime, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let duration = time.duration_since(UNIX_EPOCH).unwrap_or(Duration::ZERO);
+        (duration.as_secs(), duration.subsec_nanos()).serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<SystemTime, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (secs, nanos): (u64, u32) = Deserialize::deserialize(deserializer)?;
+        Ok(UNIX_EPOCH + Duration::new(secs, nanos))
+    }
+}
+
+impl PartialManifest {
+    /// Current manifest format version
+    pub const VERSION: u32 = 1;
+
+    /// Create a new partial manifest for a delta transfer
+    pub fn new(
+        source_path: &std::path::Path,
+        dest_path: &std::path::Path,
+        chunk_size: usize,
+        block_size: usize,
+        source_size: u64,
+        source_mtime: SystemTime,
+        dest_size: u64,
+    ) -> Self {
+        Self {
+            source_path: source_path.to_path_buf(),
+            dest_path: dest_path.to_path_buf(),
+            chunk_size,
+            processed_chunks: Vec::new(),
+            diff_applied_up_to: 0,
+            source_size,
+            source_mtime,
+            dest_size,
+            block_size,
+            checksum: None,
+            version: Self::VERSION,
+        }
+    }
+
+    /// Get the manifest file path for a given destination
+    pub fn manifest_path_for(dest_path: &std::path::Path) -> PathBuf {
+        let mut path = dest_path.to_path_buf();
+        let file_name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "file".to_string());
+        path.set_file_name(format!("{}.delta.partial.json", file_name));
+        path
+    }
+
+    /// Load a manifest from disk
+    pub fn load(path: &std::path::Path) -> std::io::Result<Self> {
+        let contents = std::fs::read_to_string(path)?;
+        serde_json::from_str(&contents).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid manifest: {}", e),
+            )
+        })
+    }
+
+    /// Save the manifest to disk
+    pub fn save(&self, path: &std::path::Path) -> std::io::Result<()> {
+        let contents = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, contents)
+    }
+
+    /// Validate that the manifest matches the current source file
+    ///
+    /// Returns true if the manifest is still valid for resume
+    pub fn is_valid_for(&self, source_path: &std::path::Path, dest_path: &std::path::Path) -> bool {
+        // Check paths match
+        if self.source_path != source_path || self.dest_path != dest_path {
+            return false;
+        }
+
+        // Check version compatibility
+        if self.version != Self::VERSION {
+            return false;
+        }
+
+        // Check source file still exists and hasn't changed
+        if let Ok(metadata) = std::fs::metadata(source_path) {
+            if metadata.len() != self.source_size {
+                return false;
+            }
+            if let Ok(mtime) = metadata.modified() {
+                // Allow small time differences (1 second) for filesystem precision
+                let diff = if mtime > self.source_mtime {
+                    mtime.duration_since(self.source_mtime).ok()
+                } else {
+                    self.source_mtime.duration_since(mtime).ok()
+                };
+                if let Some(diff) = diff {
+                    if diff.as_secs() > 1 {
+                        return false;
+                    }
+                }
+            }
+        } else {
+            return false;
+        }
+
+        true
+    }
+
+    /// Record a processed chunk
+    pub fn record_chunk(&mut self, chunk_index: usize, hash: String) {
+        self.processed_chunks.push((chunk_index, hash));
+    }
+
+    /// Update the bytes written progress
+    pub fn update_progress(&mut self, bytes_written: u64) {
+        self.diff_applied_up_to = bytes_written;
+    }
+
+    /// Check if a chunk has already been processed
+    pub fn is_chunk_processed(&self, chunk_index: usize) -> bool {
+        self.processed_chunks
+            .iter()
+            .any(|(idx, _)| *idx == chunk_index)
+    }
+
+    /// Get the number of processed chunks
+    pub fn processed_count(&self) -> usize {
+        self.processed_chunks.len()
+    }
 }
 
 impl DeltaStats {
@@ -314,6 +538,9 @@ mod tests {
             bytes_saved: 80_000_000,
             bytes_transferred: 20_000_000,
             savings_ratio: 0.0,
+            chunks_resumed: 0,
+            bytes_skipped: 0,
+            was_resumed: false,
         };
 
         stats.calculate_savings_ratio();
@@ -330,6 +557,9 @@ mod tests {
             bytes_saved: 80_000_000,
             bytes_transferred: 20_000_000,
             savings_ratio: 0.8,
+            chunks_resumed: 0,
+            bytes_skipped: 0,
+            was_resumed: false,
         };
 
         let stats2 = DeltaStats {
@@ -340,6 +570,9 @@ mod tests {
             bytes_saved: 30_000_000,
             bytes_transferred: 20_000_000,
             savings_ratio: 0.6,
+            chunks_resumed: 0,
+            bytes_skipped: 0,
+            was_resumed: false,
         };
 
         stats1.merge(&stats2);

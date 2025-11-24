@@ -206,6 +206,8 @@ pub fn should_use_delta_transfer(
         hash_algorithm: config.delta_hash_algorithm,
         parallel_hashing: config.parallel_hashing,
         manifest_path: config.delta_manifest_path.clone(),
+        resume_enabled: config.delta_resume_enabled,
+        chunk_size: config.delta_chunk_size,
     };
 
     delta::should_use_delta(source_path, dest_path, &delta_config)

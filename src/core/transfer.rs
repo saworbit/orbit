@@ -114,6 +114,8 @@ fn copy_with_delta_integration(
         hash_algorithm: config.delta_hash_algorithm,
         parallel_hashing: config.parallel_hashing,
         manifest_path: config.delta_manifest_path.clone(),
+        resume_enabled: config.delta_resume_enabled,
+        chunk_size: config.delta_chunk_size,
     };
 
     let (delta_stats, checksum) =
@@ -125,6 +127,10 @@ fn copy_with_delta_integration(
         println!("✓ Delta transfer: {}", delta_stats);
     }
 
+    // Extract resume metrics from delta stats
+    let chunks_resumed = delta_stats.chunks_resumed;
+    let bytes_skipped = delta_stats.bytes_skipped;
+
     Ok(CopyStats {
         bytes_copied: delta_stats.bytes_transferred,
         duration,
@@ -134,5 +140,7 @@ fn copy_with_delta_integration(
         files_skipped: 0,
         files_failed: 0,
         delta_stats: Some(delta_stats),
+        chunks_resumed,
+        bytes_skipped,
     })
 }

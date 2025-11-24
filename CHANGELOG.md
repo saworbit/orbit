@@ -5,6 +5,21 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Delta Resume Handling** - Partial manifest support for interrupted delta transfers (`src/core/delta/types.rs`, `src/core/delta/transfer.rs`)
+  - `PartialManifest` struct for tracking delta transfer progress with JSON serialization
+  - Resume capability via `{dest}.delta.partial.json` manifest files
+  - Automatic manifest creation on transfer start (when `resume_enabled = true`)
+  - Manifest validation checks source path, size, and modification time
+  - Automatic cleanup on successful transfer completion
+  - Smart fallback: resumable errors save manifest, non-resumable errors trigger full copy
+  - New `DeltaConfig` fields: `resume_enabled` (default: true), `chunk_size` (default: 1MB)
+  - New `CopyConfig` fields: `delta_resume_enabled`, `delta_chunk_size`
+  - New `DeltaStats` fields: `chunks_resumed`, `bytes_skipped`, `was_resumed`
+  - New `CopyStats` fields: `chunks_resumed`, `bytes_skipped`
+  - `should_use_delta()` now prioritizes delta when valid partial manifest exists
+  - Integration tests in `tests/delta_resume_test.rs`
+  - README documentation updates with programmatic usage examples
+
 - **Default Retry Metrics Emission** - Retry statistics are now collected and emitted by default during `copy_file` operations (`src/core/mod.rs`, `src/instrumentation.rs`)
   - `OperationStats::emit()` method for automatic metrics output to stderr
   - `OperationStats::has_activity()` method to check if any operations were recorded

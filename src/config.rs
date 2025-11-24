@@ -189,6 +189,14 @@ pub struct CopyConfig {
     /// Path to delta manifest database
     #[serde(default)]
     pub delta_manifest_path: Option<PathBuf>,
+
+    /// Enable resume capability for delta transfers (default: true)
+    #[serde(default = "default_true")]
+    pub delta_resume_enabled: bool,
+
+    /// Chunk size for delta resume tracking (default: 1MB)
+    #[serde(default = "default_delta_block_size")]
+    pub delta_chunk_size: usize,
 }
 
 impl Default for CopyConfig {
@@ -234,6 +242,8 @@ impl Default for CopyConfig {
             delta_hash_algorithm: crate::core::delta::HashAlgorithm::Blake3,
             parallel_hashing: true,
             delta_manifest_path: None,
+            delta_resume_enabled: true,
+            delta_chunk_size: default_delta_block_size(),
         }
     }
 }

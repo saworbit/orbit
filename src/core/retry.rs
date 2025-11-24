@@ -117,6 +117,8 @@ where
                             files_skipped: 1,
                             files_failed: 1,
                             delta_stats: None,
+                            chunks_resumed: 0,
+                            bytes_skipped: 0,
                         });
                     }
                     ErrorMode::Partial => {

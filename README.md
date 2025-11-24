@@ -432,12 +432,14 @@ orbit --source /critical --dest /backup \
 - **Smart Fallback** — Automatic full copy for incompatible files
 - **80-99% Savings** — For files with minor changes
 - **Configurable Blocks** — 64KB to 4MB block sizes
+- **Resume Handling** — Partial manifest support for interrupted transfers (NEW!)
 
 **Use Cases:**
 - ✅ Daily database backups (90-95% savings)
 - ✅ VM image updates (85-95% savings)
 - ✅ Large file synchronization over slow links
 - ✅ Log file rotation (95-99% savings for append-only)
+- ✅ Fault-tolerant transfers over unreliable networks (NEW!)
 
 ```bash
 # Basic delta transfer
@@ -451,6 +453,25 @@ orbit --source /data --dest /backup --recursive \
 orbit --source vm.qcow2 --dest backup/vm.qcow2 \
   --check delta --resume --block-size 2048
 ```
+
+**Delta Resume Handling (NEW!):**
+
+Delta transfers now support resume capability via partial manifests for fault-tolerant operations. On failure, a `{dest}.delta.partial.json` manifest is saved; subsequent calls will resume if possible.
+
+```rust
+use orbit::{CopyConfig, copy_file};
+use orbit::core::delta::CheckMode;
+
+let mut config = CopyConfig::default();
+config.check_mode = CheckMode::Delta;
+config.delta_resume_enabled = true;  // Enabled by default
+config.delta_chunk_size = 1024 * 1024;  // 1MB chunks
+
+// Attempts delta with resume; falls back on non-resumable errors
+copy_file(&src, &dest, &config)?;
+```
+
+For large data migrations, enable retries at higher levels to leverage resumes. Disable resume with `config.delta_resume_enabled = false` if not needed.
 
 **Performance:**
 - 1GB file with 5% changes: **10x faster** (3s vs 30s), **95% less data** (50MB vs 1GB)

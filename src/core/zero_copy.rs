@@ -557,6 +557,8 @@ pub fn try_zero_copy_direct(
         files_skipped: 0,
         files_failed: 0,
         delta_stats: None,
+        chunks_resumed: 0,
+        bytes_skipped: 0,
     })
 }
 
