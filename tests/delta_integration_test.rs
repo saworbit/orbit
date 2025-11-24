@@ -198,20 +198,41 @@ fn test_check_mode_size() {
 
 #[test]
 fn test_whole_file_flag() {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
     let dir = tempdir().unwrap();
     let source = dir.path().join("source.txt");
     let dest = dir.path().join("dest.txt");
 
     let data = vec![0xEE; 100 * 1024];
-    fs::write(&source, &data).unwrap();
 
-    // Add a small delay to ensure file is fully written on macOS
-    std::thread::sleep(std::time::Duration::from_millis(10));
+    // Write and explicitly sync source file
+    {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&source)
+            .unwrap();
+        file.write_all(&data).unwrap();
+        file.sync_all().unwrap();
+    } // File is closed here
 
-    fs::write(&dest, &data).unwrap();
+    // Write and explicitly sync dest file
+    {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&dest)
+            .unwrap();
+        file.write_all(&data).unwrap();
+        file.sync_all().unwrap();
+    } // File is closed here
 
-    // Add another small delay to ensure file is ready
-    std::thread::sleep(std::time::Duration::from_millis(10));
+    // Small delay to ensure OS has released file handles
+    std::thread::sleep(std::time::Duration::from_millis(50));
 
     let mut config = CopyConfig::default();
     config.check_mode = CheckMode::Delta;
