@@ -113,13 +113,25 @@ fn test_file_metadata_extraction() {
     assert_eq!(metadata.size, 12, "File size should be 12 bytes");
     assert!(metadata.is_file, "Should be identified as a file");
     assert!(!metadata.is_dir, "Should not be identified as a directory");
-    assert!(metadata.modified.is_some(), "Modified time should be present");
+    assert!(
+        metadata.modified.is_some(),
+        "Modified time should be present"
+    );
 
     #[cfg(unix)]
     {
-        assert!(metadata.permissions.is_some(), "Permissions should be present on Unix");
-        assert!(metadata.owner_uid.is_some(), "UID should be present on Unix");
-        assert!(metadata.owner_gid.is_some(), "GID should be present on Unix");
+        assert!(
+            metadata.permissions.is_some(),
+            "Permissions should be present on Unix"
+        );
+        assert!(
+            metadata.owner_uid.is_some(),
+            "UID should be present on Unix"
+        );
+        assert!(
+            metadata.owner_gid.is_some(),
+            "GID should be present on Unix"
+        );
     }
 }
 
@@ -158,7 +170,10 @@ fn test_directory_metadata() {
 
     let metadata = FileMetadata::from_path(&test_dir).unwrap();
 
-    assert!(!metadata.is_file, "Directory should not be identified as file");
+    assert!(
+        !metadata.is_file,
+        "Directory should not be identified as file"
+    );
     assert!(metadata.is_dir, "Should be identified as directory");
 }
 
@@ -178,7 +193,11 @@ fn test_manifest_conversion_roundtrip() {
     // Convert back
     let restored = FileMetadata::from_manifest_map(&map).unwrap();
 
-    assert_eq!(restored.permissions, Some(0o755), "Permissions should round-trip");
+    assert_eq!(
+        restored.permissions,
+        Some(0o755),
+        "Permissions should round-trip"
+    );
     assert_eq!(restored.owner_uid, Some(1000), "UID should round-trip");
     assert_eq!(restored.owner_gid, Some(1000), "GID should round-trip");
 }
@@ -192,8 +211,14 @@ fn test_strict_mode_configuration() {
 
     assert!(preserver.strict, "Strict mode should be enabled");
     assert!(preserver.preserve_flags.times, "times should be set");
-    assert!(preserver.preserve_flags.permissions, "permissions should be set");
-    assert!(preserver.preserve_flags.ownership, "ownership should be set");
+    assert!(
+        preserver.preserve_flags.permissions,
+        "permissions should be set"
+    );
+    assert!(
+        preserver.preserve_flags.ownership,
+        "ownership should be set"
+    );
     assert!(preserver.preserve_flags.xattrs, "xattrs should be set");
 }
 
@@ -223,7 +248,10 @@ mod extended_metadata_tests {
         // Set an xattr (user namespace on Linux)
         if let Err(e) = xattr::set(&file_path, "user.orbit.test", b"test_value") {
             // Skip if xattrs not supported on this filesystem
-            eprintln!("Skipping xattr test: filesystem may not support xattrs: {}", e);
+            eprintln!(
+                "Skipping xattr test: filesystem may not support xattrs: {}",
+                e
+            );
             return;
         }
 
@@ -279,10 +307,7 @@ mod extended_metadata_tests {
         // Verify xattr was preserved
         match xattr::get(&dest_file, "user.orbit.preserve") {
             Ok(Some(value)) => {
-                assert_eq!(
-                    value, b"preserved_value",
-                    "xattr value should be preserved"
-                );
+                assert_eq!(value, b"preserved_value", "xattr value should be preserved");
             }
             Ok(None) => {
                 panic!("xattr was not preserved to destination");

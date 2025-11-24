@@ -55,6 +55,19 @@ All notable changes to Orbit will be documented in this file.
   - Support for SQLite AUTOINCREMENT job IDs (redb backend shows appropriate error)
   - Extended jobs table schema with progress tracking columns (progress, total_chunks, completed_chunks, failed_chunks)
 
+- **Metadata Preservation Documentation Clarity** - Addressed discrepancy between README claims and feature-gated implementation
+  - Updated README.md to clearly distinguish default metadata support (timestamps, permissions) from extended metadata (xattrs, ownership)
+  - Added explicit documentation that `extended-metadata` feature is required for xattr and full ownership support
+  - Added "Optional Features" table in Quick Start section documenting all optional Cargo features
+  - Clarified that `extended-metadata` feature is Unix/Linux/macOS only (xattr crate dependency)
+  - Updated preservation flags documentation to indicate default vs. feature-gated capabilities
+  - New integration test file `tests/metadata_preservation_test.rs` with 9 comprehensive tests:
+    - Basic metadata preservation (timestamps, permissions)
+    - PreserveFlags parsing and configuration
+    - FileMetadata extraction and manifest round-trip
+    - Feature-gated xattr tests (conditional compilation)
+    - Platform-specific tests (Windows attributes, Unix ownership)
+
 ### Fixed
 - **Job ID Alignment** - Fixed inconsistency in Orbit Web API job ID handling
   - `create_job` now returns numeric job IDs (e.g., "1", "2", "3") instead of UUIDs
