@@ -58,14 +58,23 @@ Zero-copy is a technique that eliminates the need to copy data between kernel an
 - `EXDEV` (18): Cross-device link (different filesystems)
 - `EOPNOTSUPP` (95): Operation not supported by filesystem
 
-### macOS (copyfile/fcopyfile)
+### macOS (fclonefileat/fcopyfile via std::fs::copy)
 
 **Availability**: macOS 10.5+ (all modern versions)
 
+**Implementation**: Uses Rust's `std::fs::copy` which provides automatic optimization:
+- **1st attempt**: `fclonefileat` - Instant Copy-On-Write cloning on APFS (macOS 10.13+)
+- **2nd attempt**: `fcopyfile` - Efficient kernel-level copy
+- **3rd attempt**: `read/write` - Traditional buffered fallback
+
 **Characteristics**:
-- ✅ Works across filesystems
+- ✅ **Instant copies on APFS** - Copy-On-Write cloning with zero data duplication
+- ✅ Works across filesystems (falls back gracefully)
+- ✅ Path-based (avoids FD offset issues)
 - ✅ Can copy extended attributes and metadata
-- ✅ Optimized for APFS
+- ✅ Highly optimized for modern macOS systems
+
+**Performance**: On APFS filesystems, file copies complete instantly regardless of size (Copy-On-Write). Data is only duplicated when modified.
 
 ### Windows (CopyFileExW)
 
@@ -120,13 +129,14 @@ Zero-copy is a technique that eliminates the need to copy data between kernel an
 
 Zero-copy is used when ALL of the following conditions are met:
 
-1. ✅ Platform supports zero-copy
+1. ✅ Platform supports zero-copy (Linux, macOS; Windows currently disabled)
 2. ✅ File size >= 64 KB
 3. ✅ Same filesystem (Linux) OR cross-filesystem supported (macOS/Windows)
 4. ✅ `use_zero_copy = true` in config
 5. ✅ Resume NOT enabled
 6. ✅ Compression NOT enabled
-7. ✅ Bandwidth throttling NOT active
+
+**Note**: Bandwidth throttling IS supported on Linux via chunked zero-copy transfers. macOS uses `std::fs::copy` which doesn't support bandwidth limiting (returns entire file at once).
 
 If any condition fails, buffered copy is used automatically.
 
@@ -262,6 +272,17 @@ orbit -s /mnt/source/file -d /tmp/file  # Zero-copy
 orbit -s /tmp/file -d /other/dest/file  # Zero-copy
 ```
 
+### Issue: Empty files on macOS (Fixed in v0.5.1)
+
+**Previous Issue**: Earlier versions (< 0.5.1) had a bug where FD-based `fcopyfile` could create empty destination files due to file offset mismatches.
+
+**Solution**: Now fixed! The implementation now uses `std::fs::copy` which:
+- Uses path-based operations (no FD offset issues)
+- Automatically attempts APFS cloning first (instant copies)
+- Falls back gracefully to `fcopyfile` then `read/write`
+
+If you're experiencing empty files, ensure you're using Orbit v0.5.1 or later.
+
 ### Issue: Performance worse than expected
 
 **Check 1: Storage Type**
@@ -272,6 +293,13 @@ Many small files may perform better with buffered copy due to syscall overhead.
 
 **Check 3: Filesystem Cache**
 First copy may be slower (cold cache). Subsequent copies faster (warm cache).
+
+**Check 4: APFS Optimization (macOS)**
+On APFS, copies should be nearly instant due to Copy-On-Write cloning. If not:
+```bash
+diskutil info / | grep "File System Personality"
+```
+Verify you're using APFS (not HFS+).
 
 **Benchmark**:
 ```bash
@@ -375,7 +403,7 @@ Speedup = Buffered Time / Zero-Copy Time
 ### Medium-term (v0.5.0)
 
 1. **Splice Support**: Add Linux splice() as fallback for older kernels
-2. **Reflink Detection**: Use FICLONE/FICLONERANGE for CoW filesystems (Btrfs, XFS, APFS)
+2. **Reflink Detection for Linux**: Use FICLONE/FICLONERANGE for CoW filesystems (Btrfs, XFS) - ✅ Already implemented for macOS APFS
 3. **sendfile Support**: Implement sendfile() for network-to-file copies
 4. **Smart Threshold**: Auto-tune 64KB threshold based on benchmarks
 
@@ -439,6 +467,6 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ---
 
-**Last Updated**: 2025-01-XX
-**Version**: 0.4.0
+**Last Updated**: 2025-11-25
+**Version**: 0.5.1
 **Author**: Shane Wall <shaneawall@gmail.com>

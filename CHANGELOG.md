@@ -106,6 +106,15 @@ All notable changes to Orbit will be documented in this file.
     - Platform-specific tests (Windows attributes, Unix ownership)
 
 ### Fixed
+- **macOS Zero-Copy Empty Files Issue** - Fixed empty file creation when using zero-copy on macOS
+  - Replaced FD-based `fcopyfile` with path-based `std::fs::copy` for macOS (`src/core/zero_copy.rs`)
+  - Fixes file offset mismatch issues between Rust's `File` management and raw libc calls
+  - Enables APFS Copy-On-Write cloning via automatic `fclonefileat` attempts (instant copies on APFS!)
+  - Fallback chain: `fclonefileat` (instant COW) → `fcopyfile` → `read/write`
+  - Re-enabled zero-copy for macOS in `should_use_zero_copy()` (previously disabled)
+  - Maintains full checksum verification and progress tracking support
+  - Provides significant performance improvements on APFS filesystems (macOS 10.13+)
+
 - **Job ID Alignment** - Fixed inconsistency in Orbit Web API job ID handling
   - `create_job` now returns numeric job IDs (e.g., "1", "2", "3") instead of UUIDs
   - Added `jobs` metadata table to Magnetar with auto-incrementing INTEGER primary key

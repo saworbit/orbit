@@ -52,7 +52,7 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 
 | Feature | Benefit |
 |---------|---------|
-| 🚄 **3× Faster** | Zero-copy system calls transfer at device speed |
+| 🚄 **3× Faster** | Zero-copy system calls transfer at device speed (instant APFS cloning on macOS!) |
 | 🛡️ **Bulletproof** | Smart resume with chunk verification, checksums, corruption detection |
 | 🧠 **Smart** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
@@ -962,6 +962,8 @@ orbit manifest plan --source /data --dest /backup --output ./manifests
 | 1 GB | 980 ms | 340 ms | 2.9× | ↓ 78% |
 | 10 GB | 9.8 s | 3.4 s | 2.9× | ↓ 80% |
 
+**macOS APFS Optimization**: On APFS filesystems (macOS 10.13+), file copies complete **instantly** via Copy-On-Write cloning — regardless of file size! Data is only duplicated when modified, providing near-zero latency for large files.
+
 ### S3 Transfer Performance
 
 - **Multipart Upload:** 500+ MB/s on high-bandwidth links
@@ -982,7 +984,8 @@ orbit manifest plan --source /data --dest /backup --output ./manifests
 Orbit automatically selects the optimal transfer strategy:
 
 ```
-Same-disk large file  → Zero-copy (copy_file_range, sendfile)
+Same-disk large file  → Zero-copy (copy_file_range on Linux, APFS cloning on macOS)
+macOS APFS            → Instant Copy-On-Write cloning (fclonefileat)
 Cross-filesystem      → Streaming with buffer pool
 Slow network link     → Compression (zstd/lz4)
 Cloud storage (S3)    → Multipart with parallel chunks
