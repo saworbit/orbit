@@ -385,13 +385,13 @@ pub fn should_use_zero_copy(
     _dest_path: &Path,
     _config: &CopyConfig,
 ) -> Result<bool> {
-    // Disable on Windows for now due to implementation issues
-    #[cfg(target_os = "windows")]
+    // Disable on Windows and macOS for now due to implementation issues
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
         return Ok(false);
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         // Check if zero-copy is available on this platform
         let caps = ZeroCopyCapabilities::detect();
