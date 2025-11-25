@@ -29,7 +29,10 @@ fn test_atomic_resume_save() {
         .unwrap_or_else(|| "tmp".to_string());
     let temp_path = resume_path.with_extension(temp_extension);
 
-    assert!(resume_path.exists(), "resume file should be present after save");
+    assert!(
+        resume_path.exists(),
+        "resume file should be present after save"
+    );
     assert!(
         !temp_path.exists(),
         "temp resume file should be removed once rename succeeds"
@@ -87,7 +90,10 @@ fn test_crash_simulation_leaves_temp_and_preserves_previous_state() {
         thread::sleep(Duration::from_millis(100));
     }
 
-    assert!(seen_temp, "temp file should appear while helper is sleeping");
+    assert!(
+        seen_temp,
+        "temp file should appear while helper is sleeping"
+    );
 
     child.kill().ok();
     child.wait().ok();
