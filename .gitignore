@@ -47,3 +47,4 @@ test_output.txt
 *.db
 *.db-journal
 jobs.db
+.vscode/settings.json
