@@ -368,36 +368,45 @@ use tracing::info;
 /// - Files on same filesystem (if required by platform)
 /// - File size >= 64KB (small files have syscall overhead)
 pub fn should_use_zero_copy(
-    source_path: &Path,
-    dest_path: &Path,
-    config: &CopyConfig,
+    _source_path: &Path,
+    _dest_path: &Path,
+    _config: &CopyConfig,
 ) -> Result<bool> {
-    // Check if zero-copy is available on this platform
-    let caps = ZeroCopyCapabilities::detect();
-    if !caps.available {
+    // Disable on Windows for now due to implementation issues
+    #[cfg(target_os = "windows")]
+    {
         return Ok(false);
     }
 
-    // Don't use zero-copy if resume is enabled (complex offset handling works better with buffered)
-    // Note: Bandwidth limiting IS supported via chunked zero-copy transfers
-    if config.resume_enabled {
-        return Ok(false);
-    }
-
-    // Check if files are on the same filesystem (required for Linux copy_file_range)
-    if !caps.cross_filesystem {
-        let same_fs = same_filesystem(source_path, dest_path)?;
-        if !same_fs {
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Check if zero-copy is available on this platform
+        let caps = ZeroCopyCapabilities::detect();
+        if !caps.available {
             return Ok(false);
         }
-    }
 
-    // For very small files (< 64KB), buffered copy is often faster due to syscall overhead
-    if source_path.metadata()?.len() < 64 * 1024 {
-        return Ok(false);
-    }
+        // Don't use zero-copy if resume is enabled (complex offset handling works better with buffered)
+        // Note: Bandwidth limiting IS supported via chunked zero-copy transfers
+        if _config.resume_enabled {
+            return Ok(false);
+        }
 
-    Ok(true)
+        // Check if files are on the same filesystem (required for Linux copy_file_range)
+        if !caps.cross_filesystem {
+            let same_fs = same_filesystem(_source_path, _dest_path)?;
+            if !same_fs {
+                return Ok(false);
+            }
+        }
+
+        // For very small files (< 64KB), buffered copy is often faster due to syscall overhead
+        if _source_path.metadata()?.len() < 64 * 1024 {
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
 }
 
 /// Attempt zero-copy transfer with progress tracking and checksum verification
