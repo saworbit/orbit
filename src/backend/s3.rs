@@ -281,7 +281,7 @@ impl Backend for S3Backend {
         use tokio::io::AsyncReadExt;
 
         let reader = output.body.into_async_read();
-        const CHUNK_SIZE: usize = 64 * 1024; // 64 KB chunks
+        const CHUNK_SIZE: usize = 1024 * 1024; // 1 MB chunks
 
         let stream = stream::unfold(
             (reader, vec![0u8; CHUNK_SIZE]),
@@ -400,9 +400,25 @@ impl Backend for S3Backend {
         Ok(())
     }
 
+    /// Rename via copy+delete; limited to single-call copy size (5GB) until multipart copy support is added.
     async fn rename(&self, src: &Path, dest: &Path) -> BackendResult<()> {
         let src_key = self.path_to_key(src);
         let dest_key = self.path_to_key(dest);
+
+        let meta = self.stat(src).await?;
+        const MAX_COPY_SIZE: u64 = 5_368_709_120; // 5GB CopyObject limit
+
+        if meta.size > MAX_COPY_SIZE {
+            // TODO: add multipart copy for >5GB rename support
+            return Err(BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!(
+                    "Cannot rename '{}': File size ({} bytes) exceeds the 5GB limit for atomic S3 copy operations. Please use manual multipart upload/copy for files larger than 5GB.",
+                    src.display(),
+                    meta.size
+                ),
+            });
+        }
 
         // S3 doesn't have native rename, so we copy then delete
         self.client

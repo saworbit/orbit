@@ -264,6 +264,14 @@ client.copy_object("source/file.txt", "destination/file.txt").await?;
 client.delete("old-data/file.txt").await?;
 ```
 
+### Known Limitations
+
+**Rename operations on large files**
+
+The `rename` operation in the S3 backend is implemented as a copy-then-delete workflow and relies on a single-call S3 copy. AWS limits this to objects smaller than **5GB**.
+- Attempts to rename objects larger than 5GB return an error from the backend.
+- For files over 5GB, use the transfer module to perform a multipart upload to the new location and delete the original manually.
+
 ---
 
 ## Object Versioning (v0.4.1+)
