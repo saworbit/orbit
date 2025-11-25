@@ -54,7 +54,9 @@ impl RollingChecksum {
     pub fn roll(&mut self, old_byte: u8, new_byte: u8) {
         // Remove the old byte
         self.a = (self.a + ADLER_MOD - old_byte as u32) % ADLER_MOD;
-        self.b = (self.b + ADLER_MOD - (self.window_size as u32 * old_byte as u32) % ADLER_MOD)
+        // Subtract the outgoing byte's contribution across the entire window and the
+        // initial Adler offset (the leading +1 term baked into every partial sum).
+        self.b = (self.b + ADLER_MOD - 1 - (self.window_size as u32 * old_byte as u32) % ADLER_MOD)
             % ADLER_MOD;
 
         // Add the new byte
@@ -217,6 +219,22 @@ mod tests {
         // Verify it produces a valid non-zero checksum
         assert_ne!(sum2, 0);
         assert_ne!(sum2, 1); // Should not be the initial value either
+    }
+
+    #[test]
+    fn test_rolling_checksum_matches_recompute() {
+        let data = b"AAABBBCCC";
+        let window = 3;
+        let mut rolling = RollingChecksum::from_data(&data[..window]);
+
+        for start in 0..=data.len() - window {
+            if start > 0 {
+                rolling.roll(data[start - 1], data[start + window - 1]);
+            }
+
+            let recomputed = RollingChecksum::from_data(&data[start..start + window]);
+            assert_eq!(rolling.checksum(), recomputed.checksum());
+        }
     }
 
     #[test]

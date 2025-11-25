@@ -71,12 +71,24 @@ pub fn generate_delta<R: Read>(
         return Ok((instructions, stats));
     }
 
+    if block_size == 0 {
+        stats.total_bytes = buffer.len() as u64;
+        instructions.push(DeltaInstruction::Data {
+            dest_offset: 0,
+            bytes: buffer,
+        });
+        stats.bytes_transferred = stats.total_bytes;
+        stats.calculate_savings_ratio();
+        return Ok((instructions, stats));
+    }
+
     stats.total_bytes = buffer.len() as u64;
     stats.total_blocks = (buffer.len() + block_size - 1) as u64 / block_size as u64;
 
     let mut pos = 0;
     let mut dest_offset = 0u64;
-    let mut pending_data = Vec::new();
+    // Track unmatched bytes by slice range to avoid per-byte buffering.
+    let mut pending_start = 0usize;
 
     while pos < buffer.len() {
         // Try to find a matching block starting at current position
@@ -92,14 +104,10 @@ pub fn generate_delta<R: Read>(
         // Look for a match in destination signatures
         if let Some(sig) = dest_signatures.find_match(weak_hash, &strong_hash) {
             // Found a match! Flush any pending data first
-            if !pending_data.is_empty() {
-                instructions.push(DeltaInstruction::Data {
-                    dest_offset,
-                    bytes: pending_data.clone(),
-                });
-                dest_offset += pending_data.len() as u64;
-                stats.bytes_transferred += pending_data.len() as u64;
-                pending_data.clear();
+            if pos > pending_start {
+                let bytes = buffer[pending_start..pos].to_vec();
+                instructions.push(DeltaInstruction::Data { dest_offset, bytes });
+                dest_offset += (pos - pending_start) as u64;
             }
 
             // Add copy instruction
@@ -113,23 +121,24 @@ pub fn generate_delta<R: Read>(
             pos += sig.length;
             stats.blocks_matched += 1;
             stats.bytes_saved += sig.length as u64;
+            pending_start = pos;
         } else {
-            // No match, add byte to pending data
-            pending_data.push(buffer[pos]);
+            // No match, advance window; copy will be emitted when we find a match
             pos += 1;
-            stats.blocks_transferred += 1;
         }
     }
 
     // Flush any remaining pending data
-    if !pending_data.is_empty() {
+    if pending_start < buffer.len() {
+        let tail = buffer[pending_start..].to_vec();
         instructions.push(DeltaInstruction::Data {
             dest_offset,
-            bytes: pending_data,
+            bytes: tail,
         });
-        stats.bytes_transferred += buffer.len() as u64 - stats.bytes_saved;
     }
 
+    stats.blocks_transferred = stats.total_blocks.saturating_sub(stats.blocks_matched);
+    stats.bytes_transferred = stats.total_bytes.saturating_sub(stats.bytes_saved);
     stats.calculate_savings_ratio();
 
     Ok((instructions, stats))
@@ -156,32 +165,35 @@ pub fn generate_delta_rolling<R: Read>(
         return Ok((instructions, stats));
     }
 
+    if block_size == 0 {
+        stats.total_bytes = buffer.len() as u64;
+        instructions.push(DeltaInstruction::Data {
+            dest_offset: 0,
+            bytes: buffer,
+        });
+        stats.bytes_transferred = stats.total_bytes;
+        stats.calculate_savings_ratio();
+        return Ok((instructions, stats));
+    }
+
     stats.total_bytes = buffer.len() as u64;
     stats.total_blocks = buffer.len().div_ceil(block_size) as u64;
 
     let mut pos = 0;
     let mut dest_offset = 0u64;
-    let mut pending_data = Vec::new();
+    // Track the start of the current non-matching span to emit in one shot.
+    let mut pending_start = 0usize;
     let mut rolling: Option<RollingChecksum> = None;
 
-    while pos < buffer.len() {
-        let remaining = buffer.len() - pos;
-
-        if remaining < block_size {
-            // Less than a full block remaining, add to pending data
-            pending_data.extend_from_slice(&buffer[pos..]);
-            stats.blocks_transferred += 1;
-            break;
-        }
-
+    while pos + block_size <= buffer.len() {
         // Initialize or roll the checksum
         let weak_hash = if let Some(ref mut roll) = rolling {
-            if pos >= block_size {
-                // Roll forward: remove old byte, add new byte
-                let old_byte = buffer[pos - block_size];
-                let new_byte = buffer[pos];
-                roll.roll(old_byte, new_byte);
-            }
+            // Roll forward: remove the byte leaving the window, add the new byte.
+            // Safety: loop guard ensures pos > 0 has a valid previous byte and
+            // pos + block_size - 1 is in-bounds for the new trailing byte.
+            let old_byte = if pos > 0 { buffer[pos - 1] } else { buffer[0] };
+            let new_byte = buffer[pos + block_size - 1];
+            roll.roll(old_byte, new_byte);
             roll.checksum()
         } else {
             // Initialize checksum for first block
@@ -196,15 +208,11 @@ pub fn generate_delta_rolling<R: Read>(
             let strong_hash = calculate_strong_hash(chunk, algorithm);
 
             if let Some(sig) = dest_signatures.find_match(weak_hash, &strong_hash) {
-                // Found a match!
-                if !pending_data.is_empty() {
-                    instructions.push(DeltaInstruction::Data {
-                        dest_offset,
-                        bytes: pending_data.clone(),
-                    });
-                    dest_offset += pending_data.len() as u64;
-                    stats.bytes_transferred += pending_data.len() as u64;
-                    pending_data.clear();
+                // Found a match! Flush any pending data in a single memcpy.
+                if pos > pending_start {
+                    let bytes = buffer[pending_start..pos].to_vec();
+                    instructions.push(DeltaInstruction::Data { dest_offset, bytes });
+                    dest_offset += (pos - pending_start) as u64;
                 }
 
                 instructions.push(DeltaInstruction::Copy {
@@ -217,6 +225,7 @@ pub fn generate_delta_rolling<R: Read>(
                 pos += sig.length;
                 stats.blocks_matched += 1;
                 stats.bytes_saved += sig.length as u64;
+                pending_start = pos;
 
                 // Reset rolling checksum after a match
                 rolling = None;
@@ -224,20 +233,21 @@ pub fn generate_delta_rolling<R: Read>(
             }
         }
 
-        // No match, advance by one byte
-        pending_data.push(buffer[pos]);
+        // No match; just advance and keep growing the pending span.
         pos += 1;
     }
 
     // Flush remaining pending data
-    if !pending_data.is_empty() {
+    if pending_start < buffer.len() {
+        let tail = buffer[pending_start..].to_vec();
         instructions.push(DeltaInstruction::Data {
             dest_offset,
-            bytes: pending_data,
+            bytes: tail,
         });
-        stats.bytes_transferred += buffer.len() as u64 - stats.bytes_saved;
     }
 
+    stats.blocks_transferred = stats.total_blocks.saturating_sub(stats.blocks_matched);
+    stats.bytes_transferred = stats.total_bytes.saturating_sub(stats.bytes_saved);
     stats.calculate_savings_ratio();
 
     Ok((instructions, stats))
@@ -245,7 +255,7 @@ pub fn generate_delta_rolling<R: Read>(
 
 #[cfg(test)]
 mod tests {
-    use super::super::checksum::generate_signatures;
+    use super::super::checksum::{calculate_strong_hash, generate_signatures, RollingChecksum};
     use super::*;
 
     #[test]
@@ -378,6 +388,52 @@ mod tests {
 
         // Both should find similar matches
         assert_eq!(stats_basic.total_bytes, stats_rolling.total_bytes);
+    }
+
+    #[test]
+    fn test_delta_generation_gap_logic() {
+        // Source contains a single matching window in the middle.
+        let data = b"AAABBBCCC";
+        let sig = BlockSignature::new(
+            100,
+            3,
+            RollingChecksum::from_data(b"BBB").checksum(),
+            calculate_strong_hash(b"BBB", HashAlgorithm::Blake3),
+        );
+        let index = SignatureIndex::new(vec![sig]);
+
+        let (insts, _) = generate_delta_rolling(&data[..], index, HashAlgorithm::Blake3).unwrap();
+
+        assert_eq!(insts.len(), 3);
+
+        match &insts[0] {
+            DeltaInstruction::Data { dest_offset, bytes } => {
+                assert_eq!(*dest_offset, 0);
+                assert_eq!(bytes, b"AAA");
+            }
+            _ => panic!("Expected Data instruction first"),
+        }
+
+        match &insts[1] {
+            DeltaInstruction::Copy {
+                src_offset,
+                dest_offset,
+                length,
+            } => {
+                assert_eq!(*src_offset, 100);
+                assert_eq!(*dest_offset, 3);
+                assert_eq!(*length, 3);
+            }
+            _ => panic!("Expected Copy instruction second"),
+        }
+
+        match &insts[2] {
+            DeltaInstruction::Data { dest_offset, bytes } => {
+                assert_eq!(*dest_offset, 6);
+                assert_eq!(bytes, b"CCC");
+            }
+            _ => panic!("Expected Data instruction last"),
+        }
     }
 
     #[test]

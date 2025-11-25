@@ -177,6 +177,10 @@ path = "src/main.rs"
 name = "copy_benchmark"
 harness = false
 
+[[bench]]
+name = "delta_throughput"
+harness = false
+
 [profile.release]
 opt-level = 3
 lto = true

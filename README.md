@@ -428,6 +428,7 @@ orbit --source /critical --dest /backup \
 **Features:**
 - **4 Detection Modes** — ModTime (fast), Size, Checksum (BLAKE3), Delta (block-based)
 - **Rolling Checksum** — Adler-32 for O(1) per-byte block matching
+- **Slice & Emit Buffering** — Non-matching spans flush as slices (no per-byte allocations) for much faster 0% similarity workloads
 - **Parallel Hashing** — Rayon-based concurrent block processing
 - **Smart Fallback** — Automatic full copy for incompatible files
 - **80-99% Savings** — For files with minor changes

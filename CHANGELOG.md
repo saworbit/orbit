@@ -5,6 +5,7 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Delta Rolling Throughput** - Reworked non-matching buffering to slice-and-emit (`pending_start` cursor) instead of byte-by-byte pushes, slashing allocator pressure and improving worst-case (0% similarity) throughput; fixed rolling Adler window updates to keep weak hashes aligned; new Criterion benchmark `delta_throughput` captures no-match performance
 - **Resume System Reliability Hardening** - Atomic temp-file + rename persistence for resume metadata, optional crash-simulation hook (`ORBIT_RESUME_SLEEP_BEFORE_RENAME_MS`), and regression tests covering temp-file cleanup and crash behavior
 - **Manifest Generation in Delta Transfers** - Integrated manifest emission and updates in delta transfer logic (`src/core/delta/types.rs`, `src/core/delta/transfer.rs`)
   - `ManifestDb` struct for JSON-backed manifest database storage
