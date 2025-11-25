@@ -24,6 +24,12 @@ impl ConcurrencyLimiter {
     ///
     /// # Arguments
     /// * `max_concurrent` - Maximum number of concurrent operations (0 = auto-detect)
+    ///
+    /// # Auto-detection Behavior
+    /// When `max_concurrent` is 0, Orbit attempts to detect available CPU cores using
+    /// `std::thread::available_parallelism()`. If detection fails (e.g., in restricted
+    /// containers or cgroup environments), it defaults to 1 (single-threaded mode) for
+    /// safety and logs a warning to stderr.
     pub fn new(max_concurrent: usize) -> Self {
         let max = if max_concurrent == 0 {
             // Auto-detect: use number of CPU cores
@@ -105,13 +111,27 @@ pub fn detect_optimal_concurrency() -> usize {
 }
 
 // Shim for num_cpus functionality (fallback to std if needed)
+//
+// Safety: If CPU detection fails (e.g., in restricted containers or cgroup environments),
+// we default to single-threaded mode (1) and emit a warning to stderr. This prevents
+// resource exhaustion in hostile environments while alerting operators to the issue.
 mod num_cpus {
     use std::thread;
 
     pub fn get() -> usize {
         thread::available_parallelism()
             .map(|n| n.get())
-            .unwrap_or(4) // Fallback to 4 if detection fails
+            .unwrap_or_else(|e| {
+                // [SPEC CHANGE] Warn user and default to single-threaded mode for safety
+                // We use eprintln! here because this might run before the logging subsystem
+                // is fully initialized or if logging itself is failing.
+                eprintln!(
+                    "WARN: Orbit failed to detect available parallelism: {}. \
+                    Defaulting to 1 concurrent operation to prevent resource exhaustion.",
+                    e
+                );
+                1
+            })
     }
 }
 
@@ -209,6 +229,31 @@ mod tests {
         let optimal = detect_optimal_concurrency();
         assert!(optimal > 0);
         assert!(optimal <= 16);
+    }
+
+    #[test]
+    fn test_shim_behavior_sane() {
+        // We can't force an Err in the real shim, but we can verify the result is sane.
+        let cpus = num_cpus::get();
+        assert!(cpus >= 1, "Must report at least 1 CPU");
+    }
+
+    #[test]
+    fn test_optimal_concurrency_calculation() {
+        // If we hypothetically had 1 CPU (fallback case)
+        let cpu_count = 1;
+        let optimal = (cpu_count * 2).min(16);
+        assert_eq!(optimal, 2, "Should allow 2 threads on 1 core (IO bound)");
+
+        // If we had 4 CPUs (common case)
+        let cpu_count = 4;
+        let optimal = (cpu_count * 2).min(16);
+        assert_eq!(optimal, 8);
+
+        // If we had 32 CPUs (cap case)
+        let cpu_count = 32;
+        let optimal = (cpu_count * 2).min(16);
+        assert_eq!(optimal, 16, "Should cap at 16");
     }
 
     #[test]

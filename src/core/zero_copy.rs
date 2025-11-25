@@ -388,7 +388,7 @@ pub fn should_use_zero_copy(
     // Disable only on Windows for now
     #[cfg(target_os = "windows")]
     {
-        return Ok(false);
+        Ok(false)
     }
 
     #[cfg(not(target_os = "windows"))]

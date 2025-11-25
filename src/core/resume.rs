@@ -145,10 +145,7 @@ pub fn save_resume_info_full(
 
     std::fs::rename(&temp_path, &resume_file_path).map_err(|e| {
         let _ = std::fs::remove_file(&temp_path);
-        std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to atomically rename resume file: {}", e),
-        )
+        std::io::Error::other(format!("Failed to atomically rename resume file: {}", e))
     })?;
     Ok(())
 }

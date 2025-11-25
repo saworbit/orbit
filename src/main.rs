@@ -530,11 +530,9 @@ fn main() -> Result<()> {
     }
 
     // Show zero-copy status if enabled
-    if config.use_zero_copy && config.show_progress {
-        if is_zero_copy_available() {
-            let caps = get_zero_copy_capabilities();
-            println!("⚡ Zero-copy enabled ({})", caps.method);
-        }
+    if config.use_zero_copy && config.show_progress && is_zero_copy_available() {
+        let caps = get_zero_copy_capabilities();
+        println!("⚡ Zero-copy enabled ({})", caps.method);
     }
 
     // Show manifest status if enabled
@@ -669,10 +667,12 @@ fn handle_manifest_plan(
         }
     };
 
-    let mut config = CopyConfig::default();
-    config.generate_manifest = true;
-    config.manifest_output_dir = Some(output.clone());
-    config.chunking_strategy = chunking_strategy;
+    let config = CopyConfig {
+        generate_manifest: true,
+        manifest_output_dir: Some(output.clone()),
+        chunking_strategy,
+        ..Default::default()
+    };
 
     let mut generator = ManifestGenerator::new(&source, &dest, &config)?;
 

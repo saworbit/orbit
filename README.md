@@ -565,6 +565,7 @@ orbit -s /large/dataset -d /backup \
 orbit -s /large/file.bin -d /backup/file.bin --max-bandwidth 10
 
 # Auto-detect optimal concurrency (2x CPU cores, capped at 16)
+# Note: If CPU detection fails (restricted containers/cgroups), defaults to 1 thread with warning
 orbit -s /data -d /backup -R --parallel 0
 
 # Full-featured production transfer
@@ -597,10 +598,12 @@ orbit -s /production/data -d /backup/location \
 
 **Concurrency Control:**
 - Auto-detection based on CPU cores (2× CPU count, max 16)
+- Safe fallback: Defaults to 1 thread if CPU detection fails (restricted environments)
 - Configurable maximum parallel operations via `--parallel`
 - **Integrated into directory copy** with per-file permit acquisition
 - RAII-based permit management (automatic cleanup via Drop)
 - Optimal for I/O-bound operations
+- See [Performance Guide](docs/guides/PERFORMANCE.md) for detailed concurrency tuning
 - Works seamlessly with rayon thread pools
 
 **Dry-Run Capabilities:**

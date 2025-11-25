@@ -4,6 +4,15 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Concurrency Detection Safety** - Improved CPU detection fallback behavior for restricted environments
+  - Changed default fallback from 4 threads to 1 thread (single-threaded mode) when CPU detection fails
+  - Added stderr warning when `std::thread::available_parallelism()` fails (e.g., in strict cgroup environments or restricted containers)
+  - Prevents potential resource exhaustion and OOM kills in hostile environments
+  - Updated `ConcurrencyLimiter::new()` documentation to explain auto-detection and fallback behavior
+  - New unit tests: `test_shim_behavior_sane()` and `test_optimal_concurrency_calculation()`
+  - New performance guide: `docs/guides/PERFORMANCE.md` documenting concurrency detection and manual override options
+
 ### Added
 - **Delta Rolling Throughput** - Reworked non-matching buffering to slice-and-emit (`pending_start` cursor) instead of byte-by-byte pushes, slashing allocator pressure and improving worst-case (0% similarity) throughput; fixed rolling Adler window updates to keep weak hashes aligned; new Criterion benchmark `delta_throughput` captures no-match performance
 - **Resume System Reliability Hardening** - Atomic temp-file + rename persistence for resume metadata, optional crash-simulation hook (`ORBIT_RESUME_SLEEP_BEFORE_RENAME_MS`), and regression tests covering temp-file cleanup and crash behavior
