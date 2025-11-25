@@ -283,95 +283,64 @@ mod windows {
 #[cfg(target_os = "macos")]
 mod macos {
     use super::{BandwidthLimiter, ZeroCopyResult};
-    use log::debug;
     use std::fs::File;
     use std::io;
     use std::os::unix::io::AsRawFd;
-    use std::time::{Duration, Instant};
+
+    // The copyfile system call is not fully exposed in libc, so define the state type here.
+    // See /usr/include/sys/copyfile.h on macOS.
+    type CopyfileState = *mut libc::c_void;
+    const COPYFILE_STATE_T_INITIAL: CopyfileState = std::ptr::null_mut();
 
     pub fn copyfile_wrapper(
         source: &File,
         dest: &File,
         offset: u64,
         len: u64,
-        bandwidth_limiter: Option<&BandwidthLimiter>,
+        _bandwidth_limiter: Option<&BandwidthLimiter>, // fcopyfile does not support this
     ) -> ZeroCopyResult {
-        // macOS has fcopyfile which works on file descriptors
-        // For simplicity, we'll use sendfile which is more portable
-        sendfile_loop(source, dest, offset, len, bandwidth_limiter)
-    }
+        // fcopyfile copies the entire file. The calling context in `try_zero_copy_direct`
+        // does a full file copy, so offset should be 0.
+        if offset != 0 {
+            return ZeroCopyResult::Unsupported;
+        }
 
-    fn sendfile_loop(
-        source: &File,
-        dest: &File,
-        offset: u64,
-        len: u64,
-        bandwidth_limiter: Option<&BandwidthLimiter>,
-    ) -> ZeroCopyResult {
-        let mut total_copied = 0u64;
-        let current_offset = offset as i64;
+        let source_len = match source.metadata() {
+            Ok(m) => m.len(),
+            Err(e) => return ZeroCopyResult::Failed(e),
+        };
 
-        // Use 1MB chunks for bandwidth limiting granularity
-        const CHUNK_SIZE: i64 = 1024 * 1024;
+        if len != source_len {
+            return ZeroCopyResult::Unsupported; // Not a full file copy
+        }
 
-        while total_copied < len {
-            let remaining = (len - total_copied) as i64;
+        let result = unsafe {
+            // Use fcopyfile for efficient file-to-file copies on macOS.
+            // The `flags` argument should be 0 if the state is null.
+            libc::fcopyfile(
+                source.as_raw_fd(),
+                dest.as_raw_fd(),
+                COPYFILE_STATE_T_INITIAL,
+                0, // Flags are for state, must be 0 if state is null.
+            )
+        };
 
-            // Use smaller chunks if bandwidth limiting is enabled
-            let to_copy = if bandwidth_limiter.is_some() {
-                remaining.min(CHUNK_SIZE)
-            } else {
-                remaining
-            };
-
-            let result = unsafe {
-                let mut bytes_written: libc::off_t = to_copy;
-                libc::sendfile(
-                    source.as_raw_fd(),
-                    dest.as_raw_fd(),
-                    current_offset,
-                    &mut bytes_written as *mut libc::off_t,
-                    std::ptr::null_mut(),
-                    0,
-                )
-            };
-
-            if result == -1 {
-                let err = io::Error::last_os_error();
-                match err.raw_os_error() {
-                    Some(libc::ENOSYS) | Some(libc::EOPNOTSUPP) => {
-                        return ZeroCopyResult::Unsupported;
-                    }
-                    _ => {
-                        return ZeroCopyResult::Failed(err);
-                    }
+        if result == -1 {
+            let err = io::Error::last_os_error();
+            match err.raw_os_error() {
+                // EOPNOTSUPP can happen if the filesystem does not support it.
+                // EINVAL can happen for various reasons, treat as unsupported.
+                Some(libc::ENOSYS) | Some(libc::EOPNOTSUPP) | Some(libc::EINVAL) => {
+                    return ZeroCopyResult::Unsupported;
                 }
-            }
-
-            // sendfile updates current_offset automatically
-            // bytes_written contains the actual bytes transferred
-            if result == 0 {
-                break; // EOF
-            }
-
-            let bytes_copied = result as u64;
-            total_copied += bytes_copied;
-
-            // Apply bandwidth limiting
-            if let Some(limiter) = bandwidth_limiter {
-                let throttle_start = Instant::now();
-                limiter.wait_for_capacity(bytes_copied);
-                let throttle_duration = throttle_start.elapsed();
-                if throttle_duration > Duration::from_millis(10) {
-                    debug!(
-                        "Zero-copy (macOS): Bandwidth throttle: waited {:?} for {} bytes",
-                        throttle_duration, bytes_copied
-                    );
+                _ => {
+                    return ZeroCopyResult::Failed(err);
                 }
             }
         }
 
-        ZeroCopyResult::Success(total_copied)
+        // fcopyfile returns 0 on success. On success, the whole file is copied.
+        ZeroCopyResult::Success(len)
     }
 }
 
