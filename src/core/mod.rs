@@ -14,6 +14,7 @@ pub mod dry_run; // Dry-run simulation mode
 pub mod enhanced_progress; // Multi-transfer progress bars with indicatif
 pub mod file_metadata; // Comprehensive metadata preservation
 pub mod filter; // Include/exclude filter patterns
+pub mod guidance; // Guidance system ("Flight Computer")
 pub mod metadata;
 pub mod metadata_ops; // Metadata preservation orchestration
 pub mod progress;

@@ -24,6 +24,7 @@ docs/
 │   ├── DELTA_INTEGRATION_CHANGES.md
 │   ├── DISK_GUARDIAN.md
 │   ├── ERROR_HANDLING_IMPLEMENTATION.md
+│   ├── GUIDANCE_SYSTEM.md
 │   ├── GUI_INTEGRATION.md
 │   ├── IMPLEMENTATION_SUMMARY.md
 │   ├── MANIFEST_SYSTEM.md
@@ -56,6 +57,7 @@ docs/
 - [S3 Integration](guides/S3_USER_GUIDE.md)
 
 ### Architecture
+- [Guidance System](architecture/GUIDANCE_SYSTEM.md)
 - [Zero-Copy Transfers](architecture/ZERO_COPY.md)
 - [Resume System](architecture/RESUME_SYSTEM.md)
 - [Manifest System](architecture/MANIFEST_SYSTEM.md)

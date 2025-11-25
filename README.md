@@ -17,6 +17,7 @@
 - [Key Features](#-key-features)
   - [Error Handling & Retries](#-error-handling--retries-never-give-up)
   - [Disk Guardian](#️-disk-guardian-pre-flight-safety)
+  - [Guidance System](#️-guidance-system-the-flight-computer)
   - [Manifest System + Starmap](#️-manifest-system--starmap-planner)
   - [Magnetar State Machine](#-magnetar-persistent-job-state-machine)
   - [Metadata Preservation](#️-metadata-preservation--transformation)
@@ -187,6 +188,66 @@ cargo run --example disk_guardian_demo
 ```
 
 📖 **Full Documentation:** See [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
+
+---
+
+### 🛰️ Guidance System: The "Flight Computer"
+
+**NEW in v0.5.0!** Automatic configuration validation and optimization that ensures safe, performant transfers.
+
+**What It Does:**
+The Guidance System acts as an intelligent pre-processor, analyzing your configuration for logical conflicts and automatically resolving them before execution begins. Think of it as a co-pilot that prevents common mistakes and optimizes settings based on hardware capabilities and use-case logic.
+
+**Key Benefits:**
+- 🔒 **Safety First** — Prevents data corruption from incompatible flag combinations
+- ⚡ **Performance Optimization** — Automatically selects the fastest valid strategy
+- 🎓 **Educational** — Explains why configurations were changed
+- 🤖 **Automatic** — No manual debugging of conflicting flags
+
+**Example Output:**
+```
+┌── 🛰️  Orbit Guidance System ───────────────────────┐
+│ 🚀 Strategy: Disabling zero-copy to allow streaming checksum verification
+│ 🛡️  Safety: Disabling resume capability to prevent compressed stream corruption
+└────────────────────────────────────────────────────┘
+```
+
+**Implemented Rules:**
+
+| Rule | Conflict | Resolution | Icon |
+|------|----------|------------|------|
+| **Hardware** | Zero-copy on unsupported OS | Disable zero-copy | ⚠️ |
+| **Strategy** | Zero-copy + Checksum | Disable zero-copy (streaming is faster) | 🚀 |
+| **Safety** | Resume + Compression | Disable resume (can't append to streams) | 🛡️ |
+| **Precision** | Zero-copy + Resume | Disable zero-copy (need byte-level seeking) | 🚀 |
+| **Performance** | Sync + Checksum mode | Info notice (forces dual reads) | ℹ️ |
+
+**Philosophy:**
+> Users express **intent**. Orbit ensures **technical correctness**.
+
+Rather than failing with cryptic errors, Orbit understands what you're trying to achieve and automatically adjusts settings to make it work safely and efficiently.
+
+**Programmatic API:**
+```rust
+use orbit::core::guidance::Guidance;
+
+let mut config = CopyConfig::default();
+config.use_zero_copy = true;
+config.verify_checksum = true;
+
+// Run guidance pass
+let flight_plan = Guidance::plan(config)?;
+
+// Display notices
+for notice in &flight_plan.notices {
+    println!("{}", notice);
+}
+
+// Use optimized config
+copy_file(&source, &dest, &flight_plan.config)?;
+```
+
+📖 **Full Documentation:** See [`docs/architecture/GUIDANCE_SYSTEM.md`](docs/architecture/GUIDANCE_SYSTEM.md)
 
 ---
 

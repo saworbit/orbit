@@ -12,6 +12,7 @@ use orbit::{
         SymlinkMode,
     },
     copy_directory, copy_file,
+    core::guidance::Guidance,
     error::{OrbitError, Result},
     get_zero_copy_capabilities, is_zero_copy_available, logging,
     manifest_integration::ManifestGenerator,
@@ -553,6 +554,22 @@ fn main() -> Result<()> {
     config.update_manifest = cli.update_manifest;
     config.ignore_existing = cli.ignore_existing;
     config.delta_manifest_path = cli.delta_manifest;
+
+    // 🚀 GUIDANCE PASS: Sanitize and Optimize
+    let flight_plan = Guidance::plan(config)?;
+
+    // Display Intelligence to User
+    if !flight_plan.notices.is_empty() {
+        println!("┌── 🛰️  Orbit Guidance System ───────────────────────┐");
+        for notice in &flight_plan.notices {
+            println!("│ {}", notice);
+        }
+        println!("└────────────────────────────────────────────────────┘");
+        println!(); // Visual separation
+    }
+
+    // Use the optimized config from the flight plan
+    let config = flight_plan.config;
 
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {

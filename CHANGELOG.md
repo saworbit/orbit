@@ -4,6 +4,23 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Guidance System ("Flight Computer")** - Automatic configuration validation and optimization layer
+  - New `Guidance` module (`src/core/guidance.rs`) that validates and sanitizes configurations before execution
+  - `FlightPlan` struct containing optimized configuration and user-facing notices
+  - `Notice` system with four severity levels: Info, Warning, Optimization, Safety
+  - Implements five configuration rules:
+    - **Rule 1 (Hardware)**: Disables zero-copy when not supported by OS/hardware
+    - **Rule 2 (Strategy)**: Disables zero-copy when checksum verification is enabled (streaming checksum is faster than zero-copy + read-back)
+    - **Rule 3 (Safety)**: Disables resume when compression is enabled (cannot safely append to compressed streams)
+    - **Rule 4 (Precision)**: Disables zero-copy when resume is enabled (precise byte-level seeking requires buffered I/O)
+    - **Rule 5 (Performance)**: Warns when Sync/Update mode is combined with Checksum check mode (forces full file reads on both ends)
+  - Transparent user notifications displayed in formatted box with icons
+  - Integration in main execution flow between config loading and execution
+  - Comprehensive test coverage: 9 unit tests in guidance module, 10 integration tests
+  - Architecture documentation: `docs/architecture/GUIDANCE_SYSTEM.md`
+  - Philosophy: Users express intent, system ensures technical correctness
+
 ### Changed
 - **Concurrency Detection Safety** - Improved CPU detection fallback behavior for restricted environments
   - Changed default fallback from 4 threads to 1 thread (single-threaded mode) when CPU detection fails
