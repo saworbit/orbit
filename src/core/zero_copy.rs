@@ -292,6 +292,9 @@ mod macos {
     type CopyfileState = *mut libc::c_void;
     const COPYFILE_STATE_T_INITIAL: CopyfileState = std::ptr::null_mut();
 
+    // Flags for fcopyfile - see /usr/include/sys/copyfile.h
+    const COPYFILE_DATA: u32 = 0x0002; // Copy file data
+
     pub fn copyfile_wrapper(
         source: &File,
         dest: &File,
@@ -316,12 +319,12 @@ mod macos {
 
         let result = unsafe {
             // Use fcopyfile for efficient file-to-file copies on macOS.
-            // The `flags` argument should be 0 if the state is null.
+            // When state is NULL, flags specify what to copy (COPYFILE_DATA for file data).
             libc::fcopyfile(
                 source.as_raw_fd(),
                 dest.as_raw_fd(),
                 COPYFILE_STATE_T_INITIAL,
-                0, // Flags are for state, must be 0 if state is null.
+                COPYFILE_DATA, // Copy the file data
             )
         };
 
