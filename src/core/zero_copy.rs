@@ -385,13 +385,13 @@ pub fn should_use_zero_copy(
     _dest_path: &Path,
     _config: &CopyConfig,
 ) -> Result<bool> {
-    // Disable on Windows and macOS for now due to implementation issues
-    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    // Disable only on Windows for now
+    #[cfg(target_os = "windows")]
     {
         return Ok(false);
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    #[cfg(not(target_os = "windows"))]
     {
         // Check if zero-copy is available on this platform
         let caps = ZeroCopyCapabilities::detect();
@@ -440,6 +440,60 @@ pub fn try_zero_copy_direct(
     publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
+
+    // macOS Optimization: Use std::fs::copy which uses fclonefileat (COW) -> fcopyfile
+    #[cfg(target_os = "macos")]
+    {
+        // Emit start event
+        let file_id = publisher.start_transfer(
+            source_path.to_path_buf(),
+            dest_path.to_path_buf(),
+            source_size,
+        );
+
+        // Use std::fs::copy which handles fclonefileat/fcopyfile correctly via paths
+        let bytes_copied = std::fs::copy(source_path, dest_path)?;
+
+        // Calculate checksum if enabled
+        let checksum = if config.verify_checksum {
+            if config.show_progress {
+                println!("Calculating checksum...");
+            }
+            let source_checksum = checksum::calculate_checksum(source_path)?;
+            let dest_checksum = checksum::calculate_checksum(dest_path)?;
+
+            if source_checksum != dest_checksum {
+                return Err(OrbitError::ChecksumMismatch {
+                    expected: source_checksum,
+                    actual: dest_checksum,
+                });
+            }
+            Some(source_checksum)
+        } else {
+            None
+        };
+
+        let duration = start_time.elapsed();
+        publisher.complete_transfer(
+            file_id,
+            bytes_copied,
+            duration.as_millis() as u64,
+            checksum.clone(),
+        );
+
+        return Ok(CopyStats {
+            bytes_copied,
+            duration,
+            checksum,
+            compression_ratio: None,
+            files_copied: 1,
+            files_skipped: 0,
+            files_failed: 0,
+            delta_stats: None,
+            chunks_resumed: 0,
+            bytes_skipped: 0,
+        });
+    }
 
     // Setup bandwidth limiter
     let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
