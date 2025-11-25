@@ -5,7 +5,10 @@
 use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// Resume information for interrupted transfers with chunk-level tracking
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -117,11 +120,36 @@ pub fn save_resume_info_full(
 ) -> Result<()> {
     let resume_file_path = get_resume_file_path(destination_path, compressed);
 
+    let temp_extension = resume_file_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| format!("{ext}.tmp"))
+        .unwrap_or_else(|| "tmp".to_string());
+    let temp_path = resume_file_path.with_extension(temp_extension);
+
     // Save as JSON for rich metadata
     let json = serde_json::to_string_pretty(info)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
-    std::fs::write(&resume_file_path, json)?;
+    {
+        let mut file = File::create(&temp_path)?;
+        file.write_all(json.as_bytes())?;
+        file.sync_all()?;
+    }
+
+    if let Ok(ms) = std::env::var("ORBIT_RESUME_SLEEP_BEFORE_RENAME_MS") {
+        if let Ok(ms) = ms.parse::<u64>() {
+            std::thread::sleep(Duration::from_millis(ms));
+        }
+    }
+
+    std::fs::rename(&temp_path, &resume_file_path).map_err(|e| {
+        let _ = std::fs::remove_file(&temp_path);
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to atomically rename resume file: {}", e),
+        )
+    })?;
     Ok(())
 }
 

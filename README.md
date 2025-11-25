@@ -1094,6 +1094,7 @@ verify_metadata = false
 
 # Enable resume capability for interrupted transfers
 resume_enabled = true
+# Resume persistence is atomic (temp + rename); set ORBIT_RESUME_SLEEP_BEFORE_RENAME_MS for crash simulations
 
 # Enable checksum verification
 verify_checksum = true

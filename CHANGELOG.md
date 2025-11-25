@@ -5,6 +5,7 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Resume System Reliability Hardening** - Atomic temp-file + rename persistence for resume metadata, optional crash-simulation hook (`ORBIT_RESUME_SLEEP_BEFORE_RENAME_MS`), and regression tests covering temp-file cleanup and crash behavior
 - **Manifest Generation in Delta Transfers** - Integrated manifest emission and updates in delta transfer logic (`src/core/delta/types.rs`, `src/core/delta/transfer.rs`)
   - `ManifestDb` struct for JSON-backed manifest database storage
   - `ManifestEntry` struct for tracking file transfer metadata (source path, dest path, checksum, size, mtime, delta stats)

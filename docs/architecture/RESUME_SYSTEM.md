@@ -140,6 +140,19 @@ Resume operations emit structured events through the progress telemetry system:
 }
 ```
 
+## Persistence Strategy
+
+Resume metadata lives beside the destination so it stays on the same filesystem:
+- **File naming**: `.orbit_resume` (JSON) or `.orbit_resume_compressed` for compressed transfers
+- **Location**: Destination root directory
+
+To avoid corrupting state during crashes, resume saves follow an atomic write flow:
+1. Serialize `ResumeInfo` to JSON in memory.
+2. Write to a temp file in the same directory using a `.tmp` extension appended to the resume file name.
+3. Flush buffers with `fs::File::sync_all` to ensure durability.
+4. Atomically replace the previous resume file with `fs::rename`; if rename fails, the previous valid file stays intact and the temp file is cleaned up when possible.
+5. **Crash simulation:** Set `ORBIT_RESUME_SLEEP_BEFORE_RENAME_MS=<millis>` to pause after the temp file is synced but before rename. Killing the process during this window leaves the `.tmp` behind while the last good resume file remains valid.
+
 ## Usage
 
 ### Enabling Resume
