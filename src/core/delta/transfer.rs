@@ -23,6 +23,11 @@ pub fn copy_with_delta(
     dest_path: &Path,
     config: &DeltaConfig,
 ) -> Result<(DeltaStats, Option<String>)> {
+    // If whole_file is forced, skip delta and perform a full copy
+    if config.whole_file {
+        return full_copy_as_delta(source_path, dest_path, config);
+    }
+
     // Open files
     let source_file = File::open(source_path)?;
     let dest_exists = dest_path.exists();
