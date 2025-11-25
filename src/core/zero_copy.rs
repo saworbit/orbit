@@ -327,8 +327,8 @@ mod macos {
             let result = unsafe {
                 let mut bytes_written: libc::off_t = to_copy;
                 libc::sendfile(
-                    dest.as_raw_fd(),
                     source.as_raw_fd(),
+                    dest.as_raw_fd(),
                     current_offset,
                     &mut bytes_written as *mut libc::off_t,
                     std::ptr::null_mut(),
