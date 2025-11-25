@@ -317,6 +317,16 @@ mod macos {
             return ZeroCopyResult::Unsupported; // Not a full file copy
         }
 
+        // Ensure both file descriptors are at position 0
+        unsafe {
+            if libc::lseek(source.as_raw_fd(), 0, libc::SEEK_SET) == -1 {
+                return ZeroCopyResult::Failed(io::Error::last_os_error());
+            }
+            if libc::lseek(dest.as_raw_fd(), 0, libc::SEEK_SET) == -1 {
+                return ZeroCopyResult::Failed(io::Error::last_os_error());
+            }
+        }
+
         let result = unsafe {
             // Use fcopyfile for efficient file-to-file copies on macOS.
             // When state is NULL, flags specify what to copy (COPYFILE_DATA for file data).
