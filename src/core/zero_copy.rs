@@ -293,7 +293,11 @@ mod macos {
     const COPYFILE_STATE_T_INITIAL: CopyfileState = std::ptr::null_mut();
 
     // Flags for fcopyfile - see /usr/include/sys/copyfile.h
+<<<<<<< HEAD
     const COPYFILE_DATA: u32 = 0x0002; // Copy file data
+=======
+    const COPYFILE_DATA: libc::c_int = 0x0002; // Copy file data
+>>>>>>> 8fe684ee6e7947f0166d6f16299737af7d771d59
 
     pub fn copyfile_wrapper(
         source: &File,
