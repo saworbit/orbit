@@ -218,9 +218,15 @@ The Guidance System acts as an intelligent pre-processor, analyzing your configu
 |------|----------|------------|------|
 | **Hardware** | Zero-copy on unsupported OS | Disable zero-copy | ⚠️ |
 | **Strategy** | Zero-copy + Checksum | Disable zero-copy (streaming is faster) | 🚀 |
+| **Integrity** | Resume + Checksum | Disable checksum (can't verify partial file) | 🛡️ |
 | **Safety** | Resume + Compression | Disable resume (can't append to streams) | 🛡️ |
 | **Precision** | Zero-copy + Resume | Disable zero-copy (need byte-level seeking) | 🚀 |
+| **Visibility** | Manifest + Zero-copy | Disable zero-copy (need content inspection) | 🚀 |
+| **Logic** | Delta + Zero-copy | Disable zero-copy (need patch logic) | 🚀 |
+| **Control** | macOS + Bandwidth + Zero-copy | Disable zero-copy (can't throttle fcopyfile) | ⚠️ |
+| **UX** | Parallel + Progress bars | Info notice (visual artifacts possible) | ℹ️ |
 | **Performance** | Sync + Checksum mode | Info notice (forces dual reads) | ℹ️ |
+| **Physics** | Compression + Encryption | Placeholder (encrypted data won't compress) | 🚀 |
 
 **Philosophy:**
 > Users express **intent**. Orbit ensures **technical correctness**.

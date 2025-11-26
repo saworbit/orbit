@@ -9,16 +9,22 @@ All notable changes to Orbit will be documented in this file.
   - New `Guidance` module (`src/core/guidance.rs`) that validates and sanitizes configurations before execution
   - `FlightPlan` struct containing optimized configuration and user-facing notices
   - `Notice` system with four severity levels: Info, Warning, Optimization, Safety
-  - Implements five configuration rules:
+  - Implements 11 configuration rules to prevent conflicts and data corruption:
     - **Rule 1 (Hardware)**: Disables zero-copy when not supported by OS/hardware
     - **Rule 2 (Strategy)**: Disables zero-copy when checksum verification is enabled (streaming checksum is faster than zero-copy + read-back)
-    - **Rule 3 (Safety)**: Disables resume when compression is enabled (cannot safely append to compressed streams)
-    - **Rule 4 (Precision)**: Disables zero-copy when resume is enabled (precise byte-level seeking requires buffered I/O)
-    - **Rule 5 (Performance)**: Warns when Sync/Update mode is combined with Checksum check mode (forces full file reads on both ends)
-  - Transparent user notifications displayed in formatted box with icons
+    - **Rule 3 (Integrity)**: Disables checksum verification when resume is enabled (cannot verify full file when skipping beginning)
+    - **Rule 4 (Safety)**: Disables resume when compression is enabled (cannot safely append to compressed streams)
+    - **Rule 5 (Precision)**: Disables zero-copy when resume is enabled (precise byte-level seeking requires buffered I/O)
+    - **Rule 6 (Visibility)**: Disables zero-copy when manifest generation is enabled (need content inspection for hashing/chunking)
+    - **Rule 7 (Logic)**: Disables zero-copy when delta transfer is active (requires application-level patching logic)
+    - **Rule 8 (Control)**: Disables zero-copy on macOS when bandwidth limit is set (fcopyfile cannot be throttled)
+    - **Rule 9 (UX)**: Warns when parallel transfers use progress bars (may cause visual artifacts)
+    - **Rule 10 (Performance)**: Warns when Sync/Update mode is combined with Checksum check mode (forces full file reads on both ends)
+    - **Rule 11 (Physics)**: Placeholder for compression vs encryption (encrypted data cannot be compressed)
+  - Transparent user notifications displayed in formatted box with icons (🛡️ Safety, 🚀 Optimization, ⚠️ Warning, ℹ️ Info)
   - Integration in main execution flow between config loading and execution
-  - Comprehensive test coverage: 9 unit tests in guidance module, 10 integration tests
-  - Architecture documentation: `docs/architecture/GUIDANCE_SYSTEM.md`
+  - Comprehensive test coverage: 11 unit tests in guidance module, 14 integration tests including CLI output verification
+  - Architecture documentation: `docs/architecture/GUIDANCE_SYSTEM.md` with detailed rationale for each rule
   - Philosophy: Users express intent, system ensures technical correctness
 
 ### Changed

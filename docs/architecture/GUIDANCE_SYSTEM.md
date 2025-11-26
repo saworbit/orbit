@@ -100,7 +100,20 @@ The guidance system enforces the following rules, listed in order of evaluation:
 🚀 Strategy: Disabling zero-copy to allow streaming checksum verification (faster than Zero-Copy + Read-Back).
 ```
 
-### Rule 3: Data Safety (Resume vs Compression)
+### Rule 3: The Integrity Paradox (Resume vs Checksum)
+
+**Conflict**: Resume + Checksum verification enabled
+
+**Resolution**: Disable checksum verification, emit Safety notice
+
+**Rationale**: Streaming checksum verification requires reading the entire file from the beginning. When resuming a partial transfer, we skip the beginning, making full-file verification impossible.
+
+**Example**:
+```
+🛡️  Integrity: Resume enabled; disabling streaming checksum verification (requires full file read).
+```
+
+### Rule 4: Data Safety (Resume vs Compression)
 
 **Conflict**: Resume + Compression enabled
 
@@ -110,10 +123,10 @@ The guidance system enforces the following rules, listed in order of evaluation:
 
 **Example**:
 ```
-🛡️  Safety: Disabling resume capability to prevent compressed stream corruption (cannot resume standard streams).
+🛡️  Safety: Disabling resume capability to prevent compressed stream corruption.
 ```
 
-### Rule 4: Seeking Precision (Zero-Copy vs Resume)
+### Rule 5: Seeking Precision (Zero-Copy vs Resume)
 
 **Conflict**: Zero-copy + Resume enabled
 
@@ -126,7 +139,59 @@ The guidance system enforces the following rules, listed in order of evaluation:
 🚀 Precision: Resume enabled; disabling zero-copy to support precise offset seeking.
 ```
 
-### Rule 5: Performance Warning (Sync/Update + Checksum)
+### Rule 6: The Observer Effect (Manifest vs Zero-Copy)
+
+**Conflict**: Manifest generation + Zero-copy enabled
+
+**Resolution**: Disable zero-copy, emit Optimization notice
+
+**Rationale**: Manifest generation requires content inspection (hashing/chunking) which cannot be done when data stays in kernel space via zero-copy.
+
+**Example**:
+```
+🚀 Visibility: Manifest generation requires content inspection. Disabling zero-copy.
+```
+
+### Rule 7: The Patchwork Problem (Delta vs Zero-Copy)
+
+**Conflict**: Delta transfer mode + Zero-copy enabled
+
+**Resolution**: Disable zero-copy, emit Optimization notice
+
+**Rationale**: Delta transfers require application-level patch logic that zero-copy bypasses entirely.
+
+**Example**:
+```
+🚀 Logic: Delta transfer active. Disabling zero-copy to handle patch application.
+```
+
+### Rule 8: The Speed Limit (macOS Bandwidth)
+
+**Conflict**: macOS + Zero-copy + Bandwidth limit
+
+**Resolution**: Disable zero-copy, emit Warning notice
+
+**Rationale**: macOS's `fcopyfile` system call cannot be throttled. To enforce bandwidth limits, we must fall back to buffered I/O.
+
+**Example**:
+```
+⚠️  Control: macOS zero-copy (fcopyfile) cannot be throttled. Disabling zero-copy to enforce limit.
+```
+
+### Rule 9: Visual Noise (Parallel vs Progress)
+
+**Conflict**: Parallel transfers + Progress bars enabled
+
+**Resolution**: No change, emit Info notice
+
+**Rationale**: Running multiple progress bars concurrently may cause visual artifacts in the terminal output.
+
+**Example**:
+```
+ℹ️  UX: Parallel transfer with progress bars may cause visual artifacts.
+```
+
+### Rule 10: Performance Warning (Sync/Update + Checksum)
 
 **Conflict**: Sync/Update mode + Checksum check mode
 
@@ -139,13 +204,13 @@ The guidance system enforces the following rules, listed in order of evaluation:
 ℹ️  Performance: 'Checksum' check mode enabled with Sync/Update. This forces full file reads on both ends.
 ```
 
-### Rule 6: Entropy Order (Compression vs Encryption)
+### Rule 11: Physics (Compression vs Encryption) - Placeholder
 
 **Status**: Placeholder for future implementation
 
 **Conflict**: Compression + Encryption enabled
 
-**Resolution**: TBD (ensure compression runs before encryption)
+**Resolution**: TBD (ensure compression runs before encryption or disable compression)
 
 **Rationale**: Encrypted data has high entropy and cannot be effectively compressed. Compression must happen before encryption.
 
@@ -203,20 +268,35 @@ The guidance system includes comprehensive testing at two levels:
 ### Unit Tests (`src/core/guidance.rs`)
 
 Tests individual rules in isolation:
-- `test_safety_rule_resume_vs_compression`
-- `test_optimization_rule_zerocopy_vs_checksum`
-- `test_precision_rule_zerocopy_vs_resume`
-- `test_performance_info_sync_checksum`
-- `test_hardware_rule_zerocopy_unsupported`
+- `test_safety_resume_vs_compression` - Rule 4
+- `test_strategy_zerocopy_vs_checksum` - Rule 2
+- `test_paradox_resume_vs_checksum` - Rule 3
+- `test_observer_manifest_vs_zerocopy` - Rule 6
+- `test_patchwork_delta_vs_zerocopy` - Rule 7
+- `test_speed_limit_macos_bandwidth` - Rule 8 (macOS only)
+- `test_visual_noise_parallel_progress` - Rule 9
+- `test_performance_warning_sync_checksum` - Rule 10
+- `test_clean_config_minimal_notices`
 - `test_multiple_rules_triggered`
+- `test_notice_display_format`
 
 ### Integration Tests (`tests/guidance_integration.rs`)
 
 Tests the guidance system in real-world scenarios:
-- Configuration sanitization before actual file copy
-- Multiple rules triggering in combination
-- Preservation of unrelated config options
-- Notice display formatting
+- `test_guidance_resume_vs_compression_safety`
+- `test_guidance_zerocopy_vs_checksum_optimization`
+- `test_guidance_zerocopy_vs_resume_precision`
+- `test_guidance_sync_checksum_performance_info`
+- `test_guidance_multiple_rules_triggered`
+- `test_guidance_clean_config_no_notices`
+- `test_guidance_with_actual_copy_operation`
+- `test_guidance_display_format`
+- `test_guidance_preserves_other_config_options`
+- `test_guidance_cli_output` - CLI integration test
+- `test_guidance_manifest_vs_zerocopy` - Rule 6
+- `test_guidance_delta_vs_zerocopy` - Rule 7
+- `test_guidance_parallel_progress_ux` - Rule 9
+- `test_guidance_resume_vs_checksum_integrity` - Rule 3
 
 ## Adding New Rules
 

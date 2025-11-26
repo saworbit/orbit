@@ -250,3 +250,152 @@ fn test_guidance_preserves_other_config_options() {
     assert_eq!(flight_plan.config.max_bandwidth, 1000);
     assert_eq!(flight_plan.config.parallel, 4);
 }
+
+// NOTE: CLI output test disabled - requires assert_cmd crate
+// To enable, add `assert_cmd = "2.0"` to [dev-dependencies] in Cargo.toml
+/*
+#[test]
+fn test_guidance_cli_output() {
+    // Integration test: Verify the Guidance System displays in the CLI
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("test_source.txt");
+    let dest = dir.path().join("test_dest.txt");
+
+    // Create a test file
+    std::fs::write(&source, b"test data").unwrap();
+
+    let mut cmd = Command::cargo_bin("orbit").unwrap();
+
+    // Trigger the Safety Rule: Resume + Compress
+    cmd.arg("--source")
+        .arg(source.to_str().unwrap())
+        .arg("--dest")
+        .arg(dest.to_str().unwrap())
+        .arg("--resume")
+        .arg("--compress=zstd:1");
+
+    let output = cmd.output().unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Verify the "Box" and the "Message" appear
+    assert!(
+        stdout.contains("Orbit Guidance System"),
+        "Expected guidance system header in output"
+    );
+    assert!(
+        stdout.contains("Safety") || stdout.contains("🛡️"),
+        "Expected safety notice in output"
+    );
+    assert!(
+        stdout.contains("resume") || stdout.contains("compressed"),
+        "Expected message about resume/compression conflict"
+    );
+}
+*/
+
+#[test]
+fn test_guidance_manifest_vs_zerocopy() {
+    // Test RULE 6: The Observer Effect (Manifest vs Zero-Copy)
+    let mut config = CopyConfig::default();
+    config.generate_manifest = true;
+    config.use_zero_copy = true;
+    config.verify_checksum = false; // Disable to avoid triggering rule 2
+
+    let flight_plan = Guidance::plan(config).unwrap();
+
+    // Verify: Zero-copy should be disabled
+    assert_eq!(
+        flight_plan.config.use_zero_copy, false,
+        "Zero-copy should be disabled when manifest generation is enabled"
+    );
+
+    // Verify: Manifest generation should remain enabled
+    assert!(flight_plan.config.generate_manifest);
+
+    // Verify: Should have a visibility notice
+    assert!(
+        flight_plan
+            .notices
+            .iter()
+            .any(|n| { n.category == "Visibility" && n.message.contains("Manifest") }),
+        "Expected visibility notice about manifest and zero-copy"
+    );
+}
+
+#[test]
+fn test_guidance_delta_vs_zerocopy() {
+    // Test RULE 7: The Patchwork Problem (Delta vs Zero-Copy)
+    let mut config = CopyConfig::default();
+    config.check_mode = orbit::core::delta::CheckMode::Delta;
+    config.use_zero_copy = true;
+    config.verify_checksum = false; // Disable to avoid triggering rule 2
+
+    let flight_plan = Guidance::plan(config).unwrap();
+
+    // Verify: Zero-copy should be disabled
+    assert_eq!(
+        flight_plan.config.use_zero_copy, false,
+        "Zero-copy should be disabled when delta transfer is active"
+    );
+
+    // Verify: Should have a logic notice
+    assert!(
+        flight_plan
+            .notices
+            .iter()
+            .any(|n| { n.category == "Logic" && n.message.contains("Delta") }),
+        "Expected logic notice about delta and zero-copy"
+    );
+}
+
+#[test]
+fn test_guidance_parallel_progress_ux() {
+    // Test RULE 9: Visual Noise (Parallel vs Progress)
+    let mut config = CopyConfig::default();
+    config.parallel = 4;
+    config.show_progress = true;
+    config.use_zero_copy = false; // Avoid other rules
+
+    let flight_plan = Guidance::plan(config).unwrap();
+
+    // Verify: Config should remain unchanged (info only)
+    assert_eq!(flight_plan.config.parallel, 4);
+    assert!(flight_plan.config.show_progress);
+
+    // Verify: Should have a UX info notice
+    assert!(
+        flight_plan
+            .notices
+            .iter()
+            .any(|n| { n.category == "UX" && n.message.contains("Parallel") }),
+        "Expected UX notice about parallel transfer with progress bars"
+    );
+}
+
+#[test]
+fn test_guidance_resume_vs_checksum_integrity() {
+    // Test RULE 3: The Integrity Paradox (Resume vs Checksum)
+    let mut config = CopyConfig::default();
+    config.resume_enabled = true;
+    config.verify_checksum = true;
+
+    let flight_plan = Guidance::plan(config).unwrap();
+
+    // Verify: Checksum should be disabled
+    assert_eq!(
+        flight_plan.config.verify_checksum, false,
+        "Checksum should be disabled when resume is enabled"
+    );
+
+    // Verify: Resume should remain enabled
+    assert!(flight_plan.config.resume_enabled);
+
+    // Verify: Should have an integrity notice
+    assert!(
+        flight_plan
+            .notices
+            .iter()
+            .any(|n| { n.category == "Integrity" && n.message.contains("Resume") }),
+        "Expected integrity notice about resume and checksum"
+    );
+}

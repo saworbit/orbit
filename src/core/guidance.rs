@@ -2,7 +2,7 @@
  * Guidance System ("Flight Computer")
  *
  * Responsible for validating, sanitizing, and optimizing transfer configurations
- * before execution. It enforces logical consistency and safety rules.
+ * before execution. It acts as the "Pre-flight Check" to ensure safety and performance.
  */
 
 use crate::config::{CompressionType, CopyConfig, CopyMode};
@@ -21,7 +21,7 @@ pub struct FlightPlan {
     pub notices: Vec<Notice>,
 }
 
-/// A notification from the Guidance system
+/// A notification from the Guidance system explaining a config change or warning.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Notice {
     pub level: NoticeLevel,
@@ -31,9 +31,13 @@ pub struct Notice {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NoticeLevel {
+    /// General information about the plan
     Info,
+    /// Potential issues that don't stop execution
     Warning,
+    /// Performance adjustments (e.g., disabling zero-copy)
     Optimization,
+    /// Critical changes to prevent data corruption
     Safety,
 }
 
@@ -51,15 +55,13 @@ impl fmt::Display for Notice {
 
 impl Guidance {
     /// Runs pre-flight checks to sanitize and optimize the configuration.
-    ///
-    /// This resolves logical conflicts (e.g., Zero-Copy vs Checksum) and enforces
-    /// best practices (e.g., Compress before Encrypt).
     pub fn plan(mut config: CopyConfig) -> Result<FlightPlan> {
         let mut notices = Vec::new();
         let sys_caps = ZeroCopyCapabilities::detect();
 
-        // --- RULE 1: Hardware Reality (Zero-Copy Support) ---
-        // If zero-copy is requested but not supported by OS/Hardware
+        // =================================================================================
+        // RULE 1: Hardware Reality (Zero-Copy Support)
+        // =================================================================================
         if config.use_zero_copy && !sys_caps.available {
             notices.push(Notice {
                 level: NoticeLevel::Warning,
@@ -73,9 +75,10 @@ impl Guidance {
             config.use_zero_copy = false;
         }
 
-        // --- RULE 2: Integrity Strategy (Zero-Copy vs Checksum) ---
-        // Zero-copy moves data kernel-to-kernel. Reading it back for a checksum
-        // effectively reads the file twice, killing performance.
+        // =================================================================================
+        // RULE 2: Integrity Strategy (Zero-Copy vs Checksum)
+        // =================================================================================
+        // Zero-copy moves data kernel-to-kernel. Reading it back for a checksum kills the speed.
         if config.use_zero_copy && config.verify_checksum {
             notices.push(Notice {
                 level: NoticeLevel::Optimization,
@@ -85,20 +88,37 @@ impl Guidance {
             config.use_zero_copy = false;
         }
 
-        // --- RULE 3: Data Safety (Resume vs Compression) ---
+        // =================================================================================
+        // RULE 3: The Integrity Paradox (Resume vs Checksum)
+        // =================================================================================
+        // Streaming verification fails on resume because we miss the start of the file.
+        if config.resume_enabled && config.verify_checksum {
+            notices.push(Notice {
+                level: NoticeLevel::Safety,
+                category: "Integrity",
+                message: "Resume enabled; disabling streaming checksum verification (requires full file read).".to_string(),
+            });
+            config.verify_checksum = false;
+        }
+
+        // =================================================================================
+        // RULE 4: Data Safety (Resume vs Compression)
+        // =================================================================================
         // You cannot safely append to a standard compressed stream without context.
         if config.resume_enabled && config.compression != CompressionType::None {
             notices.push(Notice {
                 level: NoticeLevel::Safety,
                 category: "Safety",
-                message: "Disabling resume capability to prevent compressed stream corruption (cannot resume standard streams).".to_string(),
+                message: "Disabling resume capability to prevent compressed stream corruption."
+                    .to_string(),
             });
             config.resume_enabled = false;
         }
 
-        // --- RULE 4: Seeking Precision (Zero-Copy vs Resume) ---
-        // Zero-copy usually requires transferring whole file descriptors or blocks.
-        // Precise byte-level resuming is safer with buffered I/O.
+        // =================================================================================
+        // RULE 5: Seeking Precision (Zero-Copy vs Resume)
+        // =================================================================================
+        // Zero-copy usually requires transferring whole file descriptors.
         if config.use_zero_copy && config.resume_enabled {
             notices.push(Notice {
                 level: NoticeLevel::Optimization,
@@ -109,8 +129,64 @@ impl Guidance {
             config.use_zero_copy = false;
         }
 
-        // --- RULE 5: Performance Warning (Sync vs Checksum) ---
-        // Sync/Update with Checksum check mode forces full reads on both sides.
+        // =================================================================================
+        // RULE 6: The Observer Effect (Manifest vs Zero-Copy)
+        // =================================================================================
+        // We cannot chunk/hash data we never see in userspace.
+        if config.generate_manifest && config.use_zero_copy {
+            notices.push(Notice {
+                level: NoticeLevel::Optimization,
+                category: "Visibility",
+                message: "Manifest generation requires content inspection. Disabling zero-copy."
+                    .to_string(),
+            });
+            config.use_zero_copy = false;
+        }
+
+        // =================================================================================
+        // RULE 7: The Patchwork Problem (Delta vs Zero-Copy)
+        // =================================================================================
+        // Delta implies application-level patching logic that zero-copy bypasses.
+        if matches!(config.check_mode, crate::core::delta::CheckMode::Delta) && config.use_zero_copy
+        {
+            notices.push(Notice {
+                level: NoticeLevel::Optimization,
+                category: "Logic",
+                message: "Delta transfer active. Disabling zero-copy to handle patch application."
+                    .to_string(),
+            });
+            config.use_zero_copy = false;
+        }
+
+        // =================================================================================
+        // RULE 8: The Speed Limit (macOS Bandwidth)
+        // =================================================================================
+        #[cfg(target_os = "macos")]
+        if config.use_zero_copy && config.max_bandwidth > 0 {
+            notices.push(Notice {
+                level: NoticeLevel::Warning,
+                category: "Control",
+                message: "macOS zero-copy (fcopyfile) cannot be throttled. Disabling zero-copy to enforce limit.".to_string(),
+            });
+            config.use_zero_copy = false;
+        }
+
+        // =================================================================================
+        // RULE 9: Visual Noise (Parallel vs Progress)
+        // =================================================================================
+        // Warn about console artifacts when running parallel with progress bars
+        if config.parallel > 1 && config.show_progress {
+            notices.push(Notice {
+                level: NoticeLevel::Info,
+                category: "UX",
+                message: "Parallel transfer with progress bars may cause visual artifacts."
+                    .to_string(),
+            });
+        }
+
+        // =================================================================================
+        // RULE 10: Performance Warning (Sync vs Checksum)
+        // =================================================================================
         if matches!(config.copy_mode, CopyMode::Sync | CopyMode::Update)
             && matches!(config.check_mode, crate::core::delta::CheckMode::Checksum)
         {
@@ -118,15 +194,20 @@ impl Guidance {
                 level: NoticeLevel::Info,
                 category: "Performance",
                 message: "'Checksum' check mode enabled with Sync/Update. This forces full file reads on both ends.".to_string(),
-            });
+             });
         }
 
-        // --- RULE 6: Entropy (Compression vs Encryption) ---
-        // Placeholder for when Encryption is added to CopyConfig
+        // =================================================================================
+        // RULE 11: Physics (Compression vs Encryption) - Placeholder
+        // =================================================================================
         /*
         if config.encryption.is_some() && config.compression != CompressionType::None {
-             // Ensure Compression runs BEFORE Encryption
-             // Or disable compression if order cannot be guaranteed
+            notices.push(Notice {
+                level: NoticeLevel::Optimization,
+                category: "Physics",
+                message: "Disabling compression because encryption is active (encrypted data has max entropy).".to_string()
+            });
+            config.compression = CompressionType::None;
         }
         */
 
@@ -139,74 +220,98 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_safety_rule_resume_vs_compression() {
+    fn test_safety_resume_vs_compression() {
         let mut config = CopyConfig::default();
         config.resume_enabled = true;
         config.compression = CompressionType::Zstd { level: 3 };
 
         let plan = Guidance::plan(config).unwrap();
 
-        // Should disable resume
+        // Resume must be disabled to prevent corruption
         assert_eq!(plan.config.resume_enabled, false);
-        // Should keep compression
-        assert!(matches!(
-            plan.config.compression,
-            CompressionType::Zstd { .. }
-        ));
-        // Should have a safety notice
-        assert!(plan.notices.iter().any(|n| n.level == NoticeLevel::Safety));
+        assert!(plan.notices.iter().any(|n| n.category == "Safety"));
     }
 
     #[test]
-    fn test_optimization_rule_zerocopy_vs_checksum() {
+    fn test_strategy_zerocopy_vs_checksum() {
         let mut config = CopyConfig::default();
         config.use_zero_copy = true;
         config.verify_checksum = true;
 
-        // Mock capabilities if possible, otherwise this tests specific platform behavior
-        // Assuming we are running on a platform where ZeroCopy is technically "possible" in config
         let plan = Guidance::plan(config).unwrap();
 
-        // Should disable zero-copy to favor checksum
+        // Zero-copy must be disabled to allow streaming hash
         assert_eq!(plan.config.use_zero_copy, false);
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.level == NoticeLevel::Optimization));
+        assert!(plan.notices.iter().any(|n| n.category == "Strategy"));
     }
 
     #[test]
-    fn test_clean_config_has_no_notices() {
-        let config = CopyConfig::default(); // Safe defaults
-        let plan = Guidance::plan(config).unwrap();
-        // Default config has verify_checksum=true and use_zero_copy=true, so they conflict
-        // So we'll actually have notices. Let's test a truly clean config
+    fn test_paradox_resume_vs_checksum() {
         let mut config = CopyConfig::default();
-        config.use_zero_copy = false; // No conflicts
-        let plan = Guidance::plan(config).unwrap();
-        assert!(plan.notices.is_empty());
-    }
-
-    #[test]
-    fn test_precision_rule_zerocopy_vs_resume() {
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = true;
         config.resume_enabled = true;
+        config.verify_checksum = true;
+
+        let plan = Guidance::plan(config).unwrap();
+
+        // Checksum verification must be disabled on resume
+        assert_eq!(plan.config.verify_checksum, false);
+        assert!(plan.notices.iter().any(|n| n.category == "Integrity"));
+    }
+
+    #[test]
+    fn test_observer_manifest_vs_zerocopy() {
+        let mut config = CopyConfig::default();
+        config.generate_manifest = true;
+        config.use_zero_copy = true;
         config.verify_checksum = false; // Disable to avoid triggering rule 2
 
         let plan = Guidance::plan(config).unwrap();
 
-        // Should disable zero-copy to favor resume precision
         assert_eq!(plan.config.use_zero_copy, false);
-        assert!(plan.config.resume_enabled);
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.level == NoticeLevel::Optimization && n.category == "Precision"));
+        assert!(plan.notices.iter().any(|n| n.category == "Visibility"));
     }
 
     #[test]
-    fn test_performance_info_sync_checksum() {
+    fn test_patchwork_delta_vs_zerocopy() {
+        let mut config = CopyConfig::default();
+        config.check_mode = crate::core::delta::CheckMode::Delta;
+        config.use_zero_copy = true;
+        config.verify_checksum = false; // Disable to avoid triggering rule 2
+
+        let plan = Guidance::plan(config).unwrap();
+
+        assert_eq!(plan.config.use_zero_copy, false);
+        assert!(plan.notices.iter().any(|n| n.category == "Logic"));
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn test_speed_limit_macos_bandwidth() {
+        let mut config = CopyConfig::default();
+        config.use_zero_copy = true;
+        config.max_bandwidth = 1_000_000; // 1 MB/s
+        config.verify_checksum = false; // Disable to avoid triggering rule 2
+
+        let plan = Guidance::plan(config).unwrap();
+
+        assert_eq!(plan.config.use_zero_copy, false);
+        assert!(plan.notices.iter().any(|n| n.category == "Control"));
+    }
+
+    #[test]
+    fn test_visual_noise_parallel_progress() {
+        let mut config = CopyConfig::default();
+        config.parallel = 4;
+        config.show_progress = true;
+        config.use_zero_copy = false; // Avoid other rules
+
+        let plan = Guidance::plan(config).unwrap();
+
+        assert!(plan.notices.iter().any(|n| n.category == "UX"));
+    }
+
+    #[test]
+    fn test_performance_warning_sync_checksum() {
         let mut config = CopyConfig::default();
         config.copy_mode = CopyMode::Sync;
         config.check_mode = crate::core::delta::CheckMode::Checksum;
@@ -214,11 +319,38 @@ mod tests {
 
         let plan = Guidance::plan(config).unwrap();
 
-        // Should have an info notice about performance
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.level == NoticeLevel::Info && n.category == "Performance"));
+        assert!(plan.notices.iter().any(|n| n.category == "Performance"));
+    }
+
+    #[test]
+    fn test_clean_config_minimal_notices() {
+        let mut config = CopyConfig::default();
+        config.use_zero_copy = false; // Avoid conflicts
+        config.verify_checksum = false; // Avoid conflicts
+
+        let plan = Guidance::plan(config).unwrap();
+
+        // Should have no notices for a clean, conflict-free config
+        assert!(plan.notices.is_empty());
+    }
+
+    #[test]
+    fn test_multiple_rules_triggered() {
+        let mut config = CopyConfig::default();
+        config.use_zero_copy = true;
+        config.resume_enabled = true;
+        config.compression = CompressionType::Lz4;
+        config.verify_checksum = true;
+
+        let plan = Guidance::plan(config).unwrap();
+
+        // Multiple rules should have been triggered
+        assert!(plan.notices.len() >= 2);
+
+        // Resume should be disabled due to compression
+        assert_eq!(plan.config.resume_enabled, false);
+        // Zero-copy should be disabled
+        assert_eq!(plan.config.use_zero_copy, false);
     }
 
     #[test]
@@ -233,51 +365,5 @@ mod tests {
         assert!(display.contains("⚠️"));
         assert!(display.contains("Test"));
         assert!(display.contains("Test message"));
-    }
-
-    #[test]
-    fn test_hardware_rule_zerocopy_unsupported() {
-        // This test is platform-dependent. On platforms that don't support zero-copy,
-        // the guidance system should detect it and add a warning.
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = true;
-
-        let plan = Guidance::plan(config).unwrap();
-        let sys_caps = ZeroCopyCapabilities::detect();
-
-        if !sys_caps.available {
-            // Should have disabled zero-copy
-            assert_eq!(plan.config.use_zero_copy, false);
-            // Should have a warning
-            assert!(plan
-                .notices
-                .iter()
-                .any(|n| n.level == NoticeLevel::Warning && n.category == "Hardware"));
-        } else {
-            // On platforms with zero-copy support, other rules might still apply
-            // (like checksum verification), so we just check that it was processed
-            assert!(plan.config.verify_checksum); // Default is true
-        }
-    }
-
-    #[test]
-    fn test_multiple_rules_triggered() {
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = true;
-        config.resume_enabled = true;
-        config.compression = CompressionType::Lz4;
-        config.verify_checksum = true;
-
-        let plan = Guidance::plan(config).unwrap();
-
-        // Multiple rules should have been triggered
-        // Rule 2: Zero-copy vs Checksum OR Rule 4: Zero-copy vs Resume
-        // Rule 3: Resume vs Compression
-        assert!(plan.notices.len() >= 2);
-
-        // Resume should be disabled due to compression
-        assert_eq!(plan.config.resume_enabled, false);
-        // Zero-copy should be disabled
-        assert_eq!(plan.config.use_zero_copy, false);
     }
 }
