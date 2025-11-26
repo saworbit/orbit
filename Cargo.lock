@@ -4216,8 +4216,8 @@ dependencies = [
  "bincode",
  "criterion",
  "futures",
- "governor",
  "hyper 1.7.0",
+ "orbit-core-resilience",
  "polars",
  "rayon",
  "redb",
@@ -4228,6 +4228,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "toml",
+ "tracing",
 ]
 
 [[package]]
@@ -4807,6 +4808,20 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "uuid",
+]
+
+[[package]]
+name = "orbit-core-resilience"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "governor",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
 ]
 
 [[package]]

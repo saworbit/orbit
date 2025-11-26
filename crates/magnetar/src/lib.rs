@@ -52,6 +52,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub mod backends;
+pub mod manager;
 pub mod migration;
 
 #[cfg(feature = "resilience")]
@@ -62,6 +63,9 @@ pub use backends::sqlite::SqliteStore;
 
 #[cfg(feature = "redb")]
 pub use backends::redb::RedbStore;
+
+// Export manager types
+pub use manager::{JobManager, ManagerConfig};
 
 /// Job execution status
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -152,6 +156,19 @@ pub struct JobDependency {
     pub depends_on: u64,
 }
 
+/// A status update event for asynchronous batch persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobUpdate {
+    /// Chunk identifier
+    pub chunk_id: u64,
+    /// New status
+    pub status: JobStatus,
+    /// Optional checksum update
+    pub checksum: Option<String>,
+    /// Optional error message (for Failed status)
+    pub error: Option<String>,
+}
+
 /// Core trait for persistent job storage backends
 ///
 /// Implementations must ensure atomicity for claim operations and
@@ -178,6 +195,27 @@ pub trait JobStore: Send + Sync {
     /// is marked as Processing and should be completed or failed.
     async fn claim_pending(&mut self, job_id: i64) -> anyhow::Result<Option<JobState>>;
 
+    /// Atomically claim multiple pending chunks in one transaction
+    ///
+    /// Returns up to `limit` pending chunks, all marked as Processing.
+    /// This reduces database lock contention during high-concurrency transfers.
+    async fn claim_pending_batch(
+        &mut self,
+        job_id: i64,
+        limit: usize,
+    ) -> anyhow::Result<Vec<JobState>> {
+        // Default implementation: claim one-by-one
+        let mut batch = Vec::new();
+        for _ in 0..limit {
+            if let Some(state) = self.claim_pending(job_id).await? {
+                batch.push(state);
+            } else {
+                break;
+            }
+        }
+        Ok(batch)
+    }
+
     /// Update the status of a chunk
     ///
     /// Optionally updates the checksum. For Failed status, include an error message.
@@ -193,6 +231,24 @@ pub trait JobStore: Send + Sync {
     async fn mark_failed(&mut self, job_id: i64, chunk: u64, error: String) -> anyhow::Result<()> {
         self.mark_status(job_id, chunk, JobStatus::Failed, Some(error))
             .await
+    }
+
+    /// Apply a batch of status updates in a single transaction
+    ///
+    /// This is used by the JobManager to flush buffered updates efficiently.
+    /// The default implementation applies updates one-by-one, but backends
+    /// should override this for better performance.
+    async fn apply_batch_updates(
+        &mut self,
+        job_id: i64,
+        updates: &[JobUpdate],
+    ) -> anyhow::Result<()> {
+        // Default implementation: apply one-by-one
+        for update in updates {
+            self.mark_status(job_id, update.chunk_id, update.status, update.checksum.clone())
+                .await?;
+        }
+        Ok(())
     }
 
     /// Get all pending chunks for a job (for resumption)

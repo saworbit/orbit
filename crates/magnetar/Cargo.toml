@@ -18,6 +18,7 @@ rayon = "1.10"
 async-trait = "0.1"
 thiserror = "1.0"
 futures = "0.3"
+tracing = "0.1"
 
 # Optional backend dependencies
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"], optional = true }
@@ -28,8 +29,8 @@ bincode = { version = "1", optional = true }
 polars = { version = "0.43", features = ["parquet", "lazy"], optional = true }
 arrow = { version = "53", optional = true }
 
-# Resilience (optional)
-governor = { version = "0.6", optional = true }
+# Resilience - now using the core-resilience crate
+orbit-core-resilience = { path = "../core-resilience", optional = true }
 
 # S3 integration example (optional)
 aws-config = { version = "1.5", optional = true }
@@ -46,7 +47,7 @@ default = ["sqlite", "resilience"]
 sqlite = ["dep:sqlx"]
 redb = ["dep:redb", "dep:bincode"]
 analytics = ["dep:polars", "dep:arrow"]
-resilience = []
-resilience-governor = ["resilience", "dep:governor"]
+resilience = ["dep:orbit-core-resilience"]
+resilience-governor = ["resilience", "orbit-core-resilience/governor-impl"]
 s3-integration = ["resilience", "dep:aws-config", "dep:aws-sdk-s3", "dep:hyper"]
 all = ["sqlite", "redb", "analytics", "resilience-governor", "s3-integration"]

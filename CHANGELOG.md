@@ -4,6 +4,29 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Architecture
+- **Refactor**: Extracted `orbit-core-resilience` crate to decouple network stability patterns from persistence
+  - Created new `crates/core-resilience` crate containing pure-logic fault-tolerance primitives
+  - Moved Circuit Breaker, Connection Pool, and Rate Limiter from magnetar into standalone crate
+  - Zero knowledge of storage systems (databases, file systems) or network protocols (S3, SMB, HTTP)
+  - Provides generic, composable fault-tolerance patterns usable across any layer
+  - Magnetar now re-exports from `orbit-core-resilience` for backward compatibility
+- **Performance**: Implemented Asynchronous Write-Behind in `magnetar` (The "Disk Guardian")
+  - New `JobManager` high-level wrapper with fire-and-forget status updates
+  - Background task batches and flushes updates asynchronously (default: 100 items or 500ms)
+  - Significantly reduces SQLite lock contention during high-concurrency transfers (16x fewer locks)
+  - Workers never block on database writes
+  - Added `claim_pending_batch()` method to `JobStore` trait for atomically claiming multiple chunks
+  - Added `apply_batch_updates()` method to `JobStore` trait for batched status updates
+  - Optimized SQLite implementations using `RETURNING` clause and single-transaction batching
+  - New `JobUpdate` struct for representing status update events
+  - Graceful shutdown with `shutdown()` method ensures all pending updates are flushed
+
+### Fixed
+- Fixed semantic circular dependency where protocol layer depended on database layer for circuit breakers
+  - Network protocols (S3, SMB) can now import resilience patterns without depending on magnetar
+  - Proper layering: protocols → core-resilience (no database dependency)
+
 ### Added
 - **Guidance System ("Flight Computer")** - Automatic configuration validation and optimization layer
   - New `Guidance` module (`src/core/guidance.rs`) that validates and sanitizes configurations before execution

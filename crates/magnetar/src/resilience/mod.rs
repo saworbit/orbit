@@ -140,6 +140,7 @@
 //! // Execute with full protection
 //! let result = breaker.execute(|| {
 //!     let pool = pool.clone();
+//!     let limiter = limiter.clone();
 //!     async move {
 //!         limiter.execute(|| async {
 //!             let conn = pool.acquire().await?;
@@ -206,19 +207,22 @@
 //! # }
 //! ```
 
-pub mod circuit_breaker;
-pub mod connection_pool;
-pub mod error;
-pub mod rate_limiter;
+//! Re-export resilience primitives from orbit-core-resilience
+//!
+//! This module now delegates to the orbit-core-resilience crate.
+//! For backward compatibility, we re-export all types.
 
-// Re-export main types for convenience
-pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitState};
-pub use connection_pool::{ConnectionFactory, ConnectionPool, PoolConfig, PoolStats};
-pub use error::ResilienceError;
-pub use rate_limiter::RateLimiter;
+pub use orbit_core_resilience::*;
 
-#[cfg(feature = "resilience-governor")]
-pub use rate_limiter::governor_impl::GovernorRateLimiter;
+// Maintain backward compatibility by keeping the module structure
+#[doc(inline)]
+pub use orbit_core_resilience::circuit_breaker;
+#[doc(inline)]
+pub use orbit_core_resilience::connection_pool;
+#[doc(inline)]
+pub use orbit_core_resilience::error;
+#[doc(inline)]
+pub use orbit_core_resilience::rate_limiter;
 
 /// Prelude module for convenient imports
 ///

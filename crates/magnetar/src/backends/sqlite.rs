@@ -183,6 +183,85 @@ impl JobStore for SqliteStore {
         Ok(())
     }
 
+    async fn claim_pending_batch(
+        &mut self,
+        job_id: i64,
+        limit: usize,
+    ) -> Result<Vec<crate::JobState>> {
+        let mut tx = self.pool.begin().await?;
+
+        // Optimized batch claim using RETURNING clause
+        let rows = sqlx::query(
+            "UPDATE chunks
+             SET status = 'processing'
+             WHERE rowid IN (
+                 SELECT rowid FROM chunks
+                 WHERE job_id = ? AND status = 'pending'
+                 ORDER BY chunk ASC
+                 LIMIT ?
+             )
+             RETURNING job_id, chunk, checksum, status, error",
+        )
+        .bind(job_id)
+        .bind(limit as i64)
+        .fetch_all(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        rows.iter().map(row_to_job_state).collect()
+    }
+
+    async fn apply_batch_updates(
+        &mut self,
+        job_id: i64,
+        updates: &[crate::JobUpdate],
+    ) -> Result<()> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.pool.begin().await?;
+
+        // Apply all updates in a single transaction
+        for update in updates {
+            if let Some(err) = &update.error {
+                // Failed with error
+                sqlx::query(
+                    "UPDATE chunks SET status = ?, error = ? WHERE job_id = ? AND chunk = ?",
+                )
+                .bind(update.status.to_string())
+                .bind(err)
+                .bind(job_id)
+                .bind(update.chunk_id as i64)
+                .execute(&mut *tx)
+                .await?;
+            } else if let Some(cs) = &update.checksum {
+                // Update status and checksum
+                sqlx::query(
+                    "UPDATE chunks SET status = ?, checksum = ?, error = NULL WHERE job_id = ? AND chunk = ?",
+                )
+                .bind(update.status.to_string())
+                .bind(cs)
+                .bind(job_id)
+                .bind(update.chunk_id as i64)
+                .execute(&mut *tx)
+                .await?;
+            } else {
+                // Update status only
+                sqlx::query("UPDATE chunks SET status = ? WHERE job_id = ? AND chunk = ?")
+                    .bind(update.status.to_string())
+                    .bind(job_id)
+                    .bind(update.chunk_id as i64)
+                    .execute(&mut *tx)
+                    .await?;
+            }
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
     async fn resume_pending(&self, job_id: i64) -> Result<Vec<JobState>> {
         let rows = sqlx::query(
             "SELECT job_id, chunk, checksum, status, error FROM chunks
