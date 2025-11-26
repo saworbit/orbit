@@ -647,6 +647,7 @@ mod tests {
         // Create a mock backend for testing path normalization
         // Note: This doesn't actually connect, just tests the path conversion logic
         struct TestHelper {
+            #[allow(dead_code)]
             config: SmbConfig,
         }
 

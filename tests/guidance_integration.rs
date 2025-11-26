@@ -23,13 +23,13 @@ fn test_guidance_resume_vs_compression_safety() {
 
     // Verify: Resume should be disabled
     assert_eq!(
-        flight_plan.config.resume_enabled, false,
+        flight_plan.final_config.resume_enabled, false,
         "Resume should be disabled when compression is enabled"
     );
 
     // Verify: Compression should remain enabled
     assert!(matches!(
-        flight_plan.config.compression,
+        flight_plan.final_config.compression,
         CompressionType::Zstd { .. }
     ));
 
@@ -55,12 +55,12 @@ fn test_guidance_zerocopy_vs_checksum_optimization() {
 
     // Verify: Zero-copy should be disabled to allow checksum
     assert_eq!(
-        flight_plan.config.use_zero_copy, false,
+        flight_plan.final_config.use_zero_copy, false,
         "Zero-copy should be disabled when checksum verification is enabled"
     );
 
     // Verify: Checksum should remain enabled
-    assert!(flight_plan.config.verify_checksum);
+    assert!(flight_plan.final_config.verify_checksum);
 
     // Verify: Should have an optimization notice
     assert!(
@@ -85,12 +85,12 @@ fn test_guidance_zerocopy_vs_resume_precision() {
 
     // Verify: Zero-copy should be disabled for resume precision
     assert_eq!(
-        flight_plan.config.use_zero_copy, false,
+        flight_plan.final_config.use_zero_copy, false,
         "Zero-copy should be disabled when resume is enabled"
     );
 
     // Verify: Resume should remain enabled
-    assert!(flight_plan.config.resume_enabled);
+    assert!(flight_plan.final_config.resume_enabled);
 
     // Verify: Should have a precision notice
     assert!(
@@ -112,7 +112,7 @@ fn test_guidance_sync_checksum_performance_info() {
     let flight_plan = Guidance::plan(config).unwrap();
 
     // Verify: Config should remain unchanged (info only, no changes)
-    assert_eq!(flight_plan.config.copy_mode, CopyMode::Sync);
+    assert_eq!(flight_plan.final_config.copy_mode, CopyMode::Sync);
 
     // Verify: Should have a performance info notice
     assert!(
@@ -143,13 +143,13 @@ fn test_guidance_multiple_rules_triggered() {
 
     // Verify: Resume should be disabled due to compression
     assert_eq!(
-        flight_plan.config.resume_enabled, false,
+        flight_plan.final_config.resume_enabled, false,
         "Resume should be disabled"
     );
 
     // Verify: Zero-copy should be disabled
     assert_eq!(
-        flight_plan.config.use_zero_copy, false,
+        flight_plan.final_config.use_zero_copy, false,
         "Zero-copy should be disabled"
     );
 }
@@ -189,7 +189,7 @@ fn test_guidance_with_actual_copy_operation() {
 
     // Apply guidance
     let flight_plan = Guidance::plan(config).unwrap();
-    let optimized_config = flight_plan.config;
+    let optimized_config = flight_plan.final_config;
 
     // Verify: Guidance should have optimized the config
     assert_eq!(optimized_config.use_zero_copy, false);
@@ -245,10 +245,10 @@ fn test_guidance_preserves_other_config_options() {
     let flight_plan = Guidance::plan(config).unwrap();
 
     // Verify: Unrelated options should be preserved
-    assert_eq!(flight_plan.config.retry_attempts, 10);
-    assert_eq!(flight_plan.config.chunk_size, 2 * 1024 * 1024);
-    assert_eq!(flight_plan.config.max_bandwidth, 1000);
-    assert_eq!(flight_plan.config.parallel, 4);
+    assert_eq!(flight_plan.final_config.retry_attempts, 10);
+    assert_eq!(flight_plan.final_config.chunk_size, 2 * 1024 * 1024);
+    assert_eq!(flight_plan.final_config.max_bandwidth, 1000);
+    assert_eq!(flight_plan.final_config.parallel, 4);
 }
 
 // NOTE: CLI output test disabled - requires assert_cmd crate
@@ -305,12 +305,12 @@ fn test_guidance_manifest_vs_zerocopy() {
 
     // Verify: Zero-copy should be disabled
     assert_eq!(
-        flight_plan.config.use_zero_copy, false,
+        flight_plan.final_config.use_zero_copy, false,
         "Zero-copy should be disabled when manifest generation is enabled"
     );
 
     // Verify: Manifest generation should remain enabled
-    assert!(flight_plan.config.generate_manifest);
+    assert!(flight_plan.final_config.generate_manifest);
 
     // Verify: Should have a visibility notice
     assert!(
@@ -334,7 +334,7 @@ fn test_guidance_delta_vs_zerocopy() {
 
     // Verify: Zero-copy should be disabled
     assert_eq!(
-        flight_plan.config.use_zero_copy, false,
+        flight_plan.final_config.use_zero_copy, false,
         "Zero-copy should be disabled when delta transfer is active"
     );
 
@@ -359,8 +359,8 @@ fn test_guidance_parallel_progress_ux() {
     let flight_plan = Guidance::plan(config).unwrap();
 
     // Verify: Config should remain unchanged (info only)
-    assert_eq!(flight_plan.config.parallel, 4);
-    assert!(flight_plan.config.show_progress);
+    assert_eq!(flight_plan.final_config.parallel, 4);
+    assert!(flight_plan.final_config.show_progress);
 
     // Verify: Should have a UX info notice
     assert!(
@@ -383,12 +383,12 @@ fn test_guidance_resume_vs_checksum_integrity() {
 
     // Verify: Checksum should be disabled
     assert_eq!(
-        flight_plan.config.verify_checksum, false,
+        flight_plan.final_config.verify_checksum, false,
         "Checksum should be disabled when resume is enabled"
     );
 
     // Verify: Resume should remain enabled
-    assert!(flight_plan.config.resume_enabled);
+    assert!(flight_plan.final_config.resume_enabled);
 
     // Verify: Should have an integrity notice
     assert!(

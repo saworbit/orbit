@@ -305,7 +305,7 @@ mod tests {
             Ok(())
         }
 
-        async fn claim_pending(&mut self, job_id: i64) -> anyhow::Result<Option<JobState>> {
+        async fn claim_pending(&mut self, _job_id: i64) -> anyhow::Result<Option<JobState>> {
             let mut chunks = self.chunks.lock().await;
             for (_, state) in chunks.iter_mut() {
                 if state.status == JobStatus::Pending {
@@ -318,7 +318,7 @@ mod tests {
 
         async fn claim_pending_batch(
             &mut self,
-            job_id: i64,
+            _job_id: i64,
             limit: usize,
         ) -> anyhow::Result<Vec<JobState>> {
             let mut chunks = self.chunks.lock().await;
