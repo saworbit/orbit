@@ -275,7 +275,10 @@ mod tests {
 
         // Resume must be disabled to prevent corruption
         assert_eq!(plan.final_config.resume_enabled, false);
-        assert!(plan.notices.iter().any(|n| n.category == "Safety".to_string()));
+        assert!(plan
+            .notices
+            .iter()
+            .any(|n| n.category == "Safety".to_string()));
     }
 
     #[test]
@@ -288,7 +291,10 @@ mod tests {
 
         // Zero-copy must be disabled to allow streaming hash
         assert_eq!(plan.final_config.use_zero_copy, false);
-        assert!(plan.notices.iter().any(|n| n.category == "Strategy".to_string()));
+        assert!(plan
+            .notices
+            .iter()
+            .any(|n| n.category == "Strategy".to_string()));
     }
 
     #[test]
@@ -301,7 +307,10 @@ mod tests {
 
         // Checksum verification must be disabled on resume
         assert_eq!(plan.final_config.verify_checksum, false);
-        assert!(plan.notices.iter().any(|n| n.category == "Integrity".to_string()));
+        assert!(plan
+            .notices
+            .iter()
+            .any(|n| n.category == "Integrity".to_string()));
     }
 
     #[test]
@@ -314,7 +323,10 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         assert_eq!(plan.final_config.use_zero_copy, false);
-        assert!(plan.notices.iter().any(|n| n.category == "Visibility".to_string()));
+        assert!(plan
+            .notices
+            .iter()
+            .any(|n| n.category == "Visibility".to_string()));
     }
 
     #[test]
@@ -327,7 +339,10 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         assert_eq!(plan.final_config.use_zero_copy, false);
-        assert!(plan.notices.iter().any(|n| n.category == "Logic".to_string()));
+        assert!(plan
+            .notices
+            .iter()
+            .any(|n| n.category == "Logic".to_string()));
     }
 
     #[test]
@@ -341,7 +356,10 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         assert_eq!(plan.final_config.use_zero_copy, false);
-        assert!(plan.notices.iter().any(|n| n.category == "Control".to_string()));
+        assert!(plan
+            .notices
+            .iter()
+            .any(|n| n.category == "Control".to_string()));
     }
 
     #[test]
@@ -365,7 +383,10 @@ mod tests {
 
         let plan = Guidance::plan(config).unwrap();
 
-        assert!(plan.notices.iter().any(|n| n.category == "Performance".to_string()));
+        assert!(plan
+            .notices
+            .iter()
+            .any(|n| n.category == "Performance".to_string()));
     }
 
     #[test]
@@ -429,8 +450,14 @@ mod tests {
         assert_eq!(plan.final_config.compression, CompressionType::Lz4);
 
         // Verify the notice
-        let notice = plan.notices.iter().find(|n| n.code == "ZEROCOPY_DISABLED_COMPRESSION");
-        assert!(notice.is_some(), "Expected ZEROCOPY_DISABLED_COMPRESSION notice");
+        let notice = plan
+            .notices
+            .iter()
+            .find(|n| n.code == "ZEROCOPY_DISABLED_COMPRESSION");
+        assert!(
+            notice.is_some(),
+            "Expected ZEROCOPY_DISABLED_COMPRESSION notice"
+        );
 
         let notice = notice.unwrap();
         assert_eq!(notice.level, NoticeLevel::Warning);

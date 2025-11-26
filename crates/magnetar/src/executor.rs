@@ -111,10 +111,7 @@ where
 {
     task::spawn_blocking(move || {
         use rayon::prelude::*;
-        items
-            .into_par_iter()
-            .map(task)
-            .collect::<Result<Vec<T>>>()
+        items.into_par_iter().map(task).collect::<Result<Vec<T>>>()
     })
     .await
     .map_err(|join_err| anyhow::anyhow!("Parallel compute task panicked: {}", join_err))?
@@ -148,10 +145,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_offload_compute_with_error() {
-        let result = offload_compute(|| -> Result<()> {
-            Err(anyhow::anyhow!("intentional error"))
-        })
-        .await;
+        let result =
+            offload_compute(|| -> Result<()> { Err(anyhow::anyhow!("intentional error")) }).await;
         assert!(result.is_err());
     }
 
