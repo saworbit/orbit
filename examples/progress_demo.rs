@@ -9,7 +9,7 @@ use orbit::cli_progress::CliProgressRenderer;
 use orbit::config::CopyConfig;
 use orbit::core::progress::ProgressPublisher;
 use orbit::telemetry::{TelemetryLogger, TelemetryOutput};
-use orbit::{copy_directory_impl, copy_file_impl};
+use orbit::copy_directory_impl;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -141,11 +141,13 @@ fn demo_dual_subscribers(source: &Path, dest: &Path) -> Result<(), Box<dyn std::
     let logger_handle = logger.spawn();
 
     // Create a combined publisher that publishes to both
+    #[allow(dead_code)]
     struct DualPublisher {
         cli: Arc<ProgressPublisher>,
         telemetry: Arc<ProgressPublisher>,
     }
 
+    #[allow(dead_code)]
     impl DualPublisher {
         fn publish_to_both(&self, event: orbit::core::progress::ProgressEvent) {
             self.cli.publish(event.clone());

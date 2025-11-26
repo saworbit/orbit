@@ -551,7 +551,7 @@ mod tests {
     #[test]
     #[cfg(feature = "s3-native")]
     fn test_parse_s3_uri() {
-        let (config, path) = parse_uri("s3://my-bucket/prefix/path?region=us-east-1").unwrap();
+        let (config, _path) = parse_uri("s3://my-bucket/prefix/path?region=us-east-1").unwrap();
         if let BackendConfig::S3 { config, prefix } = config {
             assert_eq!(config.bucket, "my-bucket");
             assert_eq!(config.region, Some("us-east-1".to_string()));
@@ -570,7 +570,7 @@ mod tests {
     #[test]
     #[cfg(feature = "smb-native")]
     fn test_parse_smb_uri() {
-        let (config, path) = parse_uri("smb://user:pass@fileserver/share/path/to/file").unwrap();
+        let (config, _path) = parse_uri("smb://user:pass@fileserver/share/path/to/file").unwrap();
         if let BackendConfig::Smb(smb_config) = config {
             assert_eq!(smb_config.host, "fileserver");
             assert_eq!(smb_config.share, "share");

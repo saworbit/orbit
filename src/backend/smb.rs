@@ -147,6 +147,7 @@ impl SmbConfig {
 /// ```
 pub struct SmbBackend {
     client: Arc<RwLock<Box<dyn SmbClient>>>,
+    #[allow(dead_code)]
     config: SmbConfig,
 }
 
@@ -689,7 +690,7 @@ mod tests {
         assert_eq!(file_meta.size, 1024);
 
         // Test directory metadata
-        let dir_meta = SmbMetadata {
+        let _dir_meta = SmbMetadata {
             size: 0,
             is_dir: true,
             modified: None,

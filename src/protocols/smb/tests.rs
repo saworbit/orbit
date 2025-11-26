@@ -244,7 +244,7 @@ mod integration_tests {
         let entries = client.list_dir("").await.expect("Failed to list directory");
 
         println!("Directory entries: {:?}", entries);
-        assert!(entries.len() >= 0); // Directory might be empty
+        // Success - directory listing worked (may be empty)
     }
 
     #[tokio::test]
