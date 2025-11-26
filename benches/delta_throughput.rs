@@ -4,7 +4,7 @@ use orbit::core::delta::{
     checksum::generate_signatures,
     HashAlgorithm,
 };
-use rand::Rng;
+use rand::RngCore;
 use std::io::Cursor;
 
 fn benchmark_delta_worst_case(c: &mut Criterion) {
@@ -12,7 +12,8 @@ fn benchmark_delta_worst_case(c: &mut Criterion) {
 
     let size = 10 * 1024 * 1024; // 10MB
     let mut rng = rand::thread_rng();
-    let data: Vec<u8> = (0..size).map(|_| rng.gen()).collect();
+    let mut data = vec![0u8; size];
+    rng.fill_bytes(&mut data);
 
     // Build a destination signature set that should not match random data.
     let block_size = 4096;
