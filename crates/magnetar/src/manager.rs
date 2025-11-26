@@ -355,8 +355,13 @@ mod tests {
             updates: &[JobUpdate],
         ) -> anyhow::Result<()> {
             for update in updates {
-                self.mark_status(job_id, update.chunk_id, update.status, update.checksum.clone())
-                    .await?;
+                self.mark_status(
+                    job_id,
+                    update.chunk_id,
+                    update.status,
+                    update.checksum.clone(),
+                )
+                .await?;
             }
             Ok(())
         }
@@ -390,11 +395,7 @@ mod tests {
             Ok(Vec::new())
         }
 
-        async fn get_chunk(
-            &self,
-            _job_id: i64,
-            _chunk: u64,
-        ) -> anyhow::Result<Option<JobState>> {
+        async fn get_chunk(&self, _job_id: i64, _chunk: u64) -> anyhow::Result<Option<JobState>> {
             Ok(None)
         }
 
@@ -428,10 +429,10 @@ mod tests {
     #[tokio::test]
     async fn test_job_manager_basic() {
         let chunks = Arc::new(Mutex::new(HashMap::new()));
-        chunks.lock().await.insert(
-            1,
-            JobState::new(42, 1, "abc123".to_string()),
-        );
+        chunks
+            .lock()
+            .await
+            .insert(1, JobState::new(42, 1, "abc123".to_string()));
 
         let store = Box::new(MockStore {
             chunks: chunks.clone(),
@@ -461,10 +462,10 @@ mod tests {
     async fn test_job_manager_batch_flush() {
         let chunks = Arc::new(Mutex::new(HashMap::new()));
         for i in 1..=10 {
-            chunks.lock().await.insert(
-                i,
-                JobState::new(42, i, format!("checksum{}", i)),
-            );
+            chunks
+                .lock()
+                .await
+                .insert(i, JobState::new(42, i, format!("checksum{}", i)));
         }
 
         let store = Box::new(MockStore {

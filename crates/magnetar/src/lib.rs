@@ -245,8 +245,13 @@ pub trait JobStore: Send + Sync {
     ) -> anyhow::Result<()> {
         // Default implementation: apply one-by-one
         for update in updates {
-            self.mark_status(job_id, update.chunk_id, update.status, update.checksum.clone())
-                .await?;
+            self.mark_status(
+                job_id,
+                update.chunk_id,
+                update.status,
+                update.checksum.clone(),
+            )
+            .await?;
         }
         Ok(())
     }
