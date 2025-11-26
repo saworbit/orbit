@@ -569,7 +569,7 @@ fn main() -> Result<()> {
     }
 
     // Use the optimized config from the flight plan
-    let config = flight_plan.config;
+    let config = flight_plan.final_config;
 
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {

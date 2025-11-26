@@ -52,6 +52,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub mod backends;
+pub mod executor;
 pub mod manager;
 pub mod migration;
 
