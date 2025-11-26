@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use orbit::core::delta::{
     algorithm::{generate_delta_rolling, SignatureIndex},
     checksum::generate_signatures,
-    HashAlgorithm,
+    HashAlgorithm, RollingHashAlgo,
 };
 use rand::RngCore;
 use std::io::Cursor;
@@ -19,8 +19,13 @@ fn benchmark_delta_worst_case(c: &mut Criterion) {
     let block_size = 4096;
     let dest_signatures = {
         let dest_data = vec![0u8; size];
-        let sigs = generate_signatures(Cursor::new(dest_data), block_size, HashAlgorithm::Blake3)
-            .expect("signatures");
+        let sigs = generate_signatures(
+            Cursor::new(dest_data),
+            block_size,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .expect("signatures");
         SignatureIndex::new(sigs)
     };
 
@@ -32,6 +37,7 @@ fn benchmark_delta_worst_case(c: &mut Criterion) {
                 black_box(&data[..]),
                 black_box(dest_signatures.clone()),
                 black_box(HashAlgorithm::Blake3),
+                black_box(RollingHashAlgo::Gear64),
             );
             black_box(result).unwrap();
         });

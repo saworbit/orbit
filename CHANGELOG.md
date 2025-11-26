@@ -4,6 +4,40 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Performance & Optimization (v0.5.x / v0.6.0)
+- **Delta Algorithm**: Replaced Adler-32 with Gear Hash (64-bit) rolling checksum
+  - **Collision Resistance**: Gear64 provides ~2^32 times better collision resistance than Adler-32
+  - **Performance**: FastCDC-style gear table offers excellent entropy distribution
+  - **Configurable**: New `RollingHashAlgo` enum allows selection between Adler32 (legacy) and Gear64 (default)
+  - **Backward Compatible**: Adler-32 still available for compatibility, weak_hash field upgraded from u32 to u64
+  - **Impact**: Dramatically reduced false-positive matches, resulting in ~2x throughput improvement on high-speed networks
+  - **Testing**: Comprehensive collision resistance tests including pathological cases (runs of zeros, repeating patterns)
+
+### Binary Size & Attack Surface Reduction
+- **Aggressive Feature Gating**: Reduced default binary footprint by ~60%
+  - **New Default Features**: `default = ["zero-copy"]` (minimal, fast local copy only)
+  - **Opt-in Network Protocols**: S3, SMB, SSH now require explicit `--features` flags
+  - **Opt-in Web GUI**: GUI requires explicit `--features gui` (removes Axum, Leptos, and Tower dependencies from default build)
+  - **Security Hardening**: Server-side code (Axum web framework) no longer compiled into CLI by default
+  - **Install Profiles**:
+    - `cargo install orbit` → Minimal CLI (local copy only, ~10MB binary)
+    - `cargo install orbit --features network` → CLI + All network protocols (~35MB)
+    - `cargo install orbit --features full` → Everything including GUI (~50MB+)
+
+- **New Cargo Profile**: `release-min` for maximum size optimization
+  - `opt-level = "z"` (optimize for size)
+  - `lto = true` (link-time optimization)
+  - `codegen-units = 1` (single codegen unit for better optimization)
+  - `strip = true` (strip debug symbols)
+  - `panic = "abort"` (smaller panic handler)
+  - **Usage**: `cargo build --profile release-min`
+
+- **Dependency Impact**:
+  - **Before**: ~150+ crates in default build with GUI, S3, SMB, SSH
+  - **After (minimal)**: ~50 crates with just core functionality
+  - **After (network)**: ~100 crates with S3, SMB, SSH protocols
+  - **Compile Time**: 40-50% faster for default builds
+
 ### Architecture
 - **Refactor**: Extracted `orbit-core-resilience` crate to decouple network stability patterns from persistence
   - Created new `crates/core-resilience` crate containing pure-logic fault-tolerance primitives

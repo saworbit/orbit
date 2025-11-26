@@ -112,6 +112,7 @@ fn copy_with_delta_integration(
         update_manifest: config.update_manifest,
         ignore_existing: config.ignore_existing,
         hash_algorithm: config.delta_hash_algorithm,
+        rolling_hash_algo: delta::RollingHashAlgo::Gear64,
         parallel_hashing: config.parallel_hashing,
         manifest_path: config.delta_manifest_path.clone(),
         resume_enabled: config.delta_resume_enabled,

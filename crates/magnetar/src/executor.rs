@@ -72,7 +72,7 @@ where
     F: FnOnce() -> Result<T> + Send + 'static,
     T: Send + 'static,
 {
-    task::spawn_blocking(move || task())
+    task::spawn_blocking(task)
         .await
         .map_err(|join_err| anyhow::anyhow!("Compute task panicked: {}", join_err))?
 }

@@ -58,6 +58,33 @@ impl std::str::FromStr for CheckMode {
     }
 }
 
+/// Rolling hash algorithm for delta detection
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RollingHashAlgo {
+    /// Adler-32 (legacy, 32-bit, prone to collisions)
+    Adler32,
+
+    /// Gear Hash (64-bit, FastCDC-style, default)
+    /// Superior collision resistance and SIMD-friendly
+    Gear64,
+}
+
+impl Default for RollingHashAlgo {
+    fn default() -> Self {
+        Self::Gear64
+    }
+}
+
+impl fmt::Display for RollingHashAlgo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Adler32 => write!(f, "adler32"),
+            Self::Gear64 => write!(f, "gear64"),
+        }
+    }
+}
+
 /// Hash algorithm for checksums
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -109,6 +136,10 @@ pub struct DeltaConfig {
     /// Hash algorithm to use
     pub hash_algorithm: HashAlgorithm,
 
+    /// Rolling hash algorithm for delta detection
+    #[serde(default)]
+    pub rolling_hash_algo: RollingHashAlgo,
+
     /// Enable parallel hashing
     pub parallel_hashing: bool,
 
@@ -141,6 +172,7 @@ impl Default for DeltaConfig {
             update_manifest: false,
             ignore_existing: false,
             hash_algorithm: HashAlgorithm::Blake3,
+            rolling_hash_algo: RollingHashAlgo::Gear64,
             parallel_hashing: true,
             manifest_path: None,
             resume_enabled: true,
@@ -226,8 +258,8 @@ pub struct BlockSignature {
     /// Block length
     pub length: usize,
 
-    /// Weak rolling checksum (Adler-32)
-    pub weak_hash: u32,
+    /// Weak rolling checksum (u64 for Gear64, u32 values for Adler-32 compatibility)
+    pub weak_hash: u64,
 
     /// Strong hash (BLAKE3 or MD5)
     pub strong_hash: Vec<u8>,
@@ -235,7 +267,7 @@ pub struct BlockSignature {
 
 impl BlockSignature {
     /// Create a new block signature
-    pub fn new(offset: u64, length: usize, weak_hash: u32, strong_hash: Vec<u8>) -> Self {
+    pub fn new(offset: u64, length: usize, weak_hash: u64, strong_hash: Vec<u8>) -> Self {
         Self {
             offset,
             length,

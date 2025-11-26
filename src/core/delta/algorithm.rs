@@ -7,8 +7,8 @@
  * 3. Generate delta instructions (Copy existing blocks or insert new data)
  */
 
-use super::checksum::{calculate_strong_hash, RollingChecksum};
-use super::{BlockSignature, DeltaInstruction, DeltaStats, HashAlgorithm};
+use super::checksum::{calculate_strong_hash, RollingHash};
+use super::{BlockSignature, DeltaInstruction, DeltaStats, HashAlgorithm, RollingHashAlgo};
 use crate::error::Result;
 use std::collections::HashMap;
 use std::io::Read;
@@ -17,7 +17,7 @@ use std::io::Read;
 #[derive(Clone)]
 pub struct SignatureIndex {
     /// Map from weak hash to list of signatures with that weak hash
-    weak_hash_map: HashMap<u32, Vec<BlockSignature>>,
+    weak_hash_map: HashMap<u64, Vec<BlockSignature>>,
 
     /// Block size used for signatures
     block_size: usize,
@@ -26,7 +26,7 @@ pub struct SignatureIndex {
 impl SignatureIndex {
     /// Create a new signature index from a list of signatures
     pub fn new(signatures: Vec<BlockSignature>) -> Self {
-        let mut weak_hash_map: HashMap<u32, Vec<BlockSignature>> = HashMap::new();
+        let mut weak_hash_map: HashMap<u64, Vec<BlockSignature>> = HashMap::new();
         let block_size = signatures.first().map(|s| s.length).unwrap_or(0);
 
         for sig in signatures {
@@ -40,7 +40,7 @@ impl SignatureIndex {
     }
 
     /// Find a matching block signature for the given weak and strong hashes
-    pub fn find_match(&self, weak_hash: u32, strong_hash: &[u8]) -> Option<&BlockSignature> {
+    pub fn find_match(&self, weak_hash: u64, strong_hash: &[u8]) -> Option<&BlockSignature> {
         // First check weak hash
         let candidates = self.weak_hash_map.get(&weak_hash)?;
 
@@ -58,7 +58,8 @@ impl SignatureIndex {
 pub fn generate_delta<R: Read>(
     mut source: R,
     dest_signatures: SignatureIndex,
-    algorithm: HashAlgorithm,
+    hash_algorithm: HashAlgorithm,
+    rolling_algo: RollingHashAlgo,
 ) -> Result<(Vec<DeltaInstruction>, DeltaStats)> {
     let block_size = dest_signatures.block_size();
     let mut instructions = Vec::new();
@@ -97,9 +98,9 @@ pub fn generate_delta<R: Read>(
         let chunk = &buffer[pos..pos + chunk_size];
 
         // Calculate checksums for this block
-        let rolling = RollingChecksum::from_data(chunk);
-        let weak_hash = rolling.checksum();
-        let strong_hash = calculate_strong_hash(chunk, algorithm);
+        let rolling = RollingHash::from_data(chunk, rolling_algo);
+        let weak_hash = rolling.hash();
+        let strong_hash = calculate_strong_hash(chunk, hash_algorithm);
 
         // Look for a match in destination signatures
         if let Some(sig) = dest_signatures.find_match(weak_hash, &strong_hash) {
@@ -152,7 +153,8 @@ pub fn generate_delta<R: Read>(
 pub fn generate_delta_rolling<R: Read>(
     mut source: R,
     dest_signatures: SignatureIndex,
-    algorithm: HashAlgorithm,
+    hash_algorithm: HashAlgorithm,
+    rolling_algo: RollingHashAlgo,
 ) -> Result<(Vec<DeltaInstruction>, DeltaStats)> {
     let block_size = dest_signatures.block_size();
     let mut instructions = Vec::new();
@@ -183,7 +185,7 @@ pub fn generate_delta_rolling<R: Read>(
     let mut dest_offset = 0u64;
     // Track the start of the current non-matching span to emit in one shot.
     let mut pending_start = 0usize;
-    let mut rolling: Option<RollingChecksum> = None;
+    let mut rolling: Option<RollingHash> = None;
 
     while pos + block_size <= buffer.len() {
         // Initialize or roll the checksum
@@ -194,18 +196,18 @@ pub fn generate_delta_rolling<R: Read>(
             let old_byte = if pos > 0 { buffer[pos - 1] } else { buffer[0] };
             let new_byte = buffer[pos + block_size - 1];
             roll.roll(old_byte, new_byte);
-            roll.checksum()
+            roll.hash()
         } else {
             // Initialize checksum for first block
             let chunk = &buffer[pos..pos + block_size];
-            rolling = Some(RollingChecksum::from_data(chunk));
-            rolling.as_ref().unwrap().checksum()
+            rolling = Some(RollingHash::from_data(chunk, rolling_algo));
+            rolling.as_ref().unwrap().hash()
         };
 
         // Calculate strong hash only if weak hash matches
         let chunk = &buffer[pos..pos + block_size];
         if dest_signatures.weak_hash_map.contains_key(&weak_hash) {
-            let strong_hash = calculate_strong_hash(chunk, algorithm);
+            let strong_hash = calculate_strong_hash(chunk, hash_algorithm);
 
             if let Some(sig) = dest_signatures.find_match(weak_hash, &strong_hash) {
                 // Found a match! Flush any pending data in a single memcpy.
@@ -255,7 +257,7 @@ pub fn generate_delta_rolling<R: Read>(
 
 #[cfg(test)]
 mod tests {
-    use super::super::checksum::{calculate_strong_hash, generate_signatures, RollingChecksum};
+    use super::super::checksum::{calculate_strong_hash, generate_signatures, RollingHash};
     use super::*;
 
     #[test]
@@ -289,12 +291,23 @@ mod tests {
         let block_size = 5;
 
         // Generate signatures for "destination"
-        let signatures = generate_signatures(&data[..], block_size, HashAlgorithm::Blake3).unwrap();
+        let signatures = generate_signatures(
+            &data[..],
+            block_size,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
         let index = SignatureIndex::new(signatures);
 
         // Generate delta for identical "source"
-        let (instructions, stats) =
-            generate_delta(&data[..], index, HashAlgorithm::Blake3).unwrap();
+        let (instructions, stats) = generate_delta(
+            &data[..],
+            index,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
 
         // All blocks should match
         assert!(stats.blocks_matched > 0);
@@ -314,13 +327,23 @@ mod tests {
         let block_size = 5;
 
         // Generate signatures for destination
-        let signatures =
-            generate_signatures(&dest_data[..], block_size, HashAlgorithm::Blake3).unwrap();
+        let signatures = generate_signatures(
+            &dest_data[..],
+            block_size,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
         let index = SignatureIndex::new(signatures);
 
         // Generate delta for different source
-        let (instructions, stats) =
-            generate_delta(&source_data[..], index, HashAlgorithm::Blake3).unwrap();
+        let (instructions, stats) = generate_delta(
+            &source_data[..],
+            index,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
 
         // No blocks should match
         assert_eq!(stats.blocks_matched, 0);
@@ -341,13 +364,23 @@ mod tests {
         let block_size = 5;
 
         // Generate signatures for destination
-        let signatures =
-            generate_signatures(&dest_data[..], block_size, HashAlgorithm::Blake3).unwrap();
+        let signatures = generate_signatures(
+            &dest_data[..],
+            block_size,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
         let index = SignatureIndex::new(signatures);
 
         // Generate delta
-        let (instructions, stats) =
-            generate_delta(&source_data[..], index, HashAlgorithm::Blake3).unwrap();
+        let (instructions, stats) = generate_delta(
+            &source_data[..],
+            index,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
 
         // Should have some matches (the "hello world" part)
         assert!(stats.blocks_matched > 0);
@@ -372,19 +405,39 @@ mod tests {
         let block_size = 8;
 
         // Generate signatures for destination
-        let signatures =
-            generate_signatures(&dest_data[..], block_size, HashAlgorithm::Blake3).unwrap();
+        let signatures = generate_signatures(
+            &dest_data[..],
+            block_size,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
         let index = SignatureIndex::new(signatures);
 
         // Compare basic vs rolling algorithm
-        let (_, stats_basic) =
-            generate_delta(&source_data[..], index.clone(), HashAlgorithm::Blake3).unwrap();
+        let (_, stats_basic) = generate_delta(
+            &source_data[..],
+            index.clone(),
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
 
-        let signatures2 =
-            generate_signatures(&dest_data[..], block_size, HashAlgorithm::Blake3).unwrap();
+        let signatures2 = generate_signatures(
+            &dest_data[..],
+            block_size,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
         let index2 = SignatureIndex::new(signatures2);
-        let (_, stats_rolling) =
-            generate_delta_rolling(&source_data[..], index2, HashAlgorithm::Blake3).unwrap();
+        let (_, stats_rolling) = generate_delta_rolling(
+            &source_data[..],
+            index2,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
 
         // Both should find similar matches
         assert_eq!(stats_basic.total_bytes, stats_rolling.total_bytes);
@@ -397,12 +450,18 @@ mod tests {
         let sig = BlockSignature::new(
             100,
             3,
-            RollingChecksum::from_data(b"BBB").checksum(),
+            RollingHash::from_data(b"BBB", super::super::RollingHashAlgo::Gear64).hash(),
             calculate_strong_hash(b"BBB", HashAlgorithm::Blake3),
         );
         let index = SignatureIndex::new(vec![sig]);
 
-        let (insts, _) = generate_delta_rolling(&data[..], index, HashAlgorithm::Blake3).unwrap();
+        let (insts, _) = generate_delta_rolling(
+            &data[..],
+            index,
+            HashAlgorithm::Blake3,
+            super::super::RollingHashAlgo::Gear64,
+        )
+        .unwrap();
 
         assert_eq!(insts.len(), 3);
 
@@ -442,12 +501,22 @@ mod tests {
         let source_data = b"";
         let block_size = 5;
 
-        let signatures =
-            generate_signatures(&dest_data[..], block_size, HashAlgorithm::Blake3).unwrap();
+        let signatures = generate_signatures(
+            &dest_data[..],
+            block_size,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
         let index = SignatureIndex::new(signatures);
 
-        let (instructions, stats) =
-            generate_delta(&source_data[..], index, HashAlgorithm::Blake3).unwrap();
+        let (instructions, stats) = generate_delta(
+            &source_data[..],
+            index,
+            HashAlgorithm::Blake3,
+            RollingHashAlgo::Gear64,
+        )
+        .unwrap();
 
         assert_eq!(instructions.len(), 0);
         assert_eq!(stats.total_bytes, 0);

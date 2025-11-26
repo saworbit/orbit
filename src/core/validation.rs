@@ -167,13 +167,21 @@ fn files_differ_by_signature(source_path: &Path, dest_path: &Path) -> Result<boo
 
     // Generate signatures for source file
     let source_reader = BufReader::new(&source_file);
-    let source_sigs =
-        delta_checksum::generate_signatures(source_reader, BLOCK_SIZE, HashAlgorithm::Blake3)?;
+    let source_sigs = delta_checksum::generate_signatures(
+        source_reader,
+        BLOCK_SIZE,
+        HashAlgorithm::Blake3,
+        delta::RollingHashAlgo::Gear64,
+    )?;
 
     // Generate signatures for destination file
     let dest_reader = BufReader::new(&dest_file);
-    let dest_sigs =
-        delta_checksum::generate_signatures(dest_reader, BLOCK_SIZE, HashAlgorithm::Blake3)?;
+    let dest_sigs = delta_checksum::generate_signatures(
+        dest_reader,
+        BLOCK_SIZE,
+        HashAlgorithm::Blake3,
+        delta::RollingHashAlgo::Gear64,
+    )?;
 
     // Compare number of blocks
     if source_sigs.len() != dest_sigs.len() {
@@ -204,6 +212,7 @@ pub fn should_use_delta_transfer(
         update_manifest: config.update_manifest,
         ignore_existing: config.ignore_existing,
         hash_algorithm: config.delta_hash_algorithm,
+        rolling_hash_algo: delta::RollingHashAlgo::Gear64,
         parallel_hashing: config.parallel_hashing,
         manifest_path: config.delta_manifest_path.clone(),
         resume_enabled: config.delta_resume_enabled,

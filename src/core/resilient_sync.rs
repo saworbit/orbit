@@ -468,6 +468,7 @@ pub fn files_need_transfer(
                 update_manifest: false,
                 ignore_existing: false,
                 hash_algorithm: HashAlgorithm::Blake3,
+                rolling_hash_algo: crate::core::delta::RollingHashAlgo::Gear64,
                 parallel_hashing: true,
                 manifest_path: None,
                 resume_enabled: true,

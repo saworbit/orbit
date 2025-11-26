@@ -198,31 +198,41 @@ lto = true
 codegen-units = 1
 panic = "abort"
 
+[profile.release-min]
+inherits = "release"
+opt-level = "z"        # Optimize for size
+lto = true             # Enable link-time optimization
+codegen-units = 1      # Single codegen unit for better optimization
+strip = true           # Strip symbols
+panic = "abort"        # Smaller panic handler
+
 [features]
-default = ["zero-copy", "gui", "backend-abstraction", "s3-native", "ssh-backend", "smb-native"]
+# Minimal default: local file copy only, zero-copy optimizations
+# For network protocols or GUI, explicitly opt-in with --features
+default = ["zero-copy"]
 
 # Zero-copy system calls for maximum performance
 zero-copy = []
 
-# Protocol support (experimental)
+# Protocol support (experimental, deprecated - use specific protocol features)
 protocols = []
 
-# Native SMB2/3 client (pure Rust, async)
-smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes", "dep:futures"]
+# Native SMB2/3 client (pure Rust, async) - OFF by default
+smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes", "dep:futures", "backend-abstraction"]
 
-# Native S3 client (pure Rust, async)
-s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes"]
+# Native S3 client (pure Rust, async) - OFF by default
+s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
-# SSH backend support
-ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes"]
+# SSH backend support - OFF by default
+ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
 
-# Web GUI (enabled by default)
+# Web GUI - OFF by default (use --features gui to enable)
 gui = ["dep:orbit-web", "orbit-web/ssr", "dep:tokio"]
 
-# Delta manifest persistence with SQLite
+# Delta manifest persistence with SQLite - OFF by default
 delta-manifest = ["dep:rusqlite"]
 
 # Extended attributes and metadata preservation
@@ -231,5 +241,8 @@ extended-metadata = ["dep:xattr"]
 # Unicode normalization for consistent path encoding
 unicode-normalization = ["dep:unicode-normalization"]
 
-# Full feature set
-full = ["zero-copy", "protocols", "smb-native", "s3-native", "ssh-backend", "backend-abstraction", "delta-manifest", "extended-metadata", "gui"]
+# Convenience: All network protocols
+network = ["s3-native", "smb-native", "ssh-backend"]
+
+# Full feature set (for development and power users)
+full = ["zero-copy", "network", "backend-abstraction", "delta-manifest", "extended-metadata", "gui", "unicode-normalization"]

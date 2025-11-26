@@ -12,7 +12,7 @@ pub mod types;
 
 pub use types::{
     BlockSignature, CheckMode, DeltaConfig, DeltaStats, HashAlgorithm, ManifestDb, ManifestEntry,
-    PartialManifest,
+    PartialManifest, RollingHashAlgo,
 };
 // DeltaInstruction is module-internal
 pub use transfer::{copy_with_delta, copy_with_delta_fallback, update_manifest_if_configured};

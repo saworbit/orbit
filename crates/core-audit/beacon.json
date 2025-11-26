@@ -1,0 +1,10 @@
+{
+  "schema": "orbit.beacon.v1",
+  "job_id": "job-123",
+  "job_digest": "sha256:abc123",
+  "signer": "CN=ORBIT-SIGNER",
+  "ts": "2025-11-26T09:54:05.870431100Z",
+  "policy": {
+    "classification": "OFFICIAL:Sensitive"
+  }
+}

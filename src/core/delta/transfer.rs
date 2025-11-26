@@ -51,9 +51,19 @@ pub fn copy_with_delta(
     // Generate signatures for existing destination
     let dest_file = File::open(dest_path)?;
     let signatures = if config.parallel_hashing {
-        generate_signatures_parallel(dest_file, config.block_size, config.hash_algorithm)?
+        generate_signatures_parallel(
+            dest_file,
+            config.block_size,
+            config.hash_algorithm,
+            config.rolling_hash_algo,
+        )?
     } else {
-        generate_signatures(dest_file, config.block_size, config.hash_algorithm)?
+        generate_signatures(
+            dest_file,
+            config.block_size,
+            config.hash_algorithm,
+            config.rolling_hash_algo,
+        )?
     };
 
     if signatures.is_empty() {
@@ -77,11 +87,21 @@ pub fn copy_with_delta(
     // Generate delta instructions
     let (instructions, mut stats) = if config.block_size >= 64 * 1024 {
         // Use rolling checksum optimization for larger blocks
-        generate_delta_rolling(source_file, signature_index, config.hash_algorithm)?
+        generate_delta_rolling(
+            source_file,
+            signature_index,
+            config.hash_algorithm,
+            config.rolling_hash_algo,
+        )?
     } else {
         // Simple delta for smaller blocks
         let source_file = File::open(source_path)?;
-        generate_delta(source_file, signature_index, config.hash_algorithm)?
+        generate_delta(
+            source_file,
+            signature_index,
+            config.hash_algorithm,
+            config.rolling_hash_algo,
+        )?
     };
 
     // Apply delta to create new file
