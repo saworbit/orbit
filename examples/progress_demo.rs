@@ -7,9 +7,9 @@
 
 use orbit::cli_progress::CliProgressRenderer;
 use orbit::config::CopyConfig;
+use orbit::copy_directory_impl;
 use orbit::core::progress::ProgressPublisher;
 use orbit::telemetry::{TelemetryLogger, TelemetryOutput};
-use orbit::copy_directory_impl;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
