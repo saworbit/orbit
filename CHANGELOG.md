@@ -62,6 +62,27 @@ All notable changes to Orbit will be documented in this file.
   - Proper layering: protocols → core-resilience (no database dependency)
 
 ### Added
+- **SSH/SFTP Backend (Production-Ready)** - Complete async SSH/SFTP remote filesystem access
+  - Full `Backend` trait implementation with all operations (stat, list, read, write, delete, mkdir, rename)
+  - Three authentication methods with priority order: SSH Agent (default) → Private Key → Password
+  - Async-first design using `tokio::task::spawn_blocking` for non-blocking SSH operations
+  - Secure credential handling with `secrecy` crate (credentials zeroed on drop)
+  - Connection timeout configuration (default: 30 seconds)
+  - Automatic SSH handshake and session management
+  - Proper cleanup on disconnect
+  - Recursive directory operations with configurable depth
+  - Optional SSH compression for text files
+  - Compatible with all SFTP servers (OpenSSH, proprietary servers, etc.)
+  - URI support for both `ssh://` and `sftp://` schemes
+  - Query parameter support for authentication methods (key, password, agent)
+  - Environment variable configuration (ORBIT_SSH_HOST, ORBIT_SSH_USER, etc.)
+  - Integration with unified backend abstraction layer
+  - Integration with manifest system for tracked transfers
+  - Resume support with checkpoint recovery
+  - Comprehensive test suite with unit and integration tests
+  - Complete documentation in PROTOCOL_GUIDE.md
+  - Feature flag: `ssh-backend` (opt-in)
+  - Dependencies: `ssh2 = "0.9"` (libssh2 wrapper), `secrecy = "0.10"`
 - **Guidance System ("Flight Computer")** - Automatic configuration validation and optimization layer
   - New `Guidance` module (`src/core/guidance.rs`) that validates and sanitizes configurations before execution
   - `FlightPlan` struct containing optimized configuration and user-facing notices

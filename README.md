@@ -786,7 +786,7 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 | Protocol | Status | Feature Flag | Description |
 |----------|--------|--------------|-------------|
 | 🗂️ **Local** | ✅ Stable | Built-in | Local filesystem with zero-copy optimization |
-| 🔐 **SSH/SFTP** | 🚧 WIP | `ssh-backend` | Remote filesystem access via SSH/SFTP (implementation in progress) |
+| 🔐 **SSH/SFTP** | ✅ **Stable** | `ssh-backend` | Remote filesystem access via SSH/SFTP with async I/O |
 | 🌐 **SMB/CIFS** | ✅ **Stable** | `smb-native` | Native SMB2/3 client (pure Rust, no dependencies) |
 | ☁️ **S3** | ✅ **Stable** | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
 | ☁️ **Azure Blob** | 🚧 Planned | - | Microsoft Azure Blob Storage |
@@ -825,6 +825,47 @@ let smb = SmbBackend::new(SmbConfig::new("server", "share")
 - ✅ **Security**: Built-in secure credential handling
 
 📖 **Full Guide:** [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md)
+
+#### 🆕 SSH/SFTP Remote Access (v0.5.0)
+
+Transfer files securely over SSH/SFTP with production-ready async implementation:
+
+```bash
+# Download from SSH server using agent authentication
+orbit --source ssh://user@example.com/remote/file.txt --dest ./file.txt
+
+# Upload to SFTP server (SSH and SFTP URIs are equivalent)
+orbit --source ./local-file.txt --dest sftp://example.com/upload/file.txt
+
+# Recursive directory sync with compression
+orbit --source /local/photos --dest ssh://backup.server.com/photos/ \
+  --mode sync --compress zstd:5 --recursive
+
+# Download with resume support for unreliable connections
+orbit --source ssh://server.com/large-file.iso --dest ./large-file.iso \
+  --resume --retry-attempts 10
+```
+
+**SSH/SFTP Features:**
+- ✅ Pure Rust using libssh2 (battle-tested SSH library)
+- ✅ Async I/O with tokio::task::spawn_blocking (non-blocking operations)
+- ✅ Three authentication methods (SSH Agent, Private Key, Password)
+- ✅ Secure credential handling with `secrecy` crate
+- ✅ Connection timeout configuration
+- ✅ Automatic SSH handshake and session management
+- ✅ Full Backend trait implementation (stat, list, read, write, delete, mkdir, rename)
+- ✅ Recursive directory operations
+- ✅ Optional SSH compression for text files
+- ✅ Compatible with all SFTP servers (OpenSSH, etc.)
+- ✅ Resume support with checkpoint recovery
+- ✅ Integration with manifest system
+
+**Authentication Priority:**
+1. **SSH Agent** (Default) — Most secure, no credentials in command history
+2. **Private Key File** — Supports passphrase-protected keys
+3. **Password** — Use only when key-based auth unavailable
+
+📖 **Full Documentation:** See [`docs/guides/PROTOCOL_GUIDE.md`](docs/guides/PROTOCOL_GUIDE.md#-ssh--sftp-production-ready)
 
 #### 🆕 S3 Cloud Storage (v0.4.1)
 

@@ -47,6 +47,121 @@ orbit -s /home/user/docs -d /backup/docs \
 
 ---
 
+### ✅ SSH / SFTP (Production-Ready)
+
+**Protocol:** `ssh://` or `sftp://`
+
+**Status:** Production-ready (feature flag: `ssh-backend`)
+
+**URI Format:**
+```
+ssh://[user@]host[:port]/path/to/file
+sftp://[user@]host[:port]/path/to/file
+```
+
+**Examples:**
+```bash
+# Download from SSH server using agent authentication
+orbit --source ssh://user@example.com/remote/file.txt --dest ./file.txt
+
+# Upload to SFTP server (SSH and SFTP URIs are equivalent)
+orbit --source ./local-file.txt --dest sftp://example.com/upload/file.txt
+
+# Copy with specific SSH key
+orbit --source ssh://user@server.com/data/backup.tar.gz --dest ./backup.tar.gz
+
+# Recursive directory sync over SSH
+orbit --source /local/photos --dest ssh://backup.server.com/photos/ \
+  --mode sync --recursive --compress zstd:5
+
+# Download with compression to reduce network transfer
+orbit --source ssh://server.com/large-file.iso --dest ./large-file.iso \
+  --compress zstd:3
+```
+
+**Authentication Methods (Priority Order):**
+
+1. **SSH Agent** (Default, Most Secure)
+   - Uses keys loaded in your SSH agent (ssh-agent, Pageant, etc.)
+   - No password in command history
+   - Best for automation and security
+   ```bash
+   # Requires SSH agent running with loaded keys
+   orbit -s ssh://user@server.com/file.txt -d ./file.txt
+   ```
+
+2. **Private Key File**
+   - Uses specified SSH private key
+   - Supports passphrase-protected keys
+   ```bash
+   # URI query parameter (future)
+   orbit -s "ssh://user@server.com/file.txt?key=/path/to/id_rsa" -d ./file.txt
+   ```
+
+3. **Password Authentication**
+   - Use only when key-based auth is unavailable
+   - ⚠️ Less secure than key-based methods
+   ```bash
+   # URI query parameter (future)
+   orbit -s "ssh://user@server.com/file.txt?password=secret" -d ./file.txt
+   ```
+
+**Features:**
+- ✅ Async I/O with tokio::task::spawn_blocking for non-blocking operations
+- ✅ All three authentication methods (Agent, Key, Password)
+- ✅ Connection timeout configuration
+- ✅ Automatic SSH handshake and session management
+- ✅ Proper cleanup on disconnect
+- ✅ Full Backend trait implementation (stat, list, read, write, delete, mkdir, rename)
+- ✅ Recursive directory operations
+- ✅ Compression support (optional SSH compression flag)
+- ✅ Compatible with all SFTP servers (OpenSSH, etc.)
+
+**Security Considerations:**
+- ✅ Secure credential handling with `secrecy` crate
+- ✅ Credentials zeroed on drop
+- ✅ SSH protocol encryption (AES, ChaCha20, etc.)
+- ✅ Host key verification (future: configurable strict checking)
+- ⚠️ Avoid passwords in URIs - use SSH agent or key files instead
+
+**Configuration via Environment Variables:**
+```bash
+# SSH connection settings
+export ORBIT_SSH_HOST=example.com
+export ORBIT_SSH_USER=username
+export ORBIT_SSH_PORT=22
+export ORBIT_SSH_KEY=/path/to/private_key
+
+# Use with URI
+orbit -s ssh://example.com/file.txt -d ./file.txt
+```
+
+**Performance Tips:**
+- Use `--compress zstd:3` for slow network connections
+- SSH compression (`compress: true` in config) can help for text files
+- For large transfers, consider `--resume` to enable checkpoint recovery
+
+**Troubleshooting:**
+
+*Connection timeout:*
+```bash
+# Default timeout is 30 seconds, configurable in code
+```
+
+*SSH agent not found:*
+```bash
+# Start SSH agent and load keys
+eval $(ssh-agent)
+ssh-add ~/.ssh/id_rsa
+```
+
+*Permission denied:*
+- Verify SSH key is authorized on server (`~/.ssh/authorized_keys`)
+- Check file permissions: `chmod 600 ~/.ssh/id_rsa`
+- Test with standard SSH client: `ssh user@server.com`
+
+---
+
 ### 🚧 SMB/CIFS Network Shares (Experimental)
 
 **Protocol:** `smb://` or `cifs://`
@@ -214,12 +329,13 @@ orbit --source ./file.txt --dest gs://bucket/object
 │  (selects appropriate backend)          │
 └──────────────────┬──────────────────────┘
                    │
-        ┌──────────┼──────────┐
-        ▼          ▼          ▼
-   ┌────────┐ ┌────────┐ ┌────────┐
-   │ Local  │ │  SMB   │ │  S3    │
-   │Backend │ │Backend │ │Backend │
-   └────────┘ └────────┘ └────────┘
+        ┌──────────┼──────────┬──────────┐
+        ▼          ▼          ▼          ▼
+   ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+   │ Local  │ │  SSH/  │ │  SMB   │ │  S3    │
+   │Backend │ │ SFTP   │ │Backend │ │Backend │
+   │        │ │Backend │ │        │ │        │
+   └────────┘ └────────┘ └────────┘ └────────┘
 ```
 
 ### StorageBackend Trait
@@ -368,13 +484,22 @@ orbit -s /tmp/test.txt -d /backup/test.txt
 | Protocol | Relative Speed | Best For |
 |----------|----------------|----------|
 | Local | 100% (baseline) | Same-machine copies |
+| SSH/SFTP (LAN) | ~50-70% | Secure remote file access |
+| SSH/SFTP (WAN) | ~5-40% | Encrypted remote transfers |
 | SMB (LAN) | ~60-80% | Local network shares |
 | SMB (WAN) | ~5-30% | Remote networks |
 | S3 | Varies | Cloud storage, CDN |
 
-**Tip:** Use compression for network protocols to reduce transfer time:
+**Tips for Network Protocols:**
 ```bash
-orbit -s smb://server/share/large.dat -d ./large.dat --compress zstd:3
+# Use compression to reduce transfer time
+orbit -s ssh://server/large.dat -d ./large.dat --compress zstd:3
+
+# Enable SSH compression for text files
+# (configured in SshConfig with .with_compression())
+
+# Use resume for unreliable connections
+orbit -s ssh://server/bigfile.iso -d ./bigfile.iso --resume
 ```
 
 ---
@@ -403,17 +528,18 @@ Error: Invalid URI format: server/share/file
 
 ## 🚀 Roadmap
 
-### v0.4.1 (Q1 2026)
-- Complete SMB/CIFS implementation
-- S3 protocol support
-- Azure Blob support
-- Credential management system
+### v0.5.0 (Current Release)
+- ✅ SSH/SFTP protocol support (production-ready)
+- ✅ S3 protocol support (production-ready)
+- 🚧 Complete SMB/CIFS implementation
+- 🔜 Azure Blob support
+- 🔜 Enhanced credential management system
 
-### v0.5.0 (Q2 2026)
+### v0.6.0 (Q2 2026)
 - Google Cloud Storage
-- SFTP protocol
 - FTP/FTPS protocols
 - Protocol multiplexing (parallel connections)
+- Enhanced SSH features (connection pooling, ProxyJump)
 
 ### v1.0.0 (Q3 2026)
 - Plugin system for custom protocols

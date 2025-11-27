@@ -119,42 +119,64 @@ let backend = LocalBackend::with_root("/data");
 
 **URI Format**: `file:///path/to/dir` or just `/path/to/dir`
 
-### SSH/SFTP (Feature: `ssh-backend`)
+### SSH/SFTP (Feature: `ssh-backend`) ✅ Production-Ready
 
-Access remote filesystems over SSH:
+Access remote filesystems over SSH with full async support and multiple authentication methods:
 
 ```rust
 use orbit::backend::{Backend, SshBackend, SshConfig, SshAuth};
 use secrecy::SecretString;
 
-// Password authentication
+// SSH Agent (Recommended - most secure)
 let config = SshConfig::new(
     "example.com",
     "username",
-    SshAuth::Password(SecretString::new("password".to_string()))
-);
+    SshAuth::Agent
+)
+.with_port(22)
+.with_timeout(30)
+.with_compression(); // Optional: enable SSH compression
 
-// Key-based authentication
+let backend = SshBackend::connect(config).await?;
+
+// Key-based authentication with passphrase
 let config = SshConfig::new(
     "example.com",
     "username",
     SshAuth::KeyFile {
         key_path: "/home/user/.ssh/id_rsa".into(),
-        passphrase: None,
+        passphrase: Some(SecretString::new("keypass".into())),
     }
 );
 
-// SSH agent
+let backend = SshBackend::connect(config).await?;
+
+// Password authentication (least secure - use only when necessary)
 let config = SshConfig::new(
     "example.com",
     "username",
-    SshAuth::Agent
-).with_port(22);
+    SshAuth::Password(SecretString::new("password".into()))
+);
 
 let backend = SshBackend::connect(config).await?;
+
+// Perform operations
+let metadata = backend.stat(Path::new("/remote/file.txt")).await?;
+let entries = backend.list(Path::new("/remote/dir"), Default::default()).await?;
 ```
 
-**URI Format**: `ssh://user@host:port/path?key=/path/to/key`
+**Features:**
+- ✅ Full async I/O with `tokio::task::spawn_blocking`
+- ✅ Three authentication methods (Agent, KeyFile, Password)
+- ✅ Secure credential handling with `secrecy` crate
+- ✅ Connection timeout configuration
+- ✅ Optional SSH compression
+- ✅ All Backend trait operations supported
+- ✅ Recursive directory operations
+
+**URI Format**: `ssh://user@host:port/path?key=/path/to/key` or `sftp://user@host/path?agent=true`
+
+**Authentication Priority**: SSH Agent → Private Key → Password
 
 ### S3-Compatible Storage (Feature: `s3-native`)
 
