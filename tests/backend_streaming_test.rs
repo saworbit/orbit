@@ -57,7 +57,12 @@ mod streaming_tests {
 
         // Write using streaming API
         let bytes_written = backend
-            .write(&file_path, reader, Some(1024 * 1024), WriteOptions::default())
+            .write(
+                &file_path,
+                reader,
+                Some(1024 * 1024),
+                WriteOptions::default(),
+            )
             .await
             .unwrap();
 
@@ -77,8 +82,7 @@ mod streaming_tests {
 
         // Create 100MB test data stream (would OOM if buffered entirely)
         let size = 100 * 1024 * 1024u64; // 100MB
-        let reader: Box<dyn AsyncRead + Unpin + Send> =
-            Box::new(LargeDataReader::new(size));
+        let reader: Box<dyn AsyncRead + Unpin + Send> = Box::new(LargeDataReader::new(size));
 
         // Write using streaming API
         let bytes_written = backend
@@ -166,8 +170,7 @@ mod streaming_tests {
         let file_path = temp_dir.path().join("nested/dir/structure/file.txt");
 
         let data = b"test data";
-        let reader: Box<dyn AsyncRead + Unpin + Send> =
-            Box::new(std::io::Cursor::new(data));
+        let reader: Box<dyn AsyncRead + Unpin + Send> = Box::new(std::io::Cursor::new(data));
 
         let options = WriteOptions {
             create_parents: true,
@@ -195,8 +198,7 @@ mod streaming_tests {
 
         // Try to write without overwrite
         let data = b"new data";
-        let reader: Box<dyn AsyncRead + Unpin + Send> =
-            Box::new(std::io::Cursor::new(data));
+        let reader: Box<dyn AsyncRead + Unpin + Send> = Box::new(std::io::Cursor::new(data));
 
         let options = WriteOptions {
             overwrite: false,
@@ -208,10 +210,7 @@ mod streaming_tests {
             .await;
 
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("already exists"));
+        assert!(result.unwrap_err().to_string().contains("already exists"));
     }
 
     #[tokio::test]
@@ -276,8 +275,7 @@ mod streaming_tests {
             let file_path = temp_dir.path().join("perms.txt");
 
             let data = b"test data";
-            let reader: Box<dyn AsyncRead + Unpin + Send> =
-                Box::new(std::io::Cursor::new(data));
+            let reader: Box<dyn AsyncRead + Unpin + Send> = Box::new(std::io::Cursor::new(data));
 
             let options = WriteOptions {
                 permissions: Some(0o600), // rw-------

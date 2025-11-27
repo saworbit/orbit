@@ -438,7 +438,10 @@ impl Backend for S3Backend {
                                 backend: "s3".to_string(),
                                 message: format!("Failed to list objects: {}", e),
                             };
-                            return Some((stream::once(async move { Err(err) }).boxed(), (None, entries_count)));
+                            return Some((
+                                stream::once(async move { Err(err) }).boxed(),
+                                (None, entries_count),
+                            ));
                         }
                     };
 
@@ -612,9 +615,10 @@ impl Backend for S3Backend {
             // Small file: buffer in memory and use PutObject for efficiency
             use tokio::io::AsyncReadExt;
             let mut buffer = Vec::new();
-            let bytes_read = reader.read_to_end(&mut buffer).await.map_err(|e| {
-                BackendError::Io(e)
-            })?;
+            let bytes_read = reader
+                .read_to_end(&mut buffer)
+                .await
+                .map_err(|e| BackendError::Io(e))?;
 
             // Upload using PutObject
             let mut request = self
