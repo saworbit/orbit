@@ -4,6 +4,11 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Infrastructure
+- **CI/CD:** Implemented a dual-strategy fix for CI resource exhaustion (Signal 7 Bus Error).
+  - Added `jlumbroso/free-disk-space` action to reclaim ~30GB of runner disk space.
+  - Optimized `Cargo.toml` profile to strip debug symbols from dependencies, reducing linker memory pressure.
+
 ### Changed - BREAKING: Backend Streaming API Refactoring (v0.5.0)
 - **Backend `write()` Signature Changed** - Now accepts `AsyncRead` streams instead of `Bytes` for memory-efficient large file uploads
   - **Old**: `async fn write(&self, path: &Path, data: Bytes, options: WriteOptions) -> BackendResult<u64>`

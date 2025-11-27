@@ -118,6 +118,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Free Disk Space (Ubuntu)
+      uses: jlumbroso/free-disk-space@v1.3.1
+      with:
+        # We only need basic Linux tools and Rust. Delete the rest to free ~30GB.
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: false # Keep docker if you use it, otherwise set to true
+        swap-storage: true   # Create swap space to help prevent OOM errors
+
     - name: Checkout repository
       uses: actions/checkout@v4
 

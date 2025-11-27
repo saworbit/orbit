@@ -33,6 +33,31 @@ Thanks for your interest in contributing to Orbit! We welcome community contribu
 
 ---
 
+## Building and Testing
+
+### Resource Usage Note
+The `Cargo.toml` includes a profile override for dependencies:
+```toml
+[profile.dev.package."*"]
+opt-level = 3
+debug = 0
+```
+
+This is configured to prevent linker exhaustion (Bus Errors) on CI environments. It strips debug symbols from dependencies (like AWS SDKs) while keeping them for the Orbit codebase.
+
+**Pros:** Faster test execution, significantly lower disk usage, prevents CI crashes.
+
+**Cons:** The first compilation of dependencies might take slightly longer.
+
+### Running Tests
+To run the full suite of tests exactly as CI does:
+
+```bash
+cargo test --features full
+```
+
+---
+
 ## 🚦 Feature Ideas
 
 We welcome contributions such as:
