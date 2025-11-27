@@ -314,6 +314,8 @@ impl S3Client {
         local_path: &Path,
         resume_offset: u64,
     ) -> S3Result<()> {
+        use std::collections::BTreeMap;
+
         // Get object metadata to determine size
         let metadata = self.get_metadata(key).await?;
         let total_size = metadata.size;
@@ -344,41 +346,84 @@ impl S3Client {
             File::create(local_path).await?
         };
 
-        // Download in chunks with parallelism
+        // Download with sliding window concurrency
         let chunk_size = self.config().chunk_size as u64;
-        let mut current_offset = resume_offset;
         let parallel_downloads = self.config().parallel_operations;
 
-        while current_offset < total_size {
-            let mut download_tasks = Vec::new();
+        // Track pending downloads by their start offset
+        let mut pending_chunks: BTreeMap<u64, tokio::task::JoinHandle<S3Result<Bytes>>> =
+            BTreeMap::new();
 
-            // Queue up parallel downloads
-            for _ in 0..parallel_downloads {
-                if current_offset >= total_size {
-                    break;
-                }
+        // Buffer for completed chunks that arrived out of order
+        let mut completed_buffer: BTreeMap<u64, Bytes> = BTreeMap::new();
 
-                let end_offset = (current_offset + chunk_size - 1).min(total_size - 1);
+        let mut next_download_offset = resume_offset;
+        let mut next_write_offset = resume_offset;
+
+        loop {
+            // Fill the pipeline: spawn tasks up to parallel_downloads limit
+            while pending_chunks.len() < parallel_downloads && next_download_offset < total_size {
+                let end_offset = (next_download_offset + chunk_size - 1).min(total_size - 1);
                 let client = self.clone_for_multipart();
-                let key = key.to_string();
-                let range = (current_offset, end_offset);
+                let key_clone = key.to_string();
+                let start = next_download_offset;
 
-                let task =
-                    tokio::spawn(
-                        async move { client.download_range(&key, range.0, range.1).await },
-                    );
+                let handle = tokio::spawn(async move {
+                    client.download_range(&key_clone, start, end_offset).await
+                });
 
-                download_tasks.push((current_offset, task));
-                current_offset = end_offset + 1;
+                pending_chunks.insert(next_download_offset, handle);
+                next_download_offset = end_offset + 1;
             }
 
-            // Write chunks in order
-            for (_offset, task) in download_tasks {
-                let data = task
+            // Check if we're done
+            if pending_chunks.is_empty() && completed_buffer.is_empty() {
+                break;
+            }
+
+            // First, try to write any buffered chunks that are now sequential
+            while let Some(data) = completed_buffer.remove(&next_write_offset) {
+                file.write_all(&data).await?;
+                next_write_offset += data.len() as u64;
+            }
+
+            // Wait for the next sequential chunk if it's in flight
+            if let Some(handle) = pending_chunks.remove(&next_write_offset) {
+                // This is the chunk we need to write next
+                let data = handle
                     .await
                     .map_err(|e| S3Error::Network(format!("Task join error: {}", e)))??;
 
                 file.write_all(&data).await?;
+                next_write_offset += data.len() as u64;
+            } else if !pending_chunks.is_empty() {
+                // Next sequential chunk is not ready yet, but we have other pending downloads
+                // Poll for ANY completed task to keep pipeline full
+                use futures::future::FutureExt;
+
+                // Find any completed task
+                let mut completed_offset = None;
+                for (&offset, handle) in pending_chunks.iter_mut() {
+                    if handle.is_finished() {
+                        completed_offset = Some(offset);
+                        break;
+                    }
+                }
+
+                if let Some(offset) = completed_offset {
+                    // Remove and buffer the completed task
+                    if let Some(handle) = pending_chunks.remove(&offset) {
+                        let data = handle
+                            .await
+                            .map_err(|e| S3Error::Network(format!("Task join error: {}", e)))??;
+                        // Buffer it for later sequential write
+                        completed_buffer.insert(offset, data);
+                        // Pipeline slot freed - loop will spawn more downloads
+                    }
+                } else {
+                    // No tasks completed yet, yield briefly
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                }
             }
         }
 

@@ -3,7 +3,7 @@
 //! Provides async access to remote filesystems over SSH using SFTP protocol.
 
 use super::error::{BackendError, BackendResult};
-use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
+use super::types::{DirEntry, ListOptions, ListStream, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -13,6 +13,7 @@ use ssh2::{Session, Sftp};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tokio::io::AsyncRead;
 
 /// SSH authentication method
 #[derive(Debug, Clone)]
@@ -491,11 +492,14 @@ impl Backend for SshBackend {
         })?
     }
 
-    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<Vec<DirEntry>> {
+    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
+        use futures::stream::StreamExt;
+
         let path = path.to_path_buf();
         let sftp = self.sftp.clone();
 
-        tokio::task::spawn_blocking(move || {
+        // Collect entries in blocking task, then convert to stream
+        let entries = tokio::task::spawn_blocking(move || {
             let mut entries = Vec::new();
             list_recursive_blocking_impl(&sftp, &path, &path, &options, 0, &mut entries)?;
             Ok(entries)
@@ -504,7 +508,11 @@ impl Backend for SshBackend {
         .map_err(|e| BackendError::Other {
             backend: "ssh".to_string(),
             message: format!("Task join error: {}", e),
-        })?
+        })??;
+
+        // Convert Vec to stream
+        let stream = stream::iter(entries.into_iter().map(Ok)).boxed();
+        Ok(stream)
     }
 
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
@@ -555,9 +563,25 @@ impl Backend for SshBackend {
         Ok(Box::pin(stream))
     }
 
-    async fn write(&self, path: &Path, data: Bytes, options: WriteOptions) -> BackendResult<u64> {
+    async fn write(
+        &self,
+        path: &Path,
+        mut reader: Box<dyn AsyncRead + Unpin + Send>,
+        _size_hint: Option<u64>,
+        options: WriteOptions,
+    ) -> BackendResult<u64> {
+        use tokio::io::AsyncReadExt;
+
         let path = path.to_path_buf();
         let sftp = self.sftp.clone();
+
+        // Read all data into memory first (SSH2 is synchronous)
+        // TODO: For v0.6.0, implement chunked streaming with async-ssh2-lite or similar
+        let mut buffer = Vec::new();
+        reader
+            .read_to_end(&mut buffer)
+            .await
+            .map_err(BackendError::from)?;
 
         tokio::task::spawn_blocking(move || {
             use std::io::Write;
@@ -579,7 +603,7 @@ impl Backend for SshBackend {
                 message: format!("Failed to create file: {}", e),
             })?;
 
-            file.write_all(&data).map_err(BackendError::Io)?;
+            file.write_all(&buffer).map_err(BackendError::Io)?;
 
             // Set permissions if specified
             if let Some(perms) = options.permissions {
@@ -594,7 +618,7 @@ impl Backend for SshBackend {
                 .ok();
             }
 
-            Ok(data.len() as u64)
+            Ok(buffer.len() as u64)
         })
         .await
         .map_err(|e| BackendError::Other {

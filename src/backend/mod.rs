@@ -107,7 +107,10 @@ use async_trait::async_trait;
 use std::path::Path;
 
 #[cfg(feature = "backend-abstraction")]
-use types::ReadStream;
+use types::{ListStream, ReadStream};
+
+#[cfg(feature = "backend-abstraction")]
+use tokio::io::AsyncRead;
 
 /// Unified backend trait for all storage operations
 ///
@@ -157,7 +160,10 @@ pub trait Backend: Send + Sync {
     /// Returns `BackendError::PermissionDenied` if access is denied.
     async fn stat(&self, path: &Path) -> BackendResult<Metadata>;
 
-    /// List contents of a directory
+    /// List contents of a directory as a stream
+    ///
+    /// This method returns a stream of directory entries, enabling efficient
+    /// processing of large directories without loading all entries into memory.
     ///
     /// # Arguments
     ///
@@ -166,13 +172,31 @@ pub trait Backend: Send + Sync {
     ///
     /// # Returns
     ///
-    /// Vector of directory entries with metadata
+    /// Stream of directory entries with metadata
     ///
     /// # Errors
     ///
     /// Returns `BackendError::NotFound` if the directory doesn't exist.
     /// Returns `BackendError::InvalidPath` if path is not a directory.
-    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<Vec<DirEntry>>;
+    ///
+    /// # Performance Notes
+    ///
+    /// - Memory usage is constant regardless of directory size
+    /// - For S3: entries are streamed as pages are fetched
+    /// - Can process millions of entries without OOM
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use futures::StreamExt;
+    ///
+    /// let mut stream = backend.list(path, options).await?;
+    /// while let Some(entry) = stream.next().await {
+    ///     let entry = entry?;
+    ///     println!("{}", entry.path.display());
+    /// }
+    /// ```
+    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream>;
 
     /// Open a file for reading as a stream
     ///
@@ -190,12 +214,17 @@ pub trait Backend: Send + Sync {
     /// Returns `BackendError::PermissionDenied` if read access is denied.
     async fn read(&self, path: &Path) -> BackendResult<ReadStream>;
 
-    /// Write data to a file
+    /// Write data to a file from a stream
+    ///
+    /// This method supports efficient streaming uploads for large files without
+    /// loading the entire file into memory. Backends may use multipart uploads
+    /// or other chunked transfer mechanisms based on the size hint.
     ///
     /// # Arguments
     ///
     /// * `path` - Path where to write the file
-    /// * `data` - Data to write
+    /// * `reader` - Async reader providing the data to write
+    /// * `size_hint` - Optional hint about the total size (enables optimizations)
     /// * `options` - Write options (overwrite, permissions, etc.)
     ///
     /// # Returns
@@ -206,10 +235,17 @@ pub trait Backend: Send + Sync {
     ///
     /// Returns `BackendError::PermissionDenied` if write access is denied.
     /// Returns `BackendError::AlreadyExists` if file exists and overwrite is false.
+    ///
+    /// # Performance Notes
+    ///
+    /// - Providing `size_hint` enables backends to optimize transfer strategy
+    /// - For S3: files >5MB use multipart upload, smaller files use PutObject
+    /// - Memory usage is proportional to chunk size, not file size
     async fn write(
         &self,
         path: &Path,
-        data: bytes::Bytes,
+        reader: Box<dyn AsyncRead + Unpin + Send>,
+        size_hint: Option<u64>,
         options: WriteOptions,
     ) -> BackendResult<u64>;
 

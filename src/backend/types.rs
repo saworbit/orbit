@@ -166,6 +166,13 @@ impl DirEntry {
 pub type ReadStream = Pin<Box<dyn Stream<Item = std::io::Result<Bytes>> + Send>>;
 
 #[cfg(feature = "backend-abstraction")]
+/// Async stream of directory entries
+///
+/// Used by Backend::list() to stream directory contents without loading
+/// all entries into memory. This enables efficient listing of large directories.
+pub type ListStream = Pin<Box<dyn Stream<Item = super::BackendResult<DirEntry>> + Send>>;
+
+#[cfg(feature = "backend-abstraction")]
 /// Async write sink for file data
 pub trait WriteStream: Send {
     /// Write bytes to the stream

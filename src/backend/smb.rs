@@ -4,12 +4,13 @@
 //! This enables SMB shares to be used as data sources and destinations in Orbit.
 
 use super::error::{BackendError, BackendResult};
-use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
+use super::types::{DirEntry, ListOptions, ListStream, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tokio::io::AsyncRead;
 use tokio::sync::RwLock;
 
 use crate::protocols::smb::{client_for, SmbAuth, SmbClient, SmbMetadata, SmbSecurity, SmbTarget};
@@ -286,7 +287,9 @@ impl Backend for SmbBackend {
         Ok(self.convert_metadata(smb_meta))
     }
 
-    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<Vec<DirEntry>> {
+    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
+        use futures::stream::{self, StreamExt, TryStreamExt};
+
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;
 
@@ -360,22 +363,27 @@ impl Backend for SmbBackend {
                         ..options.clone()
                     };
 
-                    if let Ok(sub_entries) = Box::pin(self.list(&dir_path, sub_options)).await {
-                        for sub_entry in sub_entries {
-                            // Check max_entries limit
-                            if let Some(max) = options.max_entries {
-                                if entries.len() >= max {
-                                    break;
+                    if let Ok(mut sub_stream) = Box::pin(self.list(&dir_path, sub_options)).await {
+                        // Collect sub-entries from stream
+                        while let Some(sub_entry) = sub_stream.next().await {
+                            if let Ok(entry) = sub_entry {
+                                // Check max_entries limit
+                                if let Some(max) = options.max_entries {
+                                    if entries.len() >= max {
+                                        break;
+                                    }
                                 }
+                                entries.push(entry);
                             }
-                            entries.push(sub_entry);
                         }
                     }
                 }
             }
         }
 
-        Ok(entries)
+        // Convert Vec to stream
+        let stream = stream::iter(entries.into_iter().map(Ok)).boxed();
+        Ok(stream)
     }
 
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
@@ -395,7 +403,15 @@ impl Backend for SmbBackend {
         Ok(Box::pin(stream))
     }
 
-    async fn write(&self, path: &Path, data: Bytes, options: WriteOptions) -> BackendResult<u64> {
+    async fn write(
+        &self,
+        path: &Path,
+        mut reader: Box<dyn AsyncRead + Unpin + Send>,
+        _size_hint: Option<u64>,
+        options: WriteOptions,
+    ) -> BackendResult<u64> {
+        use tokio::io::AsyncReadExt;
+
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;
 
@@ -417,11 +433,18 @@ impl Backend for SmbBackend {
             }
         }
 
-        let len = data.len() as u64;
+        // Read data from stream into buffer
+        let mut buffer = Vec::new();
+        reader
+            .read_to_end(&mut buffer)
+            .await
+            .map_err(BackendError::from)?;
+
+        let len = buffer.len() as u64;
 
         // Write the file
         client
-            .write_file(&smb_path, data)
+            .write_file(&smb_path, Bytes::from(buffer))
             .await
             .map_err(|e| self.map_error(e, path))?;
 

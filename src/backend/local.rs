@@ -3,14 +3,14 @@
 //! Provides async access to the local filesystem using Tokio's async I/O.
 
 use super::error::{BackendError, BackendResult};
-use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
+use super::types::{DirEntry, ListOptions, ListStream, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 
 /// Local filesystem backend
 ///
@@ -219,7 +219,9 @@ impl Backend for LocalBackend {
         Ok(self.convert_metadata(&resolved, meta))
     }
 
-    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<Vec<DirEntry>> {
+    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
+        use futures::stream::StreamExt;
+
         let resolved = self.resolve_path(path);
 
         // Verify it's a directory
@@ -241,6 +243,8 @@ impl Backend for LocalBackend {
             });
         }
 
+        // For local filesystem, collect entries and convert to stream
+        // This is acceptable since local directories are less likely to have millions of entries
         let mut entries = Vec::new();
 
         if options.recursive {
@@ -253,7 +257,9 @@ impl Backend for LocalBackend {
             entries.retain(|e| e.path.components().count() == 1 || e.path == PathBuf::from(""));
         }
 
-        Ok(entries)
+        // Convert Vec to stream
+        let stream = stream::iter(entries.into_iter().map(Ok)).boxed();
+        Ok(stream)
     }
 
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
@@ -289,7 +295,13 @@ impl Backend for LocalBackend {
         Ok(Box::pin(stream))
     }
 
-    async fn write(&self, path: &Path, data: Bytes, options: WriteOptions) -> BackendResult<u64> {
+    async fn write(
+        &self,
+        path: &Path,
+        mut reader: Box<dyn AsyncRead + Unpin + Send>,
+        _size_hint: Option<u64>,
+        options: WriteOptions,
+    ) -> BackendResult<u64> {
         let resolved = self.resolve_path(path);
 
         // Create parent directories if needed
@@ -308,12 +320,15 @@ impl Backend for LocalBackend {
             });
         }
 
-        // Write the file
+        // Create and write to file using streaming copy
         let mut file = fs::File::create(&resolved)
             .await
             .map_err(BackendError::from)?;
 
-        file.write_all(&data).await.map_err(BackendError::from)?;
+        let bytes_written = tokio::io::copy(&mut reader, &mut file)
+            .await
+            .map_err(BackendError::from)?;
+
         file.flush().await.map_err(BackendError::from)?;
 
         // Set permissions if specified
@@ -326,7 +341,7 @@ impl Backend for LocalBackend {
                 .map_err(BackendError::from)?;
         }
 
-        Ok(data.len() as u64)
+        Ok(bytes_written)
     }
 
     async fn delete(&self, path: &Path, recursive: bool) -> BackendResult<()> {

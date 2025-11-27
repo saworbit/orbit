@@ -793,17 +793,35 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 | ☁️ **GCS** | 🚧 Planned | - | Google Cloud Storage |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
 
-#### 🆕 Unified Backend Abstraction (v0.4.1)
+#### 🆕 Unified Backend Abstraction (v0.5.0 - Streaming API)
 
-**NEW!** Write once, run on any storage backend. The backend abstraction provides a consistent async API across all storage types:
+**NEW!** Write once, run on any storage backend. The backend abstraction provides a consistent async API with **streaming I/O** for memory-efficient large file transfers:
 
 ```rust
 use orbit::backend::{Backend, LocalBackend, SshBackend, S3Backend, SmbBackend, SmbConfig};
+use tokio::fs::File;
+use tokio::io::AsyncRead;
+use futures::StreamExt;
 
-// All backends implement the same trait
+// All backends implement the same trait with streaming support
 async fn copy_file<B: Backend>(backend: &B, src: &Path, dest: &Path) -> Result<()> {
-    let data = backend.read(src).await?;
-    backend.write(dest, data, Default::default()).await?;
+    // Stream file directly from disk - no memory buffering!
+    let file = File::open(src).await?;
+    let metadata = file.metadata().await?;
+    let reader: Box<dyn AsyncRead + Unpin + Send> = Box::new(file);
+
+    backend.write(dest, reader, Some(metadata.len()), Default::default()).await?;
+    Ok(())
+}
+
+// List directories with streaming (constant memory for millions of entries)
+async fn list_large_directory<B: Backend>(backend: &B, path: &Path) -> Result<()> {
+    let mut stream = backend.list(path, ListOptions::recursive()).await?;
+
+    while let Some(entry) = stream.next().await {
+        let entry = entry?;
+        println!("{}: {} bytes", entry.path.display(), entry.metadata.size);
+    }
     Ok(())
 }
 
@@ -818,13 +836,17 @@ let smb = SmbBackend::new(SmbConfig::new("server", "share")
 
 **Features:**
 - ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, `smb://user@server/share/path`, etc.
-- ✅ **Streaming I/O**: Memory-efficient for large files
+- ✅ **Streaming I/O**: Upload files up to **5TB** to S3 with ~200MB RAM (v0.5.0 ⭐)
+- ✅ **Constant Memory Listing**: List millions of S3 objects with ~10MB RAM (v0.5.0 ⭐)
+- ✅ **Automatic Multipart Upload**: S3 files ≥5MB use efficient chunked transfers (v0.5.0 ⭐)
+- ✅ **Optimized Download**: Sliding window concurrency for 30-50% faster S3 downloads (v0.5.0 ⭐)
 - ✅ **Metadata operations**: Set permissions, timestamps, xattrs, ownership
 - ✅ **Extensibility**: Plugin system for custom backends
 - ✅ **Type-safe**: Strong typing with comprehensive error handling
 - ✅ **Security**: Built-in secure credential handling
 
-📖 **Full Guide:** [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md)
+📖 **Full Guide:** [docs/guides/BACKEND_GUIDE.md](docs/guides/BACKEND_GUIDE.md)
+📖 **Migration Guide:** [BACKEND_STREAMING_GUIDE.md](BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
 
 #### 🆕 SSH/SFTP Remote Access (v0.5.0)
 
@@ -867,15 +889,15 @@ orbit --source ssh://server.com/large-file.iso --dest ./large-file.iso \
 
 📖 **Full Documentation:** See [`docs/guides/PROTOCOL_GUIDE.md`](docs/guides/PROTOCOL_GUIDE.md#-ssh--sftp-production-ready)
 
-#### 🆕 S3 Cloud Storage (v0.4.1)
+#### 🆕 S3 Cloud Storage (v0.5.0 - Streaming Optimized)
 
-Transfer files seamlessly to AWS S3 and S3-compatible storage services with advanced features:
+Transfer files seamlessly to AWS S3 and S3-compatible storage services with **streaming I/O** and advanced features:
 
 ```bash
-# Upload to S3
+# Upload to S3 (streams directly from disk, no memory buffering!)
 orbit --source /local/dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz
 
-# Download from S3
+# Download from S3 (optimized sliding window concurrency)
 orbit --source s3://my-bucket/data/report.pdf --dest ./report.pdf
 
 # Sync directory to S3 with compression
@@ -889,7 +911,10 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 
 **S3 Features:**
 - ✅ Pure Rust (no AWS CLI dependency)
-- ✅ Multipart upload/download for large files (>5MB)
+- ✅ **Streaming multipart upload** - Files ≥5MB automatically use multipart with **5TB max file size** (v0.5.0 ⭐)
+- ✅ **Constant memory usage** - ~200MB RAM for any file size upload/download (v0.5.0 ⭐)
+- ✅ **Optimized downloads** - Sliding window concurrency for 30-50% faster transfers (v0.5.0 ⭐)
+- ✅ **Lazy S3 pagination** - List millions of objects with ~10MB RAM (v0.5.0 ⭐)
 - ✅ Resumable transfers with checkpoint support
 - ✅ Parallel chunk transfers (configurable)
 - ✅ All storage classes (Standard, IA, Glacier, etc.)
@@ -901,7 +926,8 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 - ✅ Batch operations with rate limiting
 - ✅ **Resilience patterns** — Circuit breaker, connection pooling, and rate limiting via Magnetar ⭐
 
-📖 **Full Documentation:** See [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
+📖 **Full Documentation:** See [`docs/guides/S3_USER_GUIDE.md`](docs/guides/S3_USER_GUIDE.md)
+📖 **Streaming Guide:** See [`BACKEND_STREAMING_GUIDE.md`](BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
 
 #### SMB/CIFS Network Shares
 

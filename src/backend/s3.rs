@@ -3,11 +3,12 @@
 //! Wraps the existing S3Client to provide the unified Backend interface.
 
 use super::error::{BackendError, BackendResult};
-use super::types::{DirEntry, ListOptions, Metadata, ReadStream, WriteOptions};
+use super::types::{DirEntry, ListOptions, ListStream, Metadata, ReadStream, WriteOptions};
 use super::Backend;
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
+use tokio::io::AsyncRead;
 
 use crate::protocol::s3::{S3Client, S3Config};
 
@@ -117,6 +118,233 @@ impl S3Backend {
         metadata.custom_metadata = Some(s3_meta.metadata);
         metadata
     }
+
+    /// Upload data from a reader using multipart upload
+    ///
+    /// This enables efficient streaming uploads for large files without loading
+    /// the entire file into memory.
+    async fn upload_from_reader(
+        &self,
+        key: &str,
+        mut reader: Box<dyn AsyncRead + Unpin + Send>,
+        _size_hint: Option<u64>,
+        options: &WriteOptions,
+    ) -> BackendResult<u64> {
+        use crate::protocol::s3::types::UploadPartInfo;
+        use tokio::io::AsyncReadExt;
+
+        // Initiate multipart upload
+        let upload_id = self
+            .initiate_multipart_upload_with_options(key, options)
+            .await?;
+
+        let chunk_size = self.client.config().chunk_size;
+        let mut part_number = 1i32;
+        let mut completed_parts = Vec::new();
+        let mut total_uploaded = 0u64;
+
+        // Upload parts in sequence (streaming from reader)
+        loop {
+            // Read chunk from stream
+            let mut buffer = vec![0u8; chunk_size];
+            let mut chunk_data = Vec::new();
+
+            // Read up to chunk_size bytes
+            loop {
+                match reader.read(&mut buffer).await.map_err(BackendError::from)? {
+                    0 => break, // EOF
+                    n => {
+                        chunk_data.extend_from_slice(&buffer[..n]);
+                        if chunk_data.len() >= chunk_size {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if chunk_data.is_empty() {
+                break; // End of stream
+            }
+
+            // Upload this part
+            let part_info = self
+                .upload_part(key, &upload_id, part_number, Bytes::from(chunk_data))
+                .await?;
+
+            total_uploaded += part_info.size as u64;
+            completed_parts.push(part_info);
+            part_number += 1;
+        }
+
+        // Ensure at least one part was uploaded
+        if completed_parts.is_empty() {
+            // Abort the upload
+            self.abort_multipart_upload(key, &upload_id).await?;
+            return Err(BackendError::Other {
+                backend: "s3".to_string(),
+                message: "No data to upload".to_string(),
+            });
+        }
+
+        // Complete the multipart upload
+        self.complete_multipart_upload(key, &upload_id, &completed_parts)
+            .await?;
+
+        Ok(total_uploaded)
+    }
+
+    /// Initiate a multipart upload with WriteOptions
+    async fn initiate_multipart_upload_with_options(
+        &self,
+        key: &str,
+        options: &WriteOptions,
+    ) -> BackendResult<String> {
+        let mut request = self
+            .client
+            .aws_client()
+            .create_multipart_upload()
+            .bucket(self.client.bucket())
+            .key(key);
+
+        // Set content type
+        if let Some(content_type) = &options.content_type {
+            request = request.content_type(content_type);
+        }
+
+        // Set metadata
+        if let Some(metadata) = &options.metadata {
+            for (k, v) in metadata {
+                request = request.metadata(k.clone(), v.clone());
+            }
+        }
+
+        // Set storage class
+        request = request.storage_class(self.client.config().storage_class.to_aws());
+
+        // Set server-side encryption
+        if let Some(sse) = self.client.config().server_side_encryption.to_aws() {
+            request = request.server_side_encryption(sse);
+
+            if let crate::protocol::s3::types::S3ServerSideEncryption::AwsKms {
+                key_id: Some(kid),
+            } = &self.client.config().server_side_encryption
+            {
+                request = request.ssekms_key_id(kid);
+            }
+        }
+
+        let response = request.send().await.map_err(|e| BackendError::Other {
+            backend: "s3".to_string(),
+            message: format!("Failed to initiate multipart upload: {}", e),
+        })?;
+
+        response
+            .upload_id()
+            .ok_or_else(|| BackendError::Other {
+                backend: "s3".to_string(),
+                message: "No upload ID returned".to_string(),
+            })
+            .map(|s| s.to_string())
+    }
+
+    /// Upload a single part
+    async fn upload_part(
+        &self,
+        key: &str,
+        upload_id: &str,
+        part_number: i32,
+        data: Bytes,
+    ) -> BackendResult<crate::protocol::s3::types::UploadPartInfo> {
+        use crate::protocol::s3::types::UploadPartInfo;
+        use aws_sdk_s3::primitives::ByteStream;
+
+        let size = data.len();
+        let byte_stream = ByteStream::from(data);
+
+        let response = self
+            .client
+            .aws_client()
+            .upload_part()
+            .bucket(self.client.bucket())
+            .key(key)
+            .upload_id(upload_id)
+            .part_number(part_number)
+            .body(byte_stream)
+            .send()
+            .await
+            .map_err(|e| BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!("Failed to upload part {}: {}", part_number, e),
+            })?;
+
+        let etag = response
+            .e_tag()
+            .ok_or_else(|| BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!("No ETag returned for part {}", part_number),
+            })?
+            .to_string();
+
+        Ok(UploadPartInfo::new(part_number, etag, size))
+    }
+
+    /// Complete a multipart upload
+    async fn complete_multipart_upload(
+        &self,
+        key: &str,
+        upload_id: &str,
+        parts: &[crate::protocol::s3::types::UploadPartInfo],
+    ) -> BackendResult<()> {
+        use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
+
+        let completed_parts: Vec<CompletedPart> = parts
+            .iter()
+            .map(|p| {
+                CompletedPart::builder()
+                    .part_number(p.part_number)
+                    .e_tag(&p.etag)
+                    .build()
+            })
+            .collect();
+
+        let multipart_upload = CompletedMultipartUpload::builder()
+            .set_parts(Some(completed_parts))
+            .build();
+
+        self.client
+            .aws_client()
+            .complete_multipart_upload()
+            .bucket(self.client.bucket())
+            .key(key)
+            .upload_id(upload_id)
+            .multipart_upload(multipart_upload)
+            .send()
+            .await
+            .map_err(|e| BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!("Failed to complete multipart upload: {}", e),
+            })?;
+
+        Ok(())
+    }
+
+    /// Abort a multipart upload
+    async fn abort_multipart_upload(&self, key: &str, upload_id: &str) -> BackendResult<()> {
+        self.client
+            .aws_client()
+            .abort_multipart_upload()
+            .bucket(self.client.bucket())
+            .key(key)
+            .upload_id(upload_id)
+            .send()
+            .await
+            .map_err(|e| BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!("Failed to abort multipart upload: {}", e),
+            })?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -145,7 +373,9 @@ impl Backend for S3Backend {
         Ok(self.convert_metadata(s3_meta))
     }
 
-    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<Vec<DirEntry>> {
+    async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
+        use futures::stream::{self, StreamExt};
+
         let prefix = self.path_to_key(path);
         let prefix = if prefix.is_empty() {
             "".to_string()
@@ -153,101 +383,154 @@ impl Backend for S3Backend {
             format!("{}/", prefix.trim_end_matches('/'))
         };
 
-        // Use S3 list_objects operation
-        let mut entries = Vec::new();
-        let mut continuation_token: Option<String> = None;
+        let client = self.client.clone();
+        let options_clone = options.clone();
+        let self_prefix = self.prefix.clone();
 
-        loop {
-            // List objects with prefix
-            let mut request = self
-                .client
-                .aws_client()
-                .list_objects_v2()
-                .bucket(self.client.bucket())
-                .prefix(&prefix);
+        // Create stream that lazily fetches pages from S3
+        let stream = stream::unfold(
+            (Some(None::<String>), 0usize), // (continuation_token, entries_yielded)
+            move |(token_state, entries_count)| {
+                let client = client.clone();
+                let prefix = prefix.clone();
+                let options = options_clone.clone();
+                let self_prefix = self_prefix.clone();
 
-            if !options.recursive {
-                request = request.delimiter("/");
-            }
+                async move {
+                    // Check if we're done or hit max_entries
+                    if token_state.is_none() {
+                        return None;
+                    }
 
-            if let Some(token) = &continuation_token {
-                request = request.continuation_token(token);
-            }
-
-            if let Some(max) = options.max_entries {
-                request = request.max_keys((max - entries.len()) as i32);
-            }
-
-            let response = request.send().await.map_err(|e| BackendError::Other {
-                backend: "s3".to_string(),
-                message: format!("Failed to list objects: {}", e),
-            })?;
-
-            // Process objects
-            let objects = response.contents();
-            if !objects.is_empty() {
-                for object in objects {
-                    if let Some(key) = object.key() {
-                        // Skip the prefix itself
-                        if key == prefix.trim_end_matches('/') {
-                            continue;
+                    if let Some(max) = options.max_entries {
+                        if entries_count >= max {
+                            return None;
                         }
+                    }
 
-                        let full_path = PathBuf::from(key);
-                        let relative_path = self.key_to_path(key);
+                    let token = token_state.unwrap();
 
-                        let size = object.size().unwrap_or(0) as u64;
-                        let mut metadata = Metadata::file(size);
+                    // Build list request
+                    let mut request = client
+                        .aws_client()
+                        .list_objects_v2()
+                        .bucket(client.bucket())
+                        .prefix(&prefix);
 
-                        if let Some(last_modified) = object.last_modified() {
-                            if let Ok(system_time) = std::time::SystemTime::try_from(*last_modified)
-                            {
-                                metadata.modified = Some(system_time);
+                    if !options.recursive {
+                        request = request.delimiter("/");
+                    }
+
+                    if let Some(ref t) = token {
+                        request = request.continuation_token(t);
+                    }
+
+                    if let Some(max) = options.max_entries {
+                        let remaining = max - entries_count;
+                        request = request.max_keys(remaining.min(1000) as i32);
+                    }
+
+                    // Fetch page
+                    let response = match request.send().await {
+                        Ok(r) => r,
+                        Err(e) => {
+                            let err = BackendError::Other {
+                                backend: "s3".to_string(),
+                                message: format!("Failed to list objects: {}", e),
+                            };
+                            return Some((stream::once(async move { Err(err) }).boxed(), (None, entries_count)));
+                        }
+                    };
+
+                    // Convert response to DirEntry items
+                    let mut page_entries = Vec::new();
+
+                    // Process objects
+                    for object in response.contents() {
+                        if let Some(key) = object.key() {
+                            // Skip the prefix itself
+                            if key == prefix.trim_end_matches('/') {
+                                continue;
+                            }
+
+                            let full_path = PathBuf::from(key);
+                            let relative_path = match self_prefix.as_ref() {
+                                Some(p) => {
+                                    let p = p.trim_end_matches('/');
+                                    if let Some(stripped) = key.strip_prefix(p) {
+                                        PathBuf::from(stripped.trim_start_matches('/'))
+                                    } else {
+                                        PathBuf::from(key)
+                                    }
+                                }
+                                None => PathBuf::from(key),
+                            };
+
+                            let size = object.size().unwrap_or(0) as u64;
+                            let mut metadata = Metadata::file(size);
+
+                            if let Some(last_modified) = object.last_modified() {
+                                if let Ok(system_time) =
+                                    std::time::SystemTime::try_from(*last_modified)
+                                {
+                                    metadata.modified = Some(system_time);
+                                }
+                            }
+
+                            metadata.etag = object.e_tag().map(|s| s.to_string());
+
+                            page_entries.push(DirEntry::new(relative_path, full_path, metadata));
+                        }
+                    }
+
+                    // Process common prefixes (directories in non-recursive mode)
+                    if !options.recursive {
+                        for common_prefix in response.common_prefixes() {
+                            if let Some(prefix_str) = common_prefix.prefix() {
+                                let full_path = PathBuf::from(prefix_str);
+                                let relative_path = match self_prefix.as_ref() {
+                                    Some(p) => {
+                                        let p = p.trim_end_matches('/');
+                                        if let Some(stripped) = prefix_str.strip_prefix(p) {
+                                            PathBuf::from(stripped.trim_start_matches('/'))
+                                        } else {
+                                            PathBuf::from(prefix_str)
+                                        }
+                                    }
+                                    None => PathBuf::from(prefix_str),
+                                };
+
+                                page_entries.push(DirEntry::new(
+                                    relative_path,
+                                    full_path,
+                                    Metadata::directory(),
+                                ));
                             }
                         }
-
-                        metadata.etag = object.e_tag().map(|s| s.to_string());
-
-                        entries.push(DirEntry::new(relative_path, full_path, metadata));
                     }
+
+                    let page_entry_count = page_entries.len();
+                    let new_entries_count = entries_count + page_entry_count;
+
+                    // Determine next state
+                    let next_token = if response.is_truncated().unwrap_or(false) {
+                        Some(response.next_continuation_token().map(|s| s.to_string()))
+                    } else {
+                        None // Done
+                    };
+
+                    // Yield this page as a stream
+                    Some((
+                        stream::iter(page_entries.into_iter().map(Ok)).boxed(),
+                        (next_token, new_entries_count),
+                    ))
                 }
-            }
+            },
+        )
+        .flatten()
+        .boxed();
 
-            // Process common prefixes (directories in non-recursive mode)
-            if !options.recursive {
-                let prefixes = response.common_prefixes();
-                if !prefixes.is_empty() {
-                    for common_prefix in prefixes {
-                        if let Some(prefix_str) = common_prefix.prefix() {
-                            let full_path = PathBuf::from(prefix_str);
-                            let relative_path = self.key_to_path(prefix_str);
-
-                            entries.push(DirEntry::new(
-                                relative_path,
-                                full_path,
-                                Metadata::directory(),
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // Check for more results
-            if response.is_truncated().unwrap_or(false) {
-                continuation_token = response.next_continuation_token().map(|s| s.to_string());
-            } else {
-                break;
-            }
-
-            // Check limits
-            if let Some(max) = options.max_entries {
-                if entries.len() >= max {
-                    break;
-                }
-            }
-        }
-
-        Ok(entries)
+        Ok(stream)
     }
 
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
@@ -300,7 +583,13 @@ impl Backend for S3Backend {
         Ok(Box::pin(stream))
     }
 
-    async fn write(&self, path: &Path, data: Bytes, options: WriteOptions) -> BackendResult<u64> {
+    async fn write(
+        &self,
+        path: &Path,
+        mut reader: Box<dyn AsyncRead + Unpin + Send>,
+        size_hint: Option<u64>,
+        options: WriteOptions,
+    ) -> BackendResult<u64> {
         let key = self.path_to_key(path);
 
         // Check if exists
@@ -310,33 +599,51 @@ impl Backend for S3Backend {
             });
         }
 
-        // Upload using PutObject
-        let mut request = self
-            .client
-            .aws_client()
-            .put_object()
-            .bucket(self.client.bucket())
-            .key(&key)
-            .body(data.clone().into());
+        // Determine upload strategy based on size
+        // Use multipart for files >5MB to avoid PutObject limits and enable resumption
+        const MULTIPART_THRESHOLD: u64 = 5 * 1024 * 1024; // 5 MB
+        let use_multipart = size_hint.map_or(true, |size| size > MULTIPART_THRESHOLD);
 
-        // Set content type
-        if let Some(content_type) = options.content_type {
-            request = request.content_type(content_type);
-        }
+        if use_multipart {
+            // Stream upload using multipart
+            self.upload_from_reader(&key, reader, size_hint, &options)
+                .await
+        } else {
+            // Small file: buffer in memory and use PutObject for efficiency
+            use tokio::io::AsyncReadExt;
+            let mut buffer = Vec::new();
+            let bytes_read = reader.read_to_end(&mut buffer).await.map_err(|e| {
+                BackendError::Io(e)
+            })?;
 
-        // Set metadata
-        if let Some(metadata) = options.metadata {
-            for (k, v) in metadata {
-                request = request.metadata(k, v);
+            // Upload using PutObject
+            let mut request = self
+                .client
+                .aws_client()
+                .put_object()
+                .bucket(self.client.bucket())
+                .key(&key)
+                .body(Bytes::from(buffer).into());
+
+            // Set content type
+            if let Some(content_type) = options.content_type {
+                request = request.content_type(content_type);
             }
+
+            // Set metadata
+            if let Some(metadata) = options.metadata {
+                for (k, v) in metadata {
+                    request = request.metadata(k, v);
+                }
+            }
+
+            request.send().await.map_err(|e| BackendError::Other {
+                backend: "s3".to_string(),
+                message: format!("Failed to put object: {}", e),
+            })?;
+
+            Ok(bytes_read as u64)
         }
-
-        request.send().await.map_err(|e| BackendError::Other {
-            backend: "s3".to_string(),
-            message: format!("Failed to put object: {}", e),
-        })?;
-
-        Ok(data.len() as u64)
     }
 
     async fn delete(&self, path: &Path, recursive: bool) -> BackendResult<()> {
