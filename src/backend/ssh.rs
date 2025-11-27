@@ -131,6 +131,16 @@ impl SshConfig {
 /// This backend provides access to remote filesystems over SSH using the SFTP protocol.
 /// It uses the `ssh2` crate for SSH connectivity.
 ///
+/// # Memory Usage
+///
+/// **Note:** The current implementation of `read()` and `write()` buffers entire files
+/// in memory. This provides maximum compatibility and simplicity but is not suitable
+/// for files larger than available RAM. Streaming support is planned for v0.6.0.
+///
+/// # Thread Safety
+///
+/// This backend relies on `ssh2` v0.9+ internal thread safety mechanisms.
+///
 /// # Example
 ///
 /// ```ignore
@@ -498,6 +508,16 @@ impl Backend for SshBackend {
     }
 
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
+        // Warning for large files
+        let metadata = self.stat(path).await?;
+        if metadata.size > 1_000_000_000 {
+            // 1GB
+            tracing::warn!(
+                "Orbit SSH: Reading large file ({} bytes) into memory. Consider splitting or using a different protocol until v0.6.0 streaming support.",
+                metadata.size
+            );
+        }
+
         let path = path.to_path_buf();
         let sftp = self.sftp.clone();
 
@@ -519,6 +539,7 @@ impl Backend for SshBackend {
                 }
             })?;
 
+            // Note: This buffers the full file. See struct docs.
             let mut buffer = Vec::new();
             file.read_to_end(&mut buffer).map_err(BackendError::Io)?;
             Ok::<_, BackendError>(Bytes::from(buffer))
