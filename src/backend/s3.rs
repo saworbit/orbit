@@ -130,7 +130,6 @@ impl S3Backend {
         _size_hint: Option<u64>,
         options: &WriteOptions,
     ) -> BackendResult<u64> {
-        use crate::protocol::s3::UploadPartInfo;
         use tokio::io::AsyncReadExt;
 
         // Initiate multipart upload

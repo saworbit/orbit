@@ -714,12 +714,17 @@ mod tests {
             .unwrap();
 
         let backend = LocalBackend::new();
-        let entries = backend
+        let mut stream = backend
             .list(temp_dir.path(), ListOptions::shallow())
             .await
             .unwrap();
 
-        assert_eq!(entries.len(), 3);
+        use futures::StreamExt;
+        let mut count = 0;
+        while let Some(_entry) = stream.next().await {
+            count += 1;
+        }
+        assert_eq!(count, 3);
     }
 
     #[tokio::test]
@@ -730,9 +735,12 @@ mod tests {
         let backend = LocalBackend::new();
         let data = Bytes::from("test data");
 
-        // Write
+        // Write using streaming API
+        use tokio::io::AsyncRead;
+        let reader: Box<dyn AsyncRead + Unpin + Send> =
+            Box::new(std::io::Cursor::new(data.clone()));
         let written = backend
-            .write(&file_path, data.clone(), WriteOptions::default())
+            .write(&file_path, reader, Some(9), WriteOptions::default())
             .await
             .unwrap();
         assert_eq!(written, 9);
@@ -786,8 +794,15 @@ mod tests {
 
         // Create file using relative path
         let data = Bytes::from("test");
+        use tokio::io::AsyncRead;
+        let reader: Box<dyn AsyncRead + Unpin + Send> = Box::new(std::io::Cursor::new(data));
         backend
-            .write(Path::new("test.txt"), data, WriteOptions::default())
+            .write(
+                Path::new("test.txt"),
+                reader,
+                Some(4),
+                WriteOptions::default(),
+            )
             .await
             .unwrap();
 
