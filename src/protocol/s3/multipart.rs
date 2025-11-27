@@ -399,7 +399,6 @@ impl S3Client {
             } else if !pending_chunks.is_empty() {
                 // Next sequential chunk is not ready yet, but we have other pending downloads
                 // Poll for ANY completed task to keep pipeline full
-                use futures::future::FutureExt;
 
                 // Find any completed task
                 let mut completed_offset = None;

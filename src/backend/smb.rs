@@ -288,7 +288,7 @@ impl Backend for SmbBackend {
     }
 
     async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
-        use futures::stream::{self, StreamExt, TryStreamExt};
+        use futures::stream::{self, StreamExt};
 
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;

@@ -130,7 +130,7 @@ impl S3Backend {
         _size_hint: Option<u64>,
         options: &WriteOptions,
     ) -> BackendResult<u64> {
-        use crate::protocol::s3::types::UploadPartInfo;
+        use crate::protocol::s3::UploadPartInfo;
         use tokio::io::AsyncReadExt;
 
         // Initiate multipart upload
@@ -225,9 +225,8 @@ impl S3Backend {
         if let Some(sse) = self.client.config().server_side_encryption.to_aws() {
             request = request.server_side_encryption(sse);
 
-            if let crate::protocol::s3::types::S3ServerSideEncryption::AwsKms {
-                key_id: Some(kid),
-            } = &self.client.config().server_side_encryption
+            if let crate::protocol::s3::S3ServerSideEncryption::AwsKms { key_id: Some(kid) } =
+                &self.client.config().server_side_encryption
             {
                 request = request.ssekms_key_id(kid);
             }
@@ -254,8 +253,8 @@ impl S3Backend {
         upload_id: &str,
         part_number: i32,
         data: Bytes,
-    ) -> BackendResult<crate::protocol::s3::types::UploadPartInfo> {
-        use crate::protocol::s3::types::UploadPartInfo;
+    ) -> BackendResult<crate::protocol::s3::UploadPartInfo> {
+        use crate::protocol::s3::UploadPartInfo;
         use aws_sdk_s3::primitives::ByteStream;
 
         let size = data.len();
@@ -293,7 +292,7 @@ impl S3Backend {
         &self,
         key: &str,
         upload_id: &str,
-        parts: &[crate::protocol::s3::types::UploadPartInfo],
+        parts: &[crate::protocol::s3::UploadPartInfo],
     ) -> BackendResult<()> {
         use aws_sdk_s3::types::{CompletedMultipartUpload, CompletedPart};
 
@@ -656,10 +655,12 @@ impl Backend for S3Backend {
         // Check if it's a "directory" (prefix)
         if recursive {
             // List all objects with this prefix
-            let objects = self.list(path, ListOptions::recursive()).await?;
+            use futures::StreamExt;
+            let mut stream = self.list(path, ListOptions::recursive()).await?;
 
             // Delete all objects
-            for entry in objects {
+            while let Some(entry) = stream.next().await {
+                let entry = entry?;
                 let entry_key = self.path_to_key(&entry.full_path);
                 self.client
                     .delete(&entry_key)

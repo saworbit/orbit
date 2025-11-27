@@ -499,7 +499,7 @@ impl Backend for SshBackend {
         let sftp = self.sftp.clone();
 
         // Collect entries in blocking task, then convert to stream
-        let entries = tokio::task::spawn_blocking(move || {
+        let entries = tokio::task::spawn_blocking(move || -> BackendResult<Vec<_>> {
             let mut entries = Vec::new();
             list_recursive_blocking_impl(&sftp, &path, &path, &options, 0, &mut entries)?;
             Ok(entries)

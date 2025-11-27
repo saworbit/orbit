@@ -6,7 +6,6 @@
 #[cfg(feature = "backend-abstraction")]
 mod streaming_tests {
     use orbit::backend::{Backend, ListOptions, LocalBackend, WriteOptions};
-    use std::path::Path;
     use tempfile::TempDir;
     use tokio::io::AsyncRead;
 
