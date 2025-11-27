@@ -33,6 +33,7 @@ sample_*.txt
 orbit_audit.log
 audit.log
 *.jsonl
+**/beacon.json
 
 # Windows null device artifact
 nul
