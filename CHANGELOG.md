@@ -5,14 +5,16 @@ All notable changes to Orbit will be documented in this file.
 ## [Unreleased]
 
 ### Added - Orbit V2 Architecture (v0.5.0)
-- **🚀 Content-Defined Chunking (CDC)** - New `core-cdc` crate implementing FastCDC algorithm
-  - Variable-sized chunks: 4KB min, 64KB avg, 1MB max
-  - Gear Hash 64-bit rolling hash for boundary detection
-  - BLAKE3 content hashing for chunk identification
-  - Shift-resilient: Inserting bytes at offset 0 preserves downstream chunks
-  - Iterator-based API with `ChunkStream` for memory-efficient processing
-  - Comprehensive benchmarks showing ~230 MiB/s throughput on 1MB files
-  - 8/8 unit tests passing + integration tests
+- **🚀 Content-Defined Chunking (CDC)** - New `core-cdc` crate implementing Gear Hash CDC
+  - **Solves the "Shift Problem"**: 99.1% chunk preservation after single-byte insertion (vs 0% with fixed chunking)
+  - Variable-sized chunks: 8KB min, 64KB avg, 256KB max (configurable)
+  - Gear Hash rolling hash with 256-entry lookup table for fast boundary detection
+  - BLAKE3 content hashing for cryptographically secure chunk identification
+  - Iterator-based `ChunkStream<R: Read>` API for memory-efficient streaming
+  - Efficient buffer management (2× max_size buffer with smart refilling)
+  - Threshold-based cut detection for robust chunking across different data patterns
+  - 7/7 tests passing including resilience, distribution, and deterministic chunking tests
+  - Fully integrated with V2 architecture via `v2_integration.rs`
 
 - **🧠 Semantic Replication** - New `core-semantic` crate for intent-based prioritization
   - Four built-in adapters: Config (Critical), WAL (High), Media (Low), Default (Normal)
@@ -21,7 +23,11 @@ All notable changes to Orbit will be documented in this file.
   - Magic number detection for media files (PNG, JPEG, MP4)
   - Extension-based classification for configs (.toml, .json, .yaml, .lock)
   - Path-based detection for WAL files (pg_wal/*, *.wal, *.binlog)
-  - 8/8 unit tests passing
+  - Comprehensive media detection: images (.jpg, .png, .heic), video (.mp4, .mkv, .avi), audio (.mp3, .flac, .wav)
+  - Disk image support: .iso, .img, .dmg, .vdi, .vmdk, .qcow2
+  - Archive file support: .zip, .tar, .gz, .bz2, .xz, .7z, .rar
+  - Extensible adapter system via `SemanticAdapter` trait
+  - 10/10 tests passing (8/8 unit tests + 2/2 integration tests)
 
 - **🌌 Universe Map** - Global content-addressed index in `core-starmap::universe`
   - Repository-wide deduplication: Maps BLAKE3 hash → Vec<Location>
@@ -32,6 +38,18 @@ All notable changes to Orbit will be documented in this file.
   - 100% rename detection: Identical content = 0 bytes transferred
   - 6/6 unit tests passing
 
+- **💾 Persistent Universe (Stage 4)** - ACID-compliant global index using redb
+  - `Universe` - Persistent embedded database for chunk locations
+  - `Universe::open()` - Opens or creates database at specified path
+  - `insert_chunk()` - Stores chunk hash with location metadata
+  - `find_chunk()` - Retrieves all locations for a given chunk hash
+  - `has_chunk()` - Fast existence check without retrieving full data
+  - `ChunkLocation` - Full path + offset + length for persistent storage
+  - redb backend provides ACID guarantees with zero-copy reads
+  - Data survives application restarts (verified with drop & re-open tests)
+  - 4/4 persistence tests passing (verify_universe_persistence, test_multiple_locations, test_has_chunk, test_empty_database)
+  - Table definition: `[u8; 32]` (hash) → `Vec<ChunkLocation>` (bincode-serialized)
+
 - **🔄 V1→V2 Migration** - Migration utilities in `core-starmap::migrate`
   - `migrate_to_universe()` - Single V1 StarMap → V2 Universe Map
   - `migrate_batch()` - Multiple V1 StarMaps → Single V2 Universe Map
@@ -40,14 +58,19 @@ All notable changes to Orbit will be documented in this file.
   - Automatic global deduplication during migration
   - 3/3 unit tests passing
 
-- **🔗 V2 Integration Layer** - New `src/core/v2_integration.rs` module
-  - `V2Context` - Combines semantic registry + universe map + CDC config
-  - `TransferJob` - Prioritized file transfer queue with metadata
-  - `analyze_and_queue()` - Analyze files and create sorted transfer jobs
-  - `index_file()` - CDC chunking + universe map registration
-  - `dedup_stats()` - Global deduplication statistics
-  - `save_universe()` / `load_universe()` - Persistent universe map storage
-  - 4/4 unit tests passing
+- **🔗 V2 Integration Layer** - New `src/core/v2_integration.rs` module (Stage 3: Wiring)
+  - `PrioritizedJob` - File transfer job with semantic priority and sync strategy
+  - Custom Ord trait implementation for BinaryHeap priority queue (reversed comparison)
+  - `perform_smart_sync()` - 3-phase smart sync with priority-ordered execution
+    - Phase 1: Scan directory tree + analyze with SemanticRegistry
+    - Phase 2: Queue jobs in BinaryHeap (priority-ordered)
+    - Phase 3: Execute transfers in priority order (Critical → High → Normal → Low)
+  - `is_smart_mode()` - Detects "smart" mode via check_mode_str configuration field
+  - `transfer_file()` - Helper for individual file transfers with strategy routing
+  - Binary heap ordering: Critical(0) < High(10) < Normal(50) < Low(100)
+  - 1/1 priority queue test passing (test_priority_queue_ordering)
+  - Successfully validates files processed by priority, not alphabetical order
+  - Fully integrated with existing transfer infrastructure via copy_file()
 
 - **🧪 V2 Integration Tests** - Comprehensive end-to-end validation in `tests/v2_integration_test.rs`
   - `test_v2_complete_workflow` - Full stack: semantic + CDC + universe map

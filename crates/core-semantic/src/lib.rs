@@ -226,7 +226,7 @@ impl SemanticAdapter for WalAdapter {
     }
 }
 
-/// Adapter for media files (videos, images, audio)
+/// Adapter for media files (videos, images, audio) and large archives
 ///
 /// These are typically large, immutable, and low-priority for recovery.
 pub struct MediaAdapter;
@@ -239,7 +239,9 @@ impl SemanticAdapter for MediaAdapter {
                 ext.to_lowercase().as_str(),
                 "mp4" | "mkv" | "avi" | "mov" | "webm" | "flv" |  // Video
                 "mp3" | "flac" | "wav" | "ogg" | "m4a" |          // Audio
-                "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" | "svg" // Images
+                "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" | "svg" | // Images
+                "iso" | "img" | "dmg" | "vdi" | "vmdk" | "qcow2" | // Disk images
+                "zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" // Archives (large)
             ) {
                 return true;
             }

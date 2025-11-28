@@ -72,7 +72,7 @@ pub use error::{Error, Result};
 pub use reader::StarMapReader;
 
 // V2 types
-pub use universe::{DedupStats, Location, UniverseMap};
+pub use universe::{ChunkLocation, DedupStats, Location, Universe, UniverseMap};
 
 /// Current Star Map format version
 pub const STARMAP_VERSION: u16 = 1;

@@ -412,3 +412,144 @@ mod tests {
         assert_eq!(stats.space_savings_pct(), 0.0);
     }
 }
+
+// ============================================================================
+// Stage 4: Persistent Universe (redb-based ACID-compliant storage)
+// ============================================================================
+
+use redb::{Database, ReadableTable, TableDefinition};
+use std::path::PathBuf;
+
+/// Table definition for chunk locations
+/// Key: [u8; 32] (BLAKE3 hash)
+/// Value: Vec<u8> (bincode-serialized Vec<ChunkLocation>)
+const CHUNKS_TABLE: TableDefinition<&[u8; 32], &[u8]> = TableDefinition::new("chunks");
+
+/// A location where a chunk exists (for persistent storage)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChunkLocation {
+    /// Full path to the file
+    pub path: PathBuf,
+
+    /// Byte offset within the file
+    pub offset: u64,
+
+    /// Length in bytes
+    pub length: u32,
+}
+
+impl ChunkLocation {
+    /// Create a new chunk location
+    pub fn new(path: PathBuf, offset: u64, length: u32) -> Self {
+        Self {
+            path,
+            offset,
+            length,
+        }
+    }
+}
+
+/// Persistent Universe: ACID-compliant global deduplication index
+///
+/// Uses redb for embedded database storage with full ACID guarantees.
+/// Data survives application restarts.
+pub struct Universe {
+    db: Database,
+}
+
+impl Universe {
+    /// Open or create a Universe database at the given path
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let db = Database::create(path.as_ref())
+            .map_err(|e| Error::Other(format!("Failed to open Universe DB: {}", e)))?;
+
+        // Ensure the table exists
+        let write_txn = db
+            .begin_write()
+            .map_err(|e| Error::Other(format!("Failed to begin write transaction: {}", e)))?;
+        {
+            let _ = write_txn
+                .open_table(CHUNKS_TABLE)
+                .map_err(|e| Error::Other(format!("Failed to open chunks table: {}", e)))?;
+        }
+        write_txn
+            .commit()
+            .map_err(|e| Error::Other(format!("Failed to commit transaction: {}", e)))?;
+
+        Ok(Self { db })
+    }
+
+    /// Insert a chunk location into the database
+    ///
+    /// If the chunk hash already exists, the new location is appended to the list.
+    pub fn insert_chunk(&self, hash: [u8; 32], location: ChunkLocation) -> Result<()> {
+        let write_txn = self
+            .db
+            .begin_write()
+            .map_err(|e| Error::Other(format!("Failed to begin write transaction: {}", e)))?;
+
+        {
+            let mut table = write_txn
+                .open_table(CHUNKS_TABLE)
+                .map_err(|e| Error::Other(format!("Failed to open chunks table: {}", e)))?;
+
+            // Read existing locations or create new vector
+            let mut locations: Vec<ChunkLocation> = match table.get(&hash) {
+                Ok(Some(data)) => {
+                    let bytes = data.value();
+                    bincode::deserialize(bytes)
+                        .map_err(|e| Error::DeserializationError(e.to_string()))?
+                }
+                Ok(None) => Vec::new(),
+                Err(e) => return Err(Error::Other(format!("Failed to read chunk: {}", e))),
+            };
+
+            // Append new location
+            locations.push(location);
+
+            // Serialize and store
+            let serialized = bincode::serialize(&locations)
+                .map_err(|e| Error::SerializationError(e.to_string()))?;
+
+            table
+                .insert(&hash, serialized.as_slice())
+                .map_err(|e| Error::Other(format!("Failed to insert chunk: {}", e)))?;
+        }
+
+        write_txn
+            .commit()
+            .map_err(|e| Error::Other(format!("Failed to commit transaction: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// Find all locations for a given chunk hash
+    ///
+    /// Returns None if the chunk doesn't exist.
+    pub fn find_chunk(&self, hash: &[u8; 32]) -> Result<Option<Vec<ChunkLocation>>> {
+        let read_txn = self
+            .db
+            .begin_read()
+            .map_err(|e| Error::Other(format!("Failed to begin read transaction: {}", e)))?;
+
+        let table = read_txn
+            .open_table(CHUNKS_TABLE)
+            .map_err(|e| Error::Other(format!("Failed to open chunks table: {}", e)))?;
+
+        match table.get(hash) {
+            Ok(Some(data)) => {
+                let bytes = data.value();
+                let locations: Vec<ChunkLocation> = bincode::deserialize(bytes)
+                    .map_err(|e| Error::DeserializationError(e.to_string()))?;
+                Ok(Some(locations))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(Error::Other(format!("Failed to read chunk: {}", e))),
+        }
+    }
+
+    /// Check if a chunk exists in the database
+    pub fn has_chunk(&self, hash: &[u8; 32]) -> Result<bool> {
+        Ok(self.find_chunk(hash)?.is_some())
+    }
+}

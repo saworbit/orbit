@@ -124,15 +124,15 @@ fn test_v2_complete_workflow() {
     for (file, _intent) in &file_intents {
         let file_id = universe.register_file(&file.path);
 
-        let stream = ChunkStream::new(Cursor::new(&file.content), config);
+        let stream = ChunkStream::new(Cursor::new(&file.content), config.clone());
 
         for chunk_result in stream {
             let chunk = chunk_result.expect("Chunking failed");
 
             // Add to Universe Map (global dedup index)
             universe.add_chunk(
-                &chunk.meta.hash,
-                Location::new(file_id, chunk.meta.offset, chunk.meta.length as u32),
+                &chunk.hash,
+                Location::new(file_id, chunk.offset, chunk.length as u32),
             );
         }
     }
@@ -186,15 +186,15 @@ fn test_v2_rename_detection() {
 
     // Index file at original location
     let file1_id = universe.register_file("original.txt");
-    let stream1 = ChunkStream::new(Cursor::new(original_content), config);
+    let stream1 = ChunkStream::new(Cursor::new(original_content), config.clone());
 
     let mut chunk_hashes = Vec::new();
     for chunk in stream1 {
         let chunk = chunk.unwrap();
-        chunk_hashes.push(chunk.meta.hash);
+        chunk_hashes.push(chunk.hash);
         universe.add_chunk(
-            &chunk.meta.hash,
-            Location::new(file1_id, chunk.meta.offset, chunk.meta.length as u32),
+            &chunk.hash,
+            Location::new(file1_id, chunk.offset, chunk.length as u32),
         );
     }
 
@@ -206,14 +206,14 @@ fn test_v2_rename_detection() {
     for chunk in stream2 {
         let chunk = chunk.unwrap();
 
-        if !universe.has_chunk(&chunk.meta.hash) {
+        if !universe.has_chunk(&chunk.hash) {
             // Chunk doesn't exist - would need to transfer
-            bytes_to_transfer += chunk.meta.length;
+            bytes_to_transfer += chunk.length;
         } else {
             // Chunk exists! Just add new location reference
             universe.add_chunk(
-                &chunk.meta.hash,
-                Location::new(file2_id, chunk.meta.offset, chunk.meta.length as u32),
+                &chunk.hash,
+                Location::new(file2_id, chunk.offset, chunk.length as u32),
             );
         }
     }
@@ -256,13 +256,13 @@ fn test_v2_incremental_edit() {
 
     // Index original
     let file_id = universe.register_file("file.txt");
-    let stream = ChunkStream::new(Cursor::new(original), config);
+    let stream = ChunkStream::new(Cursor::new(original), config.clone());
 
     for chunk in stream {
         let chunk = chunk.unwrap();
         universe.add_chunk(
-            &chunk.meta.hash,
-            Location::new(file_id, chunk.meta.offset, chunk.meta.length as u32),
+            &chunk.hash,
+            Location::new(file_id, chunk.offset, chunk.length as u32),
         );
     }
 
@@ -276,13 +276,13 @@ fn test_v2_incremental_edit() {
     for chunk in stream {
         let chunk = chunk.unwrap();
 
-        if universe.has_chunk(&chunk.meta.hash) {
+        if universe.has_chunk(&chunk.hash) {
             reused_chunks += 1;
         } else {
             new_chunks += 1;
             universe.add_chunk(
-                &chunk.meta.hash,
-                Location::new(file_id, chunk.meta.offset, chunk.meta.length as u32),
+                &chunk.hash,
+                Location::new(file_id, chunk.offset, chunk.length as u32),
             );
         }
     }
@@ -303,4 +303,98 @@ fn test_v2_incremental_edit() {
         "Should reuse at least 30% of chunks (got {:.1}%)",
         reuse_ratio * 100.0
     );
+}
+
+#[test]
+fn test_priority_queue_ordering() {
+    //! Stage 3 Verification: Priority Queue Ordering
+    //!
+    //! This test validates that the BinaryHeap in v2_integration correctly
+    //! reorders file processing by priority, not alphabetical order.
+    //!
+    //! Scenario: Files added in ALPHABETICAL order (backup, config, data, log)
+    //! Expected: Pop order is PRIORITY order (config, log, data, backup)
+
+    use orbit::core::v2_integration::PrioritizedJob;
+    use orbit_core_semantic::{Priority, SyncStrategy};
+    use std::collections::BinaryHeap;
+    use std::path::PathBuf;
+
+    println!("\n🧪 Starting Priority Queue Ordering Test...");
+
+    let mut queue = BinaryHeap::new();
+
+    // 1. Add files in ALPHABETICAL order
+    // (This simulates a recursive directory scan that finds files alphabetically)
+    let files = vec![
+        ("backup.iso", Priority::Low),
+        ("config.toml", Priority::Critical),
+        ("data.bin", Priority::Normal),
+        ("logs/app.log", Priority::High), // Logs are typically High priority
+    ];
+
+    for (name, prio) in files {
+        println!("   Enqueueing: {} ({:?})", name, prio);
+        queue.push(PrioritizedJob {
+            source_path: PathBuf::from(name),
+            dest_path: PathBuf::from(format!("/dest/{}", name)),
+            priority: prio,
+            strategy: SyncStrategy::ContentDefined,
+            size: 1000,
+        });
+    }
+
+    // 2. Pop and Verify Order
+    println!("   Processing Queue in priority order:");
+
+    let first = queue.pop().unwrap();
+    println!(
+        "   1. Processed: {:?} ({:?})",
+        first.source_path, first.priority
+    );
+    assert_eq!(
+        first.source_path,
+        PathBuf::from("config.toml"),
+        "Critical config must be first"
+    );
+    assert_eq!(first.priority, Priority::Critical);
+
+    let second = queue.pop().unwrap();
+    println!(
+        "   2. Processed: {:?} ({:?})",
+        second.source_path, second.priority
+    );
+    assert_eq!(
+        second.source_path,
+        PathBuf::from("logs/app.log"),
+        "High priority log must be second"
+    );
+    assert_eq!(second.priority, Priority::High);
+
+    let third = queue.pop().unwrap();
+    println!(
+        "   3. Processed: {:?} ({:?})",
+        third.source_path, third.priority
+    );
+    assert_eq!(
+        third.source_path,
+        PathBuf::from("data.bin"),
+        "Normal data must be third"
+    );
+    assert_eq!(third.priority, Priority::Normal);
+
+    let fourth = queue.pop().unwrap();
+    println!(
+        "   4. Processed: {:?} ({:?})",
+        fourth.source_path, fourth.priority
+    );
+    assert_eq!(
+        fourth.source_path,
+        PathBuf::from("backup.iso"),
+        "Low priority ISO must be last"
+    );
+    assert_eq!(fourth.priority, Priority::Low);
+
+    println!("   ✅ PASS: Priority Queue successfully reordered transfer stream.");
+    println!("   ✅ PASS: Files transferred by priority, not alphabetical order!");
 }

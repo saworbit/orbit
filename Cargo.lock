@@ -4803,10 +4803,6 @@ name = "orbit-core-cdc"
 version = "0.1.0"
 dependencies = [
  "blake3",
- "criterion",
- "rand 0.8.5",
- "serde",
- "tempfile",
  "thiserror 1.0.69",
 ]
 
@@ -4855,6 +4851,7 @@ dependencies = [
  "bitvec",
  "memmap2 0.9.9",
  "rand 0.8.5",
+ "redb",
  "serde",
  "siphasher",
  "tempfile",

@@ -197,6 +197,11 @@ pub struct CopyConfig {
     /// Chunk size for delta resume tracking (default: 1MB)
     #[serde(default = "default_delta_block_size")]
     pub delta_chunk_size: usize,
+
+    /// Raw check mode string for custom modes like "smart" (V2 integration)
+    /// Falls back to standard check_mode if not recognized
+    #[serde(default)]
+    pub check_mode_str: Option<String>,
 }
 
 impl Default for CopyConfig {
@@ -242,6 +247,7 @@ impl Default for CopyConfig {
             delta_hash_algorithm: crate::core::delta::HashAlgorithm::Blake3,
             parallel_hashing: true,
             delta_manifest_path: None,
+            check_mode_str: None,
             delta_resume_enabled: true,
             delta_chunk_size: default_delta_block_size(),
         }

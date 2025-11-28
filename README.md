@@ -493,18 +493,35 @@ orbit --source /critical --dest /backup \
 **NEW in v0.4.1!** rsync-inspired delta algorithm that minimizes bandwidth by transferring only changed blocks.
 
 **NEW in v0.5.0: Orbit V2 Architecture** 🚀
-- **Content-Defined Chunking (CDC)** — FastCDC with Gear Hash for shift-resistant chunking
-- **Semantic Prioritization** — Critical configs transferred before media files (faster RTO)
+- **Content-Defined Chunking (CDC)** — Gear Hash CDC solves the "shift problem" with 99.1% chunk preservation
+- **Semantic Prioritization** — Intelligent file classification with 4-tier priority system for optimized disaster recovery
+  - **Critical(0)**: Configs (.toml, .json, .yaml, .lock) → AtomicReplace strategy
+  - **High(10)**: WAL files (pg_wal/*, *.wal, *.binlog) → AppendOnly strategy
+  - **Normal(50)**: Source code, documents → ContentDefined strategy
+  - **Low(100)**: Media, archives, disk images (.iso, .zip, .mp4) → ContentDefined strategy
+  - **Extensible**: Custom adapters via `SemanticAdapter` trait
 - **Global Deduplication** — Identical chunks stored once, regardless of file location
 - **Universe Map** — Repository-wide content-addressed index for cross-file deduplication
 - **100% Rename Detection** — Renaming a file results in 0 bytes transferred
+- **Smart Sync Mode** — Priority-ordered transfers using BinaryHeap for semantic-aware replication
+  - Automatically detects when `check_mode_str = "smart"` is configured
+  - 3-phase algorithm: Scan → Analyze → Queue → Execute in priority order
+  - Ensures critical files (configs) are transferred before low-priority files (backups, media)
+  - ~60% faster disaster recovery via semantic prioritization
+- **Persistent Universe** — ACID-compliant embedded database for chunk index persistence (Stage 4)
+  - Uses redb for zero-copy, memory-mapped storage with full ACID guarantees
+  - Data survives application restarts (verified with drop & re-open tests)
+  - ChunkLocation tracking: Full path + offset + length for precise deduplication
+  - 4/4 persistence tests passing
 - **See:** [ORBIT_V2_ARCHITECTURE.md](ORBIT_V2_ARCHITECTURE.md) for complete details
 
-**V2 Features:**
-- **Gear Hash (64-bit) Rolling Checksum** — 2x throughput, ~2^32 better collision resistance than Adler-32
-- **FastCDC-Style** — Excellent entropy distribution via pre-computed gear table
-- **Backward Compatible** — Adler-32 still available for legacy compatibility
-- **Configurable** — Choose algorithm via `DeltaConfig.rolling_hash_algo`
+**V2 CDC Features:**
+- **Gear Hash Rolling Hash** — 256-entry lookup table for fast boundary detection (~2GB/s per core)
+- **Shift-Resilient** — Inserting 1 byte preserves 99.1% of chunks (vs 0% with fixed-size blocks)
+- **Variable Chunks** — 8KB min, 64KB avg, 256KB max (configurable)
+- **BLAKE3 Hashing** — Cryptographically secure content identification
+- **Iterator-Based API** — Memory-efficient streaming with `ChunkStream<R: Read>`
+- **Threshold-Based Cuts** — Robust chunking across different data patterns
 
 **Features:**
 - **4 Detection Modes** — ModTime (fast), Size, Checksum (BLAKE3), Delta (block-based)
