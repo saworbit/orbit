@@ -143,10 +143,7 @@ impl UniverseMap {
     ///
     /// If the chunk already exists at this location, it's a no-op.
     pub fn add_chunk(&mut self, content_id: &[u8; 32], location: Location) {
-        self.index
-            .entry(*content_id)
-            .or_default()
-            .push(location);
+        self.index.entry(*content_id).or_default().push(location);
     }
 
     /// Get all locations for a content ID
