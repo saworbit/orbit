@@ -30,6 +30,18 @@ pub enum Error {
     #[error("Invalid magic number: expected {expected:?}, found {found:?}")]
     InvalidMagic { expected: Vec<u8>, found: Vec<u8> },
 
+    /// Invalid version
+    #[error("Invalid version: expected {expected}, found {found}")]
+    InvalidVersion { expected: u16, found: u16 },
+
+    /// Serialization error
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    /// Deserialization error
+    #[error("Deserialization error: {0}")]
+    DeserializationError(String),
+
     /// Chunk index out of bounds
     #[error("Chunk index out of bounds: {index} >= {count}")]
     ChunkIndexOutOfBounds { index: u32, count: u32 },

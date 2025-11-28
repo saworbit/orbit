@@ -63,6 +63,6 @@ mod tests {
     #[test]
     fn test_audit_module_exists() {
         // Basic smoke test that the module compiles
-        assert!(true);
+        // Module compiles successfully if this test runs
     }
 }

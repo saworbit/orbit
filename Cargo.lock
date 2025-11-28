@@ -4753,7 +4753,9 @@ dependencies = [
  "notify",
  "once_cell",
  "orbit-core-audit",
+ "orbit-core-cdc",
  "orbit-core-manifest",
+ "orbit-core-semantic",
  "orbit-core-starmap",
  "orbit-web",
  "pin-project",
@@ -4797,6 +4799,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "orbit-core-cdc"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "criterion",
+ "rand 0.8.5",
+ "serde",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "orbit-core-manifest"
 version = "0.1.0"
 dependencies = [
@@ -4822,6 +4836,15 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+]
+
+[[package]]
+name = "orbit-core-semantic"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -492,9 +492,16 @@ orbit --source /critical --dest /backup \
 
 **NEW in v0.4.1!** rsync-inspired delta algorithm that minimizes bandwidth by transferring only changed blocks.
 
-**NEW in v0.5/v0.6: Gear Hash (64-bit) Rolling Checksum** 🚀
-- **2x Throughput** — Gear64 hash dramatically reduces false-positive matches on high-speed networks
-- **~2^32 Better Collision Resistance** — 64-bit hash space vs 32-bit Adler-32
+**NEW in v0.5.0: Orbit V2 Architecture** 🚀
+- **Content-Defined Chunking (CDC)** — FastCDC with Gear Hash for shift-resistant chunking
+- **Semantic Prioritization** — Critical configs transferred before media files (faster RTO)
+- **Global Deduplication** — Identical chunks stored once, regardless of file location
+- **Universe Map** — Repository-wide content-addressed index for cross-file deduplication
+- **100% Rename Detection** — Renaming a file results in 0 bytes transferred
+- **See:** [ORBIT_V2_ARCHITECTURE.md](ORBIT_V2_ARCHITECTURE.md) for complete details
+
+**V2 Features:**
+- **Gear Hash (64-bit) Rolling Checksum** — 2x throughput, ~2^32 better collision resistance than Adler-32
 - **FastCDC-Style** — Excellent entropy distribution via pre-computed gear table
 - **Backward Compatible** — Adler-32 still available for legacy compatibility
 - **Configurable** — Choose algorithm via `DeltaConfig.rolling_hash_algo`
@@ -1363,12 +1370,16 @@ Orbit is built from clean, reusable crates:
 |-------|---------|--------|
 | 🧩 `core-manifest` | Manifest parsing and job orchestration | ✅ Stable |
 | 🌌 `core-starmap` | Job planner and dependency graph | ✅ Stable |
+| 🌌 `core-starmap::universe` | Global deduplication index (V2) | ✅ **v0.5.0** |
+| 🌌 `core-starmap::migrate` | V1→V2 migration utilities | ✅ **v0.5.0** |
+| 🧬 `core-cdc` | FastCDC content-defined chunking (V2) | ✅ **v0.5.0** |
+| 🧠 `core-semantic` | Intent-based replication (V2) | ✅ **v0.5.0** |
 | 📊 `core-audit` | Structured logging and telemetry | ✅ Stable |
 | ⚡ `core-zero-copy` | OS-level optimized I/O | ✅ Stable |
 | 🗜️ `core-compress` | Compression and decompression | ✅ Stable |
 | 🛡️ `disk-guardian` | Pre-flight space & integrity checks | ✅ Stable |
-| 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | ✅ **NEW!** |
-| 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | ✅ **NEW!** |
+| 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | ✅ Stable |
+| 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | ✅ Stable |
 | 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
 | 🌐 `orbit-web` | Enterprise web control center (Nebula) | ✅ **v1.0.0-alpha.2** |
 | 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |

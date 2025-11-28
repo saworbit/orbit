@@ -52,7 +52,7 @@ async fn test_async_starvation_prevention() {
 
     println!("Starting heavy compute...");
 
-    let result = tokio::task::spawn_blocking(move || mock_heavy_compute())
+    let result = tokio::task::spawn_blocking(mock_heavy_compute)
         .await
         .expect("Task failed");
 
@@ -138,7 +138,7 @@ async fn test_magnetar_executor_prevents_starvation() {
         let mut n = 0u64;
         while start.elapsed() < Duration::from_secs(2) {
             n = n.wrapping_add(1);
-            if n % 1_000_000 == 0 {
+            if n.is_multiple_of(1_000_000) {
                 std::thread::yield_now();
             }
         }

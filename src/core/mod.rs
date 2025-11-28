@@ -23,6 +23,7 @@ pub mod resume;
 pub mod retry;
 pub mod transfer;
 pub mod transform; // Metadata and path transformation
+pub mod v2_integration; // V2 Architecture integration (CDC + Semantic + Universe Map)
 pub mod validation;
 pub mod zero_copy; // Concurrency control with semaphore
 

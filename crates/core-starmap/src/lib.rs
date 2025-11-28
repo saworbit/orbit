@@ -60,7 +60,9 @@ pub mod bitmap;
 pub mod bloom;
 pub mod builder;
 pub mod error;
+pub mod migrate; // V2: Migration utilities (V1 → V2)
 pub mod reader;
+pub mod universe; // V2: Global content-addressed index
 
 // Re-export main types
 pub use bitmap::RankSelectBitmap;
@@ -68,6 +70,9 @@ pub use bloom::BloomFilter;
 pub use builder::StarMapBuilder;
 pub use error::{Error, Result};
 pub use reader::StarMapReader;
+
+// V2 types
+pub use universe::{DedupStats, Location, UniverseMap};
 
 /// Current Star Map format version
 pub const STARMAP_VERSION: u16 = 1;

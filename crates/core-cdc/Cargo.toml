@@ -1,0 +1,26 @@
+[package]
+name = "orbit-core-cdc"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shane Wall <shaneawall@gmail.com>"]
+description = "Content-Defined Chunking (CDC) for Orbit V2 - FastCDC implementation"
+license = "Apache-2.0"
+
+[dependencies]
+# Serialization for chunk metadata
+serde = { version = "1.0", features = ["derive"] }
+
+# Fast hashing (BLAKE3)
+blake3 = "1.5"
+
+# Error handling
+thiserror = "1.0"
+
+[dev-dependencies]
+tempfile = "3.10"
+rand = "0.8"
+criterion = "0.5"
+
+[[bench]]
+name = "cdc_benchmark"
+harness = false
