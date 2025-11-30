@@ -4803,6 +4803,7 @@ name = "orbit-core-cdc"
 version = "0.1.0"
 dependencies = [
  "blake3",
+ "criterion",
  "thiserror 1.0.69",
 ]
 

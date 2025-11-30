@@ -91,6 +91,7 @@ impl GearHash {
     }
 
     /// Reset the hash state
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         self.hash = 0;
     }

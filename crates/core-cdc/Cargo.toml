@@ -11,4 +11,8 @@ blake3 = "1.5"
 thiserror = "1.0"
 
 [dev-dependencies]
-# For testing
+criterion = "0.5"
+
+[[bench]]
+name = "cdc_benchmark"
+harness = false
