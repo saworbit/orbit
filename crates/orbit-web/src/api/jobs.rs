@@ -1,12 +1,17 @@
-//! Job management API endpoints (Leptos server functions)
+//! Job management API endpoints
 
+use crate::error::{WebError, WebResult};
 use crate::state::{AppState, OrbitEvent};
-use leptos::*;
+use axum::{
+    extract::{Path, State},
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 
 /// Job information for API responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct JobInfo {
     pub id: i64,
     pub source: String,
@@ -22,6 +27,7 @@ pub struct JobInfo {
 
 /// Job creation request
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct CreateJobRequest {
     pub source: String,
     pub destination: String,
@@ -30,23 +36,16 @@ pub struct CreateJobRequest {
     pub parallel_workers: u32,
 }
 
-/// List all jobs (Leptos server function)
-#[server(ListJobs, "/api")]
-pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
-    use axum::extract::State;
-
-    // Get app state from context
-    let State(state): State<AppState> = match use_context::<State<AppState>>() {
-        Some(s) => s,
-        None => {
-            return Err(ServerFnError::ServerError(
-                "App state not found".to_string(),
-            ))
-        }
-    };
-
-    // Query Magnetar database for all jobs (using runtime query for MVP)
-    let rows = match sqlx::query(
+/// List all jobs
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    get,
+    path = "/api/jobs",
+    responses(
+        (status = 200, description = "List of jobs", body = Vec<JobInfo>)
+    )
+))]
+pub async fn list_jobs(State(state): State<AppState>) -> WebResult<Json<Vec<JobInfo>>> {
+    let rows = sqlx::query(
         r#"
         SELECT
             id, source, destination, status, progress,
@@ -59,10 +58,7 @@ pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
     )
     .fetch_all(&state.magnetar_pool)
     .await
-    {
-        Ok(r) => r,
-        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-    };
+    .map_err(|e| WebError::Database(e.to_string()))?;
 
     let jobs: Vec<JobInfo> = rows
         .into_iter()
@@ -80,24 +76,23 @@ pub async fn list_jobs() -> Result<Vec<JobInfo>, ServerFnError> {
         })
         .collect();
 
-    Ok(jobs)
+    Ok(Json(jobs))
 }
 
 /// Get job statistics
-#[server(GetJobStats, "/api")]
-pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
-    use axum::extract::State;
-
-    let State(state): State<AppState> = match use_context::<State<AppState>>() {
-        Some(s) => s,
-        None => {
-            return Err(ServerFnError::ServerError(
-                "App state not found".to_string(),
-            ))
-        }
-    };
-
-    let row = match sqlx::query(
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    get,
+    path = "/api/jobs/{job_id}",
+    responses(
+        (status = 200, description = "Job details", body = JobInfo),
+        (status = 404, description = "Job not found")
+    )
+))]
+pub async fn get_job_stats(
+    State(state): State<AppState>,
+    Path(job_id): Path<i64>,
+) -> WebResult<Json<JobInfo>> {
+    let row = sqlx::query(
         r#"
         SELECT
             id, source, destination, status, progress,
@@ -110,10 +105,7 @@ pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
     .bind(job_id)
     .fetch_one(&state.magnetar_pool)
     .await
-    {
-        Ok(r) => r,
-        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-    };
+    .map_err(|_| WebError::NotFound(format!("Job {} not found", job_id)))?;
 
     let job = JobInfo {
         id: row.get(0),
@@ -128,33 +120,33 @@ pub async fn get_job_stats(job_id: i64) -> Result<JobInfo, ServerFnError> {
         updated_at: row.get(9),
     };
 
-    Ok(job)
+    Ok(Json(job))
 }
 
 /// Create new job
-#[server(CreateJob, "/api")]
-pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError> {
-    use axum::extract::State;
-
-    let State(state): State<AppState> = match use_context::<State<AppState>>() {
-        Some(s) => s,
-        None => {
-            return Err(ServerFnError::ServerError(
-                "App state not found".to_string(),
-            ))
-        }
-    };
-
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    post,
+    path = "/api/jobs",
+    request_body = CreateJobRequest,
+    responses(
+        (status = 201, description = "Job created", body = i64),
+        (status = 400, description = "Invalid request")
+    )
+))]
+pub async fn create_job(
+    State(state): State<AppState>,
+    Json(request): Json<CreateJobRequest>,
+) -> WebResult<Json<i64>> {
     // Validate inputs
     if request.source.is_empty() || request.destination.is_empty() {
-        return Err(ServerFnError::ServerError(
+        return Err(WebError::BadRequest(
             "Source and destination are required".to_string(),
         ));
     }
 
     // Insert job into Magnetar database
     let now = chrono::Utc::now().timestamp();
-    let result = match sqlx::query(
+    let result = sqlx::query(
         r#"
         INSERT INTO jobs (source, destination, status, progress, total_chunks, completed_chunks, failed_chunks, created_at, updated_at)
         VALUES (?, ?, 'pending', 0.0, 0, 0, 0, ?, ?)
@@ -165,10 +157,8 @@ pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError>
     .bind(now)
     .bind(now)
     .execute(&state.magnetar_pool)
-    .await {
-        Ok(r) => r,
-        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-    };
+    .await
+    .map_err(|e| WebError::Database(e.to_string()))?;
 
     let job_id = result.last_insert_rowid();
 
@@ -186,62 +176,54 @@ pub async fn create_job(request: CreateJobRequest) -> Result<i64, ServerFnError>
         request.destination
     );
 
-    Ok(job_id)
+    Ok(Json(job_id))
 }
 
 /// Delete job
-#[server(DeleteJob, "/api")]
-pub async fn delete_job(job_id: i64) -> Result<(), ServerFnError> {
-    use axum::extract::State;
-
-    let State(state): State<AppState> = match use_context::<State<AppState>>() {
-        Some(s) => s,
-        None => {
-            return Err(ServerFnError::ServerError(
-                "App state not found".to_string(),
-            ))
-        }
-    };
-
-    match sqlx::query("DELETE FROM jobs WHERE id = ?")
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    delete,
+    path = "/api/jobs/{job_id}",
+    responses(
+        (status = 200, description = "Job deleted"),
+        (status = 404, description = "Job not found")
+    )
+))]
+pub async fn delete_job(
+    State(state): State<AppState>,
+    Path(job_id): Path<i64>,
+) -> WebResult<Json<()>> {
+    sqlx::query("DELETE FROM jobs WHERE id = ?")
         .bind(job_id)
         .execute(&state.magnetar_pool)
         .await
-    {
-        Ok(_) => {}
-        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-    };
+        .map_err(|e| WebError::Database(e.to_string()))?;
 
     tracing::info!("Deleted job {}", job_id);
 
-    Ok(())
+    Ok(Json(()))
 }
 
 /// Run/execute a job
-#[server(RunJob, "/api")]
-pub async fn run_job(job_id: i64) -> Result<(), ServerFnError> {
-    use axum::extract::State;
-
-    let State(state): State<AppState> = match use_context::<State<AppState>>() {
-        Some(s) => s,
-        None => {
-            return Err(ServerFnError::ServerError(
-                "App state not found".to_string(),
-            ))
-        }
-    };
-
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    post,
+    path = "/api/jobs/{job_id}/run",
+    responses(
+        (status = 200, description = "Job started"),
+        (status = 404, description = "Job not found")
+    )
+))]
+pub async fn run_job(
+    State(state): State<AppState>,
+    Path(job_id): Path<i64>,
+) -> WebResult<Json<()>> {
     // Update job status to running
     let now = chrono::Utc::now().timestamp();
-    match sqlx::query("UPDATE jobs SET status = 'running', updated_at = ? WHERE id = ?")
+    sqlx::query("UPDATE jobs SET status = 'running', updated_at = ? WHERE id = ?")
         .bind(now)
         .bind(job_id)
         .execute(&state.magnetar_pool)
         .await
-    {
-        Ok(_) => {}
-        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-    };
+        .map_err(|e| WebError::Database(e.to_string()))?;
 
     // Emit event
     state.emit_event(OrbitEvent::job_updated(
@@ -253,33 +235,29 @@ pub async fn run_job(job_id: i64) -> Result<(), ServerFnError> {
     // TODO: Actually spawn job execution task
     tracing::info!("Started job {}", job_id);
 
-    Ok(())
+    Ok(Json(()))
 }
 
 /// Cancel a running job
-#[server(CancelJob, "/api")]
-pub async fn cancel_job(job_id: i64) -> Result<(), ServerFnError> {
-    use axum::extract::State;
-
-    let State(state): State<AppState> = match use_context::<State<AppState>>() {
-        Some(s) => s,
-        None => {
-            return Err(ServerFnError::ServerError(
-                "App state not found".to_string(),
-            ))
-        }
-    };
-
+#[cfg_attr(feature = "utoipa", utoipa::path(
+    post,
+    path = "/api/jobs/{job_id}/cancel",
+    responses(
+        (status = 200, description = "Job cancelled"),
+        (status = 404, description = "Job not found")
+    )
+))]
+pub async fn cancel_job(
+    State(state): State<AppState>,
+    Path(job_id): Path<i64>,
+) -> WebResult<Json<()>> {
     let now = chrono::Utc::now().timestamp();
-    match sqlx::query("UPDATE jobs SET status = 'cancelled', updated_at = ? WHERE id = ?")
+    sqlx::query("UPDATE jobs SET status = 'cancelled', updated_at = ? WHERE id = ?")
         .bind(now)
         .bind(job_id)
         .execute(&state.magnetar_pool)
         .await
-    {
-        Ok(_) => {}
-        Err(e) => return Err(ServerFnError::ServerError(e.to_string())),
-    };
+        .map_err(|e| WebError::Database(e.to_string()))?;
 
     state.emit_event(OrbitEvent::job_updated(
         job_id.to_string(),
@@ -289,5 +267,5 @@ pub async fn cancel_job(job_id: i64) -> Result<(), ServerFnError> {
 
     tracing::info!("Cancelled job {}", job_id);
 
-    Ok(())
+    Ok(Json(()))
 }

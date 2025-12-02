@@ -1,6 +1,6 @@
 //! Axum server setup with Leptos integration
 
-use crate::{api, state::AppState, ws, WebConfig};
+use crate::{api, state::AppState, ws, ServerConfig};
 use axum::{
     extract::State,
     routing::{get, post},
@@ -1401,8 +1401,8 @@ async fn remove_edge_handler(
     Ok(Json("Edge removed".to_string()))
 }
 
-/// Run the Axum + Leptos server
-pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Error + Send>> {
+/// Run the Axum Control Plane server
+pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error + Send>> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -1475,9 +1475,9 @@ pub async fn run_server(config: WebConfig) -> Result<(), Box<dyn std::error::Err
         // Serve static files
         .nest_service("/pkg", ServeDir::new("target/site/pkg"))
         .nest_service("/public", ServeDir::new("crates/orbit-web/public"))
-        // Fallback for SPA
+        // Fallback handler - redirect to Swagger UI for API documentation
         .fallback(get(|| async {
-            axum::response::Html(include_str!("../public/index.html"))
+            axum::response::Redirect::permanent("/swagger-ui")
         }))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())

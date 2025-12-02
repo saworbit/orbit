@@ -13,7 +13,10 @@ pub type WebResult<T> = Result<T, WebError>;
 #[derive(Debug, Error)]
 pub enum WebError {
     #[error("Database error: {0}")]
-    Database(#[from] sqlx::Error),
+    DatabaseError(#[from] sqlx::Error),
+
+    #[error("Database error: {0}")]
+    Database(String),
 
     #[error("Authentication error: {0}")]
     Auth(String),
@@ -47,7 +50,10 @@ impl IntoResponse for WebError {
             WebError::Forbidden(_) => (StatusCode::FORBIDDEN, self.to_string()),
             WebError::NotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             WebError::BadRequest(_) => (StatusCode::BAD_REQUEST, self.to_string()),
-            WebError::Database(_) | WebError::Io(_) | WebError::Internal(_) => (
+            WebError::DatabaseError(_)
+            | WebError::Database(_)
+            | WebError::Io(_)
+            | WebError::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error".to_string(),
             ),

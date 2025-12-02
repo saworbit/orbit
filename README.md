@@ -10,7 +10,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.5.0)
+## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-alpha Control Plane)
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -22,7 +22,7 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- Web GUI (Nebula) is in alpha.2 with limited UI
+- **NEW v2.2.0-alpha**: Control Plane architecture with decoupled React dashboard ("The Separation")
 - Extensive testing in your specific environment is recommended before production use
 
 See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-feature stability status.
@@ -79,7 +79,7 @@ Orbit is a file transfer tool built in Rust that aims to combine reliability wit
 | 🧠 **Adaptive** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
 | 🌐 **Protocol Support** | Local, **SSH/SFTP**, SMB/CIFS (experimental), **S3**, with unified backend API |
-| 🌐 **Web Dashboard** | Launch the web dashboard with `orbit serve` (alpha.2 - limited UI) |
+| 🌐 **Web Dashboard** | Modern React dashboard with OpenAPI-documented Control Plane (v2.2.0-alpha) |
 | 📊 **Auditable** | Structured JSON telemetry for operations |
 | 🧩 **Modular** | Clean architecture with reusable crates |
 | 🌍 **Cross-Platform** | Linux, macOS, Windows with native optimizations |
@@ -111,7 +111,8 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Filter System** | 🟡 Beta | Glob/regex filters, functional but newer |
 | **Metadata Preservation** | 🟡 Beta | Works well, extended attributes are platform-specific |
 | **Guidance System** | 🟡 Beta | Config validation, recently added |
-| **Web GUI (Nebula)** | 🔴 Alpha | v1.0.0-alpha.2 - backend only, limited UI |
+| **Control Plane API** | 🔴 Alpha | v2.2.0-alpha - OpenAPI/Swagger documented REST API |
+| **React Dashboard** | 🔴 Alpha | v2.2.0-alpha - Modern SPA with React Flow pipelines |
 | **Manifest System** | 🟡 Beta | File tracking and verification |
 | **Progress/Bandwidth Limiting** | 🟡 Beta | Recently integrated across all modes |
 | **Audit Logging** | 🟡 Beta | Structured telemetry, needs more use |
@@ -1104,8 +1105,8 @@ cargo build --release
 # With network protocols (S3, SMB, SSH)
 cargo build --release --features network
 
-# With Web GUI
-cargo build --release --features gui
+# With Control Plane API
+cargo build --release --features api
 
 # Full build (everything)
 cargo build --release --features full
@@ -1136,7 +1137,7 @@ cargo install --path . --features full    # Everything
 | `s3-native` | Amazon S3 and compatible storage | +15MB | ❌ No |
 | `smb-native` | Native SMB2/3 network shares | +8MB | ❌ No |
 | `ssh-backend` | SSH/SFTP remote access | +5MB | ❌ No |
-| `gui` | Web-based dashboard (`orbit serve`) | +15MB | ❌ No |
+| `api` | Control Plane REST API (v2.2.0+) | +15MB | ❌ No |
 | `delta-manifest` | SQLite-backed delta persistence | +3MB | ❌ No |
 | `extended-metadata` | xattr + ownership (Unix/Linux/macOS only) | +500KB | ❌ No |
 | `full` | All features enabled | +50MB | ❌ No |
@@ -1473,7 +1474,8 @@ Orbit is built from clean, reusable crates:
 | 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | 🟡 Beta |
 | 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | 🟡 Beta |
 | 🌐 `protocols` | Network protocol implementations | 🟡 S3/SSH Beta, 🔴 SMB Alpha |
-| 🌐 `orbit-web` | Web control center (Nebula) | 🔴 Alpha (v1.0.0-alpha.2) |
+| 🌐 `orbit-server` | Headless Control Plane API (v2.2.0-alpha) | 🔴 Alpha |
+| 🎨 `orbit-dashboard` | React dashboard (v2.2.0-alpha) | 🔴 Alpha |
 | 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
 | 🧪 `wormhole` | Forward-error correction | 🚧 Planned |
 
@@ -1481,306 +1483,254 @@ This structure ensures isolation, testability, and reusability.
 
 ---
 
-## 🖥️ Web GUI - Nebula (v1.0.0-alpha.2)
+## 🖥️ Orbit Control Plane v2.2.0-alpha - "The Separation"
 
-**Orbit Nebula** is a complete ground-up rewrite of the web interface, transforming it from a basic polling dashboard into an enterprise-grade, real-time data orchestration control center. Built with production-ready authentication, WebSocket streaming, and a comprehensive security stack.
+**Breaking architectural change:** Orbit v2.2.0 separates the monolithic web application into a **headless Control Plane (Rust)** and a **modern Dashboard (React/TypeScript)**, enabling independent deployment, faster iteration, and better scalability.
 
-### Status: v1.0.0-alpha.2 (100% Backend Complete - Fully Compiling)
+### Architecture Overview
 
-**Codename:** Nebula
-**What's New:** Complete rewrite with ~2,000 lines of production Rust implementing JWT auth, real-time events, RESTful APIs, and comprehensive security. **Alpha.2 achieves clean compilation with 0 errors and 0 warnings.**
+```
+┌─────────────────────┐
+│  Orbit Dashboard    │  React 18 + Vite + TypeScript
+│  (Port 5173)        │  TanStack Query + React Flow
+└──────────┬──────────┘
+           │ HTTP/WebSocket
+           │ (CORS enabled)
+           ▼
+┌─────────────────────┐
+│  Control Plane API  │  Axum + OpenAPI/Swagger
+│  (Port 8080)        │  JWT Auth + WebSocket
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│  Magnetar Database  │  SQLite + redb
+└─────────────────────┘
+```
 
-### How to launch the GUI from the CLI
+### Quick Start
 
-⚠️ **Note:** v1.0.0-alpha.2 is API-focused with production-ready backend. Full interactive UI coming in beta.1.
+**Option 1: Use the launcher scripts** (Easiest)
 
-1) Build with defaults (GUI enabled): `cargo build --release`
-2) Start the server: `./target/release/orbit serve --addr 127.0.0.1:8080`
-3) Open `http://127.0.0.1:8080` in your browser.
-4) Default credentials: `admin` / `orbit2025` (⚠️ Change in production!)
-
-Tips:
-- CLI-only build: `cargo build --release --no-default-features --features zero-copy`
-- Set JWT secret: `export ORBIT_JWT_SECRET=your-secret-key`
-
-### Why Use Nebula?
-
-- **Enterprise Authentication** — JWT + Argon2 password hashing with RBAC (Admin/Operator/Viewer)
-- **Real-Time Updates** — WebSocket streaming with <500ms latency for live job events
-- **Multi-User Support** — Role-based access control with secure session management
-- **Production Security** — httpOnly cookies, encrypted passwords, automatic token expiration
-- **RESTful API** — Complete backend API ready for custom frontends
-- **Crash Recovery** — Resume monitoring after disconnects via Magnetar persistence
-
-### What's Implemented (v1.0.0-alpha.2)
-
-#### ✅ 1. Authentication & Security (100% Complete)
-- **JWT Authentication** — 24-hour token expiration with automatic validation
-- **Argon2 Password Hashing** — OWASP-recommended with salt
-- **RBAC** — Three roles: Admin, Operator, Viewer with permission checking
-- **httpOnly Cookies** — Secure token storage preventing XSS attacks
-- **Default Admin Account** — Auto-created on first run (`admin` / `orbit2025`)
-- **SQLite User Database** — Separate from job state for security isolation
-
-#### ✅ 2. Real-Time Event System (100% Complete)
-- **WebSocket Handler** — JWT-validated connections for live updates
-- **Broadcast Channels** — Sub-500ms latency event distribution
-- **6 Event Types** — JobUpdated, TransferSpeed, JobCompleted, JobFailed, AnomalyDetected, ChunkCompleted
-- **Role-Based Filtering** — Events filtered by user permissions
-- **Job-Specific Streams** — Subscribe to individual job updates via `/ws/:job_id`
-
-#### ✅ 3. RESTful API (100% Complete)
-- **Auth Endpoints** — POST `/api/auth/login`, `/api/auth/logout`, GET `/api/auth/me`
-- **Job CRUD** — List, create, get stats, delete, run, cancel jobs
-- **Backend Management** — List configured backends (S3, SMB, Local)
-- **Health Check** — GET `/api/health` for monitoring
-- **Leptos Server Functions** — Type-safe RPC-style endpoints
-
-#### ✅ 4. State Management (100% Complete)
-- **Magnetar Integration** — SQLite-backed persistent job state
-- **User Database Pool** — Async connection pooling with sqlx 0.8
-- **Event Broadcasting** — 1,000-message channel buffer
-- **Backend Configuration** — Thread-safe storage for S3/SMB credentials
-- **Crash Recovery** — Automatic state restoration on server restart
-
-### Quick Start (v1.0.0-alpha.2)
-
-⚠️ **Alpha Status:** Backend fully compiling and production-ready. Interactive UI coming in beta.1.
-
-#### Automated Startup Scripts (Easiest Way)
-
-We provide automated startup scripts that handle all setup for you:
-
-**Unix/Linux/macOS:**
 ```bash
+# Unix/Linux/macOS
+./start-orbit-v2.sh
+
+# Windows
+start-orbit-v2.bat
+```
+
+**Option 2: Manual startup**
+
+```bash
+# Terminal 1: Start Control Plane
 cd crates/orbit-web
-chmod +x start-nebula.sh
-./start-nebula.sh
+cargo run --bin orbit-server
+
+# Terminal 2: Start Dashboard
+cd dashboard
+npm install  # First time only
+npm run dev
 ```
 
-**Windows:**
-```cmd
-cd crates\orbit-web
-start-nebula.bat
-```
+**Access Points:**
+- 🎨 **Dashboard**: http://localhost:5173
+- 🔌 **API**: http://localhost:8080/api
+- 📚 **Swagger UI**: http://localhost:8080/swagger-ui
+- 🔒 **Default credentials**: `admin` / `orbit2025` (⚠️ Change in production!)
 
-**What the scripts do:**
-- ✅ Check for Rust/Cargo installation
-- ✅ Install wasm32-unknown-unknown target if missing
-- ✅ Generate JWT secret automatically (or use your `ORBIT_JWT_SECRET`)
-- ✅ Create data directories
-- ✅ Build the project (only if needed)
-- ✅ Display all API endpoints and default credentials
-- ✅ Start the server
+### Control Plane Features (v2.2.0-alpha)
 
-**Environment Variables (Optional):**
+#### ✅ OpenAPI-Documented REST API
+- **Swagger UI** at `/swagger-ui` for interactive API testing
+- **Type-safe endpoints** with utoipa schema generation
+- **Job Management**: Create, list, monitor, cancel, delete jobs
+- **Backend Configuration**: Manage S3, SMB, SSH, Local backends
+- **Authentication**: JWT-based auth with httpOnly cookies
+- **Real-time Updates**: WebSocket streams at `/ws/:job_id`
+
+#### ✅ Intelligent Scheduling (Planned)
+- **Duration Estimation**: Predict transfer times based on historical data
+- **Bottleneck Detection**: Proactive warnings for performance issues
+- **Confidence Scoring**: Reliability metrics for time estimates
+- **Priority Queues**: Smart job ordering for critical transfers
+
+#### ✅ Production Security
+- **JWT Authentication** with 24-hour expiration
+- **Argon2 Password Hashing** (OWASP recommended)
+- **Role-Based Access Control** (Admin/Operator/Viewer)
+- **CORS Configuration** for dashboard integration
+- **Environment-based secrets** via `ORBIT_JWT_SECRET`
+
+### Dashboard Features (v2.2.0-alpha)
+
+#### ✅ Modern React Stack
+- **React 18** with TypeScript for type safety
+- **Vite** for instant hot module replacement (HMR)
+- **TanStack Query** for intelligent data fetching and caching
+- **Tailwind CSS + Shadcn/UI** for professional design
+- **Lucide Icons** for consistent iconography
+
+#### ✅ Visual Pipeline Builder
+- **React Flow** DAG editor for intuitive job configuration
+- **Drag-and-drop** source and destination nodes
+- **Connection validation** prevents invalid configurations
+- **Export/Import** pipeline definitions
+
+#### ✅ Smart Data Fetching
+- **Adaptive Polling**: 1s for active jobs, 5s when idle
+- **Optimistic Updates**: Instant UI feedback
+- **Automatic Cache Invalidation**: Always shows fresh data
+- **Request Deduplication**: Efficient network usage
+
+#### ✅ Real-time Monitoring
+- **WebSocket Integration** for sub-50ms progress updates
+- **Live Job Status** with progress bars and percentages
+- **Transfer Speed Tracking** with ETA calculations
+- **Event Streaming** for completed/failed jobs
+
+### API Examples
+
+**Create a Job**
 ```bash
-# Customize before running the script
-export ORBIT_JWT_SECRET=your-secret-key-minimum-32-chars
-export ORBIT_MAGNETAR_DB=/path/to/magnetar.db
-export ORBIT_USER_DB=/path/to/users.db
-export ORBIT_HOST=0.0.0.0
-export ORBIT_PORT=3000
-```
-
-#### API Testing with curl
-
-```bash
-# Start the server
-cd crates/orbit-web
-cargo run --release
-
-# Login (returns JWT cookie)
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:8080/api/jobs \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"orbit2025"}' \
-  -c cookies.txt
-
-# Get current user info
-curl http://localhost:8080/api/auth/me -b cookies.txt
-
-# Health check
-curl http://localhost:8080/api/health
+  -d '{
+    "source": "/data/backup",
+    "destination": "s3://bucket/backup",
+    "compress": true,
+    "verify": true,
+    "parallel_workers": 4
+  }'
 ```
 
-#### WebSocket Testing
+**Get Job Status**
+```bash
+curl http://localhost:8080/api/jobs/1
+```
 
+**WebSocket Monitoring**
 ```javascript
-// Connect to WebSocket (requires JWT cookie from login)
-const ws = new WebSocket('ws://localhost:8080/ws/job-123');
-
+const ws = new WebSocket('ws://localhost:8080/ws/1');
 ws.onmessage = (event) => {
   const update = JSON.parse(event.data);
-  console.log('Job update:', update);
-  // Receives: JobUpdated, TransferSpeed, JobCompleted, etc.
+  console.log('Progress:', update.progress);
 };
 ```
 
-#### Environment Variables
+### Development
 
+**Backend (Control Plane)**
 ```bash
-# Set JWT secret (REQUIRED for production)
-export ORBIT_JWT_SECRET=your-secret-key-minimum-32-chars
-
-# Set database paths (optional)
-export ORBIT_MAGNETAR_DB=/var/lib/orbit/magnetar.db
-export ORBIT_USER_DB=/var/lib/orbit/users.db
-
-# Run server
-cargo run --release
-```
-
-#### Development Mode
-
-```bash
-# Install prerequisites
-cargo install cargo-leptos
-rustup target add wasm32-unknown-unknown
-
-# Run with hot reload
 cd crates/orbit-web
-cargo leptos watch
+cargo watch -x 'run --bin orbit-server'  # Auto-reload on changes
 ```
 
-### Architecture (v1.0.0-alpha.2)
-
-Built with enterprise-grade Rust technologies:
-
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Authentication** | JWT + Argon2 | Token-based auth with secure password hashing |
-| **Backend** | Axum 0.7 | High-performance async HTTP server |
-| **Real-time** | WebSockets | Sub-500ms latency event streaming |
-| **State** | Magnetar (SQLite) | Persistent job state with crash recovery |
-| **User DB** | SQLx 0.8 + SQLite | Async user authentication database |
-| **Frontend** | Leptos 0.6 | Full-stack Rust framework (simplified for MVP) |
-| **Runtime** | Tokio | Efficient async task execution |
-
-**Key Design Decisions:**
-- **Separate User DB** — Authentication isolated from job state for security
-- **Runtime SQL Queries** — Flexibility without compile-time DATABASE_URL requirement
-- **Backend-First MVP** — Solid API foundation before UI polish
-- **API-Driven** — Backend APIs can be consumed by any frontend
-- **Production Security** — JWT, Argon2, RBAC, httpOnly cookies from day one
-
-### API Reference (v1.0.0-alpha.2)
-
-#### Authentication Endpoints
-
-**Login**
+**Frontend (Dashboard)**
 ```bash
-POST /api/auth/login
-Content-Type: application/json
-Body: {"username":"admin","password":"orbit2025"}
-# Returns: JWT cookie (httpOnly, 24h expiration) + user info
+cd dashboard
+npm run dev  # Vite HMR enabled
 ```
 
-**Logout**
+**API Documentation**
 ```bash
-POST /api/auth/logout
-# Clears authentication cookie
+# Generate and open API docs
+cd crates/orbit-web
+cargo doc --open -p orbit-server
 ```
 
-**Get Current User**
+### Configuration
+
+**Environment Variables:**
 ```bash
-GET /api/auth/me
-Cookie: orbit_token=<jwt>
-# Returns: {"id":"...","username":"admin","role":"Admin"}
+# Control Plane
+export ORBIT_SERVER_HOST=0.0.0.0       # Bind address (default: 127.0.0.1)
+export ORBIT_SERVER_PORT=8080          # API port (default: 8080)
+export ORBIT_JWT_SECRET=$(openssl rand -base64 32)  # REQUIRED for production
+export ORBIT_MAGNETAR_DB=magnetar.db   # Job database path
+export ORBIT_USER_DB=users.db          # Auth database path
+
+# Dashboard
+# Edit dashboard/.env if needed
+VITE_API_URL=http://localhost:8080
 ```
 
-#### Health Check
+### Migration from v1.0 (Nebula)
 
+The v2.2.0 architecture is a complete rewrite. Key changes:
+
+| v1.0 (Nebula) | v2.2.0 (Control Plane) |
+|---------------|------------------------|
+| Leptos SSR | Axum REST API + React SPA |
+| `orbit-web` binary | `orbit-server` + separate dashboard |
+| Monolithic | Decoupled microservices |
+| Server-side rendering | Client-side rendering |
+| `cargo leptos watch` | `cargo run` + `npm run dev` |
+| `/pkg` WASM assets | Static JSON API |
+
+**Breaking Changes:**
+- `orbit serve` now **only** starts the API (no UI bundled)
+- Dashboard must be hosted separately or via CDN
+- API endpoints remain compatible but are now OpenAPI-documented
+- Authentication flow unchanged (JWT cookies)
+
+### Deployment
+
+**Production Checklist:**
+- [ ] Set `ORBIT_JWT_SECRET` (minimum 32 characters)
+- [ ] Change default admin password
+- [ ] Configure CORS for your dashboard domain
+- [ ] Use HTTPS (reverse proxy recommended: nginx/Caddy)
+- [ ] Set up persistent volumes for databases
+- [ ] Configure firewall rules (allow 8080 for API, 5173 for dev dashboard)
+- [ ] Enable request logging (`RUST_LOG=info`)
+
+**Docker Compose Example** (Coming soon)
+
+### Roadmap
+
+- ✅ v2.2.0-alpha.1 - Basic separation, API refactoring, React scaffolding
+- 🚧 v2.2.0-alpha.2 - Interactive job creation UI, pipeline visual editor
+- 🚧 v2.2.0-beta.1 - Complete dashboard features, duration estimation API
+- 🚧 v2.2.0-rc.1 - Production hardening, performance optimization
+- 🚧 v2.2.0 - Stable release with full documentation
+
+### Troubleshooting
+
+**Control Plane won't start**
 ```bash
-GET /api/health
-# Returns: {"status":"ok","service":"orbit-web","version":"1.0.0"}
+# Check if port is in use
+lsof -i :8080  # Unix
+netstat -ano | findstr :8080  # Windows
+
+# Check logs
+RUST_LOG=debug cargo run --bin orbit-server
 ```
 
-#### WebSocket Events (Requires JWT Cookie)
-
-**Real-Time Job Updates**
+**Dashboard can't connect to API**
 ```bash
-WS /ws/:job_id
-Cookie: orbit_token=<jwt>
-# Streams JSON events:
-# - JobUpdated {job_id, status, progress, timestamp}
-# - TransferSpeed {job_id, bytes_per_sec, timestamp}
-# - JobCompleted {job_id, total_bytes, duration_ms, timestamp}
-# - JobFailed {job_id, error, timestamp}
-# - AnomalyDetected {job_id, message, severity, timestamp}
-# - ChunkCompleted {job_id, chunk_id, bytes, timestamp}
+# Verify Control Plane is running
+curl http://localhost:8080/api/health
+
+# Check CORS configuration in server.rs
+# Ensure dashboard origin is allowed
 ```
 
-**Subscribe to All Jobs**
+**JWT Authentication fails**
 ```bash
-WS /ws
-Cookie: orbit_token=<jwt>
-# Receives events for all jobs (filtered by role permissions)
+# Ensure JWT_SECRET is set
+echo $ORBIT_JWT_SECRET
+
+# Generate a new secret
+export ORBIT_JWT_SECRET=$(openssl rand -base64 32)
 ```
 
-### Configuration (v1.0.0-alpha.2)
+### Support & Documentation
 
-**Required Environment Variables:**
-```bash
-# JWT Secret (REQUIRED for production)
-export ORBIT_JWT_SECRET=your-secret-key-minimum-32-characters
-
-# Database paths (optional, defaults shown)
-export ORBIT_MAGNETAR_DB=/path/to/magnetar.db  # Job state
-export ORBIT_USER_DB=/path/to/users.db         # User auth
-
-# Server configuration (optional)
-export ORBIT_HOST=127.0.0.1
-export ORBIT_PORT=8080
-
-# Logging (optional)
-export RUST_LOG=info,orbit_web=debug
-```
-
-**Security Checklist:**
-- ✅ Set `ORBIT_JWT_SECRET` to a strong random value (min 32 chars)
-- ✅ Change default admin password after first login
-- ✅ Enable HTTPS/TLS in production (use reverse proxy)
-- ✅ Configure CORS for production domain
-- ✅ Restrict network access to trusted IPs
-
-### Nebula Roadmap
-
-**✅ v1.0.0-alpha.2** (COMPLETED) - Compilation Fixes
-- ✅ Fixed Leptos server function type annotations
-- ✅ Cleaned up unused imports
-- ✅ Tested compilation and basic server startup
-- ✅ 0 errors, 0 warnings
-
-**v1.0.0-beta.1** (4-6 hours) - Interactive UI
-- Complete interactive dashboard with live updates
-- Job creation form with validation
-- WebSocket-powered real-time progress bars
-- Job control buttons (run, pause, cancel, delete)
-
-**v1.0.0-beta.2** (8-12 hours) - Advanced Features
-- File explorer with directory navigation
-- Drag-and-drop file upload
-- Backend credential management UI
-- User management panel (Admin only)
-
-**v1.0.0** (12-16 hours) - Production Release
-- Telemetry dashboard with charts and graphs
-- Visual pipeline builder with DAG visualization
-- Dark mode theme
-- PWA support for offline monitoring
-- Comprehensive end-to-end testing
-
-**v1.1.0+** - Future Enhancements
-- SSO integration (SAML, OAuth2)
-- Audit log viewer
-- Multi-language support
-- Mobile-optimized views
-
-📖 **Complete Documentation:**
-- **MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **v1.0.0-alpha.2**
-- **Changelog:** [`crates/orbit-web/CHANGELOG.md`](crates/orbit-web/CHANGELOG.md) ⭐ **NEW!**
-- **Full README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **UPDATED!**
-- **API Docs:** Run `cargo doc --open -p orbit-web`
+- 📖 **API Docs**: http://localhost:8080/swagger-ui (when running)
+- 📁 **Source**: [crates/orbit-web/](crates/orbit-web/) (Control Plane), [dashboard/](dashboard/) (React app)
+- 📝 **CHANGELOG**: [CHANGELOG.md](CHANGELOG.md#architecture-shift---orbit-control-plane-v220-alpha-breaking)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/saworbit/orbit/issues)
 
 ---
 

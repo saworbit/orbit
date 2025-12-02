@@ -1,32 +1,32 @@
 [package]
-name = "orbit-web"
-version = "1.0.0-rc.1"
+name = "orbit-server"
+version = "2.2.0-alpha.1"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
-description = "Nebula: Next-gen real-time web control center for Orbit"
+description = "Orbit Control Plane: Headless API and Orchestration Engine"
 license = "Apache-2.0"
 
 [dependencies]
-# Core Orbit crates (re-exported types)
+# Core Orbit crates
 magnetar = { path = "../magnetar", features = ["sqlite", "resilience"] }
 orbit-core-manifest = { path = "../core-manifest" }
 orbit-core-starmap = { path = "../core-starmap" }
 orbit-core-audit = { path = "../core-audit" }
 
-# Web stack
-axum = { version = "0.7", features = ["ws", "multipart"] }
+# API & Web Server
+axum = { version = "0.7", features = ["ws", "multipart", "macros"] }
 axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
-leptos = "0.6"
-leptos_meta = "0.6"
-leptos_router = "0.6"
-leptos_axum = "0.6"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace", "fs", "compression-gzip"] }
 tokio = { version = "1.0", features = ["full"] }
 tokio-util = "0.7"
 tokio-stream = "0.1"
 
-# Auth
+# Documentation (The "Intelligence" Layer)
+utoipa = { version = "4", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "7", features = ["axum"] }
+
+# Auth & Security
 argon2 = "0.5"
 jsonwebtoken = "9.0"
 rand_core = { version = "0.6", features = ["std"] }
@@ -36,40 +36,23 @@ sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "chrono", "uuid
 
 # Real-time
 futures = "0.3"
-serde_json = "1.0"
 
-# Serialization
+# Utilities
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 toml = "0.8"
-
-# UI / Charts (basic for MVP)
-plotters = { version = "0.3", default-features = false, features = ["line_series"] }
-chrono = { version = "0.4", features = ["serde"] }
-
-# Misc
-uuid = { version = "1.0", features = ["v4", "serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 thiserror = "1.0"
 anyhow = "1.0"
-
-# WASM support
-getrandom = { version = "0.2", features = ["js"] }
-wasm-bindgen = "0.2"
-console_error_panic_hook = "0.1"
-
-# Additional dependencies
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["json"] }
 
-[features]
-default = ["ssr"]
-ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_router/ssr", "leptos_axum/default"]
-hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
-
 [[bin]]
-name = "orbit-web"
+name = "orbit-server"
 path = "src/main.rs"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["lib"]

@@ -8,40 +8,8 @@ members = [
     "crates/core-cdc",
     "crates/core-semantic",
     "crates/magnetar",
-    "crates/orbit-web",
+    "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
 ]
-
-[[workspace.metadata.leptos]]
-# Leptos configuration for orbit-web
-name = "orbit-web"
-bin-package = "orbit-web"
-lib-package = "orbit-web"
-
-# Output configuration
-output-name = "orbit-web"
-site-root = "crates/orbit-web/target/site"
-site-pkg-dir = "pkg"
-tailwind-input-file = "crates/orbit-web/style/input.css"
-tailwind-config-file = "crates/orbit-web/tailwind.config.js"
-assets-dir = "crates/orbit-web/public"
-
-# Server configuration
-site-addr = "127.0.0.1:8080"
-reload-port = 3001
-frontend-port = 8080
-backend-port = 8080
-
-# Build configuration
-browserquery = "defaults"
-watch = false
-env = "DEV"
-
-# Feature configuration
-bin-features = ["ssr"]
-bin-default-features = false
-lib-features = ["hydrate"]
-lib-default-features = false
-lib-profile-release = "wasm-release"
 
 [package]
 name = "orbit"
@@ -114,8 +82,8 @@ log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
 
-# Web GUI integration (optional)
-orbit-web = { path = "crates/orbit-web", optional = true, default-features = false, features = ["ssr"] }
+# Control Plane API integration (optional) - V2.2.0: Renamed from orbit-web to orbit-server
+orbit-server = { path = "crates/orbit-web", optional = true, default-features = false }
 
 # Random for backoff jitter
 rand = "0.8"
@@ -235,8 +203,8 @@ ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:b
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
 
-# Web GUI - OFF by default (use --features gui to enable)
-gui = ["dep:orbit-web", "orbit-web/ssr", "dep:tokio"]
+# Control Plane API - OFF by default (use --features api to enable) - V2.2.0: Headless API server
+api = ["dep:orbit-server", "dep:tokio"]
 
 # Delta manifest persistence with SQLite - OFF by default
 delta-manifest = ["dep:rusqlite"]
@@ -251,7 +219,7 @@ unicode-normalization = ["dep:unicode-normalization"]
 network = ["s3-native", "smb-native", "ssh-backend"]
 
 # Full feature set (for development and power users)
-full = ["zero-copy", "network", "backend-abstraction", "delta-manifest", "extended-metadata", "gui", "unicode-normalization"]
+full = ["zero-copy", "network", "backend-abstraction", "delta-manifest", "extended-metadata", "api", "unicode-normalization"]
 
 # --- CI & Local Development Optimization ---
 # This profile override fixes "signal 7 [Bus error]" and "No space left on device" errors on CI.

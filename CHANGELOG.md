@@ -4,6 +4,34 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Architecture Shift - Orbit Control Plane (v2.2.0-alpha) [BREAKING]
+- **✂️ The Separation**: Split monolithic `orbit-web` into `orbit-server` (Backend) and `orbit-dashboard` (Frontend).
+  - **Motivation**: Decouples UI release cycle from Core engine stability.
+  - **Performance**: Removed WASM/SSR overhead; Dashboard is now purely static assets served via CDN/Nginx.
+  - **Breaking**: `orbit serve` now launches the API only. UI must be hosted separately or embedded via `static` assets.
+
+- **🧠 Orbit Control Plane (`orbit-server`)**
+  - **OpenAPI 3.0**: Fully documented REST API available at `/swagger-ui`.
+  - **Intelligent Scheduler**: New background service for job prioritization and estimation.
+  - **CORS Support**: Enabled by default for development (allow-all) and configurable for production.
+  - **Duration Estimation API**: `/api/jobs/:id/estimate` endpoint provides intelligent transfer predictions.
+  - **Confidence Scoring**: Estimation API includes confidence scores based on historical Magnetar data.
+  - **Bottleneck Detection**: Proactive warnings for potential performance bottlenecks.
+
+- **🎨 Orbit Dashboard (`orbit-dashboard`)**
+  - **New Stack**: React 18, Vite, TypeScript, TanStack Query.
+  - **Visual Pipeline Builder**: Migrated from custom WASM to **React Flow** for robust DAG editing.
+  - **Real-time**: WebSocket integration for sub-50ms progress updates.
+  - **Smart Data Fetching**: Adaptive polling (1s for active jobs, 5s for idle state).
+  - **Modern UI**: Tailwind CSS + Shadcn/UI (Radix Primitives) for professional design.
+  - **Optimistic Updates**: Instant UI feedback with automatic cache invalidation.
+
+- **🔧 Developer Experience**
+  - **Unified Dev Script**: `start-orbit-v2.sh` runs both backend and frontend concurrently.
+  - **Hot Module Replacement**: Vite provides instant feedback during UI development.
+  - **API Contract**: OpenAPI schema generation ensures frontend/backend type safety.
+  - **Zero Downtime Deployments**: Static dashboard can be updated without restarting control plane.
+
 ### Added - Retry Logic Optimization
 
 - **⚡ Permanent Error Fast-Fail** - Retry logic now distinguishes permanent vs transient errors
