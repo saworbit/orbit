@@ -261,11 +261,10 @@ pub fn perform_smart_sync(
     stats.duration = start_time.elapsed();
 
     // Handle mirror mode deletions
-    if config.copy_mode == CopyMode::Mirror
-        && config.show_progress {
-            println!("\n[Phase 3] Mirror mode - checking for deletions...");
-        }
-        // TODO: Implement deletion logic for mirror mode
+    if config.copy_mode == CopyMode::Mirror && config.show_progress {
+        println!("\n[Phase 3] Mirror mode - checking for deletions...");
+    }
+    // TODO: Implement deletion logic for mirror mode
 
     if config.show_progress {
         println!("\n[Complete] Smart Sync finished!");
