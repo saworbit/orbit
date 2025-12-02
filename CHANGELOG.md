@@ -4,6 +4,19 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Added - Retry Logic Optimization
+
+- **⚡ Permanent Error Fast-Fail** - Retry logic now distinguishes permanent vs transient errors
+  - **Permanent errors skip retries**: `PermissionDenied`, `AlreadyExists`, `NotFound` (I/O variants) fail immediately
+  - **Transient errors still retry**: `TimedOut`, `ConnectionRefused`, `Interrupted` benefit from full retry mechanism
+  - **Transient-First Policy**: Decision flow enforces Fatal → Permanence → Budget → Retry checks
+  - **Performance impact**: Eliminates wasted retry cycles (saves 35+ seconds per permission error with 3 retries)
+  - **User experience**: Faster failure feedback for configuration issues
+  - New integration test suite: `tests/retry_efficiency_test.rs` (5/5 tests passing)
+  - Updated error classification tests: `test_permanent_io_errors()`, `test_transient_io_errors()`
+  - Full specification: `docs/specs/RETRY_OPTIMIZATION_SPEC.md`
+  - Implementation: Enhanced permanence check in `src/core/retry.rs:92-112`
+
 ### Added - Orbit V2.1: Universe Scalability Upgrade
 
 - **🌌 Universe V3: High-Cardinality Architecture** - New `core-starmap::universe_v3` module

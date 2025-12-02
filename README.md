@@ -153,6 +153,11 @@ Control emission with the `ORBIT_STATS` environment variable:
 - **Skip** — Skip failed files, continue with remaining files
 - **Partial** — Keep partial files and retry, perfect for unstable networks
 
+**Smart Retry Logic (NEW):**
+- ⚡ **Permanent errors fail fast** — `PermissionDenied`, `AlreadyExists` skip retries (saves 35+ seconds per error)
+- 🔄 **Transient errors retry** — `TimedOut`, `ConnectionRefused` use full exponential backoff
+- 🎯 **Intelligent classification** — Allow-list approach ensures only truly transient errors are retried
+
 ```bash
 # Resilient transfer with retries and logging
 orbit --source /data --dest /backup --recursive \

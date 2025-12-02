@@ -69,6 +69,8 @@ where
                 return Ok(copy_stats);
             }
             Err(e) => {
+                let is_permanent = !e.is_transient();
+
                 log_error!(
                     "Operation failed on attempt {}: {} (category: {}, fatal: {}, transient: {})",
                     attempt + 1,
@@ -78,18 +80,40 @@ where
                     e.is_transient()
                 );
 
-                // Handle error based on error mode and fatality
+                // 1. FATAL ERROR CHECK
                 if e.is_fatal() {
                     log_error!("Fatal error encountered, aborting retries");
+                    if let Some(stats_tracker) = stats {
+                        stats_tracker.record_failure(&e);
+                    }
+                    return Err(e);
+                }
+
+                // 2. PERMANENT ERROR CHECK (Optimization)
+                // If the error is not transient (e.g. PermissionDenied), we should not retry it
+                // regardless of the ErrorMode, because the result will not change.
+                if is_permanent {
+                    warn!("Error is permanent (non-transient), aborting retries to save time");
 
                     if let Some(stats_tracker) = stats {
                         stats_tracker.record_failure(&e);
                     }
 
-                    return Err(e);
+                    // Respect the flow control of ErrorMode, but force a stop
+                    match config.error_mode {
+                        ErrorMode::Skip => {
+                            warn!("Skipping permanent failure");
+                            if let Some(stats_tracker) = stats {
+                                stats_tracker.record_skip();
+                            }
+                            return Ok(CopyStats::skipped());
+                        }
+                        _ => return Err(e), // Abort or Partial treated as failure
+                    }
                 }
 
-                // Check error mode for non-fatal errors
+                // 3. TRANSIENT ERROR HANDLING
+                // Check error mode for non-fatal, transient errors
                 match config.error_mode {
                     ErrorMode::Abort => {
                         debug!("Error mode is Abort, stopping on error");
@@ -107,19 +131,7 @@ where
                             stats_tracker.record_skip();
                         }
 
-                        // Return a dummy stats for skipped operation
-                        return Ok(CopyStats {
-                            bytes_copied: 0,
-                            duration: Duration::from_secs(0),
-                            checksum: None,
-                            compression_ratio: None,
-                            files_copied: 0,
-                            files_skipped: 1,
-                            files_failed: 1,
-                            delta_stats: None,
-                            chunks_resumed: 0,
-                            bytes_skipped: 0,
-                        });
+                        return Ok(CopyStats::skipped());
                     }
                     ErrorMode::Partial => {
                         debug!("Error mode is Partial, will retry and keep partial files");

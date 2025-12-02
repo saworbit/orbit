@@ -468,4 +468,38 @@ mod tests {
         assert_eq!(ErrorCategory::Network.to_string(), "network");
         assert_eq!(ErrorCategory::Security.to_string(), "security");
     }
+
+    #[test]
+    fn test_permanent_io_errors() {
+        // Permission denied is NOT fatal (so it could be skipped),
+        // but it is NOT transient (so it should not be retried).
+        let perm_err = io::Error::new(io::ErrorKind::PermissionDenied, "denied");
+        let orbit_err = OrbitError::Io(perm_err);
+
+        assert!(!orbit_err.is_fatal());
+        assert!(!orbit_err.is_transient());
+
+        // Already exists
+        let exists_err = io::Error::new(io::ErrorKind::AlreadyExists, "exists");
+        let orbit_err_exists = OrbitError::Io(exists_err);
+        assert!(!orbit_err_exists.is_transient());
+
+        // Not found (I/O variant, not the enum variant)
+        let not_found_err = io::Error::new(io::ErrorKind::NotFound, "not found");
+        let orbit_err_not_found = OrbitError::Io(not_found_err);
+        assert!(!orbit_err_not_found.is_transient());
+    }
+
+    #[test]
+    fn test_transient_io_errors() {
+        // These I/O errors should be retried
+        let timeout_err = io::Error::new(io::ErrorKind::TimedOut, "timed out");
+        assert!(OrbitError::Io(timeout_err).is_transient());
+
+        let conn_refused = io::Error::new(io::ErrorKind::ConnectionRefused, "refused");
+        assert!(OrbitError::Io(conn_refused).is_transient());
+
+        let interrupted = io::Error::new(io::ErrorKind::Interrupted, "interrupted");
+        assert!(OrbitError::Io(interrupted).is_transient());
+    }
 }

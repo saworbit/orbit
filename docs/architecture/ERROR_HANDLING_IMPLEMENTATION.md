@@ -13,9 +13,11 @@ This document summarizes the comprehensive error handling, retry, and logging im
 Added comprehensive error classification methods to `OrbitError`:
 
 - **`is_fatal()`** - Identifies errors that should not be retried (e.g., source not found, authentication failures)
-- **`is_transient()`** - Identifies temporary errors worth retrying (e.g., network timeouts, connection issues)
+- **`is_transient()`** - Identifies temporary errors strictly worth retrying (e.g., network timeouts, connection issues). This is the single source of truth for retry decisions.
 - **`is_network_error()`** - Identifies network-related errors specifically
 - **`category()`** - Returns an `ErrorCategory` enum for detailed error classification
+
+**Optimization: The `is_transient()` method effectively uses an "allow-list" for transient I/O errors (e.g., TimedOut, ConnectionRefused). Any I/O error not on this list (like PermissionDenied, AlreadyExists) returns false, ensuring they are not retried.**
 
 **Error Categories:**
 - Validation (path errors)
@@ -68,7 +70,24 @@ Enhanced retry implementation with:
 - **Jitter** (up to 20%) to avoid thundering herd problems
 - **Backoff cap** at 5 minutes to prevent excessive delays
 - **Fatal error detection** - stops retrying immediately for fatal errors
+- **Permanent error optimization** - stops retrying immediately for non-transient errors (NEW)
 - **Instrumentation integration** - tracks retry attempts and outcomes
+
+**Optimization: Transient-First Retry Policy**
+
+The retry logic strictly enforces a "Transient-First" policy. The decision flow for an error E encountered during attempt N is:
+
+1. **Fatal Check**: Is E fatal? (e.g., source missing). If YES → Stop.
+2. **Permanence Check**: Is E permanent? (i.e., `!E.is_transient()`). If YES → Stop.
+3. **Budget Check**: Is N < MaxAttempts? If NO → Stop.
+4. **Retry**: Wait backoff delay and retry.
+
+This optimization applies specifically to the retry loop:
+- **Abort Mode**: Fails immediately (current behavior). Optimization has no visible effect but logic is cleaner.
+- **Skip Mode**: Skips immediately (current behavior). Optimization has no visible effect.
+- **Partial Mode**: Previously retried everything. **New behavior**: Retries transient errors, fails fast on permanent errors.
+
+**Impact**: Errors like `PermissionDenied`, `AlreadyExists`, and `NotFound` (I/O variants) are classified as permanent and will not be retried, saving time and system resources.
 
 Key functions:
 ```rust
@@ -223,7 +242,9 @@ orbit -s /source -d /dest \
 
 ## Test Coverage
 
-**File:** [tests/error_handling_integration_tests.rs](tests/error_handling_integration_tests.rs)
+**Files:**
+- [tests/error_handling_integration_tests.rs](tests/error_handling_integration_tests.rs)
+- [tests/retry_efficiency_test.rs](tests/retry_efficiency_test.rs) (NEW)
 
 Comprehensive integration tests covering:
 
@@ -233,20 +254,29 @@ Comprehensive integration tests covering:
    - ✅ Fatal error immediate abort
    - ✅ Exponential backoff timing
 
-2. **Error Modes**
+2. **Retry Efficiency Optimization (NEW)**
+   - ✅ Permanent errors (PermissionDenied) trigger exactly 1 attempt (no retries)
+   - ✅ Transient errors (TimedOut) trigger configured number of retries
+   - ✅ Skip mode with permanent errors (no retries before skipping)
+   - ✅ AlreadyExists error triggers no retries
+   - ✅ ConnectionRefused (transient) triggers retries
+
+3. **Error Modes**
    - ✅ Abort mode behavior
    - ✅ Skip mode behavior
    - ✅ Partial mode with retries
 
-3. **Statistics Tracking**
+4. **Statistics Tracking**
    - ✅ Success/failure tracking
    - ✅ Retry counting
    - ✅ Error categorization
    - ✅ Concurrent stats updates
    - ✅ Snapshot formatting
 
-4. **Error Classification**
+5. **Error Classification**
    - ✅ Transient error detection
+   - ✅ Permanent I/O error detection (PermissionDenied, AlreadyExists, NotFound)
+   - ✅ Transient I/O error detection (TimedOut, ConnectionRefused, Interrupted)
    - ✅ Fatal error detection
    - ✅ Network error identification
    - ✅ I/O error categorization

@@ -73,6 +73,22 @@ impl CopyStats {
         self.delta_stats = Some(delta_stats);
         self
     }
+
+    /// Create a CopyStats instance for a skipped operation
+    pub fn skipped() -> Self {
+        Self {
+            bytes_copied: 0,
+            duration: Duration::ZERO,
+            checksum: None,
+            compression_ratio: None,
+            files_copied: 0,
+            files_skipped: 1,
+            files_failed: 1,
+            delta_stats: None,
+            chunks_resumed: 0,
+            bytes_skipped: 0,
+        }
+    }
 }
 
 impl Default for CopyStats {

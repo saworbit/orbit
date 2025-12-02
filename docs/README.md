@@ -17,7 +17,8 @@ docs/
 │   ├── RELEASE_QUICKSTART.md
 │   ├── S3_USER_GUIDE.md
 │   ├── SMB_TESTING.md
-│   └── SYNC_MIRROR.md
+│   ├── SYNC_MIRROR.md
+│   └── UNIVERSE_V3_MIGRATION.md
 │
 ├── architecture/     # Internal implementation details
 │   ├── DELTA_IMPLEMENTATION_SUMMARY.md
@@ -32,14 +33,19 @@ docs/
 │   ├── PROGRESS_AND_CONCURRENCY.md
 │   ├── PROGRESS_SYSTEM.md
 │   ├── RESUME_SYSTEM.md
+│   ├── SCALABILITY_SPEC.md
 │   ├── smb_implementation.md
 │   ├── SMB_NATIVE_STATUS.md
 │   ├── WEB_GUI.md
 │   └── ZERO_COPY.md
 │
+├── specs/            # Technical specifications
+│   └── RETRY_OPTIMIZATION_SPEC.md
+│
 ├── release/          # Release notes and summaries
 │   ├── RELEASE.md
-│   └── RELEASE_SUMMARY.md
+│   ├── RELEASE_SUMMARY.md
+│   └── V2.1_RELEASE_NOTES.md
 │
 └── file_structure_checklist.md
 ```
@@ -61,3 +67,8 @@ docs/
 - [Zero-Copy Transfers](architecture/ZERO_COPY.md)
 - [Resume System](architecture/RESUME_SYSTEM.md)
 - [Manifest System](architecture/MANIFEST_SYSTEM.md)
+- [Error Handling & Retries](architecture/ERROR_HANDLING_IMPLEMENTATION.md)
+- [Scalability (Universe V3)](architecture/SCALABILITY_SPEC.md)
+
+### Technical Specifications
+- [Retry Logic Optimization](specs/RETRY_OPTIMIZATION_SPEC.md)
