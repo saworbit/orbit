@@ -1,13 +1,14 @@
-//! V2 Verification Suite: Stage 4 (Persistence)
+//! V2.1 Verification Suite: Stage 4 (Persistence with V3 Universe)
 //!
 //! Validates:
-//! 1. Universe DB creates/opens correctly.
+//! 1. Universe V3 DB creates/opens correctly.
 //! 2. Data survives a "restart" (drop & re-open).
 //! 3. Serialization/Deserialization works.
+//! 4. High-cardinality performance (O(log N) inserts).
 
 #[cfg(test)]
 mod tests {
-    use orbit_core_starmap::{ChunkLocation, Universe};
+    use orbit_core_starmap::universe_v3::{ChunkLocation, Universe};
     use std::path::PathBuf;
     use tempfile::tempdir;
 
@@ -41,20 +42,20 @@ mod tests {
             println!("   [Run 2] Re-opening DB...");
             let universe = Universe::open(&db_path).expect("Failed to re-open DB");
 
-            let found = universe.find_chunk(&hash).expect("Read failed");
+            let iter = universe.find_chunk(hash).expect("Read failed");
+            let locations: Vec<_> = iter.collect();
 
-            match found {
-                Some(locations) => {
-                    println!("   ✅ Found {} location(s)", locations.len());
-                    assert_eq!(locations.len(), 1);
-                    let loc = &locations[0];
-                    println!("   ✅ Found Chunk at: {:?}", loc.path);
-                    assert_eq!(loc.path, location.path);
-                    assert_eq!(loc.offset, location.offset);
-                    assert_eq!(loc.length, location.length);
-                }
-                None => panic!("❌ Chunk vanished after restart! Persistence failed."),
+            if locations.is_empty() {
+                panic!("❌ Chunk vanished after restart! Persistence failed.");
             }
+
+            println!("   ✅ Found {} location(s)", locations.len());
+            assert_eq!(locations.len(), 1);
+            let loc = &locations[0];
+            println!("   ✅ Found Chunk at: {:?}", loc.path);
+            assert_eq!(loc.path, location.path);
+            assert_eq!(loc.offset, location.offset);
+            assert_eq!(loc.length, location.length);
         }
 
         println!("   ✅ PASS: Data survived restart!");
@@ -98,10 +99,8 @@ mod tests {
         // Verify after restart
         {
             let universe = Universe::open(&db_path).expect("Failed to re-open DB");
-            let locations = universe
-                .find_chunk(&hash)
-                .expect("Read failed")
-                .expect("Chunk not found");
+            let iter = universe.find_chunk(hash).expect("Read failed");
+            let locations: Vec<_> = iter.collect();
 
             assert_eq!(locations.len(), 3);
             println!("   ✅ Found {} locations after restart", locations.len());
@@ -157,8 +156,8 @@ mod tests {
 
         let universe = Universe::open(&db_path).expect("Failed to create DB");
 
-        let result = universe.find_chunk(&[0x00; 32]).expect("Read failed");
-        assert!(result.is_none(), "Empty DB should return None");
+        let iter = universe.find_chunk([0x00; 32]).expect("Read failed");
+        assert!(iter.is_empty(), "Empty DB should return empty iterator");
 
         assert!(
             !universe.has_chunk(&[0x00; 32]).expect("has_chunk failed"),

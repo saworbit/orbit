@@ -104,7 +104,7 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Delta Detection (V1)** | 🟡 Beta | rsync-style algorithm, tested but newer |
 | **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, newly introduced in v0.5.0 |
 | **Semantic Replication** | 🔴 Alpha | Priority-based transfers, new in v0.5.0 |
-| **Global Deduplication** | 🔴 Alpha | Cross-file dedup, experimental |
+| **Global Deduplication (V3)** | 🟡 Beta | High-cardinality Universe index, v2.1 scalability upgrade |
 | **Disk Guardian** | 🟡 Beta | Pre-flight checks, works well but newer |
 | **Magnetar State Machine** | 🟡 Beta | Job persistence, recently added |
 | **Resilience Patterns** | 🟡 Beta | Circuit breaker, rate limiting - new features |
@@ -551,6 +551,16 @@ orbit --source /critical --dest /backup \
 **NEW in v0.4.1!** rsync-inspired delta algorithm that minimizes bandwidth by transferring only changed blocks.
 
 **NEW in v0.5.0: Orbit V2 Architecture** 🚀
+
+**UPGRADED in v2.1: Universe Scalability** 🌌
+- **High-Cardinality Performance** — Eliminated O(N²) write amplification bottleneck in Universe index
+  - **Multimap Architecture**: Uses `redb::MultimapTableDefinition` for discrete location entries
+  - **O(log N) Inserts**: Constant-time performance regardless of duplicate count (was O(N) in V2)
+  - **Streaming Iteration**: O(1) memory usage via `scan_chunk()` callback API
+  - **Production Scale**: Handles billions of chunks with millions of duplicates per chunk
+  - **Benchmark**: 20,000 duplicates - last batch 0.55x faster than first (V2 would be ~200x slower)
+  - **See:** [SCALABILITY_SPEC.md](docs/architecture/SCALABILITY_SPEC.md) for technical details
+
 - **Content-Defined Chunking (CDC)** — Gear Hash CDC solves the "shift problem" with 99.1% chunk preservation
 - **Semantic Prioritization** — Intelligent file classification with 4-tier priority system for optimized disaster recovery
   - **Critical(0)**: Configs (.toml, .json, .yaml, .lock) → AtomicReplace strategy

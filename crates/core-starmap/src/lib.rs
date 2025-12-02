@@ -61,8 +61,10 @@ pub mod bloom;
 pub mod builder;
 pub mod error;
 pub mod migrate; // V2: Migration utilities (V1 → V2)
+pub mod migrate_v3; // V3: Migration utilities (V2 → V3)
 pub mod reader;
 pub mod universe; // V2: Global content-addressed index
+pub mod universe_v3; // V3: High-cardinality scalable index (Multimap)
 
 // Re-export main types
 pub use bitmap::RankSelectBitmap;
