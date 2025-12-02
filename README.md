@@ -10,10 +10,31 @@
 
 ---
 
+## ⚠️ Project Status: Alpha (v0.5.0)
+
+**Orbit is currently in active development and should be considered alpha-quality software.**
+
+- ✅ **Safe for**: Experimentation, evaluation, non-critical workloads, development environments
+- ⚠️ **Use with caution for**: Important data transfers (test thoroughly first, maintain backups)
+- ❌ **Not recommended for**: Mission-critical production systems without extensive testing
+
+**What this means:**
+- APIs may change between versions
+- Some features are experimental and marked as such
+- The V2 architecture (content-defined chunking, semantic replication) is newly introduced
+- Web GUI (Nebula) is in alpha.2 with limited UI
+- Extensive testing in your specific environment is recommended before production use
+
+See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-feature stability status.
+
+---
+
 ## 📑 Table of Contents
 
+- [Project Status](#️-project-status-alpha-v050)
 - [What is Orbit?](#-what-is-orbit)
 - [Why Orbit?](#-why-orbit)
+- [Feature Maturity Matrix](#-feature-maturity-matrix)
 - [Key Features](#-key-features)
   - [Error Handling & Retries](#-error-handling--retries-never-give-up)
   - [Disk Guardian](#️-disk-guardian-pre-flight-safety)
@@ -43,9 +64,9 @@
 
 ## 🌟 What is Orbit?
 
-Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combines enterprise-grade reliability with cutting-edge performance. Whether you're backing up terabytes of data, syncing files across continents, transferring to network shares, or moving data to the cloud, Orbit has you covered.
+Orbit is a file transfer tool built in Rust that aims to combine reliability with performance. Whether you're backing up data, syncing files across locations, transferring to network shares, or moving data to the cloud, Orbit provides features designed to help.
 
-**Key Philosophy:** Intelligence, resilience, and speed without compromise.
+**Key Philosophy:** Intelligence, resilience, and speed. Currently in active development (v0.5.0 alpha).
 
 ---
 
@@ -53,15 +74,52 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 
 | Feature | Benefit |
 |---------|---------|
-| 🚄 **3× Faster** | Zero-copy system calls transfer at device speed (instant APFS cloning on macOS!) |
-| 🛡️ **Bulletproof** | Smart resume with chunk verification, checksums, corruption detection |
-| 🧠 **Smart** | Adapts strategy based on environment (zero-copy, compression, buffered) |
+| 🚄 **Performance** | Zero-copy system calls for faster transfers (instant APFS cloning on macOS) |
+| 🛡️ **Resilient** | Smart resume with chunk verification, checksums, corruption detection |
+| 🧠 **Adaptive** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
-| 🌐 **Protocol Ready** | Local, **SSH/SFTP**, SMB/CIFS, **S3**, with unified backend API |
-| 🌐 **GUI Ready** | Launch the web dashboard with `orbit serve` (enabled by default) |
-| 📊 **Fully Auditable** | Structured JSON telemetry for every operation |
+| 🌐 **Protocol Support** | Local, **SSH/SFTP**, SMB/CIFS (experimental), **S3**, with unified backend API |
+| 🌐 **Web Dashboard** | Launch the web dashboard with `orbit serve` (alpha.2 - limited UI) |
+| 📊 **Auditable** | Structured JSON telemetry for operations |
 | 🧩 **Modular** | Clean architecture with reusable crates |
 | 🌍 **Cross-Platform** | Linux, macOS, Windows with native optimizations |
+
+---
+
+## 🎯 Feature Maturity Matrix
+
+Understanding feature stability helps you make informed decisions about what to use in production.
+
+| Feature | Maturity | Notes |
+|---------|----------|-------|
+| **Core File Copy (Buffered)** | 🟢 Stable | Well-tested, safe for production use |
+| **Zero-Copy Optimization** | 🟢 Stable | Platform-specific (Linux, macOS, Windows) |
+| **Resume/Checkpoint** | 🟡 Beta | Works well, needs more edge-case testing |
+| **Compression (LZ4, Zstd)** | 🟢 Stable | Reliable for most workloads |
+| **Checksum Verification** | 🟢 Stable | SHA-256, BLAKE3 well-tested |
+| **Local Filesystem** | 🟢 Stable | Primary use case, thoroughly tested |
+| **SSH/SFTP Backend** | 🟡 Beta | Functional, needs more real-world testing |
+| **S3 Backend** | 🟡 Beta | Works well, multipart upload is newer |
+| **SMB Backend** | 🔴 Alpha | Awaiting upstream dependency fixes |
+| **Delta Detection (V1)** | 🟡 Beta | rsync-style algorithm, tested but newer |
+| **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, newly introduced in v0.5.0 |
+| **Semantic Replication** | 🔴 Alpha | Priority-based transfers, new in v0.5.0 |
+| **Global Deduplication** | 🔴 Alpha | Cross-file dedup, experimental |
+| **Disk Guardian** | 🟡 Beta | Pre-flight checks, works well but newer |
+| **Magnetar State Machine** | 🟡 Beta | Job persistence, recently added |
+| **Resilience Patterns** | 🟡 Beta | Circuit breaker, rate limiting - new features |
+| **Filter System** | 🟡 Beta | Glob/regex filters, functional but newer |
+| **Metadata Preservation** | 🟡 Beta | Works well, extended attributes are platform-specific |
+| **Guidance System** | 🟡 Beta | Config validation, recently added |
+| **Web GUI (Nebula)** | 🔴 Alpha | v1.0.0-alpha.2 - backend only, limited UI |
+| **Manifest System** | 🟡 Beta | File tracking and verification |
+| **Progress/Bandwidth Limiting** | 🟡 Beta | Recently integrated across all modes |
+| **Audit Logging** | 🟡 Beta | Structured telemetry, needs more use |
+
+**Legend:**
+- 🟢 **Stable**: Production-ready with extensive testing
+- 🟡 **Beta**: Functional and tested, but needs more real-world validation
+- 🔴 **Alpha**: Experimental, expect changes and potential issues
 
 ---
 
@@ -69,7 +127,7 @@ Orbit is a **blazingly fast** 🔥 file transfer tool built in Rust that combine
 
 ### 🔄 Error Handling & Retries: Never Give Up
 
-**NEW in v0.4.1!** Enterprise-grade error handling with intelligent retry logic and comprehensive diagnostics.
+**NEW in v0.4.1!** Intelligent error handling with retry logic and comprehensive diagnostics.
 
 **Features:**
 - **Smart Retry Logic** — Exponential backoff with jitter to avoid thundering herd
@@ -809,10 +867,10 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 
 | Protocol | Status | Feature Flag | Description |
 |----------|--------|--------------|-------------|
-| 🗂️ **Local** | ✅ Stable | Built-in | Local filesystem with zero-copy optimization |
-| 🔐 **SSH/SFTP** | ✅ **Stable** | `ssh-backend` | Remote filesystem access via SSH/SFTP with async I/O |
-| 🌐 **SMB/CIFS** | ✅ **Stable** | `smb-native` | Native SMB2/3 client (pure Rust, no dependencies) |
-| ☁️ **S3** | ✅ **Stable** | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
+| 🗂️ **Local** | 🟢 Stable | Built-in | Local filesystem with zero-copy optimization |
+| 🔐 **SSH/SFTP** | 🟡 Beta | `ssh-backend` | Remote filesystem access via SSH/SFTP with async I/O |
+| ☁️ **S3** | 🟡 Beta | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
+| 🌐 **SMB/CIFS** | 🔴 Alpha | `smb-native` | Native SMB2/3 client (pure Rust, awaiting upstream fixes) |
 | ☁️ **Azure Blob** | 🚧 Planned | - | Microsoft Azure Blob Storage |
 | ☁️ **GCS** | 🚧 Planned | - | Google Cloud Storage |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
@@ -874,7 +932,7 @@ let smb = SmbBackend::new(SmbConfig::new("server", "share")
 
 #### 🆕 SSH/SFTP Remote Access (v0.5.0)
 
-Transfer files securely over SSH/SFTP with production-ready async implementation:
+Transfer files securely over SSH/SFTP with async implementation:
 
 ```bash
 # Download from SSH server using agent authentication
@@ -1015,6 +1073,8 @@ audit_log_path = "/var/log/orbit_audit.log"
 ---
 
 ## 🚀 Quick Start
+
+> **⚠️ Alpha Software:** Remember that Orbit is in active development (v0.5.0). Test thoroughly in non-production environments first, and always maintain backups when working with important data.
 
 ### Install
 
@@ -1385,22 +1445,22 @@ Orbit is built from clean, reusable crates:
 
 | Crate | Purpose | Status |
 |-------|---------|--------|
-| 🧩 `core-manifest` | Manifest parsing and job orchestration | ✅ Stable |
-| 🌌 `core-starmap` | Job planner and dependency graph | ✅ Stable |
-| 🌌 `core-starmap::universe` | Global deduplication index (V2) | ✅ **v0.5.0** |
-| 🌌 `core-starmap::migrate` | V1→V2 migration utilities | ✅ **v0.5.0** |
-| 🧬 `core-cdc` | FastCDC content-defined chunking (V2) | ✅ **v0.5.0** |
-| 🧠 `core-semantic` | Intent-based replication (V2) | ✅ **v0.5.0** |
-| 📊 `core-audit` | Structured logging and telemetry | ✅ Stable |
-| ⚡ `core-zero-copy` | OS-level optimized I/O | ✅ Stable |
-| 🗜️ `core-compress` | Compression and decompression | ✅ Stable |
-| 🛡️ `disk-guardian` | Pre-flight space & integrity checks | ✅ Stable |
-| 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | ✅ Stable |
-| 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | ✅ Stable |
-| 🌐 `protocols` | Network protocol implementations | ✅ S3, 🟡 SMB |
-| 🌐 `orbit-web` | Enterprise web control center (Nebula) | ✅ **v1.0.0-alpha.2** |
+| 🧩 `core-manifest` | Manifest parsing and job orchestration | 🟡 Beta |
+| 🌌 `core-starmap` | Job planner and dependency graph | 🟡 Beta |
+| 🌌 `core-starmap::universe` | Global deduplication index (V2) | 🔴 Alpha (v0.5.0) |
+| 🌌 `core-starmap::migrate` | V1→V2 migration utilities | 🔴 Alpha (v0.5.0) |
+| 🧬 `core-cdc` | FastCDC content-defined chunking (V2) | 🔴 Alpha (v0.5.0) |
+| 🧠 `core-semantic` | Intent-based replication (V2) | 🔴 Alpha (v0.5.0) |
+| 📊 `core-audit` | Structured logging and telemetry | 🟡 Beta |
+| ⚡ `core-zero-copy` | OS-level optimized I/O | 🟢 Stable |
+| 🗜️ `core-compress` | Compression and decompression | 🟢 Stable |
+| 🛡️ `disk-guardian` | Pre-flight space & integrity checks | 🟡 Beta |
+| 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | 🟡 Beta |
+| 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | 🟡 Beta |
+| 🌐 `protocols` | Network protocol implementations | 🟡 S3/SSH Beta, 🔴 SMB Alpha |
+| 🌐 `orbit-web` | Web control center (Nebula) | 🔴 Alpha (v1.0.0-alpha.2) |
 | 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
-| 🧪 `wormhole` | Forward-error correction | 🚧 Dev |
+| 🧪 `wormhole` | Forward-error correction | 🚧 Planned |
 
 This structure ensures isolation, testability, and reusability.
 
@@ -1744,32 +1804,41 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 
 ## 🧪 Roadmap
 
-### ✅ Completed (v0.4.1)
+### ✅ Core Features Implemented (v0.4.1 - v0.5.0)
 
-- Zero-copy and compression engines
+**Stable/Well-Tested:**
+- Zero-copy system calls (Linux, macOS, Windows)
+- Compression engines (LZ4, Zstd)
+- Checksum verification (SHA-256, BLAKE3)
+- Modular crate architecture
+
+**Beta/Recently Added (needs more real-world testing):**
+- Resume and retry with chunk-level verification
+- Native S3 support with multipart transfers
+- SSH/SFTP backend
+- S3-compatible storage (MinIO, LocalStack)
+- Disk Guardian: Pre-flight space & integrity checks
+- Magnetar: Idempotent job state machine with SQLite + redb backends
+- Magnetar Resilience Module: Circuit breaker, connection pooling, rate limiting
+- Delta Detection: rsync-inspired efficient transfers with block-based diffing
+- Metadata Preservation & Transformation
+- Inclusion/Exclusion Filters: Glob, regex, and path patterns
+- Progress Reporting & Operational Controls: Bandwidth limiting, concurrency control
 - Manifest + Starmap + Audit integration
 - Structured telemetry with JSON Lines
-- Modular crate architecture
-- Resume and retry improvements with chunk-level verification
-- **Native S3 support with multipart transfers** ⭐
-- S3-compatible storage (MinIO, LocalStack)
-- S3 object versioning support
-- S3 batch operations with rate limiting
-- Enhanced error recovery (circuit breaker, exponential backoff)
-- Progress callbacks for UI integration
-- **Disk Guardian: Pre-flight space & integrity checks** ⭐
-- **Magnetar: Idempotent job state machine with SQLite + redb backends** ⭐ **NEW!**
-- **Magnetar Resilience Module: Circuit breaker, connection pooling, rate limiting** ⭐ **NEW!**
-- **Delta Detection: rsync-inspired efficient transfers with block-based diffing** ⭐ **NEW!**
-- **Metadata Preservation & Transformation: Comprehensive attribute handling with transformations** ⭐ **NEW!**
-- **Inclusion/Exclusion Filters: Selective file processing with glob, regex, and path patterns** ⭐ **NEW!**
-- **Progress Reporting & Operational Controls: Enhanced progress bars, dry-run, bandwidth limiting, concurrency control** ⭐ **NEW!**
+
+**Alpha/Experimental:**
+- V2 Architecture (CDC, semantic replication, global dedup)
 - SMB2/3 native implementation (awaiting upstream fix)
+- Web GUI (Nebula v1.0.0-alpha.2)
 
-### 🚧 In Progress (v0.5.0)
+### 🚧 In Progress (v0.6.0)
 
-- Watcher component for monitoring transfer health
+- Stabilizing V2 architecture components (CDC, semantic replication)
+- Expanding test coverage for newer features
+- Real-world validation of S3 and SSH backends
 - Enhanced CLI with subcommands
+- Web GUI interactive dashboard (Nebula beta)
 
 ### 🔮 Planned (v0.6.0+)
 
