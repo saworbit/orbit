@@ -21,7 +21,7 @@ blake3 = "1.5"
 thiserror = "2.0"
 
 # JSON Schema validation
-jsonschema = "0.22"
+jsonschema = "0.37"
 
 # UUID generation for job IDs
 uuid = { version = "1.10", features = ["v4", "serde"] }
