@@ -24,7 +24,7 @@ bitvec = "1.0"
 siphasher = "1.0"
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 
 [dev-dependencies]
 tempfile = "3.10"
