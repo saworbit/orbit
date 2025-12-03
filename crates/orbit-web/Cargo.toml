@@ -32,7 +32,7 @@ jsonwebtoken = "9.0"
 rand_core = { version = "0.9", features = ["std"] }
 
 # Database
-sqlx = { version = "0.8.1", features = ["sqlite", "runtime-tokio", "chrono", "uuid"] }
+sqlx = { version = "0.8.1", default-features = false, features = ["sqlite", "runtime-tokio", "chrono", "uuid"] }
 
 # Real-time
 futures = "0.3"
