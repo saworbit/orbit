@@ -4396,7 +4396,7 @@ dependencies = [
  "orbit-core-audit",
  "orbit-core-manifest",
  "orbit-core-starmap",
- "rand_core 0.6.4",
+ "rand_core 0.9.3",
  "reqwest",
  "serde",
  "serde_json",
