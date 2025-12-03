@@ -23,7 +23,7 @@ tokio-util = "0.7"
 tokio-stream = "0.1"
 
 # Documentation (The "Intelligence" Layer)
-utoipa = { version = "4", features = ["axum_extras"] }
+utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "7", features = ["axum"] }
 
 # Auth & Security
