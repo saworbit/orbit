@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import ReactFlow, {
   addEdge,
   Background,
@@ -28,6 +28,10 @@ const initialNodes: Node[] = [
 function PipelineEditorInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Memoize node and edge types to prevent React Flow warnings
+  const nodeTypes = useMemo(() => ({}), []);
+  const edgeTypes = useMemo(() => ({}), []);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -79,6 +83,8 @@ function PipelineEditorInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
         >
           <Background color="#aaa" gap={16} />
