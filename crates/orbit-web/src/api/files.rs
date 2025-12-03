@@ -3,8 +3,8 @@
 use crate::error::{WebError, WebResult};
 use axum::{extract::Query, Json};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// File/directory entry for API response
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,9 +36,7 @@ pub struct ListFilesQuery {
         (status = 400, description = "Path is not a directory")
     )
 ))]
-pub async fn list_files(
-    Query(query): Query<ListFilesQuery>,
-) -> WebResult<Json<Vec<FileEntry>>> {
+pub async fn list_files(Query(query): Query<ListFilesQuery>) -> WebResult<Json<Vec<FileEntry>>> {
     let path = query.path.unwrap_or_else(|| {
         #[cfg(windows)]
         {
@@ -100,10 +98,7 @@ pub async fn list_files(
             }
         }
         Err(e) => {
-            return Err(WebError::Forbidden(format!(
-                "Cannot read directory: {}",
-                e
-            )));
+            return Err(WebError::Forbidden(format!("Cannot read directory: {}", e)));
         }
     }
 
