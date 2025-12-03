@@ -7,6 +7,7 @@ This directory contains all documentation for the ORBIT project.
 ```
 docs/
 ├── guides/           # User-facing guides and tutorials
+│   ├── RUNNING_V2.md
 │   ├── quickstart_guide.md
 │   ├── BACKEND_GUIDE.md
 │   ├── DELTA_DETECTION_GUIDE.md
@@ -53,7 +54,8 @@ docs/
 ## Quick Links
 
 ### Getting Started
-- [Quickstart Guide](guides/quickstart_guide.md)
+- **[Running Orbit v2.2 Web Platform](guides/RUNNING_V2.md)** ⭐ Start here for the dashboard!
+- [Quickstart Guide](guides/quickstart_guide.md) - CLI tool usage
 - [Backend Guide](guides/BACKEND_GUIDE.md)
 
 ### Features

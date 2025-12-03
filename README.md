@@ -1516,10 +1516,10 @@ This structure ensures isolation, testability, and reusability.
 
 ```bash
 # Unix/Linux/macOS
-./start-orbit-v2.sh
+./launch-orbit.sh
 
 # Windows
-start-orbit-v2.bat
+launch-orbit.bat
 ```
 
 **Option 2: Manual startup**
