@@ -21,7 +21,7 @@ futures = "0.3"
 tracing = "0.1"
 
 # Optional backend dependencies
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"], optional = true }
+sqlx = { version = "0.8.1", features = ["runtime-tokio", "sqlite", "migrate"], optional = true }
 redb = { version = "2.1", optional = true }
 bincode = { version = "1", optional = true }
 

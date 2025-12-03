@@ -120,7 +120,7 @@ pin-project = { version = "1", optional = true }
 once_cell = { version = "1.19", optional = true }
 
 # Delta manifest persistence (optional)
-rusqlite = { version = "0.31", features = ["bundled"], optional = true }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]
