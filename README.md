@@ -10,7 +10,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-beta.1 Control Plane)
+## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-rc.1 Control Plane)
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -22,7 +22,8 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v2.2.0-beta.1**: Enterprise platform features - Intelligence API (Estimations), Administration (User Management), System Health monitoring
+- **NEW v2.2.0-rc.1**: Full-stack CI/CD pipeline with dashboard-quality checks, professional file browser, and enhanced developer experience
+- **v2.2.0-beta.1**: Enterprise platform features - Intelligence API (Estimations), Administration (User Management), System Health monitoring
 - **v2.2.0-alpha.2**: React Dashboard implementation with Visual Pipeline Editor, File Browser, and Job Management UI
 - **v2.2.0-alpha.1**: Control Plane architecture with decoupled React dashboard ("The Separation")
 - Extensive testing in your specific environment is recommended before production use
@@ -1564,14 +1565,22 @@ npm run dev
 - **CORS Configuration** for dashboard integration
 - **Environment-based secrets** via `ORBIT_JWT_SECRET`
 
-### Dashboard Features (v2.2.0-alpha)
+### Dashboard Features (v2.2.0-rc.1)
 
 #### ✅ Modern React Stack
-- **React 18** with TypeScript for type safety
-- **Vite** for instant hot module replacement (HMR)
+- **React 19** with TypeScript for type safety
+- **Vite 7** for instant hot module replacement (HMR)
 - **TanStack Query** for intelligent data fetching and caching
-- **Tailwind CSS + Shadcn/UI** for professional design
+- **Tailwind CSS 4 + Shadcn/UI** for professional design
 - **Lucide Icons** for consistent iconography
+
+#### ✅ Professional File Browser (NEW in rc.1)
+- **Click-to-Select** files and folders with visual feedback
+- **Up Navigation** button to traverse parent directories
+- **Folder Selection** button for directory transfers
+- **Visual Indicators**: Selected items highlighted in blue with dark mode support
+- **Loading States**: Spinner and error handling for API calls
+- **RESTful API**: GET `/api/files/list?path={path}` endpoint
 
 #### ✅ Visual Pipeline Builder
 - **React Flow** DAG editor for intuitive job configuration
@@ -1590,6 +1599,17 @@ npm run dev
 - **Live Job Status** with progress bars and percentages
 - **Transfer Speed Tracking** with ETA calculations
 - **Event Streaming** for completed/failed jobs
+
+#### ✅ CI/CD Pipeline (NEW in rc.1)
+- **Dashboard Quality Control**: Dedicated GitHub Actions job
+  - Prettier formatting checks
+  - ESLint linting (zero warnings)
+  - TypeScript strict type checking
+  - npm security audit (high severity)
+  - Vitest unit tests
+  - Production build verification
+- **Rust Security**: cargo-audit integrated into backend CI
+- **Local Validation**: `npm run ci:check` for pre-push checks
 
 ### API Examples
 
@@ -1626,12 +1646,19 @@ ws.onmessage = (event) => {
 ```bash
 cd crates/orbit-web
 cargo watch -x 'run --bin orbit-server'  # Auto-reload on changes
+cargo check  # Quick compilation check
+cargo audit  # Security vulnerability scan
 ```
 
 **Frontend (Dashboard)**
 ```bash
 cd dashboard
-npm run dev  # Vite HMR enabled
+npm install              # Install dependencies (first time)
+npm run dev              # Vite HMR enabled
+npm run ci:check         # Run all checks before pushing
+npm run format:fix       # Auto-fix code formatting
+npm run typecheck        # TypeScript validation
+npm test                 # Run unit tests
 ```
 
 **API Documentation**
@@ -1639,6 +1666,19 @@ npm run dev  # Vite HMR enabled
 # Generate and open API docs
 cd crates/orbit-web
 cargo doc --open -p orbit-server
+```
+
+**Pre-Push Checklist**
+```bash
+# Backend
+cargo fmt --all --check
+cargo clippy --all
+cargo test
+cargo audit
+
+# Frontend
+cd dashboard
+npm run ci:check  # Runs: typecheck + lint + format:check + test
 ```
 
 ### Configuration
