@@ -10,7 +10,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-alpha Control Plane)
+## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-alpha.2 Control Plane)
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -22,7 +22,8 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v2.2.0-alpha**: Control Plane architecture with decoupled React dashboard ("The Separation")
+- **NEW v2.2.0-alpha.2**: React Dashboard implementation with Visual Pipeline Editor, File Browser, and Job Management UI
+- **v2.2.0-alpha.1**: Control Plane architecture with decoupled React dashboard ("The Separation")
 - Extensive testing in your specific environment is recommended before production use
 
 See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-feature stability status.
@@ -1795,7 +1796,11 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 **Alpha/Experimental:**
 - V2 Architecture (CDC, semantic replication, global dedup)
 - SMB2/3 native implementation (awaiting upstream fix)
-- Web GUI (Nebula v1.0.0-alpha.2)
+- **Orbit Control Plane v2.2.0-alpha.2** with React Dashboard
+  - Visual Pipeline Editor (React Flow)
+  - Interactive File Browser with filesystem navigation
+  - Job Management UI with real-time progress tracking
+  - REST API with OpenAPI documentation
 
 ### 🚧 In Progress (v0.6.0)
 
@@ -1870,6 +1875,7 @@ cargo clippy
 
 ### User Guides
 - **Quick Start:** This README
+- **🎨 Control Plane v2.2.0-alpha.2 Deployment:** [`DEPLOYMENT_GUIDE_V2.2.0-alpha.2.md`](DEPLOYMENT_GUIDE_V2.2.0-alpha.2.md) ⭐ **NEW!**
 - **Nebula MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **v1.0.0-alpha.2**
 - **Nebula Changelog:** [`crates/orbit-web/CHANGELOG.md`](crates/orbit-web/CHANGELOG.md) ⭐ **NEW!**
 - **Nebula README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **v1.0.0-alpha.2**

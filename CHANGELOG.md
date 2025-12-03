@@ -4,6 +4,61 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+## [2.2.0-alpha.2] - 2025-12-03
+
+### Added - Dashboard "Face" Implementation
+
+- **🎨 React Dashboard Components**
+  - **Visual Pipeline Editor**: Full React Flow integration with drag-and-drop node creation
+    - Support for Source, Transform, and Destination node types
+    - Real-time edge connections with visual feedback
+    - Background grid and zoom/pan controls
+  - **File Browser Component**: Interactive filesystem navigation
+    - Supports both Windows and Unix filesystems
+    - Directory traversal with parent navigation (..)
+    - File size display and icon differentiation
+    - Connected to backend `/api/list_dir` endpoint
+  - **Job Wizard**: Interactive job creation workflow
+    - Dual file browser panels for source/destination selection
+    - Real-time validation of job parameters
+    - Success/error feedback with TanStack Query mutations
+  - **Job List Component**: Real-time job monitoring
+    - Auto-refresh every 2 seconds for active jobs
+    - Progress bars with chunk completion tracking
+    - Status-based color coding (pending/running/completed/failed/cancelled)
+    - Run/Cancel/Delete actions with optimistic updates
+
+- **🔧 API Integration Layer**
+  - **Custom React Hooks** (`hooks/useJobs.ts`)
+    - `useJobs()`: Auto-refreshing job list query
+    - `useCreateJob()`: Job creation with cache invalidation
+    - `useRunJob()`, `useCancelJob()`, `useDeleteJob()`: Job lifecycle management
+  - **Axios Instance** with request/response interceptors
+    - JWT token injection from localStorage
+    - Automatic 401 redirect to login page
+    - Base URL configuration for API endpoint
+
+- **🎯 Frontend Infrastructure**
+  - **TanStack Query Setup**: Query client with smart defaults
+  - **Tailwind v4 Support**: Updated PostCSS configuration for `@tailwindcss/postcss`
+  - **TypeScript Strict Mode**: All components type-safe with proper imports
+  - **Simple Navigation**: Tab-based routing between Jobs/Create/Pipelines views
+  - **Production Build**: Optimized Vite build (419KB bundle, 136KB gzipped)
+
+### Changed
+
+- **Updated PostCSS Configuration**
+  - Migrated from `tailwindcss` to `@tailwindcss/postcss` plugin
+  - Resolves Tailwind v4 compatibility issues
+
+### Backend (Already Implemented)
+
+- **File Explorer API** (already existed in [server.rs:419-526](c:\orbit\crates\orbit-web\src\server.rs#L419-L526))
+  - `/api/list_dir` (POST): Directory listing with metadata
+  - `/api/list_drives` (GET): System drive enumeration
+  - Windows and Unix filesystem support
+  - Parent directory navigation with ".." entry
+
 ### Architecture Shift - Orbit Control Plane (v2.2.0-alpha) [BREAKING]
 - **✂️ The Separation**: Split monolithic `orbit-web` into `orbit-server` (Backend) and `orbit-dashboard` (Frontend).
   - **Motivation**: Decouples UI release cycle from Core engine stability.
