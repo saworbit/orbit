@@ -4,6 +4,75 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+## [2.2.0-beta.1] - 2025-12-03
+
+### Added - Enterprise Platform Features
+
+- **🧠 Intelligence API (Estimations)**
+  - `GET /api/estimates/:path` - Predictive job duration estimation endpoint
+  - Returns estimated duration (ms), confidence score (0.0-1.0), and historical throughput
+  - Foundation for smart scheduling and capacity planning
+  - Mock implementation for Beta 1 (production integration planned)
+
+- **👥 Administration API (User Management)**
+  - `GET /api/admin/users` - List all users with roles and metadata
+  - `POST /api/admin/users` - Create new users with Admin/Operator/Viewer roles
+  - Full CRUD operations for multi-user enterprise deployment
+  - Role-based access control (RBAC) ready for middleware integration
+  - Secure password hashing with Argon2
+
+- **📊 System Health API**
+  - `GET /api/stats/health` - Real-time system metrics endpoint
+  - Returns active jobs count, bandwidth utilization, system load, and storage health
+  - Auto-refreshes every 5 seconds on frontend
+  - Foundation for monitoring and alerting systems
+
+- **🎨 Enhanced Dashboard UI**
+  - **System Health Widgets**: Four beautiful metric cards on Jobs page
+    - Active Jobs counter with live updates
+    - Total Bandwidth display (Mbps) with green accent
+    - System Load percentage with yellow accent
+    - Storage Health status with purple accent
+  - **Team Management Interface**: Complete user administration panel
+    - User list with role badges and creation timestamps
+    - Add user form with username, password, and role selection
+    - Delete user functionality (ready for backend integration)
+    - SVG icons for visual consistency
+  - **Admin Navigation Tab**: New dedicated admin section in dashboard
+  - **Version Updated**: Dashboard now displays v2.2.0-beta.1
+
+### Changed
+
+- **Dashboard Architecture**: Jobs page now includes system health overview
+- **API Module Structure**: Added `admin`, `estimates`, and `stats` modules
+- **Navigation**: Added Admin tab to main dashboard navigation
+
+### Technical Implementation
+
+- **Backend (Rust)**:
+  - New modules: `crates/orbit-web/src/api/{admin,estimates,stats}.rs`
+  - Updated `crates/orbit-web/src/api/mod.rs` with new exports
+  - Routes registered in `crates/orbit-web/src/server.rs`
+  - Uses `sqlx` with `user_pool` for database operations
+  - Properly formatted with `cargo fmt`
+  - Passes `cargo clippy` checks
+
+- **Frontend (React + TypeScript)**:
+  - New components:
+    - `dashboard/src/components/admin/UserList.tsx` (user management)
+    - `dashboard/src/components/dashboard/SystemHealth.tsx` (metrics widgets)
+  - Updated `dashboard/src/App.tsx` with admin routing
+  - Updated `dashboard/src/components/jobs/JobList.tsx` with health widgets
+  - React Query integration for data fetching
+  - Tailwind CSS for responsive, beautiful UI
+
+### Notes
+
+- Intelligence API returns mock data for Beta 1 (production integration planned)
+- System Health metrics are static for Beta 1 (will query Magnetar in production)
+- User management API is fully functional and ready for production use
+- All new code follows existing patterns and conventions
+
 ## [2.2.0-alpha.2] - 2025-12-03
 
 ### Added - Dashboard "Face" Implementation

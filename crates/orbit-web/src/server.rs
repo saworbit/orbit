@@ -1445,11 +1445,20 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
         .route("/api/list_dir", post(list_dir_handler))
         .route("/api/list_drives", get(list_drives_handler))
         .route("/api/upload_file", post(upload_file_handler))
-        // User management endpoints (Admin only)
+        // User management endpoints (Admin only) - v2.2.0-alpha
         .route("/api/list_users", post(list_users_handler))
         .route("/api/create_user", post(create_user_handler))
         .route("/api/update_user", post(update_user_handler))
         .route("/api/delete_user", post(delete_user_handler))
+        // Admin API - v2.2.0-beta.1
+        .route(
+            "/api/admin/users",
+            get(api::list_users).post(api::create_user),
+        )
+        // Intelligence API - v2.2.0-beta.1
+        .route("/api/estimates/:path", get(api::get_estimate))
+        // System Stats API - v2.2.0-beta.1
+        .route("/api/stats/health", get(api::get_system_health))
         // Pipeline endpoints
         .route("/api/list_pipelines", post(list_pipelines_handler))
         .route("/api/get_pipeline", post(get_pipeline_handler))

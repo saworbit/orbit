@@ -2,9 +2,10 @@ import { useState } from 'react'
 import JobWizard from './components/jobs/JobWizard'
 import JobList from './components/jobs/JobList'
 import PipelineEditor from './components/pipelines/PipelineEditor'
+import UserList from './components/admin/UserList'
 import './App.css'
 
-type Page = 'jobs' | 'create' | 'pipelines'
+type Page = 'jobs' | 'create' | 'pipelines' | 'admin'
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('jobs')
@@ -19,7 +20,7 @@ function App() {
               <div className="text-2xl">🛸</div>
               <h1 className="text-xl font-bold text-gray-900">Orbit Control Plane</h1>
               <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-semibold">
-                v2.2.0-alpha.2
+                v2.2.0-beta.1
               </span>
             </div>
 
@@ -54,6 +55,16 @@ function App() {
               >
                 Pipelines
               </button>
+              <button
+                onClick={() => setCurrentPage('admin')}
+                className={`px-4 py-2 rounded transition-colors ${
+                  currentPage === 'admin'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Admin
+              </button>
             </div>
           </div>
         </div>
@@ -67,6 +78,11 @@ function App() {
           <div className="max-w-6xl mx-auto p-6">
             <h2 className="text-2xl font-bold mb-6">Visual Pipeline Editor</h2>
             <PipelineEditor />
+          </div>
+        )}
+        {currentPage === 'admin' && (
+          <div className="max-w-6xl mx-auto p-6">
+            <UserList />
           </div>
         )}
       </main>

@@ -10,7 +10,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-alpha.2 Control Plane)
+## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-beta.1 Control Plane)
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -22,7 +22,8 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v2.2.0-alpha.2**: React Dashboard implementation with Visual Pipeline Editor, File Browser, and Job Management UI
+- **NEW v2.2.0-beta.1**: Enterprise platform features - Intelligence API (Estimations), Administration (User Management), System Health monitoring
+- **v2.2.0-alpha.2**: React Dashboard implementation with Visual Pipeline Editor, File Browser, and Job Management UI
 - **v2.2.0-alpha.1**: Control Plane architecture with decoupled React dashboard ("The Separation")
 - Extensive testing in your specific environment is recommended before production use
 

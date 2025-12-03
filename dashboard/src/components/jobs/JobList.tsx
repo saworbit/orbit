@@ -1,5 +1,6 @@
 import { useJobs, useRunJob, useCancelJob, useDeleteJob } from '../../hooks/useJobs';
 import { Play, X, Trash2 } from 'lucide-react';
+import SystemHealth from '../dashboard/SystemHealth';
 
 export default function JobList() {
   const { data: jobs, isLoading } = useJobs();
@@ -8,13 +9,21 @@ export default function JobList() {
   const deleteJob = useDeleteJob();
 
   if (isLoading) {
-    return <div className="p-6 text-center">Loading jobs...</div>;
+    return (
+      <div className="max-w-6xl mx-auto p-6">
+        <SystemHealth />
+        <div className="text-center">Loading jobs...</div>
+      </div>
+    );
   }
 
   if (!jobs || jobs.length === 0) {
     return (
-      <div className="p-6 text-center text-gray-500">
-        No jobs yet. Create one to get started!
+      <div className="max-w-6xl mx-auto p-6">
+        <SystemHealth />
+        <div className="text-center text-gray-500">
+          No jobs yet. Create one to get started!
+        </div>
       </div>
     );
   }
@@ -38,6 +47,8 @@ export default function JobList() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      <SystemHealth />
+
       <h2 className="text-2xl font-bold mb-6">Transfer Jobs</h2>
 
       <div className="space-y-3">
