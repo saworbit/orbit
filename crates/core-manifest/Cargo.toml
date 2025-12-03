@@ -18,7 +18,7 @@ chrono = { version = "0.4", features = ["serde"] }
 blake3 = "1.5"
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 
 # JSON Schema validation
 jsonschema = "0.22"

@@ -3757,7 +3757,7 @@ dependencies = [
  "serde",
  "sqlx",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "tokio",
  "tokio-test",
  "toml",
@@ -4296,7 +4296,7 @@ dependencies = [
  "ssh2",
  "sysinfo 0.35.2",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "tokio",
  "toml",
  "tracing",
@@ -4317,7 +4317,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -4326,7 +4326,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "criterion",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -4339,7 +4339,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "uuid",
 ]
 
@@ -4351,7 +4351,7 @@ dependencies = [
  "futures",
  "governor",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "tokio",
  "tokio-test",
  "tracing",
@@ -4363,7 +4363,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -4378,7 +4378,7 @@ dependencies = [
  "serde",
  "siphasher",
  "tempfile",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -4401,7 +4401,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
- "thiserror 1.0.69",
+ "thiserror 2.0.17",
  "time",
  "tokio",
  "tokio-stream",
