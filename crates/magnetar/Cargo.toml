@@ -34,7 +34,7 @@ orbit-core-resilience = { path = "../core-resilience", optional = true }
 
 # S3 integration example (optional)
 aws-config = { version = "1.5", optional = true }
-aws-sdk-s3 = { version = "1.50", optional = true }
+aws-sdk-s3 = { version = "1.113", optional = true }
 hyper = { version = "1", optional = true }
 
 [dev-dependencies]
