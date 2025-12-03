@@ -604,7 +604,7 @@ mod tests {
         let checksum = RollingChecksum::from_data(data);
 
         // Adler-32 should produce consistent results
-        let expected = adler::adler32_slice(data);
+        let expected = adler2::adler32_slice(data);
         assert_eq!(checksum.checksum(), expected);
     }
 
