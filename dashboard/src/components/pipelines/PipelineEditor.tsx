@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback } from "react";
 import ReactFlow, {
   addEdge,
   Background,
@@ -6,13 +6,23 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
-} from 'reactflow';
-import type { Connection, Node } from 'reactflow';
-import 'reactflow/dist/style.css';
+} from "reactflow";
+import type { Connection, Node } from "reactflow";
+import "reactflow/dist/style.css";
 
 const initialNodes: Node[] = [
-  { id: '1', type: 'input', data: { label: 'Source: Local' }, position: { x: 250, y: 5 } },
-  { id: '2', type: 'output', data: { label: 'Dest: S3 Bucket' }, position: { x: 250, y: 200 } },
+  {
+    id: "1",
+    type: "input",
+    data: { label: "Source: Local" },
+    position: { x: 250, y: 5 },
+  },
+  {
+    id: "2",
+    type: "output",
+    data: { label: "Dest: S3 Bucket" },
+    position: { x: 250, y: 200 },
+  },
 ];
 
 function PipelineEditorInner() {
@@ -30,7 +40,12 @@ function PipelineEditorInner() {
       id,
       position: { x: Math.random() * 400, y: Math.random() * 400 },
       data: { label: `${type} Node` },
-      type: type === 'Source' ? 'input' : type === 'Destination' ? 'output' : 'default',
+      type:
+        type === "Source"
+          ? "input"
+          : type === "Destination"
+            ? "output"
+            : "default",
     };
     setNodes((nds) => nds.concat(newNode));
   };
@@ -39,19 +54,19 @@ function PipelineEditorInner() {
     <div className="h-[600px] border rounded-lg bg-slate-50 flex flex-col">
       <div className="p-4 border-b bg-white flex gap-2">
         <button
-          onClick={() => addNode('Source')}
+          onClick={() => addNode("Source")}
           className="px-4 py-2 border rounded hover:bg-gray-100"
         >
           + Source
         </button>
         <button
-          onClick={() => addNode('Transform')}
+          onClick={() => addNode("Transform")}
           className="px-4 py-2 border rounded hover:bg-gray-100"
         >
           + Transform
         </button>
         <button
-          onClick={() => addNode('Destination')}
+          onClick={() => addNode("Destination")}
           className="px-4 py-2 border rounded hover:bg-gray-100"
         >
           + Destination

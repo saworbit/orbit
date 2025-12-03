@@ -1,6 +1,11 @@
-import { useJobs, useRunJob, useCancelJob, useDeleteJob } from '../../hooks/useJobs';
-import { Play, X, Trash2 } from 'lucide-react';
-import SystemHealth from '../dashboard/SystemHealth';
+import {
+  useJobs,
+  useRunJob,
+  useCancelJob,
+  useDeleteJob,
+} from "../../hooks/useJobs";
+import { Play, X, Trash2 } from "lucide-react";
+import SystemHealth from "../dashboard/SystemHealth";
 
 export default function JobList() {
   const { data: jobs, isLoading } = useJobs();
@@ -30,18 +35,18 @@ export default function JobList() {
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'running':
-        return 'bg-blue-100 text-blue-800';
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "running":
+        return "bg-blue-100 text-blue-800";
+      case "completed":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      case "cancelled":
+        return "bg-gray-100 text-gray-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -60,8 +65,12 @@ export default function JobList() {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="font-mono text-sm text-gray-500">#{job.id}</span>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(job.status)}`}>
+                  <span className="font-mono text-sm text-gray-500">
+                    #{job.id}
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(job.status)}`}
+                  >
                     {job.status.toUpperCase()}
                   </span>
                 </div>
@@ -72,15 +81,21 @@ export default function JobList() {
                     <span className="font-mono truncate">{job.source}</span>
                   </div>
                   <div className="flex gap-2">
-                    <span className="text-gray-500 font-medium">Destination:</span>
-                    <span className="font-mono truncate">{job.destination}</span>
+                    <span className="text-gray-500 font-medium">
+                      Destination:
+                    </span>
+                    <span className="font-mono truncate">
+                      {job.destination}
+                    </span>
                   </div>
                 </div>
 
-                {job.status === 'running' && (
+                {job.status === "running" && (
                   <div className="mt-3">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-gray-600">Progress: {Math.round(job.progress)}%</span>
+                      <span className="text-xs text-gray-600">
+                        Progress: {Math.round(job.progress)}%
+                      </span>
                       <span className="text-xs text-gray-400">
                         ({job.completed_chunks}/{job.total_chunks} chunks)
                       </span>
@@ -96,7 +111,7 @@ export default function JobList() {
               </div>
 
               <div className="flex gap-2 ml-4">
-                {job.status === 'pending' && (
+                {job.status === "pending" && (
                   <button
                     onClick={() => runJob.mutate(job.id)}
                     className="p-2 text-green-600 hover:bg-green-50 rounded"
@@ -105,7 +120,7 @@ export default function JobList() {
                     <Play size={18} />
                   </button>
                 )}
-                {job.status === 'running' && (
+                {job.status === "running" && (
                   <button
                     onClick={() => cancelJob.mutate(job.id)}
                     className="p-2 text-orange-600 hover:bg-orange-50 rounded"

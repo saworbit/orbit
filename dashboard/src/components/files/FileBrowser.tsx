@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../lib/api';
-import { Folder, File, HardDrive } from 'lucide-react';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../lib/api";
+import { Folder, File, HardDrive } from "lucide-react";
 
 interface FileEntry {
   name: string;
@@ -16,12 +16,14 @@ interface FileBrowserProps {
 }
 
 export function FileBrowser({ onSelect }: FileBrowserProps) {
-  const [currentPath, setCurrentPath] = useState<string>('.');
+  const [currentPath, setCurrentPath] = useState<string>(".");
 
   const { data: files, isLoading } = useQuery({
-    queryKey: ['files', currentPath],
+    queryKey: ["files", currentPath],
     queryFn: async () => {
-      const res = await api.post<FileEntry[]>('/list_dir', { path: currentPath });
+      const res = await api.post<FileEntry[]>("/list_dir", {
+        path: currentPath,
+      });
       return res.data;
     },
   });
@@ -53,7 +55,9 @@ export function FileBrowser({ onSelect }: FileBrowserProps) {
             ) : (
               <File size={16} className="text-muted-foreground" />
             )}
-            <span className="text-sm truncate text-foreground">{file.name}</span>
+            <span className="text-sm truncate text-foreground">
+              {file.name}
+            </span>
             {!file.is_dir && (
               <span className="text-xs text-muted-foreground ml-auto">
                 {(file.size / 1024).toFixed(1)} KB

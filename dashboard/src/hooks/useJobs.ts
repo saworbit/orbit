@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "../lib/api";
 
 export interface JobInfo {
   id: number;
@@ -24,9 +24,9 @@ export interface CreateJobRequest {
 
 export function useJobs() {
   return useQuery({
-    queryKey: ['jobs'],
+    queryKey: ["jobs"],
     queryFn: async () => {
-      const res = await api.post<JobInfo[]>('/list_jobs');
+      const res = await api.post<JobInfo[]>("/list_jobs");
       return res.data;
     },
     refetchInterval: 2000, // Refresh every 2 seconds
@@ -38,7 +38,7 @@ export function useCreateJob() {
 
   return useMutation({
     mutationFn: async (request: CreateJobRequest) => {
-      const res = await api.post<number>('/create_job', {
+      const res = await api.post<number>("/create_job", {
         source: request.source,
         destination: request.destination,
         compress: request.compress ?? false,
@@ -48,7 +48,7 @@ export function useCreateJob() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 }
@@ -58,11 +58,11 @@ export function useRunJob() {
 
   return useMutation({
     mutationFn: async (jobId: number) => {
-      const res = await api.post('/run_job', { job_id: jobId });
+      const res = await api.post("/run_job", { job_id: jobId });
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 }
@@ -72,11 +72,11 @@ export function useCancelJob() {
 
   return useMutation({
     mutationFn: async (jobId: number) => {
-      const res = await api.post('/cancel_job', { job_id: jobId });
+      const res = await api.post("/cancel_job", { job_id: jobId });
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 }
@@ -86,11 +86,11 @@ export function useDeleteJob() {
 
   return useMutation({
     mutationFn: async (jobId: number) => {
-      const res = await api.post('/delete_job', { job_id: jobId });
+      const res = await api.post("/delete_job", { job_id: jobId });
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
     },
   });
 }
