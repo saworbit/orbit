@@ -24,7 +24,7 @@ tokio-stream = "0.1"
 
 # Documentation (The "Intelligence" Layer)
 utoipa = { version = "5", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "7", features = ["axum"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Auth & Security
 argon2 = "0.5"
