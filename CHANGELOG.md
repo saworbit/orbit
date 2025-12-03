@@ -4,6 +4,14 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Maintenance
+- **Dependency Updates** - Merged 15 automated Dependabot updates
+  - **GitHub Actions** (5): actions/checkout v4→v6, actions/download-artifact v4→v6, actions/setup-node v4→v6, actions/upload-artifact v4→v5, softprops/action-gh-release v1→v2
+  - **Cargo** (8): tracing 0.1.41→0.1.43, aws-sdk-s3 1.112.0→1.113.0, thiserror 1.0.69→2.0.17, rand_core 0.6.4→0.9.3, notify 7.0.0→8.2.0, utoipa 4.2.3→5.4.0, arrow 53.4.1→54.2.1, polars 0.43.1→0.52.0
+  - **NPM** (2): vitest 4.0.14→4.0.15, jsdom 26.0.0→27.2.0
+  - All updates tested and verified with cargo check and dashboard CI
+  - Deferred breaking updates (bincode 2.0, jsonschema 0.37) tracked in separate issues
+
 ## [2.2.0-rc.1] - 2025-12-03
 
 ### Added - Full-Stack CI/CD & Professional File Browser
