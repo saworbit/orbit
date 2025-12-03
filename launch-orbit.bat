@@ -82,15 +82,14 @@ echo %BOLD%3. Ignition%RESET%
 
 echo %CYAN%  [ .. ] Launching Services...%RESET%
 
-:: Start Backend (Hidden, log to file)
+:: Start Backend in new window (minimized)
 cd crates\orbit-web
-start /B "OrbitServer" cmd /c "cargo run --quiet --bin orbit-server > ..\..\orbit_server.log 2>&1"
-set SERVER_PID=RUNNING
+start /MIN "Orbit-Server-Process" cmd /c "cargo run --quiet --bin orbit-server > ..\..\orbit_server.log 2>&1"
 cd ..\..
 
-:: Start Frontend (Hidden, log to file)
+:: Start Frontend in new window (minimized)
 cd dashboard
-start /B "OrbitUI" cmd /c "npm run dev -- --clearScreen false > ..\orbit_ui.log 2>&1"
+start /MIN "Orbit-Dashboard-Process" cmd /c "npm run dev -- --clearScreen false > ..\orbit_ui.log 2>&1"
 cd ..
 
 :: Wait for API Health
@@ -123,11 +122,23 @@ pause >nul
 
 echo.
 echo %RED%🛑 Shutting down...%RESET%
-:: Kill by image name (Forcefully)
-taskkill /F /IM "orbit-server.exe" >nul 2>nul
-taskkill /F /IM "node.exe" >nul 2>nul
+
+:: Kill by window title (more precise than killing all node.exe)
+taskkill /F /FI "WINDOWTITLE eq Orbit-Server-Process*" >nul 2>nul
+taskkill /F /FI "WINDOWTITLE eq Orbit-Dashboard-Process*" >nul 2>nul
+
+:: Fallback: kill any remaining processes by name
+timeout /t 1 /nobreak >nul
+taskkill /F /IM cargo.exe >nul 2>nul
+taskkill /F /IM orbit-server.exe >nul 2>nul
+
+:: Kill node processes only if they're running dev server (check port)
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173"') do (
+    taskkill /F /PID %%a >nul 2>nul
+)
 
 echo %GREEN%✓ Systems offline.%RESET%
+timeout /t 2 /nobreak >nul
 exit /b 0
 
 :Error
