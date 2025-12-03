@@ -36,26 +36,26 @@ export function FileBrowser({ onSelect }: FileBrowserProps) {
   if (isLoading) return <div className="p-4">Loading file system...</div>;
 
   return (
-    <div className="border rounded-md">
-      <div className="bg-gray-100 p-2 border-b font-mono text-sm flex items-center gap-2">
+    <div className="border border-border rounded-md bg-card">
+      <div className="bg-muted p-2 border-b border-border font-mono text-xs flex items-center gap-2 text-muted-foreground">
         <HardDrive size={16} />
-        {currentPath}
+        <span className="truncate">{currentPath}</span>
       </div>
       <div className="h-64 overflow-y-auto p-2">
         {files?.map((file) => (
           <div
             key={file.path}
-            className="flex items-center gap-2 p-1 hover:bg-blue-50 cursor-pointer rounded"
+            className="flex items-center gap-2 p-1 hover:bg-accent cursor-pointer rounded transition-colors"
             onClick={() => handleNavigate(file)}
           >
             {file.is_dir ? (
-              <Folder size={16} className="text-blue-500" />
+              <Folder size={16} className="text-blue-500 dark:text-blue-400" />
             ) : (
-              <File size={16} className="text-gray-500" />
+              <File size={16} className="text-muted-foreground" />
             )}
-            <span className="text-sm truncate">{file.name}</span>
+            <span className="text-sm truncate text-foreground">{file.name}</span>
             {!file.is_dir && (
-              <span className="text-xs text-gray-400 ml-auto">
+              <span className="text-xs text-muted-foreground ml-auto">
                 {(file.size / 1024).toFixed(1)} KB
               </span>
             )}
