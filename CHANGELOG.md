@@ -4,6 +4,87 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+## [2.2.0-rc.1] - 2025-12-03
+
+### Added - Full-Stack CI/CD & Professional File Browser
+
+- **🔄 Full-Stack CI/CD Pipeline**
+  - **Dashboard Quality Control**: New `dashboard-quality` job in GitHub Actions
+    - Formatting checks with Prettier
+    - Linting with ESLint
+    - Type checking with TypeScript
+    - Security audits with npm audit (high severity threshold)
+    - Unit tests with Vitest
+    - Production build verification
+  - **Rust Security Scanning**: Integrated `cargo-audit` into backend CI pipeline
+  - **Local Development Scripts**: Added standardized npm scripts for pre-push validation
+    - `npm run ci:check` - Run all checks locally
+    - `npm run format:check` / `format:fix` - Code formatting
+    - `npm run typecheck` - TypeScript validation
+    - `npm run test` - Unit tests with Vitest
+
+- **📁 Professional File Browser Component**
+  - **Click-to-Select**: Individual file and folder selection with visual feedback
+  - **Folder Selection**: Dedicated "Select Current Folder" button for directory transfers
+  - **Up Navigation**: "Go Up" arrow button to navigate parent directories
+  - **Visual Enhancements**:
+    - Selected items highlighted in blue with dark mode support
+    - Hover states for all items
+    - CheckCircle icons for selected files/folders
+    - Loading spinner with proper error handling
+    - Folder icons with blue fill, file icons in gray
+    - Item count display in footer
+  - **Improved Navigation**: Breadcrumb-style current path display
+
+- **🔌 New Backend API Endpoint**
+  - `GET /api/files/list?path={encoded_path}` - RESTful file listing endpoint
+  - Query parameter-based path specification (replaces POST with JSON body)
+  - Full backwards compatibility maintained with legacy `/api/list_dir` endpoint
+  - Proper error handling (404/403/400) for invalid paths
+  - Cross-platform support (Windows and Unix filesystems)
+
+### Changed
+
+- **Dashboard Architecture**: FileBrowser now uses GET requests with query parameters
+- **Frontend API Integration**: Updated axios calls to match new RESTful endpoints
+- **Component Props**: FileBrowser now accepts `selectedPath` prop for visual feedback
+
+### Technical Implementation
+
+- **CI/CD Pipeline** (`.github/workflows/ci.yml`):
+  - Added `dashboard-quality` job with Node.js 20 and npm caching
+  - Injected `cargo-audit` security scanning into `build-and-test` job
+  - Both jobs run in parallel for faster feedback
+
+- **Frontend** (React + TypeScript):
+  - New utility: `dashboard/src/lib/utils.ts` (cn helper for Tailwind class merging)
+  - Updated `dashboard/src/components/files/FileBrowser.tsx` with professional UI
+  - Updated `dashboard/src/components/jobs/QuickTransfer.tsx` to pass selection state
+  - Added dev dependencies: `prettier`, `vitest`, `jsdom`
+  - Created `vitest.config.ts` for test configuration
+  - Created `.prettierrc` for consistent code formatting
+  - All code passes TypeScript compilation, ESLint, Prettier, and builds successfully
+
+- **Backend** (Rust):
+  - New handler: `list_files_handler` in `crates/orbit-web/src/server.rs`
+  - New struct: `ListFilesQuery` for query parameter parsing
+  - Route added: `.route("/api/files/list", get(list_files_handler))`
+  - Passes `cargo check` and `cargo fmt` validation
+
+### Developer Experience
+
+- **Pre-Push Validation**: Developers can now run `npm run ci:check` locally to catch issues before pushing
+- **Consistent Formatting**: Prettier ensures code style consistency across the team
+- **Type Safety**: TypeScript strict checks prevent runtime errors
+- **Security**: Automated vulnerability scanning for both Rust and Node.js dependencies
+
+### Notes
+
+- Dashboard CI job requires Node.js 20+ and package-lock.json for reproducible builds
+- Rust security audit runs on every push to main and all pull requests
+- All new code follows existing patterns and conventions
+- Full test coverage for file browser navigation and selection
+
 ## [2.2.0-beta.1] - 2025-12-03
 
 ### Added - Enterprise Platform Features

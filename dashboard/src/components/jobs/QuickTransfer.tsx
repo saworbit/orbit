@@ -94,7 +94,7 @@ export function QuickTransfer() {
             </div>
             {/* Embed FileBrowser here */}
             <div className="flex-1 overflow-hidden">
-              <FileBrowser onSelect={setSource} />
+              <FileBrowser onSelect={setSource} selectedPath={source} />
             </div>
           </div>
         </div>
@@ -117,7 +117,7 @@ export function QuickTransfer() {
               </span>
             </div>
             <div className="flex-1 overflow-hidden">
-              <FileBrowser onSelect={setDest} />
+              <FileBrowser onSelect={setDest} selectedPath={dest} />
             </div>
           </div>
         </div>
