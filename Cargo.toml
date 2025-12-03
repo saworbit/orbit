@@ -30,7 +30,7 @@ serde_json = "1.0"
 toml = "0.8"
 
 # File I/O and progress
-indicatif = "0.17"
+indicatif = "0.18"
 walkdir = "2.5"
 governor = "0.6"
 
@@ -41,7 +41,6 @@ zstd = "0.13"
 # Checksums
 sha2 = "0.10"
 blake3 = "1.5"
-adler = "1.0"
 
 # Parallel processing
 rayon = "1.10"
