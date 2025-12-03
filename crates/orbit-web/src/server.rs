@@ -1541,9 +1541,9 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
         .route("/api/create_backend", post(create_backend_handler))
         .route("/api/delete_backend", post(delete_backend_handler))
         // File explorer endpoints
-        .route("/api/files/list", get(list_files_handler))
+        .route("/api/files/list", get(api::list_files))
         .route("/api/list_dir", post(list_dir_handler))
-        .route("/api/list_drives", get(list_drives_handler))
+        .route("/api/list_drives", get(api::list_drives))
         .route("/api/upload_file", post(upload_file_handler))
         // User management endpoints (Admin only) - v2.2.0-alpha
         .route("/api/list_users", post(list_users_handler))
