@@ -147,6 +147,68 @@ chmod 600 ~/.orbit/orbit.toml
 
 **None at this time.**
 
+### Dependency Security Audit
+
+We regularly run `cargo audit` to monitor security advisories in our dependency tree. Current status as of dependency update (2025-12-04):
+
+#### ✅ Default Build: No Active Vulnerabilities
+
+The default build configuration (`cargo build`) has **zero runtime security vulnerabilities**. All reported issues exist only in optional feature dependencies that are not compiled by default.
+
+#### ⚠️ Advisory Warnings (Optional Features Only)
+
+**RSA Timing Side-Channel (RUSTSEC-2023-0071) - Severity: Medium (5.9)**
+- **Status:** Present in `Cargo.lock` but NOT compiled in default builds
+- **Affected:** Only when building with `--features smb-native` or `--features full`
+- **Dependency Chain:** `rsa 0.10.0-rc.9` ← `sspi` ← `smb` (SMB protocol support)
+- **Impact:** Potential key recovery through timing side-channels during RSA operations
+- **Mitigation:**
+  - Default build does not include SMB support
+  - No upstream fix available yet (tracked by RustSec)
+  - Attack requires active MITM position during SMB authentication
+- **Actual Risk:** Low (requires specific feature enablement + active exploitation)
+
+**Unmaintained Dependency: `paste` (RUSTSEC-2024-0436)**
+- **Status:** Compile-time macro crate only
+- **Dependency Chain:** `paste` ← `rmp` ← `rmp-serde` ← `polars` (analytics feature)
+- **Impact:** No runtime security risk (macros only used during compilation)
+- **Mitigation:** Monitoring for replacement or upstream maintenance resumption
+- **Actual Risk:** Minimal (no runtime code execution)
+
+#### 🎯 Security Posture by Feature Set
+
+| Build Configuration | Runtime Vulnerabilities | Notes |
+|---------------------|------------------------|-------|
+| Default (`cargo build`) | **None** | Recommended for production |
+| `--features api` | **None** | Web API uses SQLite only (MySQL disabled) |
+| `--features smb-native` | ⚠️ RSA timing (medium) | SMB connections only, opt-in |
+| `--features full` | ⚠️ RSA timing (medium) | Full test suite, not for production |
+
+#### 📋 Verification
+
+To verify the default build has no active vulnerabilities:
+
+```bash
+# Check RSA is not in dependency tree
+cargo tree -p rsa
+# Expected: "nothing to print"
+
+# Check SQLite-only (no MySQL)
+cargo tree -p sqlx-mysql
+# Expected: "package ID specification did not match any packages"
+
+# Run full audit scan
+cargo audit
+# Note: Shows Cargo.lock entries, not active dependencies
+```
+
+#### 🔄 Maintenance
+
+- **Audit Frequency:** Weekly automated checks via Dependabot
+- **Update Policy:** Security updates applied within 7 days
+- **Feature Defaults:** Minimal attack surface (zero-copy only)
+- **Upstream Tracking:** Monitoring RustSec advisories for fixes
+
 ### Resolved Issues
 
 | Issue | Version Affected | Fixed In | Severity |

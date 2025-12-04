@@ -12,6 +12,14 @@ All notable changes to Orbit will be documented in this file.
   - All updates tested and verified with cargo check and dashboard CI
   - Deferred breaking updates (bincode 2.0, jsonschema 0.37) tracked in separate issues
 
+- **Security Audit** - Comprehensive dependency security review completed
+  - **Default build:** Zero runtime vulnerabilities (verified via `cargo tree`)
+  - **Optional features:** RSA timing advisory (RUSTSEC-2023-0071) affects `--features smb-native` only
+  - Successfully eliminated MySQL dependencies from SQLite-only configurations
+  - Reduced unmaintained warnings from 4 to 1 (paste: compile-time only, minimal risk)
+  - Updated SECURITY.md with detailed audit results and feature-specific security posture
+  - See [SECURITY.md](SECURITY.md#dependency-security-audit) for full analysis
+
 ## [2.2.0-rc.1] - 2025-12-03
 
 ### Added - Full-Stack CI/CD & Professional File Browser

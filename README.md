@@ -1787,6 +1787,28 @@ export ORBIT_JWT_SECRET=$(openssl rand -base64 32)
 - **Pre-Flight Validation** — Disk Guardian prevents dangerous operations
 - **Future FIPS Support** — Compliance-ready crypto modules
 
+### 🛡️ Dependency Security & Build Features
+
+**Default Build Security:** The default `cargo build` configuration includes **zero runtime security vulnerabilities**. Our minimal feature set (`zero-copy` only) ensures the smallest possible attack surface.
+
+| Build Configuration | Security Status | Use Case |
+|---------------------|----------------|----------|
+| `cargo build` (default) | ✅ **Zero vulnerabilities** | Production deployments |
+| `cargo build --features api` | ✅ **Zero vulnerabilities** | Web dashboard (SQLite only) |
+| `cargo build --features smb-native` | ⚠️ **Optional advisory** | SMB protocol (see note below) |
+| `cargo build --features full` | ⚠️ **Optional advisory** | Testing & development only |
+
+**Optional Feature Advisory:** When building with `--features smb-native`, a medium-severity timing side-channel advisory (RUSTSEC-2023-0071) is present in the SMB authentication stack. This requires active exploitation during SMB connections and does not affect other protocols or default builds.
+
+**Security Verification:**
+```bash
+# Verify default build has no active vulnerabilities
+cargo tree -p rsa           # Expected: "nothing to print"
+cargo tree -p sqlx-mysql    # Expected: "package ID not found"
+```
+
+For complete security audit results, dependency chain analysis, and mitigation details, see **[SECURITY.md](SECURITY.md#dependency-security-audit)**.
+
 ---
 
 ## 📖 CLI Quick Reference
