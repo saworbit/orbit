@@ -6,9 +6,9 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
-} from "reactflow";
-import type { Connection, Node } from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import type { Connection, Node } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 const initialNodes: Node[] = [
   {

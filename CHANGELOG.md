@@ -4,6 +4,20 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **React 19 Migration & React Flow Upgrade** - Dashboard modernization completed
+  - **React**: Already on v19.2.0 (latest stable release)
+  - **React Flow**: Migrated from `reactflow` v11.11.4 to `@xyflow/react` v12.9.3
+  - **Breaking Change**: The reactflow package has been renamed to @xyflow/react
+  - **What Changed**:
+    - Updated all imports from `'reactflow'` to `'@xyflow/react'`
+    - Updated CSS imports to use new package path
+    - Removed Dependabot ignore rules for React major version updates
+  - **Verified**: All tests passing, TypeScript compilation clean, ESLint passing
+  - **Impact**: Pipeline Editor continues to work with improved React Flow v12 features
+  - See [dashboard/README.md](dashboard/README.md) for updated tech stack
+
 ### Maintenance
 - **Dependency Updates** - Merged 15 automated Dependabot updates
   - **GitHub Actions** (5): actions/checkout v4→v6, actions/download-artifact v4→v6, actions/setup-node v4→v6, actions/upload-artifact v4→v5, softprops/action-gh-release v1→v2

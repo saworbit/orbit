@@ -74,7 +74,7 @@ npm run ci:check
 - **Vite 7** - Lightning-fast build tool
 - **Tailwind CSS 4** - Utility-first styling
 - **TanStack Query** - Data fetching and caching
-- **React Flow** - Visual pipeline editor
+- **@xyflow/react 12** - Visual pipeline editor (React Flow)
 - **Lucide React** - Beautiful icon set
 - **Axios** - HTTP client for API calls
 - **Vitest** - Unit testing framework

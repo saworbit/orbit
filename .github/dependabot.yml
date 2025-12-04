@@ -36,12 +36,6 @@ updates:
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
-    # Ignore major version updates for React 19 (still in RC)
-    ignore:
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
