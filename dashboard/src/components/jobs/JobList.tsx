@@ -5,9 +5,10 @@ import SystemHealth from "../dashboard/SystemHealth";
 
 interface JobListProps {
   compact?: boolean;
+  onSelectJob?: (jobId: number) => void;
 }
 
-export default function JobList({ compact = false }: JobListProps) {
+export default function JobList({ compact = false, onSelectJob }: JobListProps) {
   const { data: jobs, isLoading, refetch } = useJobs();
   const runJob = useRunJob();
   const cancelJob = useCancelJob();
@@ -121,7 +122,11 @@ export default function JobList({ compact = false }: JobListProps) {
         ) : (
           <div className="divide-y divide-border">
             {filteredJobs.slice(0, compact ? 5 : undefined).map((job) => (
-              <div key={job.id} className="p-4 hover:bg-accent/50 transition-colors">
+              <div
+                key={job.id}
+                className={`p-4 hover:bg-accent/50 transition-colors ${onSelectJob && !compact ? 'cursor-pointer' : ''}`}
+                onClick={() => onSelectJob && !compact && onSelectJob(job.id)}
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-xs text-muted-foreground">#{job.id}</span>

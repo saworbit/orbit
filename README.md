@@ -1575,20 +1575,34 @@ npm run dev
 - **Lucide Icons** for consistent iconography
 - **@xyflow/react 12** for visual pipeline editing
 
-#### ✅ Unified App Shell (NEW in Unreleased)
+#### ✅ Cockpit-Style App Shell (NEW in Unreleased)
 - **Sidebar Navigation**: Professional persistent sidebar replacing top navigation bar
+- **Live Status Indicator**: Animated pulsing green dot for "System Online" confirmation
+- **Pre-Alpha Warning**: Prominent warning banner across all views
 - **Mobile Drawer**: Smooth slide-in menu with backdrop overlay for mobile devices
 - **Responsive Design**: Fully optimized from 320px to 4K displays
 - **Theme Integration**: Dark/light mode toggle with consistent styling
-- **User Profile**: Gradient avatars and profile section in sidebar
+- **Operator Profile**: Gradient avatar with system status in sidebar
 
-#### ✅ Dashboard Overview Page (NEW in Unreleased)
-- **System Health Cards**: Live metrics with SVG sparkline trend visualizations
-- **Recent Activity**: Compact job list showing 5 most recent transfers
-- **Visual Feedback**: Color-coded cards (Blue/Green/Orange/Purple)
-- **Real-time Updates**: 2-second auto-refresh for live monitoring
+#### ✅ Mission Control Dashboard (NEW in Unreleased - Embedded Visibility)
+- **Live Telemetry**: Real-time network throughput with SVG area charts
+- **Client-Side Buffering**: 30-point rolling history for smooth "live" feel
+- **Metric Cards**: Active Jobs, Throughput, System Load, Storage Health with trend indicators
+- **Animated Status**: Pulsing green dot for "Live Stream Active" confirmation
+- **Capacity Planning**: Donut chart visualization with used/available space breakdown
+- **Traffic Statistics**: Peak, Average, and Total Transferred metrics
+
+#### ✅ Deep-Dive Job Details (NEW in Unreleased - Embedded Visibility)
+- **Visual Chunk Map**: 100-cell grid showing completion progress with color coding
+- **Glowing Effects**: Green (completed) and red (failed) chunks with shadow effects
+- **Proportional Sampling**: Intelligent downsampling for jobs with >100 chunks
+- **Event Stream**: Real-time lifecycle events with timestamps and status icons
+- **Configuration Display**: Detailed source/destination, mode, compression, verification
+- **Performance Metrics**: Throughput, chunk statistics, and timing data
+- **Breadcrumb Navigation**: "Job List → Job #N" with back button
 
 #### ✅ Enhanced Job Management (NEW in Unreleased)
+- **Click-to-Expand**: Select any job to view detailed inspection view
 - **Real-time Search**: Filter jobs by ID, source path, or destination path
 - **Status Filtering**: Dropdown to filter by All/Running/Pending/Completed/Failed
 - **Manual Refresh**: Button for on-demand data refresh

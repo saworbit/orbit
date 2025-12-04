@@ -1,13 +1,18 @@
 # Orbit Dashboard
 
+> ⚠️ **PRE-ALPHA SOFTWARE** - This dashboard is highly experimental and under active development.
+> **NOT RECOMMENDED FOR PRODUCTION USE.** APIs and UI may change dramatically between versions.
+> Use only for evaluation and testing with non-critical data.
+
 Modern React dashboard for the Orbit Control Plane. Built with React 19, TypeScript, Vite, and Tailwind CSS.
 
 ## Features
 
 ### Core Capabilities
-- **Unified App Shell**: Professional sidebar navigation with responsive mobile drawer menu
-- **Dashboard Overview**: Landing page with system health metrics and recent job activity
-- **Real-time Job Monitoring**: Auto-refreshing job list with search, filters, and progress tracking
+- **Cockpit-Style App Shell**: Professional sidebar navigation with live status indicators and responsive mobile drawer menu
+- **Mission Control Dashboard**: Real-time telemetry with live network throughput graphs, metric cards, and capacity planning
+- **Deep-Dive Job Details**: Visual chunk map with 100-cell grid, event stream, and comprehensive performance metrics
+- **Real-time Job Monitoring**: Auto-refreshing job list with search, filters, progress tracking, and click-to-expand details
 - **Visual Pipeline Editor**: Drag-and-drop interface with React Flow v12
 - **Professional File Browser**: Navigate and select files/folders with visual feedback
 - **Quick Transfer**: Simplified copy/sync interface with visual source→destination flow
@@ -119,15 +124,17 @@ The dashboard connects to the Orbit backend at `http://localhost:8080/api` (conf
 
 Key endpoints:
 - `GET /api/files/list?path={path}` - File system navigation
-- `POST /api/list_jobs` - Fetch all jobs
+- `POST /api/list_jobs` - Fetch all jobs (includes full job details)
 - `POST /api/create_job` - Create new transfer job
 - `POST /api/run_job` - Start a pending job
 - `POST /api/cancel_job` - Cancel a running job
 - `POST /api/delete_job` - Delete a job
-- `GET /api/stats/health` - System health metrics (2s refresh)
+- `GET /api/stats/health` - System health metrics (1s refresh in Mission Control)
 - `GET /api/admin/users` - List all users
 - `POST /api/admin/users` - Create new user
 - `DELETE /api/admin/users/:id` - Delete user
+
+**Note:** The JobDetail view currently uses mock data for UI demonstration (pre-alpha). A dedicated `GET /api/jobs/:id` endpoint is planned for future releases.
 
 See the backend API documentation for full endpoint reference.
 

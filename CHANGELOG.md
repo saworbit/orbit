@@ -4,9 +4,13 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+> ⚠️ **PRE-ALPHA WARNING**: This version contains highly experimental dashboard features.
+> Not suitable for production environments. APIs and UI are subject to breaking changes.
+
 ### Added
 
 - **🎨 Dashboard UI Overhaul** - Complete architectural redesign with professional app shell
+  - **STATUS**: 🔴 Pre-Alpha - Experimental features, breaking changes expected
   - **New AppShell Component**: Persistent sidebar navigation replacing top navigation bar
     - Responsive mobile drawer menu with smooth slide-in animations
     - Backdrop overlay with click-to-close functionality
@@ -40,7 +44,32 @@ All notable changes to Orbit will be documented in this file.
     - Icon-enhanced toolbar buttons (Database/Zap/Cloud)
     - Node and edge counter in toolbar
     - Improved button styling with hover effects
-  - **New Dashboard Overview Page**: Landing page combining system health metrics and recent job activity
+  - **Embedded Visibility - Mission Control Dashboard**:
+    - Live network throughput visualization with SVG area charts
+    - Client-side data buffering (30-point history) for smooth "live" feel
+    - Real-time metric cards with trend indicators (Active Jobs, Throughput, System Load, Storage Health)
+    - Animated status indicators (pulsing green dot for "Live Stream Active")
+    - Capacity planning donut chart with used/available space breakdown
+    - Peak/Average/Total statistics for comprehensive traffic analysis
+  - **Deep-Dive Job Details View**:
+    - Visual chunk map with 100-cell grid showing completion progress
+    - Color-coded chunk states (green=completed, red=failed, gray=pending)
+    - Glowing shadow effects for active chunks
+    - Real-time event stream with timestamp and status icons
+    - Detailed configuration display (source/destination, mode, compression, verification)
+    - Performance metrics (throughput, chunk statistics, timing data)
+    - Navigation breadcrumb trail (Job List → Job #N)
+  - **Enhanced Job Selection Navigation**:
+    - Click-to-expand job details from job list
+    - Seamless navigation flow with back button
+    - State management for selected job ID
+    - Automatic page switching when selecting job
+    - Compact mode for dashboard integration
+  - **Cockpit-Style App Shell**:
+    - Live status indicator (animated pulsing green dot)
+    - "System Online" status with visual confirmation
+    - Professional operator profile section
+    - Prominent pre-alpha warning banner across all views
   - **Mobile-First Responsive Design**: Fully optimized from 320px to 4K displays
 
 ### Changed
