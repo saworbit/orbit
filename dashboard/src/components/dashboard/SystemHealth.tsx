@@ -2,6 +2,24 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { Activity, HardDrive, Cpu, Zap } from "lucide-react";
 
+interface SystemHealth {
+  active_jobs: number;
+  total_bandwidth_mbps: number;
+  system_load: number;
+  storage_health: string;
+}
+
+interface HealthCardProps {
+  label: string;
+  value: string | number;
+  unit: string;
+  icon: React.ComponentType<{ size?: number }>;
+  color: string;
+  bg: string;
+  trend?: number[];
+  staticVisual?: boolean;
+}
+
 // Simple SVG Sparkline component
 const Sparkline = ({
   color = "currentColor",
@@ -48,7 +66,7 @@ const Sparkline = ({
 export default function SystemHealth() {
   const { data: health } = useQuery({
     queryKey: ["system-health"],
-    queryFn: () => api.get<any>("/stats/health").then((r) => r.data),
+    queryFn: () => api.get<SystemHealth>("/stats/health").then((r) => r.data),
     refetchInterval: 2000,
   });
 
@@ -110,7 +128,7 @@ const HealthCard = ({
   bg,
   trend,
   staticVisual,
-}: any) => (
+}: HealthCardProps) => (
   <div className="bg-card border rounded-xl p-5 shadow-sm relative overflow-hidden group">
     <div className="flex justify-between items-start mb-4">
       <div>

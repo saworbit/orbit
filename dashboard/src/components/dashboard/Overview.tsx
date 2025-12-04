@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import {
@@ -9,6 +9,23 @@ import {
   ArrowDownRight,
   Zap,
 } from "lucide-react";
+
+interface SystemHealth {
+  active_jobs: number;
+  total_bandwidth_mbps: number;
+  system_load: number;
+  storage_health: string;
+}
+
+interface MetricCardProps {
+  label: string;
+  value: string | number;
+  unit: string;
+  icon: React.ReactNode;
+  trend?: string;
+  trendUp?: boolean;
+  good?: boolean;
+}
 
 // --- Visual Components ---
 
@@ -82,26 +99,27 @@ export default function DashboardOverview() {
   const [throughputHistory, setThroughputHistory] = useState<number[]>(
     new Array(30).fill(0)
   );
+  const lastBandwidthRef = useRef<number | null>(null);
 
   const { data: health } = useQuery({
     queryKey: ["system-health"],
-    queryFn: () => api.get<any>("/stats/health").then((r) => r.data),
+    queryFn: () => api.get<SystemHealth>("/stats/health").then((r) => r.data),
     refetchInterval: 1000, // Aggressive polling for "live" feel
   });
 
   // Simulate updating history when data arrives
   useEffect(() => {
-    if (health) {
-      setThroughputHistory((prev) => [
-        ...prev.slice(1),
-        health.total_bandwidth_mbps,
-      ]);
-    } else {
-      // Mock animation if no backend
-      setThroughputHistory((prev) => [
-        ...prev.slice(1),
-        Math.random() * 500 + 200,
-      ]);
+    const currentBandwidth = health
+      ? health.total_bandwidth_mbps
+      : Math.random() * 500 + 200;
+
+    // Only update if value has changed to avoid unnecessary re-renders
+    // Use queueMicrotask to defer setState and avoid synchronous cascading renders
+    if (lastBandwidthRef.current !== currentBandwidth) {
+      lastBandwidthRef.current = currentBandwidth;
+      queueMicrotask(() => {
+        setThroughputHistory((prev) => [...prev.slice(1), currentBandwidth]);
+      });
     }
   }, [health]);
 
@@ -252,7 +270,7 @@ const MetricCard = ({
   trend,
   trendUp,
   good,
-}: any) => (
+}: MetricCardProps) => (
   <div className="bg-card border rounded-xl p-5 shadow-sm hover:border-primary/50 transition-colors group">
     <div className="flex justify-between items-start mb-2">
       <div className="p-2 bg-muted/50 rounded-lg group-hover:bg-muted transition-colors">

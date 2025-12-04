@@ -21,6 +21,13 @@ interface JobListProps {
   onSelectJob?: (jobId: number) => void;
 }
 
+interface ActionBtnProps {
+  onClick: () => void;
+  icon: React.ComponentType<{ size?: number }>;
+  label: string;
+  color: string;
+}
+
 export default function JobList({
   compact = false,
   onSelectJob,
@@ -244,7 +251,7 @@ export default function JobList({
   );
 }
 
-const ActionBtn = ({ onClick, icon: Icon, label, color }: any) => (
+const ActionBtn = ({ onClick, icon: Icon, label, color }: ActionBtnProps) => (
   <button
     onClick={(e) => {
       e.stopPropagation();

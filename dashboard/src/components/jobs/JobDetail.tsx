@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { HardDrive, FileJson, ArrowLeft } from "lucide-react";
 
 // The "Cool" Feature: Visual Chunk Map
@@ -59,6 +60,9 @@ const ChunkMap = ({
   );
 };
 
+// Fixed timestamp for mock data (1 hour ago from a fixed point)
+const MOCK_CREATED_AT = 1704067200000;
+
 export function JobDetail({
   jobId,
   onBack,
@@ -68,22 +72,25 @@ export function JobDetail({
 }) {
   // In a real app, useQuery(["job", jobId]) here
   // Mock data for UI demonstration based on the user's backend structs
-  const job = {
-    id: jobId,
-    source: "s3://production-bucket/logs/2023",
-    destination: "smb://archive-server/backup/logs",
-    status: "running",
-    progress: 45.5,
-    total_chunks: 10240,
-    completed_chunks: 4660,
-    failed_chunks: 12,
-    created_at: Date.now() - 3600000,
-    config: {
-      compress: true,
-      verify: true,
-      parallel_workers: 8,
-    },
-  };
+  const job = useMemo(
+    () => ({
+      id: jobId,
+      source: "s3://production-bucket/logs/2023",
+      destination: "smb://archive-server/backup/logs",
+      status: "running",
+      progress: 45.5,
+      total_chunks: 10240,
+      completed_chunks: 4660,
+      failed_chunks: 12,
+      created_at: MOCK_CREATED_AT - 3600000,
+      config: {
+        compress: true,
+        verify: true,
+        parallel_workers: 8,
+      },
+    }),
+    [jobId]
+  );
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
