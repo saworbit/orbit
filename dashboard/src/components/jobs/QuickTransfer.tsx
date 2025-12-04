@@ -1,150 +1,151 @@
 import { useState } from "react";
-import { ArrowRight, HardDrive, Play, Settings2 } from "lucide-react";
-import { Button } from "../ui/button";
-import { Card } from "../ui/card";
-import { FileBrowser } from "../files/FileBrowser";
+import { ArrowRight, HardDrive, Play, Copy, RefreshCw, CheckCircle2 } from "lucide-react";
 import { api } from "../../lib/api";
+import { FileBrowser } from "../files/FileBrowser";
 
 export function QuickTransfer() {
   const [source, setSource] = useState("");
   const [dest, setDest] = useState("");
   const [mode, setMode] = useState<"copy" | "sync">("copy");
-  const [isLaunching, setIsLaunching] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // "Intuitive": We hide the complexity of the graph API here
   const handleLaunch = async () => {
     if (!source || !dest) return;
-
-    setIsLaunching(true);
+    setStatus("loading");
     try {
-      // Construct the pipeline automatically
-      const payload = {
-        nodes: [
-          { id: "src", type: "source", data: { path: source } },
-          { id: "dst", type: "destination", data: { path: dest } },
-        ],
-        edges: [{ id: "e1", source: "src", target: "dst" }],
-        config: { mode }, // copy or sync
-      };
-
-      // Call your Rust API
-      await api.post("/pipelines/execute", payload);
-
-      // Show success message
-      alert(
-        `${mode === "copy" ? "Copy" : "Sync"} job started successfully!\nFrom: ${source}\nTo: ${dest}`
-      );
-
-      // Reset form
-      setSource("");
-      setDest("");
+      await api.post("/create_job", {
+        source,
+        destination: dest,
+        verify: mode === "sync"
+      });
+      setStatus("success");
+      // Reset after 3 seconds
+      setTimeout(() => {
+        setStatus("idle");
+        setSource("");
+        setDest("");
+      }, 3000);
     } catch (error) {
-      console.error("Failed to start transfer:", error);
-      alert(
-        `Failed to start transfer: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
-    } finally {
-      setIsLaunching(false);
+      console.error(error);
+      setStatus("error");
+      setErrorMsg(error instanceof Error ? error.message : "Failed to launch job");
     }
   };
 
   return (
-    <Card className="p-6 w-full max-w-5xl mx-auto bg-card text-card-foreground shadow-lg">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Play className="text-green-500 fill-green-500" size={24} />
-          Quick Transfer
-        </h2>
-        <div className="flex bg-muted p-1 rounded-lg">
+    <div className="bg-card border rounded-xl shadow-sm p-6 max-w-5xl mx-auto">
+      {/* Header with Mode Toggle */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Play size={20} className="text-primary" />
+            New Transfer Task
+          </h2>
+          <p className="text-sm text-muted-foreground">Configure a simple point-to-point data movement</p>
+        </div>
+
+        <div className="bg-muted p-1 rounded-lg flex self-end sm:self-auto">
           <button
             onClick={() => setMode("copy")}
-            className={`px-3 py-1 text-sm rounded-md transition-all ${
-              mode === "copy"
-                ? "bg-background shadow text-foreground"
-                : "text-muted-foreground"
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+              mode === "copy" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Copy
+            <Copy size={14} /> Copy
           </button>
           <button
             onClick={() => setMode("sync")}
-            className={`px-3 py-1 text-sm rounded-md transition-all ${
-              mode === "sync"
-                ? "bg-background shadow text-foreground"
-                : "text-muted-foreground"
+            className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+              mode === "sync" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Sync
+            <RefreshCw size={14} /> Sync
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-start">
-        {/* Source Side */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">
-            Source
+      {/* Main Flow Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr,auto,1fr] gap-6 items-center">
+        {/* Source */}
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500"></span> Source Origin
           </label>
-          <div className="border rounded-lg p-4 bg-muted/30 min-h-[280px] flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-blue-500">
-              <HardDrive size={16} />
-              <span className="font-mono text-xs truncate">
-                {source || "Select source..."}
-              </span>
-            </div>
-            {/* Embed FileBrowser here */}
-            <div className="flex-1 overflow-hidden">
-              <FileBrowser onSelect={setSource} selectedPath={source} />
+          <div className={`border-2 rounded-xl overflow-hidden transition-colors ${source ? "border-blue-500/50 bg-blue-500/5" : "border-dashed border-border bg-muted/20"}`}>
+            <div className="h-[280px] flex flex-col">
+              <div className="p-3 border-b bg-background/50 flex items-center gap-2">
+                <HardDrive size={14} className="text-muted-foreground" />
+                <input
+                  value={source}
+                  readOnly
+                  placeholder="Select a path..."
+                  className="bg-transparent text-sm w-full outline-none font-mono text-muted-foreground"
+                />
+              </div>
+              <div className="flex-1 overflow-hidden relative">
+                 <FileBrowser onSelect={setSource} selectedPath={source} />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* The Arrow (Visual Direction) */}
-        <div className="flex flex-col items-center justify-center text-muted-foreground pt-8">
-          <ArrowRight size={32} />
+        {/* Visual Connector */}
+        <div className="flex lg:flex-col items-center justify-center text-muted-foreground/30 gap-2">
+          <div className="h-px w-full lg:w-px lg:h-12 bg-current"></div>
+          <div className={`p-3 rounded-full border-2 ${mode === "sync" ? "border-orange-500 text-orange-500 bg-orange-500/10" : "border-blue-500 text-blue-500 bg-blue-500/10"}`}>
+             <ArrowRight size={24} />
+          </div>
+          <div className="h-px w-full lg:w-px lg:h-12 bg-current"></div>
         </div>
 
-        {/* Destination Side */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-muted-foreground">
-            Destination
+        {/* Destination */}
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-orange-500"></span> Destination Target
           </label>
-          <div className="border rounded-lg p-4 bg-muted/30 min-h-[280px] flex flex-col">
-            <div className="flex items-center gap-2 mb-2 text-orange-500">
-              <HardDrive size={16} />
-              <span className="font-mono text-xs truncate">
-                {dest || "Select destination..."}
-              </span>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <FileBrowser onSelect={setDest} selectedPath={dest} />
+          <div className={`border-2 rounded-xl overflow-hidden transition-colors ${dest ? "border-orange-500/50 bg-orange-500/5" : "border-dashed border-border bg-muted/20"}`}>
+            <div className="h-[280px] flex flex-col">
+              <div className="p-3 border-b bg-background/50 flex items-center gap-2">
+                <HardDrive size={14} className="text-muted-foreground" />
+                <input
+                  value={dest}
+                  readOnly
+                  placeholder="Select a path..."
+                  className="bg-transparent text-sm w-full outline-none font-mono text-muted-foreground"
+                />
+              </div>
+              <div className="flex-1 overflow-hidden relative">
+                 <FileBrowser onSelect={setDest} selectedPath={dest} />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="mt-8 flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">
-          {mode === "copy"
-            ? "Copy files from source to destination"
-            : "Keep source and destination in sync"}
-        </p>
-        <div className="flex gap-3">
-          <Button variant="outline" className="gap-2">
-            <Settings2 size={16} />
-            Advanced Options
-          </Button>
-          <Button
-            size="lg"
-            onClick={handleLaunch}
-            disabled={!source || !dest || isLaunching}
-            className="bg-green-600 hover:bg-green-700 text-white min-w-[150px]"
-          >
-            {isLaunching ? "Starting..." : "Start Transfer"}
-          </Button>
+      {/* Action Footer */}
+      <div className="mt-8 pt-6 border-t flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="text-sm">
+          {status === "error" && <span className="text-red-500 font-medium">Error: {errorMsg}</span>}
+          {status === "success" && <span className="text-green-500 font-medium flex items-center gap-2"><CheckCircle2 size={16}/> Job initiated successfully!</span>}
         </div>
+
+        <button
+          onClick={handleLaunch}
+          disabled={!source || !dest || status === "loading" || status === "success"}
+          className={`
+            px-8 py-2.5 rounded-lg font-semibold text-white transition-all
+            ${!source || !dest
+               ? "bg-muted text-muted-foreground cursor-not-allowed"
+               : status === "success"
+                 ? "bg-green-600 hover:bg-green-700"
+                 : "bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/40 translate-y-0 active:translate-y-0.5"
+            }
+          `}
+        >
+          {status === "loading" ? "Initializing..." : status === "success" ? "Launched" : "Start Transfer"}
+        </button>
       </div>
-    </Card>
+    </div>
   );
 }

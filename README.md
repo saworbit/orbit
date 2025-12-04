@@ -1573,8 +1573,29 @@ npm run dev
 - **TanStack Query** for intelligent data fetching and caching
 - **Tailwind CSS 4 + Shadcn/UI** for professional design
 - **Lucide Icons** for consistent iconography
+- **@xyflow/react 12** for visual pipeline editing
 
-#### ✅ Professional File Browser (NEW in rc.1)
+#### ✅ Unified App Shell (NEW in Unreleased)
+- **Sidebar Navigation**: Professional persistent sidebar replacing top navigation bar
+- **Mobile Drawer**: Smooth slide-in menu with backdrop overlay for mobile devices
+- **Responsive Design**: Fully optimized from 320px to 4K displays
+- **Theme Integration**: Dark/light mode toggle with consistent styling
+- **User Profile**: Gradient avatars and profile section in sidebar
+
+#### ✅ Dashboard Overview Page (NEW in Unreleased)
+- **System Health Cards**: Live metrics with SVG sparkline trend visualizations
+- **Recent Activity**: Compact job list showing 5 most recent transfers
+- **Visual Feedback**: Color-coded cards (Blue/Green/Orange/Purple)
+- **Real-time Updates**: 2-second auto-refresh for live monitoring
+
+#### ✅ Enhanced Job Management (NEW in Unreleased)
+- **Real-time Search**: Filter jobs by ID, source path, or destination path
+- **Status Filtering**: Dropdown to filter by All/Running/Pending/Completed/Failed
+- **Manual Refresh**: Button for on-demand data refresh
+- **Compact Mode**: Shows 5 most recent jobs for dashboard integration
+- **Enhanced Empty States**: Helpful messaging with icons for better user guidance
+
+#### ✅ Professional File Browser (rc.1)
 - **Click-to-Select** files and folders with visual feedback
 - **Up Navigation** button to traverse parent directories
 - **Folder Selection** button for directory transfers
@@ -1582,25 +1603,40 @@ npm run dev
 - **Loading States**: Spinner and error handling for API calls
 - **RESTful API**: GET `/api/files/list?path={path}` endpoint
 
+#### ✅ Improved Quick Transfer (NEW in Unreleased)
+- **Visual Flow**: Source → destination with animated connector
+- **Color Coding**: Blue borders for source, orange for destination
+- **State Management**: Success/error feedback (no more browser alerts)
+- **Auto-reset**: Form clears automatically after successful transfer
+- **Validation**: Better input validation and loading states
+
 #### ✅ Visual Pipeline Builder
-- **React Flow** DAG editor for intuitive job configuration
+- **React Flow v12** DAG editor for intuitive job configuration
 - **Drag-and-drop** source and destination nodes
-- **Connection validation** prevents invalid configurations
-- **Export/Import** pipeline definitions
+- **Theme-aware**: Uses design system colors for consistent styling
+- **Icon Toolbar**: Enhanced buttons with Database/Zap/Cloud icons
+- **Node Counter**: Displays current number of nodes and connections
+
+#### ✅ User Management (NEW in Unreleased)
+- **Statistics Dashboard**: Cards showing Total Users, Admins, and Operators
+- **Delete Functionality**: Remove users with confirmation dialogs
+- **Gradient Avatars**: Auto-generated avatars with user initials
+- **Role Badges**: Theme-aware badges for Admin/Operator/Viewer roles
+- **Enhanced Forms**: Better layout with clear field labeling
 
 #### ✅ Smart Data Fetching
-- **Adaptive Polling**: 1s for active jobs, 5s when idle
-- **Optimistic Updates**: Instant UI feedback
+- **Adaptive Polling**: 2s for jobs and health, optimized for responsiveness
+- **Optimistic Updates**: Instant UI feedback on mutations
 - **Automatic Cache Invalidation**: Always shows fresh data
 - **Request Deduplication**: Efficient network usage
 
 #### ✅ Real-time Monitoring
-- **WebSocket Integration** for sub-50ms progress updates
 - **Live Job Status** with progress bars and percentages
-- **Transfer Speed Tracking** with ETA calculations
-- **Event Streaming** for completed/failed jobs
+- **Transfer Speed Tracking** with chunk completion metrics
+- **Sparkline Trends**: Visual representation of metric history
+- **Auto-refresh**: Continuous updates for active monitoring
 
-#### ✅ CI/CD Pipeline (NEW in rc.1)
+#### ✅ CI/CD Pipeline (rc.1)
 - **Dashboard Quality Control**: Dedicated GitHub Actions job
   - Prettier formatting checks
   - ESLint linting (zero warnings)

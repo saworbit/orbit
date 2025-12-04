@@ -4,13 +4,23 @@ Modern React dashboard for the Orbit Control Plane. Built with React 19, TypeScr
 
 ## Features
 
-- **Real-time Job Monitoring**: Auto-refreshing job list with progress tracking
-- **Visual Pipeline Editor**: Drag-and-drop interface with React Flow
+### Core Capabilities
+- **Unified App Shell**: Professional sidebar navigation with responsive mobile drawer menu
+- **Dashboard Overview**: Landing page with system health metrics and recent job activity
+- **Real-time Job Monitoring**: Auto-refreshing job list with search, filters, and progress tracking
+- **Visual Pipeline Editor**: Drag-and-drop interface with React Flow v12
 - **Professional File Browser**: Navigate and select files/folders with visual feedback
-- **Quick Transfer**: Simplified copy/sync interface for common workflows
-- **System Health Monitoring**: Real-time metrics and system status
-- **User Administration**: Multi-user management with RBAC
-- **Dark Mode Support**: Automatic theme switching based on system preferences
+- **Quick Transfer**: Simplified copy/sync interface with visual source→destination flow
+- **System Health Monitoring**: Live metrics with SVG sparkline trend visualizations
+- **User Administration**: Multi-user management with RBAC, statistics, and delete functionality
+- **Dark Mode Support**: Seamless theme switching with consistent styling across all components
+
+### UI/UX Highlights
+- **Mobile-First Design**: Fully responsive from 320px to 4K displays
+- **Search & Filtering**: Real-time job search by ID, source, or destination
+- **Visual Feedback**: Color-coded status badges, gradient avatars, and animated transitions
+- **Enhanced Empty States**: Helpful messaging with icons for better user guidance
+- **Keyboard Navigation**: Accessible interface with proper focus management
 
 ## Quick Start
 
@@ -88,12 +98,13 @@ dashboard/
 │   │   ├── admin/        # User management UI
 │   │   ├── dashboard/    # System health widgets
 │   │   ├── files/        # File browser
-│   │   ├── jobs/         # Job management
+│   │   ├── jobs/         # Job management & quick transfer
+│   │   ├── layout/       # AppShell and navigation
 │   │   ├── pipelines/    # Visual pipeline editor
 │   │   └── ui/           # Reusable UI primitives
 │   ├── hooks/            # Custom React hooks
 │   ├── lib/              # Utilities and API client
-│   ├── App.tsx           # Main app component
+│   ├── App.tsx           # Main app component with routing
 │   └── main.tsx          # Entry point
 ├── public/               # Static assets
 ├── .prettierrc           # Prettier configuration
@@ -104,14 +115,19 @@ dashboard/
 
 ## API Integration
 
-The dashboard connects to the Orbit backend at `http://localhost:3000/api`.
+The dashboard connects to the Orbit backend at `http://localhost:8080/api` (configurable in `src/lib/api.ts`).
 
 Key endpoints:
 - `GET /api/files/list?path={path}` - File system navigation
 - `POST /api/list_jobs` - Fetch all jobs
 - `POST /api/create_job` - Create new transfer job
-- `GET /api/stats/health` - System health metrics
-- `GET /api/admin/users` - User management
+- `POST /api/run_job` - Start a pending job
+- `POST /api/cancel_job` - Cancel a running job
+- `POST /api/delete_job` - Delete a job
+- `GET /api/stats/health` - System health metrics (2s refresh)
+- `GET /api/admin/users` - List all users
+- `POST /api/admin/users` - Create new user
+- `DELETE /api/admin/users/:id` - Delete user
 
 See the backend API documentation for full endpoint reference.
 

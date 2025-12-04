@@ -4,6 +4,45 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **🎨 Dashboard UI Overhaul** - Complete architectural redesign with professional app shell
+  - **New AppShell Component**: Persistent sidebar navigation replacing top navigation bar
+    - Responsive mobile drawer menu with smooth slide-in animations
+    - Backdrop overlay with click-to-close functionality
+    - Auto-close menu on navigation for better UX
+    - Integrated theme toggle and user profile section
+  - **Enhanced Job Management**:
+    - Real-time search by job ID, source, or destination path
+    - Status filter dropdown (All/Running/Pending/Completed/Failed)
+    - Manual refresh button for on-demand updates
+    - Compact mode showing 5 most recent jobs for dashboard view
+    - Improved empty states with icons and helpful messaging
+  - **Visual System Health Dashboard**:
+    - SVG-based sparkline trend visualizations for metrics
+    - Hover effects revealing detailed trend graphs
+    - Color-coded health cards (Blue/Green/Orange/Purple)
+    - 2-second auto-refresh for live monitoring
+  - **Improved Quick Transfer**:
+    - Visual source → destination flow with animated connector
+    - Color-coded borders (blue for source, orange for destination)
+    - Success/error state management (replaced browser alerts)
+    - Auto-reset form after successful transfer
+    - Better validation and loading states
+  - **Redesigned User Management**:
+    - User statistics dashboard (Total Users, Admins, Operators)
+    - Delete user functionality with confirmation dialogs
+    - Gradient avatars with user initials
+    - Theme-aware role badges with enhanced visibility
+    - Enhanced form layout with better field labeling
+  - **Updated Pipeline Editor**:
+    - Theme-aware colors throughout (no more hardcoded values)
+    - Icon-enhanced toolbar buttons (Database/Zap/Cloud)
+    - Node and edge counter in toolbar
+    - Improved button styling with hover effects
+  - **New Dashboard Overview Page**: Landing page combining system health metrics and recent job activity
+  - **Mobile-First Responsive Design**: Fully optimized from 320px to 4K displays
+
 ### Changed
 
 - **React 19 Migration & React Flow Upgrade** - Dashboard modernization completed
@@ -17,6 +56,13 @@ All notable changes to Orbit will be documented in this file.
   - **Verified**: All tests passing, TypeScript compilation clean, ESLint passing
   - **Impact**: Pipeline Editor continues to work with improved React Flow v12 features
   - See [dashboard/README.md](dashboard/README.md) for updated tech stack
+
+### Fixed
+
+- **API Compatibility**: QuickTransfer now uses correct `/create_job` endpoint instead of non-existent `/pipelines/execute`
+- **Mobile Navigation**: Hamburger menu now properly opens/closes with state management
+- **User Management**: Delete user action now properly wired with confirmation and cache invalidation
+- **Theme Consistency**: All components now use theme variables instead of hardcoded colors
 
 ### Maintenance
 - **Dependency Updates** - Merged 15 automated Dependabot updates
