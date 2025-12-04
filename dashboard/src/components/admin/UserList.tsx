@@ -50,12 +50,17 @@ export default function UserList() {
 
   const getRoleBadge = (role: string) => {
     const styles: Record<string, string> = {
-      admin: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800",
-      operator: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
-      viewer: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700",
+      admin:
+        "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+      operator:
+        "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+      viewer:
+        "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700",
     };
     return (
-      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border capitalize ${styles[role.toLowerCase()] || styles.viewer}`}>
+      <span
+        className={`px-2.5 py-0.5 rounded-full text-xs font-bold border capitalize ${styles[role.toLowerCase()] || styles.viewer}`}
+      >
         {role}
       </span>
     );
@@ -70,7 +75,9 @@ export default function UserList() {
             <Shield className="text-primary" size={32} />
             Team Management
           </h2>
-          <p className="text-muted-foreground mt-1">Manage user accounts and permissions</p>
+          <p className="text-muted-foreground mt-1">
+            Manage user accounts and permissions
+          </p>
         </div>
         <button
           onClick={() => setIsAdding(!isAdding)}
@@ -90,30 +97,42 @@ export default function UserList() {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Username</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Username
+              </label>
               <input
                 placeholder="Enter username"
                 className="w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 value={newUser.username}
-                onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, username: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Password</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Password
+              </label>
               <input
                 placeholder="Enter password"
                 type="password"
                 className="w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 value={newUser.password}
-                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, password: e.target.value })
+                }
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">Role</label>
+              <label className="text-sm font-medium text-muted-foreground">
+                Role
+              </label>
               <select
                 className="w-full px-3 py-2 bg-background border rounded-md focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                 value={newUser.role}
-                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, role: e.target.value })
+                }
               >
                 <option value="admin">Admin</option>
                 <option value="operator">Operator</option>
@@ -188,7 +207,9 @@ export default function UserList() {
               <Users className="text-muted-foreground" size={32} />
             </div>
             <h3 className="text-lg font-medium">No users found</h3>
-            <p className="text-muted-foreground">Create your first user to get started</p>
+            <p className="text-muted-foreground">
+              Create your first user to get started
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -211,7 +232,10 @@ export default function UserList() {
               </thead>
               <tbody className="divide-y divide-border">
                 {users?.map((user) => (
-                  <tr key={user.id} className="hover:bg-accent/50 transition-colors">
+                  <tr
+                    key={user.id}
+                    className="hover:bg-accent/50 transition-colors"
+                  >
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">

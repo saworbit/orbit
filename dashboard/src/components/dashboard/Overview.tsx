@@ -1,33 +1,66 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import { Activity, Server, HardDrive, ArrowUpRight, ArrowDownRight, Zap } from "lucide-react";
+import {
+  Activity,
+  Server,
+  HardDrive,
+  ArrowUpRight,
+  ArrowDownRight,
+  Zap,
+} from "lucide-react";
 
 // --- Visual Components ---
 
-const AreaChart = ({ data, color, height = 60 }: { data: number[], color: string, height?: number }) => {
+const AreaChart = ({
+  data,
+  color,
+  height = 60,
+}: {
+  data: number[];
+  color: string;
+  height?: number;
+}) => {
   if (data.length < 2) return null;
   const max = Math.max(...data, 100) * 1.1; // 10% headroom
   const min = 0;
   const range = max - min;
 
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * 100;
-    const y = 100 - ((d - min) / range) * 100;
-    return `${x},${y}`;
-  }).join(" ");
+  const points = data
+    .map((d, i) => {
+      const x = (i / (data.length - 1)) * 100;
+      const y = 100 - ((d - min) / range) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
 
   return (
-    <div className={`relative w-full overflow-hidden`} style={{ height: `${height}px` }}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
+    <div
+      className={`relative w-full overflow-hidden`}
+      style={{ height: `${height}px` }}
+    >
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="w-full h-full"
+      >
         <defs>
-          <linearGradient id={`grad-${color}`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <linearGradient
+            id={`grad-${color}`}
+            x1="0%"
+            y1="0%"
+            x2="0%"
+            y2="100%"
+          >
             <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.2 }} />
             <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
           </linearGradient>
         </defs>
         <path
-          d={`M 0 100 L 0 ${100 - ((data[0] - min) / range) * 100} L ${points.split(" ").map(p => "L "+p).join(" ")} L 100 100 Z`}
+          d={`M 0 100 L 0 ${100 - ((data[0] - min) / range) * 100} L ${points
+            .split(" ")
+            .map((p) => "L " + p)
+            .join(" ")} L 100 100 Z`}
           fill={`url(#grad-${color})`}
         />
         <polyline
@@ -46,7 +79,9 @@ const AreaChart = ({ data, color, height = 60 }: { data: number[], color: string
 
 export default function DashboardOverview() {
   // Client-side buffer for "Live" feel
-  const [throughputHistory, setThroughputHistory] = useState<number[]>(new Array(30).fill(0));
+  const [throughputHistory, setThroughputHistory] = useState<number[]>(
+    new Array(30).fill(0)
+  );
 
   const { data: health } = useQuery({
     queryKey: ["system-health"],
@@ -57,10 +92,16 @@ export default function DashboardOverview() {
   // Simulate updating history when data arrives
   useEffect(() => {
     if (health) {
-      setThroughputHistory(prev => [...prev.slice(1), health.total_bandwidth_mbps]);
+      setThroughputHistory((prev) => [
+        ...prev.slice(1),
+        health.total_bandwidth_mbps,
+      ]);
     } else {
       // Mock animation if no backend
-      setThroughputHistory(prev => [...prev.slice(1), Math.random() * 500 + 200]);
+      setThroughputHistory((prev) => [
+        ...prev.slice(1),
+        Math.random() * 500 + 200,
+      ]);
     }
   }, [health]);
 
@@ -68,7 +109,7 @@ export default function DashboardOverview() {
     active_jobs: 3,
     total_bandwidth_mbps: 0.0,
     system_load: 0.45,
-    storage_health: "Healthy"
+    storage_health: "Healthy",
   };
 
   return (
@@ -76,7 +117,9 @@ export default function DashboardOverview() {
       <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-border pb-6">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Mission Control</h2>
-          <p className="text-muted-foreground mt-1">Real-time telemetry and flight status.</p>
+          <p className="text-muted-foreground mt-1">
+            Real-time telemetry and flight status.
+          </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
           <span className="relative flex h-2 w-2">
@@ -128,10 +171,13 @@ export default function DashboardOverview() {
           <div className="flex justify-between items-center mb-6">
             <div>
               <h3 className="text-lg font-semibold">Network Throughput</h3>
-              <p className="text-sm text-muted-foreground">Inbound/Outbound traffic analysis</p>
+              <p className="text-sm text-muted-foreground">
+                Inbound/Outbound traffic analysis
+              </p>
             </div>
             <div className="text-2xl font-mono font-bold text-blue-500">
-               {stats.total_bandwidth_mbps.toFixed(1)} <span className="text-sm text-muted-foreground">MB/s</span>
+              {stats.total_bandwidth_mbps.toFixed(1)}{" "}
+              <span className="text-sm text-muted-foreground">MB/s</span>
             </div>
           </div>
 
@@ -141,15 +187,21 @@ export default function DashboardOverview() {
 
           <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-border/50">
             <div className="text-center">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Peak</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                Peak
+              </div>
               <div className="font-mono font-bold">892 MB/s</div>
             </div>
             <div className="text-center border-l border-border/50">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Average</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                Average
+              </div>
               <div className="font-mono font-bold">450 MB/s</div>
             </div>
             <div className="text-center border-l border-border/50">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">Total Transferred</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                Total Transferred
+              </div>
               <div className="font-mono font-bold">4.2 TB</div>
             </div>
           </div>
@@ -159,22 +211,30 @@ export default function DashboardOverview() {
         <div className="bg-card border rounded-xl shadow-sm p-6 flex flex-col">
           <h3 className="text-lg font-semibold mb-4">Capacity Planning</h3>
           <div className="flex-1 flex items-center justify-center relative">
-             {/* Simple CSS Donut Chart */}
-             <div className="w-48 h-48 rounded-full border-[16px] border-muted relative flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border-[16px] border-primary border-t-transparent border-l-transparent rotate-45"></div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold">72%</div>
-                  <div className="text-xs text-muted-foreground uppercase">Used</div>
+            {/* Simple CSS Donut Chart */}
+            <div className="w-48 h-48 rounded-full border-[16px] border-muted relative flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-[16px] border-primary border-t-transparent border-l-transparent rotate-45"></div>
+              <div className="text-center">
+                <div className="text-3xl font-bold">72%</div>
+                <div className="text-xs text-muted-foreground uppercase">
+                  Used
                 </div>
-             </div>
+              </div>
+            </div>
           </div>
           <div className="space-y-3 mt-6">
             <div className="flex justify-between text-sm">
-              <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary"></span> Used Space</span>
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-primary"></span> Used
+                Space
+              </span>
               <span className="font-mono">84.2 TB</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-muted"></span> Available</span>
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-muted"></span>{" "}
+                Available
+              </span>
               <span className="font-mono">32.8 TB</span>
             </div>
           </div>
@@ -184,20 +244,36 @@ export default function DashboardOverview() {
   );
 }
 
-const MetricCard = ({ label, value, unit, icon, trend, trendUp, good }: any) => (
+const MetricCard = ({
+  label,
+  value,
+  unit,
+  icon,
+  trend,
+  trendUp,
+  good,
+}: any) => (
   <div className="bg-card border rounded-xl p-5 shadow-sm hover:border-primary/50 transition-colors group">
     <div className="flex justify-between items-start mb-2">
-      <div className="p-2 bg-muted/50 rounded-lg group-hover:bg-muted transition-colors">{icon}</div>
+      <div className="p-2 bg-muted/50 rounded-lg group-hover:bg-muted transition-colors">
+        {icon}
+      </div>
       {trend && (
-        <div className={`flex items-center text-xs font-bold ${good || trendUp ? "text-green-500" : "text-muted-foreground"}`}>
+        <div
+          className={`flex items-center text-xs font-bold ${good || trendUp ? "text-green-500" : "text-muted-foreground"}`}
+        >
           {trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
           {trend}
         </div>
       )}
     </div>
     <div>
-      <div className="text-3xl font-bold tracking-tight text-foreground">{value}</div>
-      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">{label} <span className="opacity-50">/ {unit}</span></div>
+      <div className="text-3xl font-bold tracking-tight text-foreground">
+        {value}
+      </div>
+      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
+        {label} <span className="opacity-50">/ {unit}</span>
+      </div>
     </div>
   </div>
 );

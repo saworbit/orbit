@@ -1,13 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import {
-  LayoutDashboard,
-  Network,
-  Zap,
-  Settings,
-  Menu,
-  X
-} from "lucide-react";
+import { LayoutDashboard, Network, Zap, Settings, Menu, X } from "lucide-react";
 import { ModeToggle } from "../mode-toggle";
 
 interface AppShellProps {
@@ -34,9 +27,13 @@ export function AppShell({ children, currentPage, onNavigate }: AppShellProps) {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
       {/* Sidebar Navigation */}
-      <aside className={`w-full md:w-64 bg-card border-r border-border flex-shrink-0 flex flex-col h-auto md:h-screen sticky top-0 z-50 transition-transform duration-300 ${
-        mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-      } fixed md:static`}>
+      <aside
+        className={`w-full md:w-64 bg-card border-r border-border flex-shrink-0 flex flex-col h-auto md:h-screen sticky top-0 z-50 transition-transform duration-300 ${
+          mobileMenuOpen
+            ? "translate-x-0"
+            : "-translate-x-full md:translate-x-0"
+        } fixed md:static`}
+      >
         <div className="p-6 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -49,7 +46,9 @@ export function AppShell({ children, currentPage, onNavigate }: AppShellProps) {
               </span>
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-none tracking-tight">Orbit</h1>
+              <h1 className="font-bold text-lg leading-none tracking-tight">
+                Orbit
+              </h1>
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
                 Control Plane
               </span>
@@ -68,21 +67,28 @@ export function AppShell({ children, currentPage, onNavigate }: AppShellProps) {
             Platform
           </div>
           <nav className="space-y-1">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-200 group ${
-                currentPage === item.id
-                  ? "bg-primary/10 text-primary border-r-2 border-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`}
-            >
-              <item.icon size={18} className={currentPage === item.id ? "animate-pulse" : "group-hover:scale-110 transition-transform"} />
-              {item.label}
-            </button>
-          ))}
-        </nav>
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleNavigate(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-200 group ${
+                  currentPage === item.id
+                    ? "bg-primary/10 text-primary border-r-2 border-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <item.icon
+                  size={18}
+                  className={
+                    currentPage === item.id
+                      ? "animate-pulse"
+                      : "group-hover:scale-110 transition-transform"
+                  }
+                />
+                {item.label}
+              </button>
+            ))}
+          </nav>
         </div>
 
         <div className="mt-auto p-4 border-t border-border space-y-4 bg-muted/10">
@@ -94,7 +100,11 @@ export function AppShell({ children, currentPage, onNavigate }: AppShellProps) {
               <div className="flex-1 overflow-hidden">
                 <p className="text-sm font-medium truncate">Operator</p>
                 <div className="flex items-center gap-1.5 text-xs text-green-500">
-                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 8 8">
+                  <svg
+                    className="w-2.5 h-2.5"
+                    fill="currentColor"
+                    viewBox="0 0 8 8"
+                  >
                     <circle cx="4" cy="4" r="3" />
                   </svg>
                   <span>System Online</span>
@@ -136,8 +146,18 @@ export function AppShell({ children, currentPage, onNavigate }: AppShellProps) {
           <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">
-                <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                <svg
+                  className="w-5 h-5 text-yellow-600 dark:text-yellow-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
@@ -145,8 +165,13 @@ export function AppShell({ children, currentPage, onNavigate }: AppShellProps) {
                   ⚠️ PRE-ALPHA SOFTWARE - USE AT YOUR OWN RISK
                 </p>
                 <p className="text-xs text-yellow-800 dark:text-yellow-300 mt-1">
-                  This dashboard is experimental and under active development. APIs may change without notice.
-                  <strong className="font-semibold"> NOT recommended for production use.</strong> Test thoroughly with non-critical data.
+                  This dashboard is experimental and under active development.
+                  APIs may change without notice.
+                  <strong className="font-semibold">
+                    {" "}
+                    NOT recommended for production use.
+                  </strong>{" "}
+                  Test thoroughly with non-critical data.
                 </p>
               </div>
             </div>

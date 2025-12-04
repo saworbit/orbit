@@ -3,16 +3,28 @@ import { api } from "../../lib/api";
 import { Activity, HardDrive, Cpu, Zap } from "lucide-react";
 
 // Simple SVG Sparkline component
-const Sparkline = ({ color = "currentColor", data = [40, 30, 45, 50, 45, 60, 55, 70, 65, 80] }: { color?: string, data?: number[] }) => {
+const Sparkline = ({
+  color = "currentColor",
+  data = [40, 30, 45, 50, 45, 60, 55, 70, 65, 80],
+}: {
+  color?: string;
+  data?: number[];
+}) => {
   const max = Math.max(...data, 100);
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * 100;
-    const y = 100 - (d / max) * 100;
-    return `${x},${y}`;
-  }).join(" ");
+  const points = data
+    .map((d, i) => {
+      const x = (i / (data.length - 1)) * 100;
+      const y = 100 - (d / max) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
 
   return (
-    <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible" preserveAspectRatio="none">
+    <svg
+      viewBox="0 0 100 100"
+      className="w-full h-full overflow-visible"
+      preserveAspectRatio="none"
+    >
       <polyline
         fill="none"
         stroke={color}
@@ -21,7 +33,10 @@ const Sparkline = ({ color = "currentColor", data = [40, 30, 45, 50, 45, 60, 55,
         vectorEffect="non-scaling-stroke"
       />
       <path
-        d={`M 0 100 L 0 ${100 - (data[0]/max)*100} L ${points.split(" ").map(p => "L "+p).join(" ")} L 100 100 Z`}
+        d={`M 0 100 L 0 ${100 - (data[0] / max) * 100} L ${points
+          .split(" ")
+          .map((p) => "L " + p)
+          .join(" ")} L 100 100 Z`}
         fill={color}
         fillOpacity="0.1"
         stroke="none"
@@ -41,7 +56,7 @@ export default function SystemHealth() {
     active_jobs: 0,
     total_bandwidth_mbps: 0.0,
     system_load: 0.0,
-    storage_health: "Optimal"
+    storage_health: "Optimal",
   };
 
   return (
@@ -86,14 +101,25 @@ export default function SystemHealth() {
   );
 }
 
-const HealthCard = ({ label, value, unit, icon: Icon, color, bg, trend, staticVisual }: any) => (
+const HealthCard = ({
+  label,
+  value,
+  unit,
+  icon: Icon,
+  color,
+  bg,
+  trend,
+  staticVisual,
+}: any) => (
   <div className="bg-card border rounded-xl p-5 shadow-sm relative overflow-hidden group">
     <div className="flex justify-between items-start mb-4">
       <div>
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
         <div className="flex items-baseline gap-1 mt-1">
           <span className="text-2xl font-bold">{value}</span>
-          <span className="text-xs text-muted-foreground font-medium uppercase">{unit}</span>
+          <span className="text-xs text-muted-foreground font-medium uppercase">
+            {unit}
+          </span>
         </div>
       </div>
       <div className={`p-2.5 rounded-lg ${bg} ${color}`}>
@@ -103,9 +129,9 @@ const HealthCard = ({ label, value, unit, icon: Icon, color, bg, trend, staticVi
 
     <div className="h-12 w-full mt-2 opacity-50 group-hover:opacity-100 transition-opacity">
       {staticVisual ? (
-         <div className="h-full w-full bg-muted/30 rounded flex items-center justify-center text-xs text-muted-foreground">
-           System Optimal
-         </div>
+        <div className="h-full w-full bg-muted/30 rounded flex items-center justify-center text-xs text-muted-foreground">
+          System Optimal
+        </div>
       ) : (
         <Sparkline color="currentColor" data={trend} />
       )}

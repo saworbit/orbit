@@ -8,7 +8,7 @@ use axum::{
 };
 use serde::Deserialize;
 use sqlx::Row;
-use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 /// Request for creating a job
 #[derive(Debug, Deserialize)]
@@ -1581,10 +1581,9 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
                 }))
             }),
         )
-        // Serve static files
-        .nest_service("/pkg", ServeDir::new("target/site/pkg"))
-        .nest_service("/public", ServeDir::new("crates/orbit-web/public"))
         // Fallback handler - redirect to Swagger UI for API documentation
+        // Note: Static dashboard files are served by Vite dev server (port 5173) in development
+        // or should be served by a reverse proxy in production
         .fallback(get(|| async {
             axum::response::Redirect::permanent("/swagger-ui")
         }))
