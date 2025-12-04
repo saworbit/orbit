@@ -1,0 +1,35 @@
+# Cargo Audit Configuration
+# See: https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+
+# Advisory Database Configuration
+[database]
+fetch = true
+url = "https://github.com/RustSec/advisory-db.git"
+stale = false
+
+# Output Configuration
+[output]
+deny = ["warnings"]
+format = "terminal"
+show_tree = true
+quiet = false
+
+# Advisories to Ignore
+# These are documented in SECURITY.md with full context and risk assessment
+[advisories]
+# RUSTSEC-2023-0071: RSA Marvin Attack timing side-channel
+# Status: Only affects optional SMB feature (not default build)
+# Risk: Low (requires --features smb-native + active MITM exploitation)
+# Documentation: SECURITY.md#dependency-security-audit
+# Reason: No upstream fix available; default builds unaffected
+# RUSTSEC-2024-0436: paste crate unmaintained (compile-time macros only)
+# Risk: Minimal (no runtime code execution)
+ignore = [
+    "RUSTSEC-2023-0071",  # RSA timing side-channel (SMB feature only)
+    "RUSTSEC-2024-0436",  # paste - compile-time macro only
+]
+
+# Yanked Crates
+[yanked]
+enabled = true
+update_index = true
