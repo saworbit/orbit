@@ -41,7 +41,7 @@ const AreaChart = ({
   if (data.length < 2) return null;
   const max = Math.max(...data, 100) * 1.1; // 10% headroom
   const min = 0;
-  const range = max - min;
+  const range = max - min || 1; // Prevent division by zero
 
   const points = data
     .map((d, i) => {
@@ -49,6 +49,13 @@ const AreaChart = ({
       const y = 100 - ((d - min) / range) * 100;
       return `${x},${y}`;
     })
+    .join(" ");
+
+  // Build path with proper SVG commands (no duplicate L)
+  const firstY = 100 - ((data[0] - min) / range) * 100;
+  const pathCommands = points
+    .split(" ")
+    .map((p) => `L ${p}`)
     .join(" ");
 
   return (
@@ -74,10 +81,7 @@ const AreaChart = ({
           </linearGradient>
         </defs>
         <path
-          d={`M 0 100 L 0 ${100 - ((data[0] - min) / range) * 100} L ${points
-            .split(" ")
-            .map((p) => "L " + p)
-            .join(" ")} L 100 100 Z`}
+          d={`M 0 100 L 0 ${firstY} ${pathCommands} L 100 100 Z`}
           fill={`url(#grad-${color})`}
         />
         <polyline
