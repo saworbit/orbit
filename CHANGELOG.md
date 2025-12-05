@@ -92,6 +92,16 @@ All notable changes to Orbit will be documented in this file.
 - **Mobile Navigation**: Hamburger menu now properly opens/closes with state management
 - **User Management**: Delete user action now properly wired with confirmation and cache invalidation
 - **Theme Consistency**: All components now use theme variables instead of hardcoded colors
+- **Full-Screen Layout**: Removed default Vite scaffolding styles (App.css) that constrained dashboard to centered 1280px box
+  - Cleared max-width, padding, and text-align constraints blocking AppShell
+  - Added tailwindcss-animate plugin for smooth entry animations
+  - Added shimmer keyframe for TeraCopy-style progress indicators
+  - Dashboard now renders edge-to-edge as designed
+- **React 19 Type Safety**: Resolved all ESLint errors for strict React 19 compliance
+  - Added proper TypeScript interfaces (SystemHealth, MetricCardProps, HealthCardProps, ActionBtnProps)
+  - Fixed setState in useEffect pattern using queueMicrotask() to prevent cascading renders
+  - Moved impure Date.now() calls outside render using constants
+  - All CI checks passing (ESLint, TypeScript, Prettier)
 
 ### Maintenance
 - **Dependency Updates** - Merged 15 automated Dependabot updates

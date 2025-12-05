@@ -87,7 +87,7 @@ npm run ci:check
 - **React 19** - UI library with latest features
 - **TypeScript 5.9** - Type safety and better DX
 - **Vite 7** - Lightning-fast build tool
-- **Tailwind CSS 4** - Utility-first styling
+- **Tailwind CSS 4** - Utility-first styling with tailwindcss-animate plugin
 - **TanStack Query** - Data fetching and caching
 - **@xyflow/react 12** - Visual pipeline editor (React Flow)
 - **Lucide React** - Beautiful icon set
@@ -177,6 +177,13 @@ npm run test -- --run
 Tests are written using Vitest. Place test files next to the components they test with `.test.tsx` extension.
 
 ## Troubleshooting
+
+### Layout or Styling Issues
+If you see layout constraints or the dashboard doesn't render edge-to-edge:
+1. Ensure `App.css` only contains the comment about removed Vite styles
+2. Verify `tailwindcss-animate` is in `package.json` dependencies
+3. Run `npm install` to install the animation plugin
+4. Restart your dev server (`npm run dev`)
 
 ### Port Already in Use
 If port 5173 is already in use, Vite will automatically try the next available port.
