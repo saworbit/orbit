@@ -105,8 +105,8 @@ bitflags = { version = "2", optional = true }
 zeroize = { version = "1", optional = true }
 
 # S3 native dependencies (optional, feature-gated)
-aws-config = { version = "1.5", default-features = false, features = ["behavior-version-latest", "rustls"], optional = true }
-aws-sdk-s3 = { version = "1.113", default-features = false, features = ["rt-tokio", "rustls"], optional = true }
+aws-config = { version = "1.8", default-features = false, features = ["behavior-version-latest", "rustls"], optional = true }
+aws-sdk-s3 = { version = "1.116", default-features = false, features = ["rt-tokio", "rustls"], optional = true }
 url = { version = "2.5", optional = true }
 
 # SSH backend dependencies (optional, feature-gated)

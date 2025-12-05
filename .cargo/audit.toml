@@ -24,9 +24,15 @@ quiet = false
 # Reason: No upstream fix available; default builds unaffected
 # RUSTSEC-2024-0436: paste crate unmaintained (compile-time macros only)
 # Risk: Minimal (no runtime code execution)
+# RUSTSEC-2025-0134: rustls-pemfile unmaintained (via AWS SDK)
+# Status: Transitive dependency through aws-smithy-runtime -> hyper-rustls 0.24
+# Risk: Low (not a security vulnerability, just unmaintained)
+# Plan: Remove once AWS SDK updates to rustls-pki-types 1.9+
+# Advisory Date: 2025-11-28 (very recent, AWS SDK fix expected soon)
 ignore = [
     "RUSTSEC-2023-0071",  # RSA timing side-channel (SMB feature only)
     "RUSTSEC-2024-0436",  # paste - compile-time macro only
+    "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained (AWS SDK transitive dep)
 ]
 
 # Yanked Crates
