@@ -1542,6 +1542,13 @@ npm run dev
 - 📚 **Swagger UI**: http://localhost:8080/swagger-ui
 - 🔒 **Default credentials**: `admin` / `orbit2025` (⚠️ Change in production!)
 
+**What's Running:**
+- ☢️ **Reactor Engine**: Background job executor (starts automatically with orbit-server)
+- 🎨 **Dashboard Dev Server**: React app with hot reload (port 5173)
+- 🔌 **API Server**: RESTful API with WebSockets (port 8080)
+
+**Browser Safety**: Launch scripts open the dashboard in a **new browser tab** and will **NOT kill your other tabs** when you close the script. Safe to use with your existing browser session!
+
 ### Compilation Modes: Headless vs Full UI
 
 **NEW in v2.2.0!** The Control Plane now supports **compile-time modularity** via feature flags, allowing you to build either a lightweight headless API server or a full-featured server with embedded dashboard.
