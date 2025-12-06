@@ -10,6 +10,10 @@ use serde::Deserialize;
 use sqlx::Row;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
+// Only import these if the UI feature is enabled
+#[cfg(feature = "ui")]
+use tower_http::services::{ServeDir, ServeFile};
+
 /// Request for creating a job
 #[derive(Debug, Deserialize)]
 pub struct CreateJobRequest {
@@ -1580,13 +1584,31 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
                     "version": "1.0.0-rc.1"
                 }))
             }),
-        )
-        // Fallback handler - redirect to Swagger UI for API documentation
-        // Note: Static dashboard files are served by Vite dev server (port 5173) in development
-        // or should be served by a reverse proxy in production
-        .fallback(get(|| async {
-            axum::response::Redirect::permanent("/swagger-ui")
+        );
+
+    // ---------------------------------------------------------
+    // CONDITIONAL UI COMPILATION
+    // ---------------------------------------------------------
+    #[cfg(feature = "ui")]
+    let app = {
+        tracing::info!("🎨 UI Feature Enabled: Serving embedded dashboard from dashboard/dist");
+        app.nest_service("/", ServeDir::new("dashboard/dist"))
+            .fallback_service(ServeFile::new("dashboard/dist/index.html"))
+    };
+
+    #[cfg(not(feature = "ui"))]
+    let app = {
+        tracing::info!("⚙️ Headless Mode: Dashboard not included, API-only server");
+        app.fallback(get(|| async {
+            (
+                axum::http::StatusCode::NOT_FOUND,
+                "Orbit Control Plane (Headless Mode) - API available at /api/*",
+            )
         }))
+    };
+    // ---------------------------------------------------------
+
+    let app = app
         .layer(
             CorsLayer::new()
                 .allow_origin([

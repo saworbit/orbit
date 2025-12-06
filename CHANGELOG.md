@@ -9,6 +9,27 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+- **🏗️ Control Plane Compile-Time Modularity** - Build headless or full UI mode with feature flags
+  - **New `ui` feature flag** in `crates/orbit-web/Cargo.toml`
+  - **Headless Mode (Default)**: API-only server with ~40% smaller binary size
+    - No static file serving dependencies
+    - Reduced attack surface - no UI code in binary
+    - Perfect for Kubernetes, Docker, CI/CD automation
+    - Fallback returns helpful 404 message directing users to API endpoints
+  - **UI Mode (`--features ui`)**: Full-featured server with embedded dashboard
+    - Serves static files from `dashboard/dist`
+    - Single-binary deployment with integrated UI
+    - Ideal for desktop applications and quick demos
+  - **Conditional Compilation**: Uses `#[cfg(feature = "ui")]` for zero runtime overhead
+  - **Tower-http `fs` feature**: Only compiled when UI mode is enabled
+  - **Informative Logging**: Clear startup messages indicating mode
+    - Headless: "⚙️ Headless Mode: Dashboard not included, API-only server"
+    - UI: "🎨 UI Feature Enabled: Serving embedded dashboard from dashboard/dist"
+  - **Build Commands**:
+    - `cargo build --release -p orbit-server` → Headless (~15MB)
+    - `cargo build --release -p orbit-server --features ui` → Full UI (~25MB)
+  - **See**: README.md section "Compilation Modes: Headless vs Full UI"
+
 - **🎨 Dashboard UI Overhaul** - Complete architectural redesign with professional app shell
   - **STATUS**: 🔴 Pre-Alpha - Experimental features, breaking changes expected
   - **New AppShell Component**: Persistent sidebar navigation replacing top navigation bar

@@ -1542,6 +1542,58 @@ npm run dev
 - 📚 **Swagger UI**: http://localhost:8080/swagger-ui
 - 🔒 **Default credentials**: `admin` / `orbit2025` (⚠️ Change in production!)
 
+### Compilation Modes: Headless vs Full UI
+
+**NEW in v2.2.0!** The Control Plane now supports **compile-time modularity** via feature flags, allowing you to build either a lightweight headless API server or a full-featured server with embedded dashboard.
+
+#### Scenario A: Headless Mode (Default)
+Build a smaller, API-only binary without UI dependencies. Perfect for automation, CI/CD pipelines, or custom frontend integrations.
+
+```bash
+# Minimal binary - no UI, smaller attack surface
+cargo build --release -p orbit-server
+
+# Binary size: ~15MB (vs ~25MB with UI)
+# No static file serving, no dashboard embedded
+```
+
+**Use cases:**
+- Kubernetes/Docker deployments with separate UI CDN
+- API-only microservices
+- Custom dashboard integration
+- Embedded systems with limited storage
+
+#### Scenario B: Full UI Mode
+Build with embedded dashboard for all-in-one deployment.
+
+```bash
+# Full binary with embedded React dashboard
+cargo build --release -p orbit-server --features ui
+
+# Binary serves dashboard from dashboard/dist
+# Requires: npm run build in dashboard/ first
+```
+
+**Use cases:**
+- Single-binary desktop applications
+- Quick demos and development
+- End-user installations
+- Local workstation deployment
+
+#### Runtime Behavior
+
+**Headless Mode:**
+```
+⚙️ Headless Mode: Dashboard not included, API-only server
+Orbit Control Plane (Headless Mode) - API available at /api/*
+```
+
+**UI Mode:**
+```
+🎨 UI Feature Enabled: Serving embedded dashboard from dashboard/dist
+Dashboard available at http://localhost:8080/
+```
+
 ### Control Plane Features (v2.2.0-alpha)
 
 #### ✅ OpenAPI-Documented REST API

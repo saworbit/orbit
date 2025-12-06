@@ -7,8 +7,11 @@ This directory contains the Orbit Control Plane - a RESTful API server built wit
 ## Quick Start
 
 ```bash
-# Run the Control Plane
+# Run the Control Plane (Headless Mode - Default)
 cargo run --bin orbit-server
+
+# Run with UI embedded (requires dashboard build)
+cargo run --bin orbit-server --features ui
 
 # With custom configuration
 export ORBIT_SERVER_PORT=9000
@@ -20,6 +23,53 @@ cargo run --bin orbit-server
 - API: http://localhost:8080/api
 - Swagger UI: http://localhost:8080/swagger-ui
 - WebSocket: ws://localhost:8080/ws/:job_id
+- **UI (with `--features ui`)**: http://localhost:8080/
+
+## Compilation Modes
+
+The Control Plane supports two compilation modes via feature flags:
+
+### Headless Mode (Default)
+**Recommended for production deployments, microservices, and automation.**
+
+```bash
+# Build headless API-only binary
+cargo build --release -p orbit-server
+
+# Smaller binary (~15MB vs ~25MB with UI)
+# No static file serving dependencies
+# Reduced attack surface
+```
+
+**Use cases:**
+- Kubernetes/Docker deployments with separate UI CDN
+- API-only microservices
+- CI/CD automation
+- Custom frontend integration
+
+### UI Mode
+**Recommended for single-binary desktop applications and quick demos.**
+
+```bash
+# Build with embedded dashboard
+cargo build --release -p orbit-server --features ui
+
+# Note: Requires dashboard build first
+cd ../../dashboard
+npm run build
+cd ../crates/orbit-web
+```
+
+**Use cases:**
+- All-in-one desktop applications
+- Quick demos and development
+- End-user installations
+- Local workstation deployment
+
+**Feature flag details:**
+- `ui` - Enables static file serving from `dashboard/dist`
+- Conditionally compiles `tower-http/fs` feature
+- Zero runtime overhead when disabled
 
 ## Architecture
 
