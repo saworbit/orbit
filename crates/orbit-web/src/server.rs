@@ -108,6 +108,11 @@ async fn create_job_handler(
         request.source,
         request.destination
     );
+
+    // Wake up the reactor to process the new job
+    state.reactor_notify.notify_one();
+    tracing::debug!("Notified reactor about new job {}", job_id);
+
     Ok(Json(job_id))
 }
 
@@ -1505,7 +1510,10 @@ async fn remove_edge_handler(
 }
 
 /// Run the Axum Control Plane server
-pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error + Send>> {
+pub async fn run_server(
+    config: ServerConfig,
+    reactor_notify: std::sync::Arc<tokio::sync::Notify>,
+) -> Result<(), Box<dyn std::error::Error + Send>> {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -1520,7 +1528,7 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
     tracing::info!("User DB: {}", config.user_db);
 
     // Initialize application state
-    let state = AppState::new(&config.magnetar_db, &config.user_db).await?;
+    let state = AppState::new(&config.magnetar_db, &config.user_db, reactor_notify).await?;
 
     tracing::info!("Application state initialized");
 

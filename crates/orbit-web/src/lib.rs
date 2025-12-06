@@ -6,6 +6,8 @@
 pub mod api;
 pub mod auth;
 pub mod error;
+pub mod progress;
+pub mod reactor;
 pub mod state;
 pub mod utils;
 pub mod ws;
@@ -36,6 +38,9 @@ impl Default for ServerConfig {
 }
 
 /// Start the Control Plane API server
-pub async fn start_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error + Send>> {
-    server::run_server(config).await
+pub async fn start_server(
+    config: ServerConfig,
+    reactor_notify: std::sync::Arc<tokio::sync::Notify>,
+) -> Result<(), Box<dyn std::error::Error + Send>> {
+    server::run_server(config, reactor_notify).await
 }

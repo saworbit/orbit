@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{Row, SqlitePool};
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, Notify, RwLock};
 use uuid::Uuid;
 
 /// Global application state shared across all handlers
@@ -23,6 +23,9 @@ pub struct AppState {
 
     /// Pipeline configurations (DAG workflows)
     pub pipelines: Arc<RwLock<HashMap<String, Pipeline>>>,
+
+    /// Notification channel for waking up the reactor
+    pub reactor_notify: Arc<Notify>,
 }
 
 impl AppState {
@@ -30,6 +33,7 @@ impl AppState {
     pub async fn new(
         magnetar_db_path: &str,
         user_db_path: &str,
+        reactor_notify: Arc<Notify>,
     ) -> Result<Self, Box<dyn std::error::Error + Send>> {
         // Initialize Magnetar database pool (create if doesn't exist)
         let magnetar_pool = SqlitePool::connect(&format!("sqlite:{}?mode=rwc", magnetar_db_path))
@@ -163,6 +167,7 @@ impl AppState {
             event_tx,
             backends,
             pipelines,
+            reactor_notify,
         })
     }
 

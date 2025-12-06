@@ -2,8 +2,10 @@
 //!
 //! Headless API and Orchestration Engine for Orbit V2.2.0
 
-use orbit_server::{start_server, ServerConfig};
-use std::env;
+use orbit_server::{reactor::Reactor, start_server, ServerConfig};
+use sqlx::SqlitePool;
+use std::{env, sync::Arc};
+use tokio::sync::Notify;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send>> {
@@ -37,6 +39,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send>> {
     );
     println!();
 
-    // Start server
-    start_server(config).await
+    // Create shared notification channel for reactor
+    let reactor_notify = Arc::new(Notify::new());
+
+    // Initialize database pool for reactor
+    let reactor_pool =
+        SqlitePool::connect(&format!("sqlite:{}?mode=rwc", config.magnetar_db))
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+
+    println!("☢️  Starting Orbit Reactor (job execution engine)...");
+
+    // Start reactor in background
+    let reactor = Reactor::new(reactor_pool, reactor_notify.clone());
+    tokio::spawn(async move {
+        reactor.run().await;
+    });
+
+    // Start API server
+    start_server(config, reactor_notify).await
 }
