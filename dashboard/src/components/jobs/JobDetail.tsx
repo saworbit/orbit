@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { HardDrive, FileJson, ArrowLeft } from "lucide-react";
+import { api } from "../../lib/api";
 
 // The "Cool" Feature: Visual Chunk Map
 // Simulates a dense grid of file chunks being processed
@@ -60,8 +61,19 @@ const ChunkMap = ({
   );
 };
 
-// Fixed timestamp for mock data (1 hour ago from a fixed point)
-const MOCK_CREATED_AT = 1704067200000;
+// --- DATA SHAPE (Must match Rust API) ---
+interface Job {
+  id: number;
+  source: string;
+  destination: string;
+  status: string;
+  progress: number;
+  total_chunks: number;
+  completed_chunks: number;
+  failed_chunks: number;
+  created_at: number;
+  updated_at: number;
+}
 
 export function JobDetail({
   jobId,
@@ -70,27 +82,30 @@ export function JobDetail({
   jobId: number;
   onBack: () => void;
 }) {
-  // In a real app, useQuery(["job", jobId]) here
-  // Mock data for UI demonstration based on the user's backend structs
-  const job = useMemo(
-    () => ({
-      id: jobId,
-      source: "s3://production-bucket/logs/2023",
-      destination: "smb://archive-server/backup/logs",
-      status: "running",
-      progress: 45.5,
-      total_chunks: 10240,
-      completed_chunks: 4660,
-      failed_chunks: 12,
-      created_at: MOCK_CREATED_AT - 3600000,
-      config: {
-        compress: true,
-        verify: true,
-        parallel_workers: 8,
-      },
-    }),
-    [jobId]
-  );
+  // --- CONNECT TO REAL API WITH LIVE POLLING ---
+  const { data: job, isLoading } = useQuery({
+    queryKey: ["job", jobId],
+    queryFn: () =>
+      api.post<Job>("/get_job", { job_id: jobId }).then((r) => r.data),
+    refetchInterval: 1000, // Poll every second for live updates
+  });
+
+  if (isLoading || !job) {
+    return (
+      <div className="p-12 text-center animate-pulse">
+        <div className="text-xl font-bold text-muted-foreground">
+          Loading flight telemetry...
+        </div>
+      </div>
+    );
+  }
+
+  // Mock config for now - will be added to API later
+  const config = {
+    compress: true,
+    verify: true,
+    parallel_workers: 4,
+  };
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
@@ -145,7 +160,7 @@ export function JobDetail({
                     Compression
                   </div>
                   <div className="font-bold">
-                    {job.config.compress ? "Enabled" : "Disabled"}
+                    {config.compress ? "Enabled" : "Disabled"}
                   </div>
                 </div>
                 <div className="bg-muted/30 p-2 rounded">
@@ -153,13 +168,13 @@ export function JobDetail({
                     Verification
                   </div>
                   <div className="font-bold">
-                    {job.config.verify ? "Strict" : "Fast"}
+                    {config.verify ? "Strict" : "Fast"}
                   </div>
                 </div>
                 <div className="bg-muted/30 p-2 rounded">
                   <div className="text-xs text-muted-foreground">Workers</div>
                   <div className="font-bold">
-                    {job.config.parallel_workers} Threads
+                    {config.parallel_workers} Threads
                   </div>
                 </div>
               </div>
