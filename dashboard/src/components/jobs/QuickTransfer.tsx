@@ -8,7 +8,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { api } from "../../lib/api";
-import { FileBrowser } from "../files/FileBrowser";
 
 export function QuickTransfer() {
   const [source, setSource] = useState("");
@@ -104,7 +103,7 @@ export function QuickTransfer() {
                 />
               </div>
               <div className="flex-1 overflow-hidden relative">
-                <FileBrowser onSelect={setSource} selectedPath={source} />
+                <div className="text-slate-500 p-4">File browser coming soon...</div>
               </div>
             </div>
           </div>
@@ -141,7 +140,7 @@ export function QuickTransfer() {
                 />
               </div>
               <div className="flex-1 overflow-hidden relative">
-                <FileBrowser onSelect={setDest} selectedPath={dest} />
+                <div className="text-slate-500 p-4">File browser coming soon...</div>
               </div>
             </div>
           </div>

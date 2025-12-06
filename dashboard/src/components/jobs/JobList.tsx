@@ -14,7 +14,6 @@ import {
   RefreshCcw,
   Network,
 } from "lucide-react";
-import SystemHealth from "../dashboard/SystemHealth";
 
 interface JobListProps {
   compact?: boolean;
@@ -56,7 +55,6 @@ export default function JobList({
   if (isLoading) {
     return (
       <div className="space-y-6">
-        {!compact && <SystemHealth />}
         <div className="w-full h-48 flex items-center justify-center text-muted-foreground animate-pulse">
           Loading job data...
         </div>
@@ -89,7 +87,6 @@ export default function JobList({
 
   return (
     <div className="space-y-4">
-      {!compact && <SystemHealth />}
 
       {!compact && (
         <>

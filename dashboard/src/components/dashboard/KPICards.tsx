@@ -1,35 +1,52 @@
 import { Activity, Database, Clock, TrendingUp } from 'lucide-react';
+import { useJobs } from '../../hooks/useJobs';
 
 export function KPICards() {
+  const { data: jobs, isLoading } = useJobs();
+
+  // Calculate real statistics from job data
+  const activeJobs = jobs?.filter((j) => j.status === 'running' || j.status === 'pending').length || 0;
+  const completedJobs = jobs?.filter((j) => j.status === 'completed').length || 0;
+
+  // Calculate total transferred data (assuming 1 chunk = 1MB for visualization)
+  const totalChunks = jobs?.reduce((sum, j) => sum + (j.completed_chunks || 0), 0) || 0;
+  const totalGB = (totalChunks / 1024).toFixed(1);
+
+  // Calculate average progress for active jobs
+  const runningJobs = jobs?.filter((j) => j.status === 'running') || [];
+  const avgProgress = runningJobs.length > 0
+    ? (runningJobs.reduce((sum, j) => sum + (j.progress || 0), 0) / runningJobs.length).toFixed(1)
+    : '0';
+
   const kpis = [
     {
       label: 'Active Jobs',
-      value: '5',
-      change: '+2 from yesterday',
+      value: isLoading ? '...' : `${activeJobs}`,
+      change: completedJobs > 0 ? `${completedJobs} completed` : 'No completed jobs yet',
       trend: 'up',
       icon: Activity,
       color: 'blue',
     },
     {
       label: 'Total Data Transferred',
-      value: '2.5 TB',
-      change: '+180 GB today',
+      value: isLoading ? '...' : `${totalGB} GB`,
+      change: totalChunks > 0 ? `${totalChunks} chunks completed` : 'No data transferred',
       trend: 'up',
       icon: Database,
       color: 'purple',
     },
     {
-      label: 'Average Speed',
-      value: '45.2 MB/s',
-      change: 'Optimal range',
+      label: 'Average Progress',
+      value: isLoading ? '...' : `${avgProgress}%`,
+      change: runningJobs.length > 0 ? `${runningJobs.length} jobs running` : 'No active jobs',
       trend: 'stable',
       icon: TrendingUp,
       color: 'green',
     },
     {
-      label: 'Uptime',
-      value: '99.9%',
-      change: '30 days',
+      label: 'Total Jobs',
+      value: isLoading ? '...' : `${jobs?.length || 0}`,
+      change: 'All time',
       trend: 'stable',
       icon: Clock,
       color: 'amber',

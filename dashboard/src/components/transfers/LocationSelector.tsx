@@ -6,7 +6,7 @@ interface LocationSelectorProps {
   type: 'source' | 'destination';
 }
 
-export function LocationSelector({ title, type }: LocationSelectorProps) {
+export function LocationSelector({ title }: LocationSelectorProps) {
   const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [selectedPath, setSelectedPath] = useState<string>('');
 

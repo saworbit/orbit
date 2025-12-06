@@ -1,11 +1,45 @@
-import { Server, Database, Cloud, HardDrive } from 'lucide-react';
+import { Server, Cloud, HardDrive } from 'lucide-react';
+import { useJobs } from '../../hooks/useJobs';
 
 export function NetworkMap() {
-  const connections = [
-    { id: 1, source: 'Local Drive', dest: 'AWS S3', protocol: 'S3', speed: '45.2 MB/s', status: 'active' },
-    { id: 2, source: 'Database', dest: 'Backup Server', protocol: 'SMB', speed: '28.1 MB/s', status: 'active' },
-    { id: 3, source: 'Cloud Storage', dest: 'Local Drive', protocol: 'HTTPS', speed: '12.5 MB/s', status: 'paused' },
-  ];
+  const { data: jobs, isLoading } = useJobs();
+
+  // Extract real connections from active jobs
+  const connections = jobs
+    ?.filter((j) => j.status === 'running' || j.status === 'pending')
+    .map((job) => {
+      // Determine protocol from path
+      const getProtocol = (path: string) => {
+        if (path.startsWith('s3://')) return 'S3';
+        if (path.startsWith('smb://')) return 'SMB';
+        if (path.startsWith('ssh://')) return 'SSH';
+        return 'Local';
+      };
+
+      // Calculate speed from progress (simplified)
+      const speed = job.status === 'running' ? `${(job.progress * 0.5).toFixed(1)} MB/s` : 'Pending';
+
+      return {
+        id: job.id,
+        source: job.source,
+        dest: job.destination,
+        protocol: getProtocol(job.destination),
+        speed,
+        status: job.status === 'running' ? 'active' : 'paused',
+      };
+    }) || [];
+
+  // If no active jobs, show placeholder
+  if (!isLoading && connections.length === 0) {
+    connections.push({
+      id: 0,
+      source: 'No active transfers',
+      dest: 'Create a job to see network topology',
+      protocol: '-',
+      speed: '-',
+      status: 'paused',
+    });
+  }
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-6">

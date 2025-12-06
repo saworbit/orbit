@@ -1,51 +1,75 @@
 import { CheckCircle2, AlertCircle, Clock, XCircle, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { useJobs } from '../../hooks/useJobs';
 
 export function ActivityFeed() {
   const [filter, setFilter] = useState('all');
-  
-  const activities = [
-    {
-      id: 1,
-      type: 'success',
-      title: 'Backup to AWS S3 completed',
-      timestamp: '2 minutes ago',
-      details: '2.4 GB transferred in 1m 23s',
-      expanded: false,
-    },
-    {
-      id: 2,
-      type: 'progress',
-      title: 'Media sync in progress',
-      timestamp: '5 minutes ago',
-      details: '45% complete • 12.1 GB of 26.8 GB',
-      expanded: false,
-    },
-    {
-      id: 3,
+  const { data: jobs, isLoading } = useJobs();
+
+  // Convert jobs to activity feed items
+  const activities = jobs
+    ?.map((job) => {
+      const getType = (status: string) => {
+        if (status === 'completed') return 'success';
+        if (status === 'failed' || status === 'cancelled') return 'error';
+        if (status === 'running') return 'progress';
+        return 'warning';
+      };
+
+      const getTitle = (job: any) => {
+        if (job.status === 'completed') return `Transfer to ${job.destination.split('/').pop()} completed`;
+        if (job.status === 'running') return `Transferring to ${job.destination.split('/').pop()}`;
+        if (job.status === 'failed') return `Transfer failed: ${job.destination.split('/').pop()}`;
+        if (job.status === 'cancelled') return `Transfer cancelled: ${job.destination.split('/').pop()}`;
+        return `Job pending: ${job.destination.split('/').pop()}`;
+      };
+
+      const getDetails = (job: any) => {
+        if (job.status === 'running') {
+          return `${job.progress}% complete • ${job.completed_chunks} of ${job.total_chunks} chunks`;
+        }
+        if (job.status === 'completed') {
+          return `${job.completed_chunks} chunks transferred successfully`;
+        }
+        if (job.failed_chunks > 0) {
+          return `${job.failed_chunks} chunks failed • ${job.completed_chunks} completed`;
+        }
+        return `${job.total_chunks} chunks total`;
+      };
+
+      const getTimestamp = (created_at: number) => {
+        const now = Date.now();
+        const diff = Math.floor((now - created_at) / 1000); // seconds
+
+        if (diff < 60) return `${diff}s ago`;
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+      };
+
+      return {
+        id: job.id,
+        type: getType(job.status),
+        title: getTitle(job),
+        timestamp: getTimestamp(job.created_at),
+        details: getDetails(job),
+        expanded: false,
+      };
+    })
+    .sort((a, b) => b.id - a.id) // Most recent first
+    .slice(0, 10) || []; // Limit to 10 items
+
+  // If no jobs, show placeholder
+  if (!isLoading && activities.length === 0) {
+    activities.push({
+      id: 0,
       type: 'warning',
-      title: 'Network hiccup detected, resuming...',
-      timestamp: '12 minutes ago',
-      details: 'Retry attempt 2 of 5 • Exponential backoff applied',
+      title: 'No activity yet',
+      timestamp: 'Just now',
+      details: 'Create a job to see activity here',
       expanded: false,
-    },
-    {
-      id: 4,
-      type: 'error',
-      title: 'Permission denied for /system/protected',
-      timestamp: '28 minutes ago',
-      details: 'Skipped 3 files • Partial transfer completed',
-      expanded: false,
-    },
-    {
-      id: 5,
-      type: 'success',
-      title: 'Database backup completed',
-      timestamp: '1 hour ago',
-      details: '890 MB transferred with compression (Zstd)',
-      expanded: false,
-    },
-  ];
+    });
+  }
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -85,43 +109,35 @@ export function ActivityFeed() {
       </div>
 
       <div className="space-y-3">
-        {activities.map((activity) => (
-          <div
-            key={activity.id}
-            className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors"
-          >
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5">{getIcon(activity.type)}</div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-slate-900">{activity.title}</p>
-                  <button className="text-slate-400 hover:text-slate-600">
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </div>
-                
-                <p className="text-sm text-slate-600 mt-1">{activity.details}</p>
-                <p className="text-xs text-slate-500 mt-2">{activity.timestamp}</p>
+        {activities
+          .filter((activity) => {
+            if (filter === 'all') return true;
+            if (filter === 'completed') return activity.type === 'success';
+            if (filter === 'failed') return activity.type === 'error';
+            return true;
+          })
+          .map((activity) => (
+            <div
+              key={activity.id}
+              className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors"
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">{getIcon(activity.type)}</div>
 
-                {/* AI Suggestion */}
-                {activity.id === 5 && (
-                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-900">💡 AI Suggestion: Optimize compression for images? (Zstd recommended)</p>
-                    <div className="flex gap-2 mt-2">
-                      <button className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">
-                        Apply
-                      </button>
-                      <button className="px-3 py-1 text-xs border border-blue-300 text-blue-700 rounded hover:bg-blue-100">
-                        Learn More
-                      </button>
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-slate-900">{activity.title}</p>
+                    <button className="text-slate-400 hover:text-slate-600">
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
+
+                  <p className="text-sm text-slate-600 mt-1">{activity.details}</p>
+                  <p className="text-xs text-slate-500 mt-2">{activity.timestamp}</p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
       </div>
 
       <div className="mt-4 pt-4 border-t border-slate-200 text-center">
