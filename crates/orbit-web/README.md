@@ -203,9 +203,9 @@ See [CHANGELOG.md](../../CHANGELOG.md) for full migration details.
 The Control Plane is designed to work with the separate **Orbit Dashboard** (located in `/dashboard`):
 
 ```bash
-# Run both services concurrently
-../../start-orbit-v2.sh  # Unix/Linux/macOS
-../../start-orbit-v2.bat # Windows
+# Run both services concurrently (recommended)
+../../launch-orbit.sh  # Unix/Linux/macOS
+../../launch-orbit.bat # Windows
 ```
 
 The dashboard is a React SPA that consumes this API.

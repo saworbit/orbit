@@ -61,8 +61,8 @@ cargo build --release --features gui
 **New (v2.2.0):**
 ```bash
 # Development (use helper scripts)
-./start-orbit-v2.sh  # Unix/Linux/macOS
-start-orbit-v2.bat   # Windows
+./launch-orbit.sh  # Unix/Linux/macOS
+launch-orbit.bat   # Windows
 
 # Or manually:
 # Terminal 1: Backend

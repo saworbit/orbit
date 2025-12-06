@@ -415,7 +415,7 @@ All notable changes to Orbit will be documented in this file.
   - **Optimistic Updates**: Instant UI feedback with automatic cache invalidation.
 
 - **🔧 Developer Experience**
-  - **Unified Dev Script**: `start-orbit-v2.sh` runs both backend and frontend concurrently.
+  - **Unified Dev Script**: `launch-orbit.sh` / `launch-orbit.bat` runs both backend and frontend concurrently.
   - **Hot Module Replacement**: Vite provides instant feedback during UI development.
   - **API Contract**: OpenAPI schema generation ensures frontend/backend type safety.
   - **Zero Downtime Deployments**: Static dashboard can be updated without restarting control plane.
