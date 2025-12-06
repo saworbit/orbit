@@ -47,7 +47,7 @@ rayon = "1.10"
 crossbeam-channel = "0.5"
 
 # System information
-sysinfo = "0.35"
+sysinfo = "0.37"
 notify = "8.2"
 tempfile = "3.10"
 
