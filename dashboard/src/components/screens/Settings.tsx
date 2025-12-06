@@ -29,7 +29,15 @@ export function Settings() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as 'general' | 'backends' | 'users' | 'notifications')}
+                  onClick={() =>
+                    setActiveTab(
+                      tab.id as
+                        | "general"
+                        | "backends"
+                        | "users"
+                        | "notifications"
+                    )
+                  }
                   className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === tab.id
                       ? "border-blue-600 text-blue-600"

@@ -11,7 +11,13 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-type Screen = 'dashboard' | 'transfers' | 'files' | 'pipelines' | 'analytics' | 'settings';
+type Screen =
+  | "dashboard"
+  | "transfers"
+  | "files"
+  | "pipelines"
+  | "analytics"
+  | "settings";
 
 interface SidebarProps {
   currentScreen: string;
@@ -26,7 +32,11 @@ export function Sidebar({
   collapsed,
   onToggleCollapse,
 }: SidebarProps) {
-  const navItems: Array<{ id: Screen; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+  const navItems: Array<{
+    id: Screen;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = [
     { id: "dashboard", label: "Dashboard", icon: Home },
     { id: "transfers", label: "Transfers", icon: Activity },
     { id: "files", label: "Files", icon: FolderTree },

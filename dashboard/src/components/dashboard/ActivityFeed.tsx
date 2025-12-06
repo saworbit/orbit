@@ -23,7 +23,7 @@ export function ActivityFeed() {
           return "warning";
         };
 
-        const getTitle = (job: typeof jobs[0]) => {
+        const getTitle = (job: (typeof jobs)[0]) => {
           if (job.status === "completed")
             return `Transfer to ${job.destination.split("/").pop()} completed`;
           if (job.status === "running")
@@ -35,7 +35,7 @@ export function ActivityFeed() {
           return `Job pending: ${job.destination.split("/").pop()}`;
         };
 
-        const getDetails = (job: typeof jobs[0]) => {
+        const getDetails = (job: (typeof jobs)[0]) => {
           if (job.status === "running") {
             return `${job.progress}% complete • ${job.completed_chunks} of ${job.total_chunks} chunks`;
           }
