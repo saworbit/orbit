@@ -1,42 +1,50 @@
-import { useState } from 'react';
-import { FolderOpen, HardDrive, Cloud, Database, ChevronRight } from 'lucide-react';
+import { useState } from "react";
+import {
+  FolderOpen,
+  HardDrive,
+  Cloud,
+  Database,
+  ChevronRight,
+} from "lucide-react";
 
 interface LocationSelectorProps {
   title: string;
-  type: 'source' | 'destination';
+  type: "source" | "destination";
 }
 
 export function LocationSelector({ title }: LocationSelectorProps) {
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [selectedPath, setSelectedPath] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [selectedPath, setSelectedPath] = useState<string>("");
 
   const locations = [
-    { id: 'local', name: 'Local Drive', icon: HardDrive },
-    { id: 'cloud', name: 'Cloud Storage', icon: Cloud },
-    { id: 'database', name: 'Database', icon: Database },
+    { id: "local", name: "Local Drive", icon: HardDrive },
+    { id: "cloud", name: "Cloud Storage", icon: Cloud },
+    { id: "database", name: "Database", icon: Database },
   ];
 
   const sampleFiles = [
-    { name: 'Documents', type: 'folder', size: '2.4 GB' },
-    { name: 'Images', type: 'folder', size: '5.1 GB' },
-    { name: 'Videos', type: 'folder', size: '12.8 GB' },
-    { name: 'Projects', type: 'folder', size: '890 MB' },
+    { name: "Documents", type: "folder", size: "2.4 GB" },
+    { name: "Images", type: "folder", size: "5.1 GB" },
+    { name: "Videos", type: "folder", size: "12.8 GB" },
+    { name: "Projects", type: "folder", size: "890 MB" },
   ];
 
   return (
     <div className="space-y-4">
       <h3 className="text-slate-700">{title}</h3>
-      
+
       <div className="space-y-2">
         <label className="text-sm text-slate-600">Location Type</label>
-        <select 
+        <select
           className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white text-slate-900"
           value={selectedLocation}
           onChange={(e) => setSelectedLocation(e.target.value)}
         >
           <option value="">Select location type...</option>
-          {locations.map(loc => (
-            <option key={loc.id} value={loc.id}>{loc.name}</option>
+          {locations.map((loc) => (
+            <option key={loc.id} value={loc.id}>
+              {loc.name}
+            </option>
           ))}
         </select>
       </div>
@@ -44,7 +52,7 @@ export function LocationSelector({ title }: LocationSelectorProps) {
       <div className="space-y-2">
         <label className="text-sm text-slate-600">Path</label>
         <div className="flex gap-2">
-          <input 
+          <input
             type="text"
             placeholder="/Users/documents"
             className="flex-1 px-4 py-2 border border-slate-300 rounded-lg"
@@ -65,7 +73,7 @@ export function LocationSelector({ title }: LocationSelectorProps) {
           </div>
           <div className="max-h-48 overflow-y-auto">
             {sampleFiles.map((file, index) => (
-              <div 
+              <div
                 key={index}
                 className="px-4 py-3 hover:bg-slate-50 flex items-center justify-between border-b border-slate-100 last:border-b-0 cursor-pointer"
               >

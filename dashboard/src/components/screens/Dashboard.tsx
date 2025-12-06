@@ -1,6 +1,6 @@
-import { KPICards } from '../dashboard/KPICards';
-import { NetworkMap } from '../dashboard/NetworkMap';
-import { ActivityFeed } from '../dashboard/ActivityFeed';
+import { KPICards } from "../dashboard/KPICards";
+import { NetworkMap } from "../dashboard/NetworkMap";
+import { ActivityFeed } from "../dashboard/ActivityFeed";
 
 export function Dashboard() {
   return (

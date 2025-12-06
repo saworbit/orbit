@@ -1,14 +1,16 @@
-import { BarChart3, TrendingUp, Download } from 'lucide-react';
-import { useJobs } from '../../hooks/useJobs';
+import { BarChart3, TrendingUp, Download } from "lucide-react";
+import { useJobs } from "../../hooks/useJobs";
 
 export function Analytics() {
   const { data: jobs } = useJobs();
 
   // Calculate basic stats
   const totalJobs = jobs?.length || 0;
-  const completedJobs = jobs?.filter(j => j.status === 'completed').length || 0;
-  const failedJobs = jobs?.filter(j => j.status === 'failed').length || 0;
-  const successRate = totalJobs > 0 ? ((completedJobs / totalJobs) * 100).toFixed(1) : '0';
+  const completedJobs =
+    jobs?.filter((j) => j.status === "completed").length || 0;
+  const failedJobs = jobs?.filter((j) => j.status === "failed").length || 0;
+  const successRate =
+    totalJobs > 0 ? ((completedJobs / totalJobs) * 100).toFixed(1) : "0";
 
   return (
     <div className="p-6 space-y-6">
@@ -38,8 +40,12 @@ export function Analytics() {
             <span className="text-sm text-slate-600">Completed</span>
             <TrendingUp className="w-4 h-4 text-green-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">{completedJobs}</div>
-          <div className="text-xs text-green-600 mt-1">+{successRate}% success rate</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {completedJobs}
+          </div>
+          <div className="text-xs text-green-600 mt-1">
+            +{successRate}% success rate
+          </div>
         </div>
 
         <div className="bg-white rounded-lg border border-slate-200 p-6">
@@ -56,7 +62,9 @@ export function Analytics() {
             <span className="text-sm text-slate-600">Success Rate</span>
             <TrendingUp className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">{successRate}%</div>
+          <div className="text-2xl font-bold text-slate-900">
+            {successRate}%
+          </div>
           <div className="text-xs text-slate-500 mt-1">Overall performance</div>
         </div>
       </div>
@@ -64,21 +72,29 @@ export function Analytics() {
       {/* Charts Placeholder */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg border border-slate-200 p-6">
-          <h3 className="text-lg font-medium text-slate-900 mb-4">Job Completion Over Time</h3>
+          <h3 className="text-lg font-medium text-slate-900 mb-4">
+            Job Completion Over Time
+          </h3>
           <div className="h-64 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-lg">
             <div className="text-center">
               <BarChart3 className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">Chart coming soon (Recharts)</p>
+              <p className="text-sm text-slate-500">
+                Chart coming soon (Recharts)
+              </p>
             </div>
           </div>
         </div>
 
         <div className="bg-white rounded-lg border border-slate-200 p-6">
-          <h3 className="text-lg font-medium text-slate-900 mb-4">Throughput Trends</h3>
+          <h3 className="text-lg font-medium text-slate-900 mb-4">
+            Throughput Trends
+          </h3>
           <div className="h-64 flex items-center justify-center border-2 border-dashed border-slate-200 rounded-lg">
             <div className="text-center">
               <TrendingUp className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">Chart coming soon (Recharts)</p>
+              <p className="text-sm text-slate-500">
+                Chart coming soon (Recharts)
+              </p>
             </div>
           </div>
         </div>

@@ -1,22 +1,38 @@
-import { useState } from 'react';
-import { CheckCircle2, AlertCircle, Info, XCircle } from 'lucide-react';
+import { useState } from "react";
+import { CheckCircle2, AlertCircle, Info, XCircle } from "lucide-react";
 
 export function StatusLog() {
   const [logs] = useState([
-    { type: 'info', message: 'Orbit initialized successfully', time: '10:24:15' },
-    { type: 'success', message: 'Connected to source location', time: '10:24:16' },
-    { type: 'success', message: 'Connected to destination location', time: '10:24:17' },
-    { type: 'info', message: 'Scanning source directory...', time: '10:24:18' },
-    { type: 'warning', message: 'Some files may require administrator privileges', time: '10:24:20' },
+    {
+      type: "info",
+      message: "Orbit initialized successfully",
+      time: "10:24:15",
+    },
+    {
+      type: "success",
+      message: "Connected to source location",
+      time: "10:24:16",
+    },
+    {
+      type: "success",
+      message: "Connected to destination location",
+      time: "10:24:17",
+    },
+    { type: "info", message: "Scanning source directory...", time: "10:24:18" },
+    {
+      type: "warning",
+      message: "Some files may require administrator privileges",
+      time: "10:24:20",
+    },
   ]);
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'success':
+      case "success":
         return <CheckCircle2 className="w-4 h-4 text-green-600" />;
-      case 'error':
+      case "error":
         return <XCircle className="w-4 h-4 text-red-600" />;
-      case 'warning':
+      case "warning":
         return <AlertCircle className="w-4 h-4 text-amber-600" />;
       default:
         return <Info className="w-4 h-4 text-blue-600" />;
@@ -31,7 +47,7 @@ export function StatusLog() {
           Clear Log
         </button>
       </div>
-      
+
       <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm max-h-64 overflow-y-auto">
         {logs.map((log, index) => (
           <div key={index} className="flex items-start gap-3 mb-2 last:mb-0">

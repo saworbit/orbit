@@ -103,7 +103,9 @@ export function QuickTransfer() {
                 />
               </div>
               <div className="flex-1 overflow-hidden relative">
-                <div className="text-slate-500 p-4">File browser coming soon...</div>
+                <div className="text-slate-500 p-4">
+                  File browser coming soon...
+                </div>
               </div>
             </div>
           </div>
@@ -140,7 +142,9 @@ export function QuickTransfer() {
                 />
               </div>
               <div className="flex-1 overflow-hidden relative">
-                <div className="text-slate-500 p-4">File browser coming soon...</div>
+                <div className="text-slate-500 p-4">
+                  File browser coming soon...
+                </div>
               </div>
             </div>
           </div>

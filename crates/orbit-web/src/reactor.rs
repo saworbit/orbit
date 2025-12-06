@@ -152,21 +152,24 @@ impl Reactor {
                 );
 
                 let now = chrono::Utc::now().timestamp();
-                let _ = sqlx::query("UPDATE jobs SET status = 'completed', updated_at = ? WHERE id = ?")
-                    .bind(now)
-                    .bind(job.id)
-                    .execute(&pool)
-                    .await;
+                let _ = sqlx::query(
+                    "UPDATE jobs SET status = 'completed', updated_at = ? WHERE id = ?",
+                )
+                .bind(now)
+                .bind(job.id)
+                .execute(&pool)
+                .await;
             }
             Err(e) => {
                 error!("❌ Job #{} failed: {}", job.id, e);
 
                 let now = chrono::Utc::now().timestamp();
-                let _ = sqlx::query("UPDATE jobs SET status = 'failed', updated_at = ? WHERE id = ?")
-                    .bind(now)
-                    .bind(job.id)
-                    .execute(&pool)
-                    .await;
+                let _ =
+                    sqlx::query("UPDATE jobs SET status = 'failed', updated_at = ? WHERE id = ?")
+                        .bind(now)
+                        .bind(job.id)
+                        .execute(&pool)
+                        .await;
             }
         }
 

@@ -43,10 +43,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send>> {
     let reactor_notify = Arc::new(Notify::new());
 
     // Initialize database pool for reactor
-    let reactor_pool =
-        SqlitePool::connect(&format!("sqlite:{}?mode=rwc", config.magnetar_db))
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+    let reactor_pool = SqlitePool::connect(&format!("sqlite:{}?mode=rwc", config.magnetar_db))
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 
     println!("☢️  Starting Orbit Reactor (job execution engine)...");
 

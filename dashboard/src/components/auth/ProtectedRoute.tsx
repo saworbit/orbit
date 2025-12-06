@@ -1,7 +1,7 @@
-import type { ReactNode } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { Login } from './Login';
-import { Loader2 } from 'lucide-react';
+import type { ReactNode } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { Login } from "./Login";
+import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: ReactNode;

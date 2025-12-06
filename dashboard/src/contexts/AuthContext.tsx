@@ -1,12 +1,12 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
-import { api } from '../lib/api';
+import { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
+import { api } from "../lib/api";
 
 interface User {
   id: number;
   username: string;
   email: string;
-  role: 'admin' | 'user';
+  role: "admin" | "user";
 }
 
 interface AuthContextType {
@@ -26,14 +26,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check if user is already logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("auth_token");
       if (token) {
         try {
-          const response = await api.get('/auth/me');
+          const response = await api.get("/auth/me");
           setUser(response.data);
         } catch (error) {
-          console.error('Auth check failed:', error);
-          localStorage.removeItem('auth_token');
+          console.error("Auth check failed:", error);
+          localStorage.removeItem("auth_token");
         }
       }
       setIsLoading(false);
@@ -43,21 +43,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     try {
-      const response = await api.post('/auth/login', { username, password });
+      const response = await api.post("/auth/login", { username, password });
       const { token, user: userData } = response.data;
 
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem("auth_token", token);
       setUser(userData);
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error("Login failed:", error);
       throw error;
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem("auth_token");
     setUser(null);
-    window.location.href = '/login';
+    window.location.href = "/login";
   };
 
   const value = {
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

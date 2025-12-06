@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { StatusLog } from './StatusLog';
-import { ArrowRight, Play } from 'lucide-react';
-import { useCreateJob } from '../../hooks/useJobs';
+import { useState } from "react";
+import { StatusLog } from "./StatusLog";
+import { ArrowRight, Play } from "lucide-react";
+import { useCreateJob } from "../../hooks/useJobs";
 
 export function SimpleTransfer() {
-  const [source, setSource] = useState('');
-  const [destination, setDestination] = useState('');
+  const [source, setSource] = useState("");
+  const [destination, setDestination] = useState("");
   const [compress, setCompress] = useState(false);
   const [verify, setVerify] = useState(true);
   const [parallelWorkers, setParallelWorkers] = useState(4);
@@ -14,7 +14,7 @@ export function SimpleTransfer() {
 
   const handleStartTransfer = () => {
     if (!source || !destination) {
-      alert('Please select both source and destination paths');
+      alert("Please select both source and destination paths");
       return;
     }
 
@@ -114,7 +114,7 @@ export function SimpleTransfer() {
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Play className="w-5 h-5" />
-            {createJob.isPending ? 'Creating...' : 'Create Transfer Job'}
+            {createJob.isPending ? "Creating..." : "Create Transfer Job"}
           </button>
 
           {createJob.isSuccess && (

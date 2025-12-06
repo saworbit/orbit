@@ -1,4 +1,4 @@
-import { FolderOpen, File, HardDrive } from 'lucide-react';
+import { FolderOpen, File, HardDrive } from "lucide-react";
 
 export function Files() {
   return (
@@ -34,9 +34,12 @@ export function Files() {
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <FolderOpen className="w-8 h-8 text-slate-400" />
           </div>
-          <h3 className="text-lg font-medium text-slate-900 mb-2">File Browser Coming Soon</h3>
+          <h3 className="text-lg font-medium text-slate-900 mb-2">
+            File Browser Coming Soon
+          </h3>
           <p className="text-slate-600 mb-4">
-            This feature will allow you to browse and select files from local and remote filesystems.
+            This feature will allow you to browse and select files from local
+            and remote filesystems.
           </p>
           <div className="inline-flex items-center gap-2 text-sm text-slate-500">
             <File className="w-4 h-4" />

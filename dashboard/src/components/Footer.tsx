@@ -1,4 +1,4 @@
-import { HardDrive, Wifi, Pause, Play } from 'lucide-react';
+import { HardDrive, Wifi, Pause, Play } from "lucide-react";
 
 export function Footer() {
   return (
@@ -9,15 +9,13 @@ export function Footer() {
           <HardDrive className="w-4 h-4" />
           <span>Disk: 842 GB free</span>
         </div>
-        
+
         <div className="flex items-center gap-2 text-green-400">
           <Wifi className="w-4 h-4" />
           <span>Connected: 3 active</span>
         </div>
-        
-        <div className="text-slate-400">
-          Uptime: 99.9%
-        </div>
+
+        <div className="text-slate-400">Uptime: 99.9%</div>
       </div>
 
       {/* Quick Actions */}

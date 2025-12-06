@@ -1,6 +1,14 @@
-import { Search, Bell, User, Moon, Sun, LogOut, Settings as SettingsIcon } from 'lucide-react';
-import { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import {
+  Search,
+  Bell,
+  User,
+  Moon,
+  Sun,
+  LogOut,
+  Settings as SettingsIcon,
+} from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 export function Header() {
   const [darkMode, setDarkMode] = useState(false);
@@ -13,7 +21,13 @@ export function Header() {
       {/* Logo */}
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-          <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            className="w-5 h-5 text-white"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <circle cx="12" cy="12" r="10" />
             <circle cx="12" cy="12" r="3" />
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
@@ -41,7 +55,11 @@ export function Header() {
           onClick={() => setDarkMode(!darkMode)}
           className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white"
         >
-          {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {darkMode ? (
+            <Sun className="w-5 h-5" />
+          ) : (
+            <Moon className="w-5 h-5" />
+          )}
         </button>
 
         {/* Notifications */}
@@ -63,16 +81,22 @@ export function Header() {
             <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
               <User className="w-4 h-4 text-white" />
             </div>
-            <span className="text-slate-300 text-sm">{user?.username || 'User'}</span>
+            <span className="text-slate-300 text-sm">
+              {user?.username || "User"}
+            </span>
           </button>
 
           {/* User Dropdown Menu */}
           {showUserMenu && (
             <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
               <div className="px-4 py-3 border-b border-slate-200">
-                <p className="text-sm font-medium text-slate-900">{user?.username}</p>
+                <p className="text-sm font-medium text-slate-900">
+                  {user?.username}
+                </p>
                 <p className="text-xs text-slate-500">{user?.email}</p>
-                <p className="text-xs text-slate-400 mt-1">Role: {user?.role}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Role: {user?.role}
+                </p>
               </div>
               <button
                 onClick={() => setShowUserMenu(false)}

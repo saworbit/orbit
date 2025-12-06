@@ -87,7 +87,6 @@ export default function JobList({
 
   return (
     <div className="space-y-4">
-
       {!compact && (
         <>
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">

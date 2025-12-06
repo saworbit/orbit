@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { SimpleTransfer } from '../transfers/SimpleTransfer';
-import { AdvancedTransfer } from '../transfers/AdvancedTransfer';
-import JobList from '../jobs/JobList';
-import { JobDetail } from '../jobs/JobDetail';
+import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { SimpleTransfer } from "../transfers/SimpleTransfer";
+import { AdvancedTransfer } from "../transfers/AdvancedTransfer";
+import JobList from "../jobs/JobList";
+import { JobDetail } from "../jobs/JobDetail";
 
 export function Transfers() {
-  const [mode, setMode] = useState<'simple' | 'advanced'>('simple');
+  const [mode, setMode] = useState<"simple" | "advanced">("simple");
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
 
   // If job is selected, show JobDetail with chunk map
@@ -20,7 +20,10 @@ export function Transfers() {
           <ArrowLeft className="w-5 h-5" />
           Back to Transfers
         </button>
-        <JobDetail jobId={selectedJobId} onBack={() => setSelectedJobId(null)} />
+        <JobDetail
+          jobId={selectedJobId}
+          onBack={() => setSelectedJobId(null)}
+        />
       </div>
     );
   }
@@ -34,21 +37,21 @@ export function Transfers() {
           {/* Mode Toggle */}
           <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
             <button
-              onClick={() => setMode('simple')}
+              onClick={() => setMode("simple")}
               className={`px-4 py-2 rounded-md text-sm transition-colors ${
-                mode === 'simple'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                mode === "simple"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Simple
             </button>
             <button
-              onClick={() => setMode('advanced')}
+              onClick={() => setMode("advanced")}
               className={`px-4 py-2 rounded-md text-sm transition-colors ${
-                mode === 'advanced'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                mode === "advanced"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Advanced
@@ -58,7 +61,7 @@ export function Transfers() {
       </div>
 
       {/* Transfer Panel */}
-      {mode === 'simple' ? <SimpleTransfer /> : <AdvancedTransfer />}
+      {mode === "simple" ? <SimpleTransfer /> : <AdvancedTransfer />}
 
       {/* Job List with chunk map integration */}
       <div className="mt-6">

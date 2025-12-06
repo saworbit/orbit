@@ -166,7 +166,9 @@ impl MagnetarProgress {
 
     /// Record a successful chunk completion
     pub fn chunk_completed(&mut self, chunk_idx: usize, _checksum: &str) {
-        let _ = self.tx.try_send(UpdateMsg::ChunkSuccess { index: chunk_idx });
+        let _ = self
+            .tx
+            .try_send(UpdateMsg::ChunkSuccess { index: chunk_idx });
     }
 
     /// Record a chunk failure

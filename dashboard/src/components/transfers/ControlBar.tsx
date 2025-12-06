@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Play, Pause, Square, Settings2, Copy } from 'lucide-react';
+import { useState } from "react";
+import { Play, Pause, Square, Settings2, Copy } from "lucide-react";
 
 export function ControlBar() {
   const [isRunning, setIsRunning] = useState(false);
@@ -11,7 +11,7 @@ export function ControlBar() {
     setIsPaused(false);
     // Simulate progress
     const interval = setInterval(() => {
-      setProgress(prev => {
+      setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
           setIsRunning(false);
@@ -38,7 +38,7 @@ export function ControlBar() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {!isRunning ? (
-              <button 
+              <button
                 onClick={handleStart}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
               >
@@ -47,14 +47,14 @@ export function ControlBar() {
               </button>
             ) : (
               <>
-                <button 
+                <button
                   onClick={handlePause}
                   className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center gap-2"
                 >
                   <Pause className="w-5 h-5" />
-                  {isPaused ? 'Resume' : 'Pause'}
+                  {isPaused ? "Resume" : "Pause"}
                 </button>
-                <button 
+                <button
                   onClick={handleStop}
                   className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2"
                 >
@@ -63,7 +63,7 @@ export function ControlBar() {
                 </button>
               </>
             )}
-            
+
             <button className="px-4 py-3 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 flex items-center gap-2">
               <Settings2 className="w-5 h-5" />
               Options
@@ -74,7 +74,9 @@ export function ControlBar() {
             <Copy className="w-5 h-5" />
             <div>
               <div className="text-sm">Files: 0 / 1,247</div>
-              <div className="text-sm">Speed: {isRunning && !isPaused ? '45.2 MB/s' : '0 MB/s'}</div>
+              <div className="text-sm">
+                Speed: {isRunning && !isPaused ? "45.2 MB/s" : "0 MB/s"}
+              </div>
             </div>
           </div>
         </div>
@@ -86,14 +88,14 @@ export function ControlBar() {
             <span className="text-slate-900">{progress}%</span>
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
           <div className="flex justify-between text-sm text-slate-500">
-            <span>{isRunning ? '2.1 GB of 20.4 GB' : '0 GB of 20.4 GB'}</span>
-            <span>{isRunning ? 'Time remaining: 6m 32s' : 'Not started'}</span>
+            <span>{isRunning ? "2.1 GB of 20.4 GB" : "0 GB of 20.4 GB"}</span>
+            <span>{isRunning ? "Time remaining: 6m 32s" : "Not started"}</span>
           </div>
         </div>
       </div>

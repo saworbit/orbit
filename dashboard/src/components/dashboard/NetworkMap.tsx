@@ -1,43 +1,47 @@
-import { Server, Cloud, HardDrive } from 'lucide-react';
-import { useJobs } from '../../hooks/useJobs';
+import { Server, Cloud, HardDrive } from "lucide-react";
+import { useJobs } from "../../hooks/useJobs";
 
 export function NetworkMap() {
   const { data: jobs, isLoading } = useJobs();
 
   // Extract real connections from active jobs
-  const connections = jobs
-    ?.filter((j) => j.status === 'running' || j.status === 'pending')
-    .map((job) => {
-      // Determine protocol from path
-      const getProtocol = (path: string) => {
-        if (path.startsWith('s3://')) return 'S3';
-        if (path.startsWith('smb://')) return 'SMB';
-        if (path.startsWith('ssh://')) return 'SSH';
-        return 'Local';
-      };
+  const connections =
+    jobs
+      ?.filter((j) => j.status === "running" || j.status === "pending")
+      .map((job) => {
+        // Determine protocol from path
+        const getProtocol = (path: string) => {
+          if (path.startsWith("s3://")) return "S3";
+          if (path.startsWith("smb://")) return "SMB";
+          if (path.startsWith("ssh://")) return "SSH";
+          return "Local";
+        };
 
-      // Calculate speed from progress (simplified)
-      const speed = job.status === 'running' ? `${(job.progress * 0.5).toFixed(1)} MB/s` : 'Pending';
+        // Calculate speed from progress (simplified)
+        const speed =
+          job.status === "running"
+            ? `${(job.progress * 0.5).toFixed(1)} MB/s`
+            : "Pending";
 
-      return {
-        id: job.id,
-        source: job.source,
-        dest: job.destination,
-        protocol: getProtocol(job.destination),
-        speed,
-        status: job.status === 'running' ? 'active' : 'paused',
-      };
-    }) || [];
+        return {
+          id: job.id,
+          source: job.source,
+          dest: job.destination,
+          protocol: getProtocol(job.destination),
+          speed,
+          status: job.status === "running" ? "active" : "paused",
+        };
+      }) || [];
 
   // If no active jobs, show placeholder
   if (!isLoading && connections.length === 0) {
     connections.push({
       id: 0,
-      source: 'No active transfers',
-      dest: 'Create a job to see network topology',
-      protocol: '-',
-      speed: '-',
-      status: 'paused',
+      source: "No active transfers",
+      dest: "Create a job to see network topology",
+      protocol: "-",
+      speed: "-",
+      status: "paused",
     });
   }
 
@@ -58,10 +62,13 @@ export function NetworkMap() {
       {/* Visual Node Graph */}
       <div className="relative h-80 bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
         {/* Grid Pattern */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: `linear-gradient(rgba(148, 163, 184, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px)`,
-          backgroundSize: '20px 20px'
-        }} />
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(rgba(148, 163, 184, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px)`,
+            backgroundSize: "20px 20px",
+          }}
+        />
 
         {/* Nodes */}
         <div className="absolute top-20 left-20">
@@ -91,12 +98,34 @@ export function NetworkMap() {
         {/* Connection Lines */}
         <svg className="absolute inset-0 pointer-events-none">
           <defs>
-            <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="3"
+              orient="auto"
+            >
               <polygon points="0 0, 10 3, 0 6" fill="#3b82f6" />
             </marker>
           </defs>
-          <line x1="140" y1="80" x2="calc(100% - 140)" y2="80" stroke="#3b82f6" strokeWidth="2" markerEnd="url(#arrowhead)" strokeDasharray="5,5">
-            <animate attributeName="stroke-dashoffset" from="0" to="10" dur="0.5s" repeatCount="indefinite" />
+          <line
+            x1="140"
+            y1="80"
+            x2="calc(100% - 140)"
+            y2="80"
+            stroke="#3b82f6"
+            strokeWidth="2"
+            markerEnd="url(#arrowhead)"
+            strokeDasharray="5,5"
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              from="0"
+              to="10"
+              dur="0.5s"
+              repeatCount="indefinite"
+            />
           </line>
         </svg>
 
@@ -111,15 +140,22 @@ export function NetworkMap() {
       {/* Connection List */}
       <div className="mt-4 space-y-2">
         {connections.map((conn) => (
-          <div key={conn.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+          <div
+            key={conn.id}
+            className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+          >
             <div className="flex items-center gap-3">
-              <div className={`w-2 h-2 rounded-full ${conn.status === 'active' ? 'bg-green-500' : 'bg-amber-500'}`} />
+              <div
+                className={`w-2 h-2 rounded-full ${conn.status === "active" ? "bg-green-500" : "bg-amber-500"}`}
+              />
               <span className="text-sm text-slate-700">{conn.source}</span>
               <span className="text-slate-400">→</span>
               <span className="text-sm text-slate-700">{conn.dest}</span>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded">{conn.protocol}</span>
+              <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded">
+                {conn.protocol}
+              </span>
               <span className="text-sm text-slate-600">{conn.speed}</span>
             </div>
           </div>

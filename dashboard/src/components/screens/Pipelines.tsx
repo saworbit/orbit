@@ -1,4 +1,4 @@
-import { Workflow, Plus, Play } from 'lucide-react';
+import { Workflow, Plus, Play } from "lucide-react";
 
 export function Pipelines() {
   return (
@@ -23,9 +23,12 @@ export function Pipelines() {
           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Workflow className="w-8 h-8 text-slate-400" />
           </div>
-          <h3 className="text-lg font-medium text-slate-900 mb-2">Pipeline Editor Coming Soon</h3>
+          <h3 className="text-lg font-medium text-slate-900 mb-2">
+            Pipeline Editor Coming Soon
+          </h3>
           <p className="text-slate-600 mb-4">
-            Visual workflow editor for chaining multiple transfer jobs with React Flow.
+            Visual workflow editor for chaining multiple transfer jobs with
+            React Flow.
           </p>
           <div className="inline-flex items-center gap-2 text-sm text-slate-500">
             <Workflow className="w-4 h-4" />

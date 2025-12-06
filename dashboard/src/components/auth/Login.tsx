@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { Shield, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import type { FormEvent } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { Shield, Loader2 } from "lucide-react";
 
 export function Login() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setIsLoading(true);
 
     try {
       await login(username, password);
       // Redirect will happen automatically via AuthContext
-    } catch (err) {
-      setError('Invalid username or password');
+    } catch {
+      setError("Invalid username or password");
       setIsLoading(false);
     }
   };
@@ -32,7 +32,9 @@ export function Login() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl mb-4">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Orbit Control Plane</h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            Orbit Control Plane
+          </h1>
           <p className="text-slate-600">Sign in to access the dashboard</p>
         </div>
 
@@ -46,7 +48,10 @@ export function Login() {
             )}
 
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-slate-900 mb-2">
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-slate-900 mb-2"
+              >
                 Username
               </label>
               <input
@@ -62,7 +67,10 @@ export function Login() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-900 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-slate-900 mb-2"
+              >
                 Password
               </label>
               <input
@@ -87,14 +95,15 @@ export function Login() {
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                "Sign In"
               )}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-500">
-              Default credentials: <span className="font-mono text-slate-700">admin / admin</span>
+              Default credentials:{" "}
+              <span className="font-mono text-slate-700">admin / admin</span>
             </p>
           </div>
         </div>
