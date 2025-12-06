@@ -32,7 +32,7 @@ toml = "0.8"
 # File I/O and progress
 indicatif = "0.18"
 walkdir = "2.5"
-governor = "0.6"
+governor = "0.10"
 
 # Compression
 lz4 = "1.25"
