@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Settings as SettingsIcon, Users, Database, Bell } from 'lucide-react';
 import UserList from '../admin/UserList';
+import { useTheme } from '../theme-provider';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState<'general' | 'backends' | 'users' | 'notifications'>('general');
+  const { theme, setTheme } = useTheme();
 
   const tabs = [
     { id: 'general', label: 'General', icon: SettingsIcon },
@@ -52,10 +54,14 @@ export function Settings() {
                       <div className="font-medium text-slate-900">Theme</div>
                       <div className="text-sm text-slate-600">Choose your preferred color scheme</div>
                     </div>
-                    <select className="px-3 py-2 border border-slate-300 rounded-lg">
-                      <option>Light</option>
-                      <option>Dark (Coming Soon)</option>
-                      <option>System</option>
+                    <select
+                      className="px-3 py-2 border border-slate-300 rounded-lg"
+                      value={theme}
+                      onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="system">System</option>
                     </select>
                   </div>
 

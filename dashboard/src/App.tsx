@@ -8,6 +8,7 @@ import { Pipelines } from './components/screens/Pipelines';
 import { Analytics } from './components/screens/Analytics';
 import { Settings } from './components/screens/Settings';
 import { Footer } from './components/Footer';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 type Screen = 'dashboard' | 'transfers' | 'files' | 'pipelines' | 'analytics' | 'settings';
 
@@ -35,20 +36,22 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50">
-      <Header />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          currentScreen={currentScreen}
-          onNavigate={setCurrentScreen}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
-        <main className="flex-1 overflow-auto">
-          {renderScreen()}
-        </main>
+    <ProtectedRoute>
+      <div className="h-screen flex flex-col bg-slate-50">
+        <Header />
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar
+            currentScreen={currentScreen}
+            onNavigate={setCurrentScreen}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
+          <main className="flex-1 overflow-auto">
+            {renderScreen()}
+          </main>
+        </div>
+        <Footer />
       </div>
-      <Footer />
-    </div>
+    </ProtectedRoute>
   );
 }

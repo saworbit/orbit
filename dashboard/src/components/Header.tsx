@@ -1,9 +1,12 @@
-import { Search, Bell, User, Moon, Sun } from 'lucide-react';
+import { Search, Bell, User, Moon, Sun, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export function Header() {
   const [darkMode, setDarkMode] = useState(false);
   const [notifications] = useState(3);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const { user, logout } = useAuth();
 
   return (
     <header className="h-16 bg-slate-900 border-b border-slate-700 flex items-center px-6 gap-6">
@@ -51,13 +54,43 @@ export function Header() {
           )}
         </button>
 
-        {/* User Profile */}
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-800">
-          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-slate-300 text-sm">Admin</span>
-        </button>
+        {/* User Profile with Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-800"
+          >
+            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+              <User className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-slate-300 text-sm">{user?.username || 'User'}</span>
+          </button>
+
+          {/* User Dropdown Menu */}
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
+              <div className="px-4 py-3 border-b border-slate-200">
+                <p className="text-sm font-medium text-slate-900">{user?.username}</p>
+                <p className="text-xs text-slate-500">{user?.email}</p>
+                <p className="text-xs text-slate-400 mt-1">Role: {user?.role}</p>
+              </div>
+              <button
+                onClick={() => setShowUserMenu(false)}
+                className="w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <SettingsIcon className="w-4 h-4" />
+                Settings
+              </button>
+              <button
+                onClick={logout}
+                className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
