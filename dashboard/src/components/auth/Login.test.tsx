@@ -29,7 +29,7 @@ describe("Login Component", () => {
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
     expect(screen.getByText("Default credentials:")).toBeInTheDocument();
-    expect(screen.getByText("admin / admin")).toBeInTheDocument();
+    expect(screen.getByText("admin / orbit2025")).toBeInTheDocument();
   });
 
   it("allows typing in username and password fields", () => {
