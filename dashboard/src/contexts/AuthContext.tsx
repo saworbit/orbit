@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Backend uses httpOnly cookies, so just try to fetch current user
         const response = await api.get("/auth/me");
         setUser(response.data);
-      } catch (error) {
+      } catch {
         // Not authenticated or session expired
         console.debug("No active session");
       }
