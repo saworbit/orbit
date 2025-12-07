@@ -12,11 +12,7 @@ export const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized - redirect to login
-      // Cookie will be cleared by backend
-      window.location.href = "/login";
-    }
+    // Just pass through errors - ProtectedRoute handles auth state
     return Promise.reject(error);
   }
 );
