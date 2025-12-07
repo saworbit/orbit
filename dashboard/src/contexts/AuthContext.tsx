@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { api } from "../lib/api";
 
 interface User {
-  id: number;
+  id: string;
   username: string;
-  email: string;
-  role: "admin" | "user";
+  role: string;
+  created_at: number;
 }
 
 interface AuthContextType {
@@ -26,15 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check if user is already logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem("auth_token");
-      if (token) {
-        try {
-          const response = await api.get("/auth/me");
-          setUser(response.data);
-        } catch (error) {
-          console.error("Auth check failed:", error);
-          localStorage.removeItem("auth_token");
-        }
+      try {
+        // Backend uses httpOnly cookies, so just try to fetch current user
+        const response = await api.get("/auth/me");
+        setUser(response.data);
+      } catch (error) {
+        // Not authenticated or session expired
+        console.debug("No active session");
       }
       setIsLoading(false);
     };
@@ -44,9 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     try {
       const response = await api.post("/auth/login", { username, password });
-      const { token, user: userData } = response.data;
+      const { user: userData } = response.data;
 
-      localStorage.setItem("auth_token", token);
+      // Token is set as httpOnly cookie by backend
       setUser(userData);
     } catch (error) {
       console.error("Login failed:", error);
@@ -54,8 +52,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("auth_token");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
     setUser(null);
     window.location.href = "/login";
   };
