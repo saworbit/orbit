@@ -16,7 +16,7 @@ describe("Login Component", () => {
     return render(
       <AuthProvider>
         <Login />
-      </AuthProvider>,
+      </AuthProvider>
     );
   };
 
@@ -24,10 +24,14 @@ describe("Login Component", () => {
     renderLogin();
 
     expect(screen.getByText("Orbit Control Plane")).toBeInTheDocument();
-    expect(screen.getByText("Sign in to access the dashboard")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sign in to access the dashboard")
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Username")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /sign in/i })
+    ).toBeInTheDocument();
     expect(screen.getByText("Default credentials:")).toBeInTheDocument();
     expect(screen.getByText("admin / orbit2025")).toBeInTheDocument();
   });
@@ -47,7 +51,7 @@ describe("Login Component", () => {
 
   it("shows loading state when submitting", async () => {
     vi.mocked(api.post).mockImplementation(
-      () => new Promise(() => {}), // Never resolves to keep loading state
+      () => new Promise(() => {}) // Never resolves to keep loading state
     );
 
     renderLogin();
@@ -82,7 +86,7 @@ describe("Login Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Invalid username or password"),
+        screen.getByText("Invalid username or password")
       ).toBeInTheDocument();
     });
   });

@@ -19,7 +19,9 @@ describe("AuthContext", () => {
   describe("useAuth hook", () => {
     it("throws error when used outside AuthProvider", () => {
       // Suppress console.error for this test
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       expect(() => {
         renderHook(() => useAuth());
@@ -141,7 +143,7 @@ describe("AuthContext", () => {
       });
 
       await expect(
-        result.current.login("wronguser", "wrongpass"),
+        result.current.login("wronguser", "wrongpass")
       ).rejects.toThrow();
 
       expect(result.current.user).toBe(null);

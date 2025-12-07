@@ -14,7 +14,7 @@ vi.mock("../../lib/api", () => ({
 describe("ProtectedRoute Component", () => {
   it("shows loading state initially", () => {
     vi.mocked(api.get).mockImplementation(
-      () => new Promise(() => {}), // Never resolves to keep loading state
+      () => new Promise(() => {}) // Never resolves to keep loading state
     );
 
     render(
@@ -22,7 +22,7 @@ describe("ProtectedRoute Component", () => {
         <ProtectedRoute>
           <div>Protected Content</div>
         </ProtectedRoute>
-      </AuthProvider>,
+      </AuthProvider>
     );
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
@@ -37,7 +37,7 @@ describe("ProtectedRoute Component", () => {
         <ProtectedRoute>
           <div>Protected Content</div>
         </ProtectedRoute>
-      </AuthProvider>,
+      </AuthProvider>
     );
 
     await waitFor(() => {
@@ -64,7 +64,7 @@ describe("ProtectedRoute Component", () => {
         <ProtectedRoute>
           <div>Protected Content</div>
         </ProtectedRoute>
-      </AuthProvider>,
+      </AuthProvider>
     );
 
     await waitFor(() => {
@@ -93,7 +93,7 @@ describe("ProtectedRoute Component", () => {
             <p>Welcome back!</p>
           </div>
         </ProtectedRoute>
-      </AuthProvider>,
+      </AuthProvider>
     );
 
     await waitFor(() => {

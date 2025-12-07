@@ -103,7 +103,9 @@ export function Login() {
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-500">
               Default credentials:{" "}
-              <span className="font-mono text-slate-700">admin / orbit2025</span>
+              <span className="font-mono text-slate-700">
+                admin / orbit2025
+              </span>
             </p>
           </div>
         </div>
