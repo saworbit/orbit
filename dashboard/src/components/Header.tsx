@@ -93,7 +93,6 @@ export function Header() {
                 <p className="text-sm font-medium text-slate-900">
                   {user?.username}
                 </p>
-                <p className="text-xs text-slate-500">{user?.email}</p>
                 <p className="text-xs text-slate-400 mt-1">
                   Role: {user?.role}
                 </p>

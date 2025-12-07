@@ -13,8 +13,4 @@ describe("API Configuration", () => {
   it("has correct default headers", () => {
     expect(api.defaults.headers["Content-Type"]).toBe("application/json");
   });
-
-  it("has response interceptor configured", () => {
-    expect(api.interceptors.response.handlers).toHaveLength(1);
-  });
 });

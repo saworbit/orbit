@@ -165,8 +165,8 @@ describe("AuthContext", () => {
       vi.mocked(api.post).mockResolvedValue({ data: {} });
 
       // Mock window.location
-      delete (window as Window).location;
-      window.location = { href: "" } as Location;
+      const locationMock = { href: "" };
+      vi.stubGlobal("location", locationMock);
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -180,7 +180,7 @@ describe("AuthContext", () => {
       await result.current.logout();
 
       expect(api.post).toHaveBeenCalledWith("/auth/logout");
-      expect(window.location.href).toBe("/login");
+      expect(locationMock.href).toBe("/login");
     });
 
     it("clears user state even if logout endpoint fails", async () => {
@@ -195,8 +195,8 @@ describe("AuthContext", () => {
       vi.mocked(api.post).mockRejectedValue(new Error("Logout failed"));
 
       // Mock window.location
-      delete (window as Window).location;
-      window.location = { href: "" } as Location;
+      const locationMock = { href: "" };
+      vi.stubGlobal("location", locationMock);
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
@@ -208,7 +208,7 @@ describe("AuthContext", () => {
 
       await result.current.logout();
 
-      expect(window.location.href).toBe("/login");
+      expect(locationMock.href).toBe("/login");
     });
   });
 });
