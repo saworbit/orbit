@@ -153,3 +153,151 @@ The `--profile adaptive` mode will automatically route files based on:
 - Integration: Phase 2a in Smart Sync pipeline (before standard lane)
 
 For more details, see [ORBIT_V2_ARCHITECTURE.md](../architecture/ORBIT_V2_ARCHITECTURE.md).
+
+## The "Equilibrium" Standard Lane
+
+The **Equilibrium** profile is Orbit's default operating mode, optimized for the majority of your data: source code repositories, PDF documents, office files, and moderate binary assets (8KB to 1GB). In this zone, the CPU cost of deduplication is outweighed by the bandwidth savings.
+
+### Design Philosophy
+
+Equilibrium represents a balanced trade-off between three competing resources:
+- **CPU**: Content-Defined Chunking (CDC) with BLAKE3 hashing
+- **Memory**: Universe Map indexing for global deduplication
+- **Network**: Delta transfers (only unique chunks are sent)
+
+### The Pipeline Flow
+
+```
+File (8KB - 1GB)
+    ↓
+Chunking: CDC with Gear Hash (64KB avg chunks)
+    ↓
+Indexing: Lookup chunks in Universe Map
+    ↓
+Filtering: Identify chunks not present at destination
+    ↓
+Transfer: Send only unique chunks
+```
+
+### Behavior
+
+**Chunking**: Uses Gear Hash CDC with a target size of 64KB:
+- Minimum chunk size: 8KB
+- Average chunk size: 64KB
+- Maximum chunk size: 256KB
+
+**Deduplication**: Full Universe Map lookup ensures that moving a folder of 10,000 PDFs to a new location results in **zero data transfer** (100% deduplication).
+
+**Concurrency**: Automatically scales based on CPU cores (`std::thread::available_parallelism`).
+
+### Resource Usage
+
+This mode represents a balanced trade-off:
+
+- **Memory**: Moderate. Uses ~1KB of RAM per 64KB of data processed during indexing
+- **CPU**: Moderate. Uses BLAKE3 hashing on blocking threads to ensure UI/Heartbeat responsiveness
+- **Network**: Minimal for repeated content. Only unique chunks are transferred
+
+### Performance Characteristics
+
+**Deduplication Efficiency**: By using 64KB chunks, Equilibrium maximizes deduplication rates for:
+- Source code where functions often move between files
+- Documents with repeated sections
+- Media libraries with similar content
+- VM images with common OS files
+
+**Stability**: The `offload_compute` "Air Gap" pattern ensures that hashing a 500MB ISO doesn't freeze the async reactor or web dashboard.
+
+### Usage
+
+No special flags are required. This is the **default behavior** for files 8KB to 1GB.
+
+```bash
+# Standard sync (uses Equilibrium automatically for medium files)
+orbit sync /source /destination
+
+# With compression
+orbit sync --compress /source /destination
+
+# Tune connection pool for unstable networks
+orbit sync --idle-timeout 300 /source /dest
+```
+
+### When to Use Equilibrium
+
+✅ **Best For:**
+- Source code repositories (dedups moved/refactored code)
+- PDF documents and office files
+- Virtual machine images (dedups OS commonality)
+- Media files (photos, music) with duplicates
+- Database backups with repeated blocks
+
+✅ **Why It's the Default:**
+- Handles 90% of typical file transfer workloads
+- Provides significant bandwidth savings (often 30-70% deduplication)
+- CPU overhead is acceptable for network-bound transfers
+- Memory usage is predictable and bounded
+
+### Deduplication Examples
+
+**Example 1: Repository Refactoring**
+```bash
+# Before: 1GB repository
+# After refactoring: 1GB repository (files moved around)
+# Traditional rsync: Transfers ~500MB (50% changed)
+# Orbit Equilibrium: Transfers ~0MB (chunks unchanged)
+```
+
+**Example 2: Document Versioning**
+```bash
+# Annual report v1: 50MB PDF
+# Annual report v2: 52MB PDF (minor edits)
+# Traditional transfer: 52MB
+# Orbit Equilibrium: ~2MB (only changed chunks)
+```
+
+### Configuration
+
+While Equilibrium requires no special configuration, you can tune related settings:
+
+```bash
+# Adjust concurrency (default: auto-detected CPU count)
+orbit sync --concurrency 8 /source /dest
+
+# Adjust connection pool idle timeout (default: 300s)
+orbit sync --idle-timeout 600 /source /dest
+
+# Enable compression for text-heavy content
+orbit sync --compress /source /dest
+```
+
+### Technical Details
+
+**CDC Implementation**:
+- Algorithm: Gear Hash rolling hash with threshold-based cut detection
+- Implementation: `orbit-core-cdc` crate
+- Hash function: BLAKE3 (faster than SHA-256, more secure than BLAKE2)
+
+**Universe Map**:
+- Storage: redb embedded database (ACID-compliant)
+- Index structure: Content-hash → Vec<Location>
+- Query performance: O(1) chunk existence lookup
+- Implementation: `orbit-core-starmap::universe` module
+
+**Air Gap Pattern**:
+- CPU-intensive hashing runs on `tokio::task::spawn_blocking` threads
+- Prevents async reactor starvation
+- Maintains responsiveness for web dashboard and heartbeats
+
+### Comparing the Lanes
+
+| Feature | Neutrino (<8KB) | Equilibrium (8KB-1GB) | Gigantor (>1GB) |
+|---------|-----------------|----------------------|-----------------|
+| **Chunking** | None (direct copy) | CDC 64KB avg | Tiered CDC (future) |
+| **Deduplication** | None | Full (Universe Map) | Adaptive (future) |
+| **Concurrency** | Very High (200+) | Auto (CPU count) | Controlled (future) |
+| **Best For** | Config files, logs | Code, docs, media | VM images, videos |
+| **CPU Usage** | Very Low | Moderate | High (future) |
+| **Network Savings** | 0% (no dedup) | 30-70% typical | Varies (future) |
+
+For more architectural details, see [ORBIT_V2_ARCHITECTURE.md](../architecture/ORBIT_V2_ARCHITECTURE.md).

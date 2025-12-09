@@ -1,22 +1,28 @@
 //! Pipeline Router: Determines the execution strategy for a given file.
 //!
-//! The router acts as "The Sieve", directing files to either the fast lane
-//! (Neutrino) or the standard lane (CDC + deduplication) based on file size.
+//! The router acts as "The Sieve", directing files to the appropriate lane
+//! based on file size: Neutrino (Fast), Equilibrium (Standard), or Gigantor (Large).
 
 /// Size threshold for fast lane routing (8KB)
 pub const BYPASS_THRESHOLD_BYTES: u64 = 8192;
+
+/// Size threshold for large file routing (1GB)
+pub const LARGE_FILE_THRESHOLD_BYTES: u64 = 1024 * 1024 * 1024;
 
 /// Transfer lane selection based on file characteristics
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransferLane {
     /// The "Neutrino" Fast Lane: Raw streaming, no chunking, no indexing.
-    /// Used for files below the size threshold where CDC/dedup overhead
-    /// exceeds potential savings.
+    /// Used for files below 8KB where CDC/dedup overhead exceeds potential savings.
     Fast,
 
-    /// The Standard Lane: CDC chunking, Universe indexing, Deduplication.
-    /// Used for larger files where content-defined chunking provides value.
+    /// The "Equilibrium" Standard Lane: CDC chunking, Universe indexing, Deduplication.
+    /// Used for medium-sized files (8KB to 1GB) where content-defined chunking provides value.
     Standard,
+
+    /// The "Gigantor" Large File Lane: Tiered deduplication for files over 1GB.
+    /// Uses specialized strategies for large files (future implementation).
+    Large,
 }
 
 /// Router that determines optimal transfer strategy based on file metadata
@@ -56,8 +62,9 @@ impl FileRouter {
     ///
     /// # Returns
     ///
-    /// * `TransferLane::Fast` - If file is below threshold and fast lane is enabled
-    /// * `TransferLane::Standard` - Otherwise
+    /// * `TransferLane::Fast` - If file is below 8KB and fast lane is enabled
+    /// * `TransferLane::Standard` - If file is 8KB to 1GB (Equilibrium)
+    /// * `TransferLane::Large` - If file is over 1GB (Gigantor - future)
     ///
     /// # Example
     ///
@@ -67,12 +74,15 @@ impl FileRouter {
     /// let router = FileRouter::new(8192, true);
     /// assert_eq!(router.route(4096), TransferLane::Fast);
     /// assert_eq!(router.route(16384), TransferLane::Standard);
+    /// assert_eq!(router.route(2_000_000_000), TransferLane::Large);
     /// ```
     pub fn route(&self, file_size: u64) -> TransferLane {
         if self.enabled && file_size < self.threshold {
             TransferLane::Fast
-        } else {
+        } else if file_size < LARGE_FILE_THRESHOLD_BYTES {
             TransferLane::Standard
+        } else {
+            TransferLane::Large
         }
     }
 
@@ -107,11 +117,27 @@ mod tests {
         assert_eq!(router.route(4096), TransferLane::Fast);
         assert_eq!(router.route(8191), TransferLane::Fast);
 
-        // Files at or above threshold should use standard lane
+        // Files at or above threshold but below 1GB should use standard lane (Equilibrium)
         assert_eq!(router.route(8192), TransferLane::Standard);
         assert_eq!(router.route(8193), TransferLane::Standard);
         assert_eq!(router.route(16384), TransferLane::Standard);
         assert_eq!(router.route(1_000_000), TransferLane::Standard);
+        assert_eq!(router.route(500 * 1024 * 1024), TransferLane::Standard); // 500MB
+        assert_eq!(
+            router.route(LARGE_FILE_THRESHOLD_BYTES - 1),
+            TransferLane::Standard
+        );
+
+        // Files at or above 1GB should use large file lane (Gigantor)
+        assert_eq!(
+            router.route(LARGE_FILE_THRESHOLD_BYTES),
+            TransferLane::Large
+        );
+        assert_eq!(
+            router.route(LARGE_FILE_THRESHOLD_BYTES + 1),
+            TransferLane::Large
+        );
+        assert_eq!(router.route(2 * 1024 * 1024 * 1024), TransferLane::Large); // 2GB
     }
 
     #[test]

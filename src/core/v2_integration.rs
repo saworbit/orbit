@@ -232,6 +232,10 @@ pub async fn perform_smart_sync(
                         size: job.size,
                     }),
                     TransferLane::Standard => standard.push(job),
+                    TransferLane::Large => {
+                        // Large files (>1GB): Route to standard for now (Gigantor future)
+                        standard.push(job);
+                    }
                 }
             }
 

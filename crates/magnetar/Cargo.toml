@@ -29,6 +29,10 @@ bincode = { version = "1", optional = true }
 polars = { version = "0.52", features = ["parquet", "lazy"], optional = true }
 arrow = { version = "54", optional = true }
 
+# Core Orbit crates
+orbit-core-cdc = { path = "../core-cdc" }
+orbit-core-starmap = { path = "../core-starmap" }
+
 # Resilience - now using the core-resilience crate
 orbit-core-resilience = { path = "../core-resilience", optional = true }
 

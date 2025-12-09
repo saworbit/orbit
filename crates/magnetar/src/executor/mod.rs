@@ -39,6 +39,8 @@
 //! }
 //! ```
 
+pub mod standard;
+
 use anyhow::Result;
 use tokio::task;
 
