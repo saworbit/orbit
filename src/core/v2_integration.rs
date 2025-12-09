@@ -250,9 +250,8 @@ pub async fn perform_smart_sync(
     };
 
     #[cfg(not(feature = "backend-abstraction"))]
-    let (fast_lane_jobs, mut standard_lane_queue) = {
-        let empty_fast: Vec<SmallFileJob> = Vec::new();
-        (empty_fast, queue)
+    let (fast_lane_jobs, mut standard_lane_queue): (Vec<()>, _) = {
+        (Vec::new(), queue)
     };
 
     // Phase 2: Execute in priority order
