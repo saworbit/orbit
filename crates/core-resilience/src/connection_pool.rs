@@ -36,6 +36,43 @@ impl Default for PoolConfig {
     }
 }
 
+impl PoolConfig {
+    /// Neutrino profile: High concurrency for small-file workloads
+    ///
+    /// Optimized for the Neutrino Fast Lane with:
+    /// - Very high max_size (500 concurrent connections)
+    /// - High min_idle (50 warm connections)
+    /// - Short idle_timeout (10s - connections are cheap)
+    /// - Short max_lifetime (60s - frequent refresh)
+    /// - Fast acquire_timeout (100ms - fail fast)
+    ///
+    /// # Use Case
+    ///
+    /// Designed for high-throughput scenarios where:
+    /// - Many small files (<8KB) need to be transferred
+    /// - Connection setup overhead exceeds data transfer time
+    /// - I/O-bound workload can benefit from high concurrency
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use orbit_core_resilience::connection_pool::PoolConfig;
+    ///
+    /// let config = PoolConfig::neutrino_profile();
+    /// assert_eq!(config.max_size, 500);
+    /// assert_eq!(config.min_idle, 50);
+    /// ```
+    pub fn neutrino_profile() -> Self {
+        Self {
+            max_size: 500,                                   // Very high concurrency
+            min_idle: 50,                                    // Keep many warm
+            idle_timeout: Some(Duration::from_secs(10)),    // Short timeout
+            max_lifetime: Some(Duration::from_secs(60)),    // Frequent refresh
+            acquire_timeout: Duration::from_millis(100),    // Fail fast
+        }
+    }
+}
+
 /// A connection wrapper that tracks metadata
 #[derive(Debug)]
 struct PooledConnection<T> {

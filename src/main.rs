@@ -205,6 +205,15 @@ struct Cli {
     #[arg(long, global = true)]
     config: Option<PathBuf>,
 
+    /// Transfer profile for workload optimization (standard, neutrino, adaptive)
+    #[arg(long = "profile", value_enum, global = true)]
+    profile: Option<ProfileArg>,
+
+    /// Neutrino threshold in KB (default: 8)
+    /// Files smaller than this use the fast lane when --profile=neutrino
+    #[arg(long, default_value = "8", global = true)]
+    neutrino_threshold: u64,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -425,6 +434,13 @@ impl From<LogLevelArg> for LogLevel {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum ProfileArg {
+    Standard,
+    Neutrino,
+    Adaptive,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -554,6 +570,14 @@ fn main() -> Result<()> {
     config.update_manifest = cli.update_manifest;
     config.ignore_existing = cli.ignore_existing;
     config.delta_manifest_path = cli.delta_manifest;
+
+    // Configure Neutrino fast lane
+    config.transfer_profile = cli.profile.map(|p| match p {
+        ProfileArg::Standard => "standard".to_string(),
+        ProfileArg::Neutrino => "neutrino".to_string(),
+        ProfileArg::Adaptive => "adaptive".to_string(),
+    });
+    config.neutrino_threshold = cli.neutrino_threshold * 1024; // Convert KB to bytes
 
     // 🚀 GUIDANCE PASS: Sanitize and Optimize
     let flight_plan = Guidance::plan(config)?;

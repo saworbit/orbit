@@ -16,6 +16,8 @@ pub mod file_metadata; // Comprehensive metadata preservation
 pub mod filter; // Include/exclude filter patterns
 pub mod guidance; // Guidance system ("Flight Computer")
 pub mod metadata;
+#[cfg(feature = "backend-abstraction")]
+pub mod neutrino; // Neutrino Fast Lane for small file optimization
 pub mod metadata_ops; // Metadata preservation orchestration
 pub mod progress;
 pub mod resilient_sync; // Crash-proof sync with Magnetar integration

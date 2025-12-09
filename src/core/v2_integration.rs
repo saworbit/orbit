@@ -16,6 +16,8 @@ use walkdir::WalkDir;
 
 use crate::config::{CopyConfig, CopyMode};
 use crate::core::filter::FilterList;
+#[cfg(feature = "backend-abstraction")]
+use crate::core::neutrino::{DirectTransferExecutor, FileRouter, SmallFileJob, TransferLane};
 use crate::core::validation::matches_exclude_pattern;
 use crate::core::CopyStats;
 use crate::error::{OrbitError, Result};
@@ -69,7 +71,7 @@ pub fn is_smart_mode(config: &CopyConfig) -> bool {
 /// 2. Analyze Phase: Run SemanticRegistry on each file to determine priority
 /// 3. Queue Phase: Push files into BinaryHeap<PrioritizedJob> (priority queue)
 /// 4. Execute Phase: Pop jobs from heap and transfer in priority order
-pub fn perform_smart_sync(
+pub async fn perform_smart_sync(
     source_dir: &Path,
     dest_dir: &Path,
     config: &CopyConfig,
@@ -214,17 +216,93 @@ pub fn perform_smart_sync(
         println!("   [OK] Priority queue: {} jobs", queue.len());
     }
 
-    // Phase 2: Execute in priority order
-    if config.show_progress {
-        println!("\n[Phase 2] Transferring files by priority...");
-        print_priority_summary(&queue);
-    }
+    // Phase 1.5: Route by file size (if Neutrino enabled)
+    #[cfg(feature = "backend-abstraction")]
+    let (fast_lane_jobs, mut standard_lane_queue) =
+        if config.transfer_profile.as_deref() == Some("neutrino") {
+            let router = FileRouter::new(config.neutrino_threshold, true);
+            let mut fast = Vec::new();
+            let mut standard = BinaryHeap::new();
 
+            while let Some(job) = queue.pop() {
+                match router.route(job.size) {
+                    TransferLane::Fast => fast.push(SmallFileJob {
+                        source: job.source_path,
+                        dest: job.dest_path,
+                        size: job.size,
+                    }),
+                    TransferLane::Standard => standard.push(job),
+                }
+            }
+
+            if config.show_progress && !fast.is_empty() {
+                println!(
+                    "   [Neutrino] Routing: {} small files → fast lane, {} large files → standard lane",
+                    fast.len(),
+                    standard.len()
+                );
+            }
+
+            (fast, standard)
+        } else {
+            (Vec::new(), queue)
+        };
+
+    #[cfg(not(feature = "backend-abstraction"))]
+    let (fast_lane_jobs, mut standard_lane_queue) = {
+        let empty_fast: Vec<SmallFileJob> = Vec::new();
+        (empty_fast, queue)
+    };
+
+    // Phase 2: Execute in priority order
     let mut stats = CopyStats::new();
-    let total_jobs = queue.len();
+    let total_jobs = fast_lane_jobs.len() + standard_lane_queue.len();
     let mut processed = 0;
 
-    while let Some(job) = queue.pop() {
+    // Phase 2a: Neutrino Fast Lane (if any)
+    #[cfg(feature = "backend-abstraction")]
+    if !fast_lane_jobs.is_empty() {
+        if config.show_progress {
+            println!("\n[Phase 2a] Neutrino Fast Lane - {} small files", fast_lane_jobs.len());
+        }
+
+        let executor = DirectTransferExecutor::new(config)
+            .map_err(|e| OrbitError::Other(format!("Failed to create Neutrino executor: {}", e)))?;
+        match executor.execute_batch(fast_lane_jobs.clone(), config).await
+            .map_err(|e| OrbitError::Other(format!("Neutrino batch execution failed: {}", e))) {
+            Ok(neutrino_stats) => {
+                stats.files_copied += neutrino_stats.files_copied;
+                stats.bytes_copied += neutrino_stats.bytes_copied;
+                stats.files_failed += neutrino_stats.files_failed;
+                processed += (neutrino_stats.files_copied + neutrino_stats.files_failed) as usize;
+
+                if config.show_progress {
+                    println!(
+                        "   [OK] Fast lane complete: {} files copied, {} failed",
+                        neutrino_stats.files_copied, neutrino_stats.files_failed
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("   [ERROR] Neutrino batch failed: {}", e);
+                stats.files_failed += fast_lane_jobs.len() as u64;
+
+                if config.error_mode == crate::config::ErrorMode::Abort {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    // Phase 2b: Standard Lane (large files)
+    if !standard_lane_queue.is_empty() {
+        if config.show_progress {
+            println!("\n[Phase 2b] Standard Lane - {} large files", standard_lane_queue.len());
+            print_priority_summary(&standard_lane_queue);
+        }
+    }
+
+    while let Some(job) = standard_lane_queue.pop() {
         processed += 1;
 
         if config.show_progress && processed % 10 == 1 {

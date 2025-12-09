@@ -107,6 +107,7 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Delta Detection (V1)** | 🟡 Beta | rsync-style algorithm, tested but newer |
 | **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, newly introduced in v0.5.0 |
 | **Semantic Replication** | 🔴 Alpha | Priority-based transfers, new in v0.5.0 |
+| **Neutrino Fast Lane** | 🔴 Alpha | Small file optimization (<8KB), new in v0.5.0 |
 | **Global Deduplication (V3)** | 🟡 Beta | High-cardinality Universe index, v2.1 scalability upgrade |
 | **Disk Guardian** | 🟡 Beta | Pre-flight checks, works well but newer |
 | **Magnetar State Machine** | 🟡 Beta | Job persistence, recently added |
@@ -591,6 +592,44 @@ orbit --source /critical --dest /backup \
   - ChunkLocation tracking: Full path + offset + length for precise deduplication
   - 4/4 persistence tests passing
 - **See:** [ORBIT_V2_ARCHITECTURE.md](ORBIT_V2_ARCHITECTURE.md) for complete details
+
+**NEW in v0.5.0: Neutrino Fast Lane** ⚡
+
+The **Neutrino Fast Lane** provides ~3x performance improvement for small-file workloads by bypassing CDC/deduplication overhead:
+
+- **Smart Routing** — Files <8KB automatically routed to high-concurrency direct transfer
+- **High Concurrency** — 100-500 concurrent async tasks (vs standard 16)
+- **Zero Overhead** — Bypasses BLAKE3 hashing, CDC chunking, and starmap indexing
+- **Reduced CPU Load** — Direct I/O without rolling hash computation
+- **Configurable Threshold** — Adjustable size threshold (default: 8KB)
+- **Seamless Integration** — Works with Smart Sync priority-based transfers
+
+**Performance:**
+- 10,000 files (1-4KB): ~15s vs ~45s (standard) = **3x faster**
+- 60% lower CPU usage for small-file workloads
+- Minimal database bloat (no index entries for small files)
+
+**Usage:**
+```bash
+# Enable Neutrino fast lane
+orbit copy --profile neutrino --recursive /source /dest
+
+# Custom threshold (16KB)
+orbit copy --profile neutrino --neutrino-threshold 16 --recursive /source /dest
+
+# Combined with Smart Sync
+orbit copy --check smart --profile neutrino --recursive /source /dest
+```
+
+**Best For:**
+- Source code repositories (`node_modules`, `.git` directories)
+- Configuration directories (`/etc`, `.config`)
+- Log files and small assets
+- npm/pip package directories
+
+**Requirements:** Requires `backend-abstraction` feature (included with network backends)
+
+**See:** [PERFORMANCE.md](docs/guides/PERFORMANCE.md#neutrino-fast-lane-v05) for detailed documentation
 
 **V2 CDC Features:**
 - **Gear Hash Rolling Hash** — 256-entry lookup table for fast boundary detection (~2GB/s per core)

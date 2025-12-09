@@ -170,7 +170,32 @@ PoolConfig {
     max_lifetime: Some(Duration::from_secs(1800)),  // Max connection lifetime
     acquire_timeout: Duration::from_secs(30),       // Timeout for acquiring
 }
+
+// Neutrino profile for small-file workloads (high concurrency, short timeouts)
+let neutrino_config = PoolConfig::neutrino_profile();
+// max_size: 500, min_idle: 50, idle_timeout: 10s, acquire_timeout: 100ms
 ```
+
+**Neutrino Profile (v0.5+)**
+
+Optimized for small-file workloads with high I/O concurrency:
+
+```rust
+let config = PoolConfig::neutrino_profile();
+// Equivalent to:
+PoolConfig {
+    max_size: 500,                                   // Very high concurrency
+    min_idle: 50,                                    // Keep many warm
+    idle_timeout: Some(Duration::from_secs(10)),    // Short timeout
+    max_lifetime: Some(Duration::from_secs(60)),    // Frequent refresh
+    acquire_timeout: Duration::from_millis(100),    // Fail fast
+}
+```
+
+Use this profile for:
+- Transferring many small files (<8KB)
+- I/O-bound workloads where connection setup exceeds data transfer time
+- Source code repositories, config directories, log files
 
 ### Rate Limiter
 

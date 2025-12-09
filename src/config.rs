@@ -202,6 +202,16 @@ pub struct CopyConfig {
     /// Falls back to standard check_mode if not recognized
     #[serde(default)]
     pub check_mode_str: Option<String>,
+
+    /// Transfer profile: "neutrino" for small-file optimization
+    /// Options: "standard", "neutrino", "adaptive"
+    #[serde(default)]
+    pub transfer_profile: Option<String>,
+
+    /// Neutrino threshold in bytes (default: 8192 = 8KB)
+    /// Files smaller than this use the fast lane
+    #[serde(default = "default_neutrino_threshold")]
+    pub neutrino_threshold: u64,
 }
 
 impl Default for CopyConfig {
@@ -250,6 +260,8 @@ impl Default for CopyConfig {
             check_mode_str: None,
             delta_resume_enabled: true,
             delta_chunk_size: default_delta_block_size(),
+            transfer_profile: None,
+            neutrino_threshold: default_neutrino_threshold(),
         }
     }
 }
@@ -387,6 +399,10 @@ fn default_retry_delay() -> u64 {
 
 fn default_delta_block_size() -> usize {
     1024 * 1024 // 1 MB
+}
+
+fn default_neutrino_threshold() -> u64 {
+    8 * 1024 // 8 KB
 }
 
 impl CopyConfig {
