@@ -24,7 +24,7 @@ blake3 = "1.5"
 # Optional backend dependencies
 sqlx = { version = "0.8.1", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"], optional = true }
 redb = { version = "2.1", optional = true }
-bincode = { version = "1", optional = true }
+bincode = { version = "2", optional = true }
 
 # Analytics (optional)
 polars = { version = "0.52", features = ["parquet", "lazy"], optional = true }
