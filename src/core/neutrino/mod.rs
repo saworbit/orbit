@@ -21,8 +21,8 @@
 //! orbit copy --profile neutrino --recursive /source /dest
 //! ```
 
-pub mod router;
 pub mod executor;
+pub mod router;
 
+pub use executor::{DirectTransferExecutor, ExecutorStats, SmallFileJob};
 pub use router::{FileRouter, TransferLane};
-pub use executor::{DirectTransferExecutor, SmallFileJob, ExecutorStats};

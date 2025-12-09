@@ -123,7 +123,7 @@ impl DirectTransferExecutor {
     /// A new DirectTransferExecutor instance
     pub fn new(config: &CopyConfig) -> Result<Self> {
         let concurrency = if config.parallel > 0 {
-            config.parallel as usize
+            config.parallel
         } else {
             Self::DEFAULT_CONCURRENCY
         };
@@ -260,7 +260,7 @@ impl DirectTransferExecutor {
             let dest_file = std::fs::File::open(&job.dest)?;
 
             // Preserve times
-            if let Some(modified) = source_meta.modified().ok() {
+            if let Ok(modified) = source_meta.modified() {
                 dest_file.set_modified(modified)?;
             }
 
@@ -379,7 +379,11 @@ mod tests {
 
         let jobs = vec![SmallFileJob {
             source: src_file,
-            dest: temp_dest.path().join("nested").join("deep").join("file.txt"),
+            dest: temp_dest
+                .path()
+                .join("nested")
+                .join("deep")
+                .join("file.txt"),
             size: 14,
         }];
 
@@ -393,8 +397,13 @@ mod tests {
         // Verify nested directory was created
         assert!(temp_dest.path().join("nested").join("deep").exists());
         let content = fs::read_to_string(
-            temp_dest.path().join("nested").join("deep").join("file.txt")
-        ).await?;
+            temp_dest
+                .path()
+                .join("nested")
+                .join("deep")
+                .join("file.txt"),
+        )
+        .await?;
         assert_eq!(content, "nested content");
 
         Ok(())

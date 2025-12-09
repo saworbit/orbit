@@ -64,11 +64,11 @@ impl PoolConfig {
     /// ```
     pub fn neutrino_profile() -> Self {
         Self {
-            max_size: 500,                                   // Very high concurrency
-            min_idle: 50,                                    // Keep many warm
-            idle_timeout: Some(Duration::from_secs(10)),    // Short timeout
-            max_lifetime: Some(Duration::from_secs(60)),    // Frequent refresh
-            acquire_timeout: Duration::from_millis(100),    // Fail fast
+            max_size: 500,                               // Very high concurrency
+            min_idle: 50,                                // Keep many warm
+            idle_timeout: Some(Duration::from_secs(10)), // Short timeout
+            max_lifetime: Some(Duration::from_secs(60)), // Frequent refresh
+            acquire_timeout: Duration::from_millis(100), // Fail fast
         }
     }
 }

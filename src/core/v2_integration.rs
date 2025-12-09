@@ -218,35 +218,36 @@ pub async fn perform_smart_sync(
 
     // Phase 1.5: Route by file size (if Neutrino enabled)
     #[cfg(feature = "backend-abstraction")]
-    let (fast_lane_jobs, mut standard_lane_queue) =
-        if config.transfer_profile.as_deref() == Some("neutrino") {
-            let router = FileRouter::new(config.neutrino_threshold, true);
-            let mut fast = Vec::new();
-            let mut standard = BinaryHeap::new();
+    let (fast_lane_jobs, mut standard_lane_queue) = if config.transfer_profile.as_deref()
+        == Some("neutrino")
+    {
+        let router = FileRouter::new(config.neutrino_threshold, true);
+        let mut fast = Vec::new();
+        let mut standard = BinaryHeap::new();
 
-            while let Some(job) = queue.pop() {
-                match router.route(job.size) {
-                    TransferLane::Fast => fast.push(SmallFileJob {
-                        source: job.source_path,
-                        dest: job.dest_path,
-                        size: job.size,
-                    }),
-                    TransferLane::Standard => standard.push(job),
-                }
+        while let Some(job) = queue.pop() {
+            match router.route(job.size) {
+                TransferLane::Fast => fast.push(SmallFileJob {
+                    source: job.source_path,
+                    dest: job.dest_path,
+                    size: job.size,
+                }),
+                TransferLane::Standard => standard.push(job),
             }
+        }
 
-            if config.show_progress && !fast.is_empty() {
-                println!(
-                    "   [Neutrino] Routing: {} small files → fast lane, {} large files → standard lane",
-                    fast.len(),
-                    standard.len()
-                );
-            }
+        if config.show_progress && !fast.is_empty() {
+            println!(
+                "   [Neutrino] Routing: {} small files → fast lane, {} large files → standard lane",
+                fast.len(),
+                standard.len()
+            );
+        }
 
-            (fast, standard)
-        } else {
-            (Vec::new(), queue)
-        };
+        (fast, standard)
+    } else {
+        (Vec::new(), queue)
+    };
 
     #[cfg(not(feature = "backend-abstraction"))]
     let (fast_lane_jobs, mut standard_lane_queue) = {
@@ -263,13 +264,19 @@ pub async fn perform_smart_sync(
     #[cfg(feature = "backend-abstraction")]
     if !fast_lane_jobs.is_empty() {
         if config.show_progress {
-            println!("\n[Phase 2a] Neutrino Fast Lane - {} small files", fast_lane_jobs.len());
+            println!(
+                "\n[Phase 2a] Neutrino Fast Lane - {} small files",
+                fast_lane_jobs.len()
+            );
         }
 
         let executor = DirectTransferExecutor::new(config)
             .map_err(|e| OrbitError::Other(format!("Failed to create Neutrino executor: {}", e)))?;
-        match executor.execute_batch(fast_lane_jobs.clone(), config).await
-            .map_err(|e| OrbitError::Other(format!("Neutrino batch execution failed: {}", e))) {
+        match executor
+            .execute_batch(fast_lane_jobs.clone(), config)
+            .await
+            .map_err(|e| OrbitError::Other(format!("Neutrino batch execution failed: {}", e)))
+        {
             Ok(neutrino_stats) => {
                 stats.files_copied += neutrino_stats.files_copied;
                 stats.bytes_copied += neutrino_stats.bytes_copied;
@@ -295,11 +302,12 @@ pub async fn perform_smart_sync(
     }
 
     // Phase 2b: Standard Lane (large files)
-    if !standard_lane_queue.is_empty() {
-        if config.show_progress {
-            println!("\n[Phase 2b] Standard Lane - {} large files", standard_lane_queue.len());
-            print_priority_summary(&standard_lane_queue);
-        }
+    if !standard_lane_queue.is_empty() && config.show_progress {
+        println!(
+            "\n[Phase 2b] Standard Lane - {} large files",
+            standard_lane_queue.len()
+        );
+        print_priority_summary(&standard_lane_queue);
     }
 
     while let Some(job) = standard_lane_queue.pop() {
