@@ -218,41 +218,38 @@ pub async fn perform_smart_sync(
 
     // Phase 1.5: Route by file size (if Neutrino enabled)
     #[cfg(feature = "backend-abstraction")]
-    let (fast_lane_jobs, mut standard_lane_queue) = if config.transfer_profile.as_deref()
-        == Some("neutrino")
-    {
-        let router = FileRouter::new(config.neutrino_threshold, true);
-        let mut fast = Vec::new();
-        let mut standard = BinaryHeap::new();
+    let (fast_lane_jobs, mut standard_lane_queue) =
+        if config.transfer_profile.as_deref() == Some("neutrino") {
+            let router = FileRouter::new(config.neutrino_threshold, true);
+            let mut fast = Vec::new();
+            let mut standard = BinaryHeap::new();
 
-        while let Some(job) = queue.pop() {
-            match router.route(job.size) {
-                TransferLane::Fast => fast.push(SmallFileJob {
-                    source: job.source_path,
-                    dest: job.dest_path,
-                    size: job.size,
-                }),
-                TransferLane::Standard => standard.push(job),
+            while let Some(job) = queue.pop() {
+                match router.route(job.size) {
+                    TransferLane::Fast => fast.push(SmallFileJob {
+                        source: job.source_path,
+                        dest: job.dest_path,
+                        size: job.size,
+                    }),
+                    TransferLane::Standard => standard.push(job),
+                }
             }
-        }
 
-        if config.show_progress && !fast.is_empty() {
-            println!(
+            if config.show_progress && !fast.is_empty() {
+                println!(
                 "   [Neutrino] Routing: {} small files → fast lane, {} large files → standard lane",
                 fast.len(),
                 standard.len()
             );
-        }
+            }
 
-        (fast, standard)
-    } else {
-        (Vec::new(), queue)
-    };
+            (fast, standard)
+        } else {
+            (Vec::new(), queue)
+        };
 
     #[cfg(not(feature = "backend-abstraction"))]
-    let (fast_lane_jobs, mut standard_lane_queue): (Vec<()>, _) = {
-        (Vec::new(), queue)
-    };
+    let (fast_lane_jobs, mut standard_lane_queue): (Vec<()>, _) = { (Vec::new(), queue) };
 
     // Phase 2: Execute in priority order
     let mut stats = CopyStats::new();
