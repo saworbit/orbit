@@ -56,6 +56,7 @@ pub mod config;
 pub mod executor;
 pub mod manager;
 pub mod migration;
+pub mod pipeline;
 
 #[cfg(feature = "resilience")]
 pub mod resilience;

@@ -3779,6 +3779,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-s3",
  "bincode 1.3.3",
+ "blake3",
  "criterion",
  "futures",
  "hyper 1.8.1",

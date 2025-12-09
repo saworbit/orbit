@@ -71,6 +71,70 @@ impl PoolConfig {
             acquire_timeout: Duration::from_millis(100), // Fail fast
         }
     }
+
+    /// Long-haul profile: Configuration optimized for large file workloads (Gigantor)
+    ///
+    /// This profile is designed for long-running transfers of very large files
+    /// (>1GB) where connections need to be maintained for extended periods.
+    ///
+    /// # Characteristics
+    ///
+    /// - **Strict Max Size**: Large transfers consume significant bandwidth.
+    ///   We don't want 100 parallel 100GB transfers choking the pipe.
+    ///   Default: 4 concurrent connections
+    ///
+    /// - **Min Idle**: Low. We assume these connections stay busy for hours.
+    ///   Default: 1 connection
+    ///
+    /// - **Idle Timeout**: Standard. Connections that go idle for 5 minutes
+    ///   are reclaimed.
+    ///   Default: 300 seconds (5 minutes)
+    ///
+    /// - **Max Lifetime**: EXTENDED. A single S3 multipart upload session
+    ///   might last hours. Don't kill it in the middle.
+    ///   Default: 86400 seconds (24 hours)
+    ///
+    /// - **Acquire Timeout**: Long. Waiting for a slot on the "Heavy" lane
+    ///   is expected when all connections are busy.
+    ///   Default: 600 seconds (10 minutes)
+    ///
+    /// # Use Cases
+    ///
+    /// - Multi-hour S3 multipart uploads
+    /// - Large database backup transfers
+    /// - VM image synchronization
+    /// - Video file transfers
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use orbit_core_resilience::connection_pool::PoolConfig;
+    ///
+    /// let config = PoolConfig::long_haul_profile();
+    /// assert_eq!(config.max_size, 4);
+    /// assert_eq!(config.max_lifetime, Some(std::time::Duration::from_secs(24 * 60 * 60)));
+    /// ```
+    pub fn long_haul_profile() -> Self {
+        Self {
+            // Strict Max Size: Large transfers consume bandwidth.
+            // We don't want 100 parallel 100GB transfers choking the pipe.
+            max_size: 4,
+
+            // Min Idle: Low. We assume these connections stay busy for hours.
+            min_idle: 1,
+
+            // Idle Timeout: Standard.
+            idle_timeout: Some(Duration::from_secs(300)), // 5 minutes
+
+            // Max Lifetime: EXTENDED.
+            // A single S3 multipart upload session might last hours.
+            // Don't kill it in the middle.
+            max_lifetime: Some(Duration::from_secs(24 * 60 * 60)), // 24 Hours
+
+            // Acquire Timeout: Long. Waiting for a slot on the "Heavy" lane is expected.
+            acquire_timeout: Duration::from_secs(600), // 10 minutes
+        }
+    }
 }
 
 /// A connection wrapper that tracks metadata

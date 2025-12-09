@@ -39,6 +39,7 @@
 //! }
 //! ```
 
+pub mod gigantor;
 pub mod standard;
 
 use anyhow::Result;

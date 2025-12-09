@@ -224,7 +224,6 @@ impl StandardExecutor {
 mod tests {
     use super::*;
     use tempfile::{tempdir, NamedTempFile};
-    use tokio::fs;
 
     /// Create a Universe database in a temporary location
     fn create_test_universe() -> Result<(tempfile::TempDir, Arc<Universe>)> {
