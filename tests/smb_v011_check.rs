@@ -55,7 +55,7 @@ mod smb_v011_tests {
             .await
             .expect("Stream empty")
             .expect("Read error");
-        assert_eq!(chunk, content);
+        assert_eq!(chunk.as_ref(), &content[..]);
 
         // 4. Cleanup
         backend
