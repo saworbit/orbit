@@ -1590,17 +1590,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
-name = "cmac"
-version = "0.8.0-rc.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2fa99ca412f76b4656efeab943ef06f1ddd8036c31ca38f35188f173d0dc85e"
-dependencies = [
- "cipher",
- "dbl",
- "digest 0.11.0-rc.3",
-]
-
-[[package]]
 name = "cmake"
 version = "0.1.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2061,15 +2050,6 @@ name = "data-encoding"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
-
-[[package]]
-name = "dbl"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0d7a944e61df464668c5f51f56cc667396a8821434273112948ea0b66e405d7"
-dependencies = [
- "hybrid-array",
-]
 
 [[package]]
 name = "debug_unsafe"
@@ -3764,12 +3744,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lz4_flex"
-version = "0.11.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08ab2867e3eeeca90e844d1940eab391c9dc5228783db2ed999acbc0a9ed375a"
-
-[[package]]
 name = "magnetar"
 version = "0.1.0"
 dependencies = [
@@ -4243,7 +4217,7 @@ dependencies = [
 
 [[package]]
 name = "orbit"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "adler2",
  "anyhow",
@@ -6506,16 +6480,15 @@ dependencies = [
 
 [[package]]
 name = "smb"
-version = "0.10.4"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edac4744872fa1ce8e5aec210f71dcb43e12bc9da6235b1b55ca5261a3519437"
+checksum = "85e5812a5aea11774250978e082ccef7549d3648f42396ba90d016a9c2180b56"
 dependencies = [
  "aead",
  "aes",
  "aes-gcm",
  "binrw",
  "ccm",
- "cmac",
  "crypto-common 0.2.0-rc.4",
  "futures",
  "futures-core",
@@ -6523,7 +6496,6 @@ dependencies = [
  "hmac 0.13.0-rc.2",
  "kbkdf",
  "log",
- "lz4_flex",
  "maybe-async",
  "modular-bitfield",
  "pastey",
@@ -6545,22 +6517,34 @@ dependencies = [
 
 [[package]]
 name = "smb-dtyp"
-version = "0.10.4"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93c841e39256a1ce8498d13db3632e03728d81314b3be30ba988c5fcfcda1cb5"
+checksum = "f7d27f780ca3cb8862b06e7630635be44d2d40eb87f062ccef2339725a364b50"
 dependencies = [
  "binrw",
  "modular-bitfield",
  "pastey",
  "rand 0.8.5",
+ "smb-dtyp-derive",
  "time",
 ]
 
 [[package]]
-name = "smb-fscc"
-version = "0.10.4"
+name = "smb-dtyp-derive"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dacd239590004fbb1825a732285486ab6a3c4bba4d43f69f824631cfe1689128"
+checksum = "4aafe9cf48d49125d7236e21a0a3c3fe8468756a437085f8fc982500cdb83bcd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
+name = "smb-fscc"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0f3d21818c20d9b2976c8128cd0b226ef4b7454a4e21f32d2cdc2b72ebcb6ac"
 dependencies = [
  "binrw",
  "modular-bitfield",
@@ -6572,24 +6556,36 @@ dependencies = [
 
 [[package]]
 name = "smb-msg"
-version = "0.10.4"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90da146e01c066c325d3be075d01bf71896fe7552f423bf38bc597723e54812a"
+checksum = "055249a7cc5d66f6c5a0a4f112e34126e1388069d330e2b4ba47b1bd6756b983"
 dependencies = [
  "binrw",
  "modular-bitfield",
  "pastey",
  "smb-dtyp",
  "smb-fscc",
+ "smb-msg-derive",
  "thiserror 2.0.17",
  "time",
 ]
 
 [[package]]
-name = "smb-rpc"
-version = "0.10.4"
+name = "smb-msg-derive"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a9774152cdcb9780e856a4bb6d041bb07dd6d31947df0ed32a3d4e486b8c20b"
+checksum = "323736cd18b0b9fe048c1d60dc9e60a542ae9f39e71ce9f2f9b96189788a49c9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
+
+[[package]]
+name = "smb-rpc"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c798d3d80879fb4a439845f160f4d272e368aa50d5038af550552aa15c885d99"
 dependencies = [
  "binrw",
  "maybe-async",
@@ -6602,9 +6598,9 @@ dependencies = [
 
 [[package]]
 name = "smb-transport"
-version = "0.10.4"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45533ad50054338ccabd66201bf01423b9d6830c59db0fae6b25d45a403bdae1"
+checksum = "f06f448a9ea90dbf805716a25adc60c2d7a9a39ad34527535ed335c96b6001c0"
 dependencies = [
  "binrw",
  "futures-core",

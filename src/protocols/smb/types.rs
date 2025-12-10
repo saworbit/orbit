@@ -73,22 +73,12 @@ impl std::fmt::Debug for Secret {
 
 impl Drop for Secret {
     fn drop(&mut self) {
-        #[cfg(feature = "smb-native")]
-        {
-            use zeroize::Zeroize;
-            self.0.zeroize();
-        }
-
-        // Best-effort zeroing even without zeroize crate
-        #[cfg(not(feature = "smb-native"))]
-        {
-            // SAFETY: We're zeroing our own String's bytes
-            // This is best-effort and may not work if the string was moved
-            unsafe {
-                let bytes = self.0.as_bytes_mut();
-                for b in bytes {
-                    std::ptr::write_volatile(b, 0);
-                }
+        // Best-effort zeroing of the password string
+        // Note: This may not work if the string was moved, but provides basic protection
+        unsafe {
+            let bytes = self.0.as_bytes_mut();
+            for b in bytes {
+                std::ptr::write_volatile(b, 0);
             }
         }
     }
@@ -171,27 +161,27 @@ pub enum SmbSecurity {
     SignOnly,
 }
 
-#[cfg(feature = "smb-native")]
-bitflags::bitflags! {
-    /// SMB3 capability flags
-    pub struct SmbCapability: u32 {
-        /// Multi-channel support (multiple TCP connections)
-        const MULTI_CHANNEL   = 0b0001;
+/// SMB3 capability flags (simplified for v0.11.0)
+///
+/// Note: Advanced capabilities like multi-channel, durable handles, etc.
+/// are handled internally by the smb crate and don't need explicit flags here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SmbCapability {
+    _private: (),
+}
 
-        /// Durable file handles (survive temporary disconnects)
-        const DURABLE_HANDLES = 0b0010;
-
-        /// Directory leases (caching)
-        const LEASES          = 0b0100;
-
-        /// Distributed File System support
-        const DFS             = 0b1000;
+impl SmbCapability {
+    /// Create a new capability set (currently a placeholder)
+    pub fn new() -> Self {
+        Self { _private: () }
     }
 }
 
-#[cfg(not(feature = "smb-native"))]
-/// Placeholder when feature is disabled
-pub struct SmbCapability;
+impl Default for SmbCapability {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// File/directory metadata from SMB
 #[derive(Debug, Clone)]

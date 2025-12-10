@@ -103,7 +103,7 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Local Filesystem** | 🟢 Stable | Primary use case, thoroughly tested |
 | **SSH/SFTP Backend** | 🟡 Beta | Functional, needs more real-world testing |
 | **S3 Backend** | 🟡 Beta | Works well, multipart upload is newer |
-| **SMB Backend** | 🔴 Alpha | Awaiting upstream dependency fixes |
+| **SMB Backend** | 🟡 Beta | v0.11.0 upgrade complete, ready for integration testing |
 | **Delta Detection (V1)** | 🟡 Beta | rsync-style algorithm, tested but newer |
 | **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, newly introduced in v0.5.0 |
 | **Semantic Replication** | 🔴 Alpha | Priority-based transfers, new in v0.5.0 |
@@ -928,7 +928,7 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 | 🗂️ **Local** | 🟢 Stable | Built-in | Local filesystem with zero-copy optimization |
 | 🔐 **SSH/SFTP** | 🟡 Beta | `ssh-backend` | Remote filesystem access via SSH/SFTP with async I/O |
 | ☁️ **S3** | 🟡 Beta | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
-| 🌐 **SMB/CIFS** | 🔴 Alpha | `smb-native` | Native SMB2/3 client (pure Rust, awaiting upstream fixes) |
+| 🌐 **SMB/CIFS** | 🟡 Beta | `smb-native` | Native SMB2/3 client (pure Rust, v0.11.0, ready for testing) |
 | ☁️ **Azure Blob** | 🚧 Planned | - | Microsoft Azure Blob Storage |
 | ☁️ **GCS** | 🚧 Planned | - | Google Cloud Storage |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |

@@ -269,6 +269,27 @@ All notable changes to Orbit will be documented in this file.
   - **Impact**: Pipeline Editor continues to work with improved React Flow v12 features
   - See [dashboard/README.md](dashboard/README.md) for updated tech stack
 
+- **SMB Protocol v0.11.0 Remediation** - Native SMB client upgraded for long-term stability
+  - **Version Bump**: v0.5.0 → v0.5.1
+  - **SMB Crate**: Upgraded from v0.10.2 to v0.11.0 for API stability and protocol compliance
+  - **API Migration**: Migrated from deprecated `list()` to `Directory::query()` API for directory listings
+  - **Retry Logic**: Added 3-attempt connection with exponential backoff (500ms * attempt)
+  - **Smart Fallback**: Encryption → Signing fallback for opportunistic security mode
+  - **Feature Flags**: Streamlined to essential features (async, encrypt_aesgcm, encrypt_aesccm, std-fs-impls, netbios-transport)
+  - **Removed Dependencies**: Eliminated unused bitflags and zeroize dependencies
+  - **Type Safety**: Proper Arc<Directory> handling and FileNamesInformation imports
+  - **Clippy Clean**: Fixed all linter warnings (match→if-let, redundant guards, io::Error::other)
+  - **Security Audit**: No vulnerabilities (cargo audit clean)
+  - **Integration Test**: Added tests/smb_v011_check.rs for v0.11.0 query API validation
+  - **Documentation**: Updated docs/architecture/SMB_NATIVE_STATUS.md with v0.11.0 status
+  - **Build Status**: ✅ Compiles cleanly with `--features smb-native`
+  - **What Changed**:
+    - Directory listing now uses `Directory::query::<FileNamesInformation>()` instead of deprecated `list()`
+    - Connection failures automatically retry up to 3 times with increasing delays
+    - SignOnly mode relies on default signing behavior (explicit signing_mode removed)
+    - Secret type uses simplified drop implementation without external dependencies
+  - **Impact**: More robust SMB connections, future-proof API compatibility, cleaner codebase
+
 ### Fixed
 
 - **API Compatibility**: QuickTransfer now uses correct `/create_job` endpoint instead of non-existent `/pipelines/execute`

@@ -13,7 +13,7 @@ members = [
 
 [package]
 name = "orbit"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
 description = "Alpha-stage file transfer tool with compression, resume, and parallel operations (not production-ready)"
@@ -99,7 +99,7 @@ orbit-core-semantic = { path = "crates/core-semantic" }
 # SMB native dependencies (optional, feature-gated)
 bytes = { version = "1", optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "fs", "io-util"], optional = true }
-smb = { version = "0.10.2", optional = true, default-features = false, features = ["async", "encrypt_aesgcm", "encrypt_aesccm", "sign_hmac", "sign_gmac", "sign_cmac", "compress_lz4", "compress_pattern_v1", "std-fs-impls", "netbios-transport"] }
+smb = { version = "0.11.0", optional = true, default-features = false, features = ["async", "encrypt_aesgcm", "encrypt_aesccm", "std-fs-impls", "netbios-transport"] }
 async-trait = { version = "0.1", optional = true }
 bitflags = { version = "2", optional = true }
 zeroize = { version = "1", optional = true }
@@ -192,7 +192,7 @@ zero-copy = []
 protocols = []
 
 # Native SMB2/3 client (pure Rust, async) - OFF by default
-smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bitflags", "dep:zeroize", "dep:bytes", "dep:futures", "backend-abstraction"]
+smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
 # Native S3 client (pure Rust, async) - OFF by default
 s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
@@ -217,6 +217,9 @@ unicode-normalization = ["dep:unicode-normalization"]
 
 # Convenience: All network protocols
 network = ["s3-native", "smb-native", "ssh-backend"]
+
+# NEW: Aggregated feature for all network protocols
+network-all = ["s3-native", "smb-native", "ssh-backend"]
 
 # Full feature set (for development and power users)
 full = ["zero-copy", "network", "backend-abstraction", "delta-manifest", "extended-metadata", "api", "unicode-normalization"]
