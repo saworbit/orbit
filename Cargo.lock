@@ -4205,7 +4205,7 @@ dependencies = [
 
 [[package]]
 name = "orbit"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "adler2",
  "anyhow",

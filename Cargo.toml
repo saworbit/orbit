@@ -13,7 +13,7 @@ members = [
 
 [package]
 name = "orbit"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 authors = ["Shane Wall <shaneawall@gmail.com>"]
 description = "Alpha-stage file transfer tool with compression, resume, and parallel operations (not production-ready)"

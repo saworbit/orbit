@@ -4,6 +4,16 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+### Changed
+
+### Fixed
+
+### Maintenance
+
+## [0.6.0] - 2025-12-10
+
 > ⚠️ **PRE-ALPHA WARNING**: This version contains highly experimental dashboard features.
 > Not suitable for production environments. APIs and UI are subject to breaking changes.
 
