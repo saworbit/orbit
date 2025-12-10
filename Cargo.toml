@@ -85,7 +85,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"]
 orbit-server = { path = "crates/orbit-web", optional = true, default-features = false }
 
 # Random for backoff jitter
-rand = "0.8"
+rand = "0.9"
 
 # Manifest system
 orbit-core-manifest = { path = "crates/core-manifest" }
