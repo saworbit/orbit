@@ -257,6 +257,40 @@ All notable changes to Orbit will be documented in this file.
 
 ### Changed
 
+- **Dependency Updates (December 2024)** - 23 safe dependency updates merged
+  - **Cargo Dependencies (13 updates)**:
+    - `arrow` 54.x → 57.1.0 - Apache Arrow data structures
+    - `aws-sdk-s3` 1.x → 1.113.0 - AWS S3 SDK
+    - `axum-extra` 0.9 → 0.12.2 - Axum web framework extras
+    - `governor` 0.6 → 0.10.2 - Rate limiting middleware
+    - `notify` 8.x → 8.2.0 - File system notifications
+    - `polars` 0.x → 0.52.0 - DataFrame library for analytics
+    - `rand` 0.8 → 0.9.2 - Random number generation
+    - `sysinfo` 0.35 → 0.37.2 - System information queries
+    - `thiserror` 2.0.x → 2.0.17 - Error derive macros
+    - `tower` 0.4 → 0.5.2 - Service middleware layer
+    - `tower-http` 0.5 → 0.6.7 - HTTP-specific Tower middleware
+    - `tracing` 0.1.x → 0.1.43 - Application tracing
+    - `utoipa` 5.x → 5.4.0 - OpenAPI documentation
+  - **NPM Dependencies (10 updates)**:
+    - `react` 18.x → 19.2.1, `react-dom` 18.x → 19.2.1 - UI framework
+    - `vite` 6.x → 7.2.7 - Build tool
+    - `@vitejs/plugin-react` 4.x → 5.1.2 - React plugin for Vite
+    - `@tanstack/react-query` 5.x → 5.90.12 - Data fetching
+    - `@xyflow/react` 12.x → 12.10.0 - Flow diagram library
+    - `lucide-react` 0.x → 0.556.0 - Icon library
+    - `react-resizable-panels` 2.x → 3.0.6 - Resizable panels
+    - `jsdom` 25.x → 27.2.0 - DOM testing
+    - `vitest` 3.x → 4.0.15 - Testing framework
+  - **Deferred (Breaking API Changes)**:
+    - `bincode` 2.0 - Complete API rewrite requires code refactoring
+    - `redb` 3.1 - Transaction API changes need migration
+    - `jsonschema` 0.37 - Validation error API redesign
+    - `recharts` 3.5.1 - TypeScript conflicts with React 19
+  - **Status**: All changes compile cleanly, tests passing, no security vulnerabilities
+  - **Cleanup**: 34 dependabot branches merged and deleted
+  - See [DEPENDABOT_ISSUES.md](DEPENDABOT_ISSUES.md) for details on deferred updates
+
 - **React 19 Migration & React Flow Upgrade** - Dashboard modernization completed
   - **React**: Already on v19.2.0 (latest stable release)
   - **React Flow**: Migrated from `reactflow` v11.11.4 to `@xyflow/react` v12.9.3
