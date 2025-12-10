@@ -257,11 +257,10 @@ All notable changes to Orbit will be documented in this file.
 
 ### Changed
 
-- **Dependency Updates (December 2024)** - 23 safe dependency updates merged
-  - **Cargo Dependencies (13 updates)**:
+- **Dependency Updates (December 2024)** - 22 safe dependency updates merged
+  - **Cargo Dependencies (12 updates)**:
     - `arrow` 54.x → 57.1.0 - Apache Arrow data structures
     - `aws-sdk-s3` 1.x → 1.113.0 - AWS S3 SDK
-    - `axum-extra` 0.9 → 0.12.2 - Axum web framework extras
     - `governor` 0.6 → 0.10.2 - Rate limiting middleware
     - `notify` 8.x → 8.2.0 - File system notifications
     - `polars` 0.x → 0.52.0 - DataFrame library for analytics
@@ -283,6 +282,7 @@ All notable changes to Orbit will be documented in this file.
     - `jsdom` 25.x → 27.2.0 - DOM testing
     - `vitest` 3.x → 4.0.15 - Testing framework
   - **Deferred (Breaking API Changes)**:
+    - `axum-extra` 0.12 - Requires axum 0.8 (breaking web framework upgrade)
     - `bincode` 2.0 - Complete API rewrite requires code refactoring
     - `redb` 3.1 - Transaction API changes need migration
     - `jsonschema` 0.37 - Validation error API redesign

@@ -162,9 +162,56 @@ Currently blocks React 19 upgrade. Dashboard build fails with TypeScript errors.
 
 ---
 
+## Issue 5: Update axum-extra to 0.12 (requires axum 0.8 upgrade)
+
+**Labels**: `dependencies`, `web`, `breaking-change`
+
+**Description**:
+Dependabot has flagged axum-extra 0.9 → 0.12 update, but this requires upgrading axum from 0.7 to 0.8, which is a breaking change.
+
+### Breaking Changes
+- axum-extra 0.12 requires axum 0.8 as a peer dependency
+- axum 0.8 has breaking API changes from 0.7
+- Multiple handler trait changes and routing API updates
+
+### Affected Files
+- `crates/orbit-web/Cargo.toml`
+- `crates/orbit-web/src/server.rs` (API route handlers)
+- `crates/orbit-web/src/api/*.rs` (all API modules)
+
+### Current Error
+```
+error[E0277]: the trait bound `fn(...) -> ... {handler}: Handler<_, _>` is not satisfied
+note: there are multiple different versions of crate `axum` in the dependency graph
+- axum 0.7.9 (direct dependency)
+- axum 0.8.7 (via axum-extra 0.12)
+```
+
+### Migration Options
+1. **Upgrade to axum 0.8**: Update all handler signatures and routing code
+2. **Stay on axum 0.7**: Keep axum-extra at 0.9 (current approach)
+
+### Impact
+Blocks axum-extra upgrade until full axum 0.8 migration is completed. This affects access to new features in axum-extra like improved cookie handling and typed headers.
+
+### Migration Steps (Option 1 - Upgrade to axum 0.8)
+1. Update `Cargo.toml`: `axum = "0.8"`, `axum-extra = "0.12"`
+2. Review axum 0.8 migration guide: https://github.com/tokio-rs/axum/releases/tag/axum-0.8.0
+3. Update all route handler signatures (trait bounds may have changed)
+4. Update State extraction patterns if changed
+5. Test all API endpoints thoroughly
+6. Verify WebSocket connections still work
+7. Check multipart file upload functionality
+
+### References
+- Axum 0.8 release notes: https://github.com/tokio-rs/axum/releases/tag/axum-0.8.0
+- Dependabot branch was: `dependabot/cargo/axum-extra-0.12.2`
+
+---
+
 ## Summary
 
-**Successfully Merged**: 23 dependency updates
-**Require Manual Work**: 4 updates (bincode, redb, jsonschema, recharts)
+**Successfully Merged**: 22 dependency updates
+**Require Manual Work**: 5 updates (axum-extra, bincode, redb, jsonschema, recharts)
 
 All 34 dependabot branches have been cleaned up. The safe updates are already merged to main and building successfully.

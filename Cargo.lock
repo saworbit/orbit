@@ -1064,7 +1064,6 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -1104,30 +1103,31 @@ dependencies = [
  "sync_wrapper",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
 name = "axum-extra"
-version = "0.12.2"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbfe9f610fe4e99cf0cfcd03ccf8c63c28c616fe714d80475ef731f3b13dd21b"
+checksum = "c794b30c904f0a1c2fb7740f7df7f7972dfaa14ef6f57cb6178dc63e5dca2f04"
 dependencies = [
- "axum 0.8.7",
- "axum-core 0.5.5",
+ "axum 0.7.9",
+ "axum-core 0.4.5",
  "bytes",
  "cookie",
- "futures-core",
+ "fastrand",
  "futures-util",
  "headers",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
  "mime",
+ "multer",
  "pin-project-lite",
+ "serde",
+ "tower",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
