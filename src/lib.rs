@@ -23,6 +23,7 @@ pub mod logging;
 pub mod manifest_integration;
 pub mod protocol;
 pub mod stats;
+#[cfg(feature = "orbit-system")]
 pub mod system; // Phase 1: OrbitSystem implementations
 pub mod telemetry;
 
