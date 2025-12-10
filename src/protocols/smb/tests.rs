@@ -161,12 +161,11 @@ mod tests {
 
     #[cfg(feature = "smb-native")]
     #[test]
-    fn test_capability_flags() {
-        let caps = SmbCapability::MULTI_CHANNEL | SmbCapability::LEASES;
-
-        assert!(caps.contains(SmbCapability::MULTI_CHANNEL));
-        assert!(caps.contains(SmbCapability::LEASES));
-        assert!(!caps.contains(SmbCapability::DFS));
+    fn test_capability_placeholder() {
+        // SmbCapability is now a placeholder in v0.11.0
+        // Advanced capabilities are handled internally by the smb crate
+        let caps = SmbCapability::new();
+        assert_eq!(caps, SmbCapability::default());
     }
 }
 
