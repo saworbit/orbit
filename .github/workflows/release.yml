@@ -143,8 +143,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-web:
-    name: Build orbit-web
+  build-server:
+    name: Build orbit-server with dashboard
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -152,24 +152,32 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          targets: wasm32-unknown-unknown
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
 
-      - name: Install cargo-leptos
-        run: cargo install cargo-leptos
-
-      - name: Build orbit-web
-        run: cargo leptos build --release -p orbit-web
-
-      - name: Create orbit-web archive
+      - name: Build React dashboard
+        working-directory: dashboard
         run: |
-          mkdir -p orbit-web-dist
-          cp target/release/orbit-web orbit-web-dist/
-          cp -r crates/orbit-web/target/site orbit-web-dist/
-          tar czf orbit-web-${{ github.ref_name }}.tar.gz -C orbit-web-dist .
+          npm ci
+          npm run build
 
-      - name: Upload orbit-web artifact
+      - name: Build orbit-server with UI
+        run: cargo build --release -p orbit-server --features ui
+
+      - name: Create orbit-server archive
+        run: |
+          mkdir -p orbit-server-dist
+          cp target/release/orbit-server orbit-server-dist/
+          cp -r dashboard/dist orbit-server-dist/dashboard
+          tar czf orbit-server-${{ github.ref_name }}.tar.gz -C orbit-server-dist .
+
+      - name: Upload orbit-server artifact
         uses: actions/upload-artifact@v5
         with:
-          name: orbit-web
-          path: orbit-web-${{ github.ref_name }}.tar.gz
+          name: orbit-server
+          path: orbit-server-${{ github.ref_name }}.tar.gz
