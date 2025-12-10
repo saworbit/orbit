@@ -7,6 +7,7 @@ members = [
     "crates/core-resilience",
     "crates/core-cdc",
     "crates/core-semantic",
+    "crates/orbit-core-interface",  # Phase 1: I/O Abstraction Layer
     "crates/magnetar",
     "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
 ]
@@ -95,6 +96,7 @@ orbit-core-audit = { path = "crates/core-audit" }
 # V2 Architecture
 orbit-core-cdc = { path = "crates/core-cdc" }
 orbit-core-semantic = { path = "crates/core-semantic" }
+orbit-core-interface = { path = "crates/orbit-core-interface" }  # Phase 1: I/O Abstraction
 
 # SMB native dependencies (optional, feature-gated)
 bytes = { version = "1", optional = true }
@@ -183,7 +185,11 @@ panic = "abort"        # Smaller panic handler
 [features]
 # Minimal default: local file copy only, zero-copy optimizations
 # For network protocols or GUI, explicitly opt-in with --features
-default = ["zero-copy"]
+# Phase 1: Added tokio and async-trait for OrbitSystem abstraction
+default = ["zero-copy", "orbit-system"]
+
+# OrbitSystem abstraction layer (Phase 1)
+orbit-system = ["dep:tokio", "dep:async-trait"]
 
 # Zero-copy system calls for maximum performance
 zero-copy = []

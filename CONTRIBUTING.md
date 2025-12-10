@@ -33,6 +33,72 @@ Thanks for your interest in contributing to Orbit! We welcome community contribu
 
 ---
 
+## 🏗️ Architecture: OrbitSystem Pattern
+
+### Phase 1: I/O Abstraction Layer
+
+As of v0.6.0, Orbit uses the **OrbitSystem trait** to abstract filesystem and compute operations. This enables both local (standalone) and distributed (Grid/Star) topologies with the same codebase.
+
+#### Key Components
+
+1. **`orbit-core-interface`**: Defines the `OrbitSystem` trait
+   - Discovery operations (`exists`, `metadata`, `read_dir`)
+   - Data access (`reader`, `writer`)
+   - Compute offloading (`read_header`, `calculate_hash`)
+
+2. **`LocalSystem`**: Default implementation for standalone mode
+   - Located in `src/system/local.rs`
+   - Wraps `tokio::fs` operations
+   - Zero-overhead abstraction via monomorphization
+
+3. **`MockSystem`**: In-memory implementation for testing
+   - Located in `src/system/mock.rs`
+   - No filesystem I/O required
+   - Deterministic test results
+
+#### Using OrbitSystem in Your Code
+
+When adding new features that need filesystem access, use the `OrbitSystem` trait:
+
+```rust
+use orbit_core_interface::OrbitSystem;
+use std::path::Path;
+
+async fn process_file<S: OrbitSystem>(system: &S, path: &Path) -> anyhow::Result<()> {
+    // Check if file exists
+    if !system.exists(path).await {
+        return Ok(());
+    }
+
+    // Read file header for analysis
+    let header = system.read_header(path, 512).await?;
+
+    // Process...
+    Ok(())
+}
+```
+
+#### Testing with MockSystem
+
+Write tests without touching the filesystem:
+
+```rust
+#[tokio::test]
+async fn test_process_file() {
+    use orbit::system::MockSystem;
+
+    let system = MockSystem::new();
+    system.add_file("/test.txt", b"Hello, World!");
+
+    let result = process_file(&system, Path::new("/test.txt")).await;
+    assert!(result.is_ok());
+}
+```
+
+For more details, see [`docs/specs/PHASE_1_ABSTRACTION_SPEC.md`](docs/specs/PHASE_1_ABSTRACTION_SPEC.md).
+
+---
+
 ## 🏗️ Building and Testing
 
 ### Resource Optimization

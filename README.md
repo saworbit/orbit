@@ -22,6 +22,7 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
+- **NEW v0.6.0-alpha.1**: Phase 1 I/O Abstraction Layer - OrbitSystem trait enables future distributed topologies
 - **NEW v2.2.0-rc.1**: Full-stack CI/CD pipeline with dashboard-quality checks, professional file browser, and enhanced developer experience
 - **v2.2.0-beta.1**: Enterprise platform features - Intelligence API (Estimations), Administration (User Management), System Health monitoring
 - **v2.2.0-alpha.2**: React Dashboard implementation with Visual Pipeline Editor, File Browser, and Job Management UI
@@ -97,6 +98,7 @@ Understanding feature stability helps you make informed decisions about what to 
 |---------|----------|-------|
 | **Core File Copy (Buffered)** | 🟢 Stable | Well-tested, safe for production use |
 | **Zero-Copy Optimization** | 🟢 Stable | Platform-specific (Linux, macOS, Windows) |
+| **OrbitSystem Abstraction (Phase 1)** | 🟢 Stable | I/O abstraction layer, foundation for Grid topology |
 | **Resume/Checkpoint** | 🟡 Beta | Works well, needs more edge-case testing |
 | **Compression (LZ4, Zstd)** | 🟢 Stable | Reliable for most workloads |
 | **Checksum Verification** | 🟢 Stable | SHA-256, BLAKE3 well-tested |
@@ -1499,10 +1501,50 @@ audit_log_path = "/var/log/orbit_audit.log"
 
 ## 🧩 Modular Architecture
 
+### Phase 1: OrbitSystem I/O Abstraction (v0.6.0-alpha.1)
+
+**NEW!** Orbit now features a universal I/O abstraction layer that decouples core logic from filesystem operations.
+
+**Key Components:**
+
+- **`orbit-core-interface`**: Defines the `OrbitSystem` trait
+  - Discovery: `exists()`, `metadata()`, `read_dir()`
+  - Data Access: `reader()`, `writer()`
+  - Compute Offloading: `read_header()`, `calculate_hash()`
+
+- **`LocalSystem`**: Default provider for standalone mode (wraps `tokio::fs`)
+- **`MockSystem`**: In-memory implementation for testing (no disk I/O)
+
+**Benefits:**
+
+- ✅ **Testability**: Unit tests without filesystem via `MockSystem`
+- ✅ **Flexibility**: Runtime switching between Local/Remote providers
+- ✅ **Future-Ready**: Foundation for distributed Grid/Star topology
+- ✅ **Performance**: Compute offloading enables efficient distributed CDC
+
+```rust
+use orbit::system::LocalSystem;
+use orbit_core_interface::OrbitSystem;
+
+async fn example() -> anyhow::Result<()> {
+    let system = LocalSystem::new();
+    let header = system.read_header(path, 512).await?;
+    // Same code works for future RemoteSystem!
+    Ok(())
+}
+```
+
+📖 **See:** [`docs/specs/PHASE_1_ABSTRACTION_SPEC.md`](docs/specs/PHASE_1_ABSTRACTION_SPEC.md)
+
+---
+
+### Crate Structure
+
 Orbit is built from clean, reusable crates:
 
 | Crate | Purpose | Status |
 |-------|---------|--------|
+| 🔌 `orbit-core-interface` | OrbitSystem I/O abstraction (Phase 1) | 🟢 Stable |
 | 🧩 `core-manifest` | Manifest parsing and job orchestration | 🟡 Beta |
 | 🌌 `core-starmap` | Job planner and dependency graph | 🟡 Beta |
 | 🌌 `core-starmap::universe` | Global deduplication index (V2) | 🔴 Alpha |

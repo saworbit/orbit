@@ -1,8 +1,12 @@
 /*!
  * Orbit CLI - Command Line Interface
  *
- * Version: 0.4.0
+ * Version: 0.6.0
  * Author: Shane Wall <shaneawall@gmail.com>
+ *
+ * Phase 1 Note: The OrbitSystem abstraction (orbit-core-interface) is now available.
+ * Future sync operations will use dependency injection with LocalSystem (standalone)
+ * or RemoteSystem (Grid/Star topology). See docs/specs/PHASE_1_ABSTRACTION_SPEC.md
  */
 
 use clap::{Parser, Subcommand, ValueEnum};

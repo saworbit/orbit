@@ -12,6 +12,11 @@ serde = { version = "1.0", features = ["derive"] }
 
 # Error handling
 thiserror = "2.0"
+anyhow = "1.0"
+
+# I/O Abstraction (Phase 1)
+orbit-core-interface = { path = "../orbit-core-interface" }
+async-trait = "0.1"
 
 [dev-dependencies]
 tempfile = "3.10"

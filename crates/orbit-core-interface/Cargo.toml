@@ -1,0 +1,23 @@
+[package]
+name = "orbit-core-interface"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shane Wall <shaneawall@gmail.com>"]
+description = "Core I/O abstraction layer for Orbit - enables local and distributed filesystem operations"
+license = "Apache-2.0"
+repository = "https://github.com/saworbit/orbit"
+keywords = ["filesystem", "abstraction", "async", "distributed", "io"]
+
+[dependencies]
+# Async traits
+async-trait = "0.1"
+
+# Async I/O
+tokio = { version = "1", features = ["io-util", "fs"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+tokio-test = "0.4"

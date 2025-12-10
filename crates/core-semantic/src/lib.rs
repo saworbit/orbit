@@ -314,7 +314,7 @@ impl SemanticRegistry {
         self.adapters.push(adapter);
     }
 
-    /// Determine the replication intent for a file
+    /// Determine the replication intent for a file (synchronous version with provided header)
     ///
     /// # Arguments
     /// * `path` - File path
@@ -331,6 +331,44 @@ impl SemanticRegistry {
 
         // Fallback to default
         DefaultAdapter.analyze(path, head_bytes)
+    }
+
+    /// Determine the replication intent for a file (async version using OrbitSystem)
+    ///
+    /// # Arguments
+    /// * `system` - The OrbitSystem implementation to use for reading file headers
+    /// * `path` - File path
+    ///
+    /// # Returns
+    /// The intent from the first matching adapter, or default intent if none match.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use orbit_core_semantic::SemanticRegistry;
+    /// use orbit_core_interface::OrbitSystem;
+    /// use std::path::Path;
+    ///
+    /// async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    ///     let registry = SemanticRegistry::default();
+    ///     let intent = registry.determine_intent_async(system, Path::new("/data/config.toml")).await?;
+    ///     println!("Priority: {:?}", intent.priority);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn determine_intent_async<S: orbit_core_interface::OrbitSystem>(
+        &self,
+        system: &S,
+        path: &Path,
+    ) -> anyhow::Result<ReplicationIntent> {
+        // Read first 512 bytes for magic number detection and file type analysis
+        // This is typically enough for most file format detection
+        let head_bytes = system.read_header(path, 512).await.map_err(|e| {
+            anyhow::anyhow!("Failed to read file header for {}: {}", path.display(), e)
+        })?;
+
+        // Use the synchronous version with the fetched header
+        Ok(self.determine_intent(path, &head_bytes))
     }
 }
 

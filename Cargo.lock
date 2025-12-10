@@ -3752,6 +3752,7 @@ dependencies = [
  "futures",
  "hyper 1.8.1",
  "orbit-core-cdc",
+ "orbit-core-interface",
  "orbit-core-resilience",
  "orbit-core-starmap",
  "polars",
@@ -4235,6 +4236,7 @@ dependencies = [
  "once_cell",
  "orbit-core-audit",
  "orbit-core-cdc",
+ "orbit-core-interface",
  "orbit-core-manifest",
  "orbit-core-semantic",
  "orbit-core-starmap",
@@ -4289,6 +4291,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "orbit-core-interface"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-test",
+]
+
+[[package]]
 name = "orbit-core-manifest"
 version = "0.1.0"
 dependencies = [
@@ -4320,6 +4333,9 @@ dependencies = [
 name = "orbit-core-semantic"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
+ "orbit-core-interface",
  "serde",
  "tempfile",
  "thiserror 2.0.17",

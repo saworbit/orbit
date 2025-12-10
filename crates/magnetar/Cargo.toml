@@ -33,6 +33,7 @@ arrow = { version = "57", optional = true }
 # Core Orbit crates
 orbit-core-cdc = { path = "../core-cdc" }
 orbit-core-starmap = { path = "../core-starmap" }
+orbit-core-interface = { path = "../orbit-core-interface" }  # Phase 1: I/O Abstraction
 
 # Resilience - now using the core-resilience crate
 orbit-core-resilience = { path = "../core-resilience", optional = true }

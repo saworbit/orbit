@@ -23,6 +23,7 @@ pub mod logging;
 pub mod manifest_integration;
 pub mod protocol;
 pub mod stats;
+pub mod system; // Phase 1: OrbitSystem implementations
 pub mod telemetry;
 
 // Native SMB protocol support (feature-gated)
