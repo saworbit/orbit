@@ -10,7 +10,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.5.0 Core / v2.2.0-rc.1 Control Plane)
+## ⚠️ Project Status: Alpha (v0.6.0 Core / v2.2.0-rc.1 Control Plane)
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -69,7 +69,7 @@ See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-featu
 
 Orbit is a file transfer tool built in Rust that aims to combine reliability with performance. Whether you're backing up data, syncing files across locations, transferring to network shares, or moving data to the cloud, Orbit provides features designed to help.
 
-**Key Philosophy:** Intelligence, resilience, and speed. Currently in active development (v0.5.0 alpha).
+**Key Philosophy:** Intelligence, resilience, and speed. Currently in active development (v0.6.0 alpha).
 
 ---
 
@@ -105,9 +105,9 @@ Understanding feature stability helps you make informed decisions about what to 
 | **S3 Backend** | 🟡 Beta | Works well, multipart upload is newer |
 | **SMB Backend** | 🟡 Beta | v0.11.0 upgrade complete, ready for integration testing |
 | **Delta Detection (V1)** | 🟡 Beta | rsync-style algorithm, tested but newer |
-| **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, newly introduced in v0.5.0 |
-| **Semantic Replication** | 🔴 Alpha | Priority-based transfers, new in v0.5.0 |
-| **Neutrino Fast Lane** | 🔴 Alpha | Small file optimization (<8KB), new in v0.5.0 |
+| **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, introduced in v0.5.0 |
+| **Semantic Replication** | 🔴 Alpha | Priority-based transfers, introduced in v0.5.0 |
+| **Neutrino Fast Lane** | 🔴 Alpha | Small file optimization (<8KB), introduced in v0.5.0 |
 | **Global Deduplication (V3)** | 🟡 Beta | High-cardinality Universe index, v2.1 scalability upgrade |
 | **Disk Guardian** | 🟡 Beta | Pre-flight checks, works well but newer |
 | **Magnetar State Machine** | 🟡 Beta | Job persistence, recently added |
@@ -261,7 +261,7 @@ cargo run --example disk_guardian_demo
 
 ### 🛰️ Guidance System: The "Flight Computer"
 
-**NEW in v0.5.0!** Automatic configuration validation and optimization that ensures safe, performant transfers.
+Automatic configuration validation and optimization that ensures safe, performant transfers.
 
 **What It Does:**
 The Guidance System acts as an intelligent pre-processor, analyzing your configuration for logical conflicts and automatically resolving them before execution begins. Think of it as a co-pilot that prevents common mistakes and optimizes settings based on hardware capabilities and use-case logic.
@@ -492,7 +492,7 @@ breaker.execute(|| {
 To enable extended metadata preservation:
 ```toml
 [dependencies]
-orbit = { version = "0.5.0", features = ["extended-metadata"] }
+orbit = { version = "0.6.0", features = ["extended-metadata"] }
 ```
 
 > **Note:** Extended attributes have platform limitations (e.g., partial or no support on Windows, requires compatible filesystem on Unix). Ownership preservation typically requires root/administrator privileges.
@@ -560,7 +560,7 @@ orbit --source /critical --dest /backup \
 
 **NEW in v0.4.1!** rsync-inspired delta algorithm that minimizes bandwidth by transferring only changed blocks.
 
-**NEW in v0.5.0: Orbit V2 Architecture** 🚀
+**Orbit V2 Architecture** 🚀
 
 **UPGRADED in v2.1: Universe Scalability** 🌌
 - **High-Cardinality Performance** — Eliminated O(N²) write amplification bottleneck in Universe index
@@ -593,7 +593,7 @@ orbit --source /critical --dest /backup \
   - 4/4 persistence tests passing
 - **See:** [ORBIT_V2_ARCHITECTURE.md](ORBIT_V2_ARCHITECTURE.md) for complete details
 
-**NEW in v0.5.0: Neutrino Fast Lane** ⚡
+**Neutrino Fast Lane** ⚡
 
 The **Neutrino Fast Lane** provides ~3x performance improvement for small-file workloads by bypassing CDC/deduplication overhead:
 
@@ -933,7 +933,7 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 | ☁️ **GCS** | 🚧 Planned | - | Google Cloud Storage |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
 
-#### 🆕 Unified Backend Abstraction (v0.5.0 - Streaming API)
+#### 🆕 Unified Backend Abstraction (v0.5.0+ - Streaming API)
 
 **NEW!** Write once, run on any storage backend. The backend abstraction provides a consistent async API with **streaming I/O** for memory-efficient large file transfers:
 
@@ -976,10 +976,10 @@ let smb = SmbBackend::new(SmbConfig::new("server", "share")
 
 **Features:**
 - ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, `smb://user@server/share/path`, etc.
-- ✅ **Streaming I/O**: Upload files up to **5TB** to S3 with ~200MB RAM (v0.5.0 ⭐)
-- ✅ **Constant Memory Listing**: List millions of S3 objects with ~10MB RAM (v0.5.0 ⭐)
-- ✅ **Automatic Multipart Upload**: S3 files ≥5MB use efficient chunked transfers (v0.5.0 ⭐)
-- ✅ **Optimized Download**: Sliding window concurrency for 30-50% faster S3 downloads (v0.5.0 ⭐)
+- ✅ **Streaming I/O**: Upload files up to **5TB** to S3 with ~200MB RAM
+- ✅ **Constant Memory Listing**: List millions of S3 objects with ~10MB RAM
+- ✅ **Automatic Multipart Upload**: S3 files ≥5MB use efficient chunked transfers
+- ✅ **Optimized Download**: Sliding window concurrency for 30-50% faster S3 downloads
 - ✅ **Metadata operations**: Set permissions, timestamps, xattrs, ownership
 - ✅ **Extensibility**: Plugin system for custom backends
 - ✅ **Type-safe**: Strong typing with comprehensive error handling
@@ -988,7 +988,7 @@ let smb = SmbBackend::new(SmbConfig::new("server", "share")
 📖 **Full Guide:** [docs/guides/BACKEND_GUIDE.md](docs/guides/BACKEND_GUIDE.md)
 📖 **Migration Guide:** [BACKEND_STREAMING_GUIDE.md](BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
 
-#### 🆕 SSH/SFTP Remote Access (v0.5.0)
+#### SSH/SFTP Remote Access
 
 Transfer files securely over SSH/SFTP with async implementation:
 
@@ -1029,7 +1029,7 @@ orbit --source ssh://server.com/large-file.iso --dest ./large-file.iso \
 
 📖 **Full Documentation:** See [`docs/guides/PROTOCOL_GUIDE.md`](docs/guides/PROTOCOL_GUIDE.md#-ssh--sftp-production-ready)
 
-#### 🆕 S3 Cloud Storage (v0.5.0 - Streaming Optimized)
+#### S3 Cloud Storage (Streaming Optimized)
 
 Transfer files seamlessly to AWS S3 and S3-compatible storage services with **streaming I/O** and advanced features:
 
@@ -1051,10 +1051,10 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 
 **S3 Features:**
 - ✅ Pure Rust (no AWS CLI dependency)
-- ✅ **Streaming multipart upload** - Files ≥5MB automatically use multipart with **5TB max file size** (v0.5.0 ⭐)
-- ✅ **Constant memory usage** - ~200MB RAM for any file size upload/download (v0.5.0 ⭐)
-- ✅ **Optimized downloads** - Sliding window concurrency for 30-50% faster transfers (v0.5.0 ⭐)
-- ✅ **Lazy S3 pagination** - List millions of objects with ~10MB RAM (v0.5.0 ⭐)
+- ✅ **Streaming multipart upload** - Files ≥5MB automatically use multipart with **5TB max file size**
+- ✅ **Constant memory usage** - ~200MB RAM for any file size upload/download
+- ✅ **Optimized downloads** - Sliding window concurrency for 30-50% faster transfers
+- ✅ **Lazy S3 pagination** - List millions of objects with ~10MB RAM
 - ✅ Resumable transfers with checkpoint support
 - ✅ Parallel chunk transfers (configurable)
 - ✅ All storage classes (Standard, IA, Glacier, etc.)
@@ -1132,7 +1132,7 @@ audit_log_path = "/var/log/orbit_audit.log"
 
 ## 🚀 Quick Start
 
-> **⚠️ Alpha Software:** Remember that Orbit is in active development (v0.5.0). Test thoroughly in non-production environments first, and always maintain backups when working with important data.
+> **⚠️ Alpha Software:** Remember that Orbit is in active development (v0.6.0). Test thoroughly in non-production environments first, and always maintain backups when working with important data.
 
 ### Install
 
@@ -1162,11 +1162,11 @@ cargo install --path . --features network  # With network
 cargo install --path . --features full    # Everything
 ```
 
-> **NEW in v0.5/v0.6:** Orbit now defaults to a minimal build (just local copy with zero-copy optimizations) for fastest compile times and smallest binaries. Network protocols and GUI are opt-in via feature flags.
+> **v0.5+:** Orbit defaults to a minimal build (just local copy with zero-copy optimizations) for fastest compile times and smallest binaries. Network protocols and GUI are opt-in via feature flags.
 
 ### Feature Flags & Binary Sizes
 
-**v0.5+ Performance Improvements:**
+**v0.5-0.6 Performance Improvements:**
 - 🎯 **60% smaller default binary** — Minimal build is ~10MB (was ~50MB)
 - ⚡ **50% faster compilation** — Default build in ~60s (was ~120s)
 - 🔒 **Reduced attack surface** — No web server code in default CLI build
@@ -1505,10 +1505,10 @@ Orbit is built from clean, reusable crates:
 |-------|---------|--------|
 | 🧩 `core-manifest` | Manifest parsing and job orchestration | 🟡 Beta |
 | 🌌 `core-starmap` | Job planner and dependency graph | 🟡 Beta |
-| 🌌 `core-starmap::universe` | Global deduplication index (V2) | 🔴 Alpha (v0.5.0) |
-| 🌌 `core-starmap::migrate` | V1→V2 migration utilities | 🔴 Alpha (v0.5.0) |
-| 🧬 `core-cdc` | FastCDC content-defined chunking (V2) | 🔴 Alpha (v0.5.0) |
-| 🧠 `core-semantic` | Intent-based replication (V2) | 🔴 Alpha (v0.5.0) |
+| 🌌 `core-starmap::universe` | Global deduplication index (V2) | 🔴 Alpha |
+| 🌌 `core-starmap::migrate` | V1→V2 migration utilities | 🔴 Alpha |
+| 🧬 `core-cdc` | FastCDC content-defined chunking (V2) | 🔴 Alpha |
+| 🧠 `core-semantic` | Intent-based replication (V2) | 🔴 Alpha |
 | 📊 `core-audit` | Structured logging and telemetry | 🟡 Beta |
 | ⚡ `core-zero-copy` | OS-level optimized I/O | 🟢 Stable |
 | 🗜️ `core-compress` | Compression and decompression | 🟢 Stable |
@@ -1982,7 +1982,7 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 
 ## 🧪 Roadmap
 
-### ✅ Core Features Implemented (v0.4.1 - v0.5.0)
+### ✅ Core Features Implemented (v0.4.1 - v0.6.0)
 
 **Stable/Well-Tested:**
 - Zero-copy system calls (Linux, macOS, Windows)
@@ -2091,7 +2091,7 @@ cargo clippy
 - **Nebula MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **v1.0.0-alpha.2**
 - **Nebula Changelog:** [`crates/orbit-web/CHANGELOG.md`](crates/orbit-web/CHANGELOG.md) ⭐ **NEW!**
 - **Nebula README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **v1.0.0-alpha.2**
-- **Web GUI (v0.5.0):** [`docs/WEB_GUI.md`](docs/WEB_GUI.md) (deprecated, see Nebula docs)
+- **Web Dashboard (v2.2.0):** See Control Plane documentation
 - **GUI Integration:** [`docs/GUI_INTEGRATION.md`](docs/GUI_INTEGRATION.md)
 - **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
 - **Disk Guardian:** [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
