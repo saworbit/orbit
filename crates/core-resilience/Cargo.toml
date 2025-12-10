@@ -13,7 +13,7 @@ keywords = ["resilience", "circuit-breaker", "rate-limiter", "connection-pool", 
 tokio = { version = "1", features = ["time", "sync"] }
 
 # Rate limiting (optional)
-governor = { version = "0.6", optional = true }
+governor = { version = "0.10", optional = true }
 
 # Core utilities
 async-trait = "0.1"
