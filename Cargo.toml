@@ -47,7 +47,7 @@ rayon = "1.10"
 crossbeam-channel = "0.5"
 
 # System information
-sysinfo = "0.35"
+sysinfo = "0.37"
 notify = "8.2"
 tempfile = "3.10"
 
@@ -85,7 +85,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"]
 orbit-server = { path = "crates/orbit-web", optional = true, default-features = false }
 
 # Random for backoff jitter
-rand = "0.8"
+rand = "0.9"
 
 # Manifest system
 orbit-core-manifest = { path = "crates/core-manifest" }
