@@ -125,7 +125,9 @@ function ChartTooltipContent({
     indicator?: "line" | "dot" | "dashed";
     nameKey?: string;
     labelKey?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     payload?: any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     label?: any;
   }) {
   const { config } = useChart();
@@ -181,6 +183,7 @@ function ChartTooltipContent({
     >
       {!nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         {payload.map((item: any, index: number) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
@@ -261,6 +264,7 @@ function ChartLegendContent({
 }: React.ComponentProps<"div"> & {
   hideIcon?: boolean;
   nameKey?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   payload?: any[];
   verticalAlign?: "top" | "bottom";
 }) {
@@ -278,6 +282,7 @@ function ChartLegendContent({
         className
       )}
     >
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {payload.map((item: any) => {
         const key = `${nameKey || item.dataKey || "value"}`;
         const itemConfig = getPayloadConfigFromPayload(config, item, key);
