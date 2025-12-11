@@ -22,9 +22,10 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v0.6.0-alpha.3**: Phase 3 - Nucleus Client & RemoteSystem (Client-side connectivity for Nucleus-to-Star orchestration, 99.997% network reduction via compute offloading)
-- **NEW v0.6.0-alpha.2**: Phase 2 - Star Protocol & Agent (gRPC remote execution server for distributed Orbit Grid)
-- **NEW v0.6.0-alpha.1**: Phase 1 I/O Abstraction Layer - OrbitSystem trait enables future distributed topologies
+- **NEW v0.6.0-alpha.4**: Phase 4 - Data Plane (P2P Transfer) - Direct Star-to-Star data transfer eliminates Nucleus bandwidth bottleneck, enabling infinite horizontal scaling
+- **v0.6.0-alpha.3**: Phase 3 - Nucleus Client & RemoteSystem (Client-side connectivity for Nucleus-to-Star orchestration, 99.997% network reduction via compute offloading)
+- **v0.6.0-alpha.2**: Phase 2 - Star Protocol & Agent (gRPC remote execution server for distributed Orbit Grid)
+- **v0.6.0-alpha.1**: Phase 1 I/O Abstraction Layer - OrbitSystem trait enables future distributed topologies
 - **NEW v2.2.0-rc.1**: Full-stack CI/CD pipeline with dashboard-quality checks, professional file browser, and enhanced developer experience
 - **v2.2.0-beta.1**: Enterprise platform features - Intelligence API (Estimations), Administration (User Management), System Health monitoring
 - **v2.2.0-alpha.2**: React Dashboard implementation with Visual Pipeline Editor, File Browser, and Job Management UI

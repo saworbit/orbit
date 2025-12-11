@@ -4,7 +4,72 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
-### Added
+### Added - Phase 4: The Data Plane (Star-to-Star Transfer)
+
+**Peer-to-Peer Data Movement** - This release implements direct Star-to-Star data transfer, eliminating the Nucleus bandwidth bottleneck. Data now flows directly between Stars without routing through the Nucleus, enabling infinite horizontal bandwidth scaling.
+
+#### Protocol Extensions
+
+- **New RPC Methods in `orbit.proto`**:
+  - **`ReplicateFile`**: Command interface (Nucleus → Destination Star)
+    - Orchestrates P2P transfer with source URL, paths, and JWT token
+    - Returns success status, bytes transferred, and SHA-256 checksum
+  - **`ReadStream`**: Data access interface (Destination Star → Source Star)
+    - Streams file content in 64KB chunks with backpressure control
+    - Stateless JWT token authorization (no session required)
+  - **New message types**: `ReplicateRequest`, `ReplicateResponse`, `ReadStreamRequest`, `ReadStreamResponse`
+
+#### Security Infrastructure
+
+- **`orbit-star/src/auth.rs`**: JWT-based authentication service
+  - **Stateless authorization**: HMAC-SHA256 signed tokens
+  - **Path-specific permissions**: Token authorizes specific file access
+  - **Time-bound validity**: 1-hour default expiration (configurable)
+  - **Zero-trust model**: No shared database required between Stars
+  - **Token claims**: subject, allow_file, expiration, issued_at, issuer
+- **Shared secret distribution**: `ORBIT_AUTH_SECRET` environment variable
+
+#### Star Agent Enhancements
+
+- **`read_stream()` implementation** (Source Star):
+  - JWT token verification before serving data
+  - PathJail security validation (directory traversal protection)
+  - Async I/O with tokio::fs for non-blocking reads
+  - 64KB streaming chunks with 4-message backpressure buffer
+  - Graceful client disconnection handling
+- **`replicate_file()` implementation** (Destination Star):
+  - Session validation (Nucleus authentication required)
+  - Remote Star connection via gRPC
+  - Streaming write with SHA-256 checksum computation
+  - Expected size verification (detects truncated transfers)
+  - Automatic parent directory creation
+- **CLI updates**: Added `--auth-secret` parameter and `ORBIT_AUTH_SECRET` env var
+- **Dependencies**: Added `jsonwebtoken`, `sha2`, `serde`
+
+#### Testing & Documentation
+
+- **Integration tests** (`p2p_transfer_test.rs`):
+  - Triangle Test: End-to-end Star → Star transfer verification
+  - Security tests: Invalid token rejection, path authorization enforcement
+  - Streaming tests: Multi-chunk transfer validation (200KB file)
+- **Comprehensive documentation**:
+  - Phase 4 specification: [`docs/specs/PHASE_4_DATA_PLANE_SPEC.md`](docs/specs/PHASE_4_DATA_PLANE_SPEC.md)
+  - Implementation summary: [`docs/PHASE_4_IMPLEMENTATION_SUMMARY.md`](docs/PHASE_4_IMPLEMENTATION_SUMMARY.md)
+
+#### Performance Impact
+
+- **Before Phase 4**: 1GB transfer Star A → Star B = 2GB Nucleus traffic (bottleneck)
+- **After Phase 4**: 1GB transfer Star A → Star B = <1KB Nucleus traffic (command only)
+- **Scalability**: Bandwidth now scales horizontally with number of Stars
+- **Chunk size**: 64KB (balance between memory usage and RPC overhead)
+
+#### Architecture Evolution
+
+```
+BEFORE: [Star A] ──(1GB)──> [Nucleus] ──(1GB)──> [Star B]  (bottleneck)
+AFTER:  [Star A] ──(1GB)────────────────────────> [Star B]  (P2P direct)
+        [Nucleus] (sends <1KB command only)
+```
 
 ### Changed
 

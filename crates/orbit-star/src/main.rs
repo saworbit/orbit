@@ -3,6 +3,7 @@
 //! The Star agent exposes local filesystem and CPU resources to the Nucleus (Hub)
 //! over gRPC. It provides secure, sandboxed access for distributed data operations.
 
+mod auth;
 mod security;
 mod server;
 
@@ -26,6 +27,10 @@ struct Cli {
     /// Authentication token (shared secret with Nucleus)
     #[arg(short, long, env = "ORBIT_STAR_TOKEN")]
     token: String,
+
+    /// Auth secret for P2P transfer tokens (shared across all Stars)
+    #[arg(long, env = "ORBIT_AUTH_SECRET")]
+    auth_secret: String,
 
     /// Allowed root directories (can be specified multiple times)
     #[arg(short, long = "allow", required = true)]
@@ -63,6 +68,10 @@ async fn main() -> Result<()> {
         anyhow::bail!("Authentication token cannot be empty");
     }
 
+    if args.auth_secret.is_empty() {
+        anyhow::bail!("Auth secret cannot be empty (required for P2P transfers)");
+    }
+
     if args.allow_paths.is_empty() {
         anyhow::bail!("At least one allowed path must be specified");
     }
@@ -84,7 +93,7 @@ async fn main() -> Result<()> {
         .context("Failed to parse bind address")?;
 
     // Create the Star service implementation
-    let star = StarImpl::new(args.allow_paths, args.token);
+    let star = StarImpl::new(args.allow_paths, args.token, args.auth_secret);
 
     info!("✨ Starting gRPC server on {}", addr);
 

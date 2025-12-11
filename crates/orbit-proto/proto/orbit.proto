@@ -18,6 +18,18 @@ service StarService {
   // --- 4. Compute (CDC) ---
   // The Heavy Lifter: Hashes a file range on the remote CPU.
   rpc CalculateHash (HashRequest) returns (HashResponse);
+
+  // ═══════════════════════════════════════════════════════════
+  // Phase 4: Data Plane (Peer-to-Peer Transfer)
+  // ═══════════════════════════════════════════════════════════
+
+  // ① Command Interface (Nucleus → Destination Star)
+  // "Please pull data from the remote source and save it locally."
+  rpc ReplicateFile (ReplicateRequest) returns (ReplicateResponse);
+
+  // ② Data Access Interface (Destination Star → Source Star)
+  // "Give me the byte stream for this file."
+  rpc ReadStream (ReadStreamRequest) returns (stream ReadStreamResponse);
 }
 
 // --- Message Types ---
@@ -63,4 +75,42 @@ message HashRequest {
 
 message HashResponse {
   bytes hash = 1; // 32 bytes (BLAKE3)
+}
+
+// ═══════════════════════════════════════════════════════════
+// Phase 4: Data Plane Messages
+// ═══════════════════════════════════════════════════════════
+
+// ReplicateFile: Nucleus commands Destination to pull
+message ReplicateRequest {
+  // Where to pull from
+  string source_star_url = 1;     // e.g., "http://10.0.0.5:50051"
+  string remote_path = 2;         // File path on Source Star
+
+  // Where to save
+  string local_path = 3;          // Destination path on this Star
+
+  // Security
+  string transfer_token = 4;      // JWT signed by Nucleus
+
+  // Metadata
+  uint64 expected_size = 5;       // For progress tracking (optional)
+  bytes expected_checksum = 6;    // SHA-256 for verification (optional)
+}
+
+message ReplicateResponse {
+  bool success = 1;
+  uint64 bytes_transferred = 2;
+  string checksum = 3;            // SHA-256 of transferred data
+  string error_message = 4;       // Populated if success = false
+}
+
+// ReadStream: Star-to-Star data transfer
+message ReadStreamRequest {
+  string path = 1;                // File to read
+  string transfer_token = 2;      // Authorization token from Nucleus
+}
+
+message ReadStreamResponse {
+  bytes chunk = 1;                // File data (up to 64KB per message)
 }

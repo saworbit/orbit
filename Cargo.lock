@@ -4471,8 +4471,11 @@ version = "0.6.0"
 dependencies = [
  "anyhow",
  "clap",
+ "jsonwebtoken",
  "orbit-core-cdc",
  "orbit-proto",
+ "serde",
+ "sha2 0.10.9",
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
