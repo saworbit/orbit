@@ -1,0 +1,57 @@
+# cargo-deny configuration
+# Documentation: https://embarkstudios.github.io/cargo-deny/
+
+# Note: This is a minimal configuration. cargo-deny will use sensible defaults
+# for any settings not explicitly configured here.
+
+[advisories]
+# Ignore specific advisories if needed
+ignore = []
+
+[licenses]
+# Fail the build if any dependency has a license we don't explicitly allow
+unlicensed = "deny"
+
+# Allow Apache-2.0 compatible licenses
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "CC0-1.0",
+    "Zlib",
+    "Unicode-DFS-2016",
+    "MPL-2.0",  # Mozilla Public License (weak copyleft, compatible with Apache-2.0)
+]
+
+# Explicitly deny strong copyleft licenses
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "AGPL-3.0",
+    "LGPL-2.0",
+    "LGPL-2.1",
+    "LGPL-3.0",
+]
+
+# Confidence threshold for license detection
+confidence-threshold = 0.8
+
+[bans]
+# Warn on multiple versions of same crate
+multiple-versions = "warn"
+
+# Specific crates to skip for duplicate version warnings
+skip = []
+
+# Specific crates to ban entirely
+deny = []
+
+[sources]
+# Lint level for what to happen when a crate from a git repository is encountered
+unknown-git = "warn"
+
+# Allow git repositories
+allow-git = []
