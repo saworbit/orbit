@@ -61,13 +61,24 @@ pub const UNIVERSE_V3_VERSION: u16 = 3;
 const CHUNKS_TABLE_V3: MultimapTableDefinition<&[u8; 32], &[u8]> =
     MultimapTableDefinition::new("chunks_v3");
 
-/// A location where a chunk exists
+/// A location where a chunk exists in the Orbit Grid
 ///
 /// This is serialized individually for each entry in the multimap,
 /// avoiding the O(N²) write amplification of the V2 approach.
+///
+/// # Phase 5 Enhancement
+///
+/// The `star_id` field enables the Sentinel to identify which Star
+/// owns each chunk for resilience monitoring and healing operations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChunkLocation {
-    /// Full path to the file
+    /// The ID of the Star holding this chunk
+    ///
+    /// For local files on the Nucleus, use "local" or the Nucleus UUID.
+    /// For remote Stars, this is the Star's unique identifier.
+    pub star_id: String,
+
+    /// Full path to the file on that Star
     pub path: PathBuf,
 
     /// Byte offset within the file
@@ -79,8 +90,16 @@ pub struct ChunkLocation {
 
 impl ChunkLocation {
     /// Create a new chunk location
-    pub fn new(path: PathBuf, offset: u64, length: u32) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `star_id` - Unique identifier of the Star holding this chunk
+    /// * `path` - Full path to the file on that Star
+    /// * `offset` - Byte offset within the file
+    /// * `length` - Length in bytes
+    pub fn new(star_id: String, path: PathBuf, offset: u64, length: u32) -> Self {
         Self {
+            star_id,
             path,
             offset,
             length,
@@ -299,6 +318,121 @@ impl Universe {
 
         Ok(count as usize)
     }
+
+    /// Iterate over all unique chunk hashes in the database
+    ///
+    /// This is used by the Sentinel to scan the entire Universe for health checks.
+    ///
+    /// # Returns
+    ///
+    /// A vector of all chunk hashes. For very large databases, consider using
+    /// `scan_all_chunks` with a callback to avoid memory overhead.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use orbit_core_starmap::universe_v3::Universe;
+    /// let universe = Universe::open("db.redb").unwrap();
+    ///
+    /// for hash in universe.iter_all_hashes().unwrap() {
+    ///     println!("Chunk: {:x?}", hash);
+    /// }
+    /// ```
+    pub fn iter_all_hashes(&self) -> Result<Vec<[u8; 32]>> {
+        let read_txn = self
+            .db
+            .begin_read()
+            .map_err(|e| Error::Other(format!("Failed to begin read: {}", e)))?;
+
+        let table = read_txn
+            .open_multimap_table(CHUNKS_TABLE_V3)
+            .map_err(|e| Error::Other(format!("Failed to open table: {}", e)))?;
+
+        let mut hashes = Vec::new();
+
+        // Use range(..) to iterate over all keys in the multimap
+        let range = table
+            .range::<&[u8; 32]>(..)
+            .map_err(|e| Error::Other(format!("Failed to create range: {}", e)))?;
+
+        for item in range {
+            let (hash_ref, _) = item.map_err(|e| Error::Other(format!("DB error: {}", e)))?;
+            hashes.push(*hash_ref.value());
+        }
+
+        Ok(hashes)
+    }
+
+    /// Scan all chunks with a callback function
+    ///
+    /// This is the most memory-efficient way to process all chunks in the Universe.
+    /// The callback receives the hash and all its locations, one chunk at a time.
+    ///
+    /// # Phase 5: Sentinel Usage
+    ///
+    /// The Sentinel uses this method to perform health sweeps without loading
+    /// the entire database into memory.
+    ///
+    /// # Arguments
+    ///
+    /// * `callback` - Called for each chunk with its hash and locations.
+    ///   Return `false` to stop iteration early.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use orbit_core_starmap::universe_v3::Universe;
+    /// let universe = Universe::open("db.redb").unwrap();
+    ///
+    /// universe.scan_all_chunks(|hash, locations| {
+    ///     println!("Chunk {:x?} has {} locations", hash, locations.len());
+    ///     for loc in locations {
+    ///         println!("  - Star: {}, Path: {:?}", loc.star_id, loc.path);
+    ///     }
+    ///     true // Continue scanning
+    /// }).unwrap();
+    /// ```
+    pub fn scan_all_chunks<F>(&self, mut callback: F) -> Result<()>
+    where
+        F: FnMut([u8; 32], Vec<ChunkLocation>) -> bool,
+    {
+        let read_txn = self
+            .db
+            .begin_read()
+            .map_err(|e| Error::Other(format!("Failed to begin read: {}", e)))?;
+
+        let table = read_txn
+            .open_multimap_table(CHUNKS_TABLE_V3)
+            .map_err(|e| Error::Other(format!("Failed to open table: {}", e)))?;
+
+        // Use range(..) to iterate over all keys in the multimap
+        let range = table
+            .range::<&[u8; 32]>(..)
+            .map_err(|e| Error::Other(format!("Failed to create range: {}", e)))?;
+
+        for item in range {
+            let (hash_ref, locations_iter) =
+                item.map_err(|e| Error::Other(format!("DB error: {}", e)))?;
+            let hash = *hash_ref.value();
+
+            // Collect all locations for this hash
+            let mut locations = Vec::new();
+            for location_entry in locations_iter {
+                let location_ref =
+                    location_entry.map_err(|e| Error::Other(format!("DB error: {}", e)))?;
+                let loc: ChunkLocation = bincode::deserialize(location_ref.value())
+                    .map_err(|e| Error::DeserializationError(e.to_string()))?;
+                locations.push(loc);
+            }
+
+            // Call the callback with this chunk's data
+            if !callback(hash, locations) {
+                break;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Iterator wrapper for locations
@@ -344,7 +478,12 @@ mod tests {
         let universe = Universe::open(tmp_file.path()).unwrap();
 
         let hash = [0x42; 32];
-        let loc = ChunkLocation::new(PathBuf::from("/test/file.bin"), 0, 4096);
+        let loc = ChunkLocation::new(
+            "star-1".to_string(),
+            PathBuf::from("/test/file.bin"),
+            0,
+            4096,
+        );
 
         universe.insert_chunk(hash, loc.clone()).unwrap();
 
@@ -353,6 +492,7 @@ mod tests {
         let iter = universe.find_chunk(hash).unwrap();
         let locations: Vec<_> = iter.collect();
         assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].star_id, "star-1");
         assert_eq!(locations[0].path, PathBuf::from("/test/file.bin"));
     }
 
@@ -363,23 +503,23 @@ mod tests {
 
         let hash = [0xAB; 32];
 
-        // Insert 3 different locations for the same hash
+        // Insert 3 different locations for the same hash (different Stars)
         universe
             .insert_chunk(
                 hash,
-                ChunkLocation::new(PathBuf::from("file1.bin"), 0, 1024),
+                ChunkLocation::new("star-1".to_string(), PathBuf::from("file1.bin"), 0, 1024),
             )
             .unwrap();
         universe
             .insert_chunk(
                 hash,
-                ChunkLocation::new(PathBuf::from("file2.bin"), 4096, 1024),
+                ChunkLocation::new("star-2".to_string(), PathBuf::from("file2.bin"), 4096, 1024),
             )
             .unwrap();
         universe
             .insert_chunk(
                 hash,
-                ChunkLocation::new(PathBuf::from("file3.bin"), 8192, 1024),
+                ChunkLocation::new("star-3".to_string(), PathBuf::from("file3.bin"), 8192, 1024),
             )
             .unwrap();
 
@@ -400,7 +540,12 @@ mod tests {
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new(PathBuf::from(format!("file{}.bin", i)), 0, 100),
+                    ChunkLocation::new(
+                        format!("star-{}", i),
+                        PathBuf::from(format!("file{}.bin", i)),
+                        0,
+                        100,
+                    ),
                 )
                 .unwrap();
         }
@@ -432,11 +577,17 @@ mod tests {
 
     #[test]
     fn test_chunk_location_serialization() {
-        let loc = ChunkLocation::new(PathBuf::from("/data/test.bin"), 1024, 4096);
+        let loc = ChunkLocation::new(
+            "star-42".to_string(),
+            PathBuf::from("/data/test.bin"),
+            1024,
+            4096,
+        );
 
         let serialized = bincode::serialize(&loc).unwrap();
         let deserialized: ChunkLocation = bincode::deserialize(&serialized).unwrap();
 
         assert_eq!(loc, deserialized);
+        assert_eq!(deserialized.star_id, "star-42");
     }
 }

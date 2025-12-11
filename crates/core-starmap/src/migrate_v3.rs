@@ -188,8 +188,18 @@ pub fn bulk_insert_v3(
 ///
 /// V2 and V3 use different ChunkLocation types with slightly different fields.
 /// This helper converts between them.
+///
+/// # Phase 5 Update
+///
+/// Since V2 was single-node only (no concept of Stars), all migrated data
+/// is assigned the star_id "local" to represent the local Nucleus storage.
 pub fn convert_chunk_location(v2_loc: &universe::ChunkLocation) -> universe_v3::ChunkLocation {
-    universe_v3::ChunkLocation::new(v2_loc.path.clone(), v2_loc.offset, v2_loc.length)
+    universe_v3::ChunkLocation::new(
+        "local".to_string(), // V2 data defaults to local storage
+        v2_loc.path.clone(),
+        v2_loc.offset,
+        v2_loc.length,
+    )
 }
 
 #[cfg(test)]
@@ -217,18 +227,34 @@ mod tests {
 
         let mut data = std::collections::HashMap::new();
 
-        // Add a chunk with 3 locations
+        // Add a chunk with 3 locations (from different Stars)
         let hash1 = [0x11; 32];
         let locations1 = vec![
-            universe_v3::ChunkLocation::new(PathBuf::from("file1.bin"), 0, 1024),
-            universe_v3::ChunkLocation::new(PathBuf::from("file2.bin"), 0, 1024),
-            universe_v3::ChunkLocation::new(PathBuf::from("file3.bin"), 0, 1024),
+            universe_v3::ChunkLocation::new(
+                "star-1".to_string(),
+                PathBuf::from("file1.bin"),
+                0,
+                1024,
+            ),
+            universe_v3::ChunkLocation::new(
+                "star-2".to_string(),
+                PathBuf::from("file2.bin"),
+                0,
+                1024,
+            ),
+            universe_v3::ChunkLocation::new(
+                "star-3".to_string(),
+                PathBuf::from("file3.bin"),
+                0,
+                1024,
+            ),
         ];
         data.insert(hash1, locations1);
 
-        // Add a chunk with 1 location
+        // Add a chunk with 1 location (local)
         let hash2 = [0x22; 32];
         let locations2 = vec![universe_v3::ChunkLocation::new(
+            "local".to_string(),
             PathBuf::from("file4.bin"),
             0,
             2048,
@@ -264,6 +290,8 @@ mod tests {
 
         let v3_loc = convert_chunk_location(&v2_loc);
 
+        // Verify V2 data is migrated with "local" as star_id
+        assert_eq!(v3_loc.star_id, "local");
         assert_eq!(v3_loc.path, v2_loc.path);
         assert_eq!(v3_loc.offset, v2_loc.offset);
         assert_eq!(v3_loc.length, v2_loc.length);

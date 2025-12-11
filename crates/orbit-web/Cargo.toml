@@ -10,6 +10,8 @@ license = "Apache-2.0"
 default = []
 # When enabled, compiles the dashboard static files into the binary
 ui = ["tower-http/fs"]
+# When enabled, starts the Sentinel autonomous resilience engine
+sentinel = ["dep:orbit-sentinel", "dep:orbit-star", "dep:orbit-connect"]
 
 [dependencies]
 # Core Orbit crates
@@ -17,6 +19,11 @@ magnetar = { path = "../magnetar", features = ["sqlite", "resilience"] }
 orbit-core-manifest = { path = "../core-manifest" }
 orbit-core-starmap = { path = "../core-starmap" }
 orbit-core-audit = { path = "../core-audit" }
+
+# Optional Sentinel dependencies (enabled with "sentinel" feature)
+orbit-sentinel = { path = "../orbit-sentinel", optional = true }
+orbit-star = { path = "../orbit-star", optional = true }
+orbit-connect = { path = "../orbit-connect", optional = true }
 
 # API & Web Server
 axum = { version = "0.7", features = ["ws", "multipart", "macros"] }

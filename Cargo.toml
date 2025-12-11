@@ -11,7 +11,8 @@ members = [
     "crates/orbit-proto",           # Phase 2: gRPC Protocol Definitions
     "crates/orbit-star",            # Phase 2: Star Agent Binary
     "crates/orbit-connect",         # Phase 3: Nucleus Client & RemoteSystem
-    "crates/magnetar",
+    "crates/magnetar",              # Phase 4: Job Execution Engine
+    "crates/orbit-sentinel",        # Phase 5: Autonomous Resilience Engine
     "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
 ]
 

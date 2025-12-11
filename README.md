@@ -22,7 +22,8 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v0.6.0-alpha.4**: Phase 4 - Data Plane (P2P Transfer) - Direct Star-to-Star data transfer eliminates Nucleus bandwidth bottleneck, enabling infinite horizontal scaling
+- **NEW v0.6.0-alpha.5**: Phase 5 - Sentinel (Autonomous Resilience Engine) - OODA loop monitors Universe V3 and autonomously heals under-replicated chunks via Phase 4 P2P transfers
+- **v0.6.0-alpha.4**: Phase 4 - Data Plane (P2P Transfer) - Direct Star-to-Star data transfer eliminates Nucleus bandwidth bottleneck, enabling infinite horizontal scaling
 - **v0.6.0-alpha.3**: Phase 3 - Nucleus Client & RemoteSystem (Client-side connectivity for Nucleus-to-Star orchestration, 99.997% network reduction via compute offloading)
 - **v0.6.0-alpha.2**: Phase 2 - Star Protocol & Agent (gRPC remote execution server for distributed Orbit Grid)
 - **v0.6.0-alpha.1**: Phase 1 I/O Abstraction Layer - OrbitSystem trait enables future distributed topologies
@@ -117,6 +118,7 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Disk Guardian** | 🟡 Beta | Pre-flight checks, works well but newer |
 | **Magnetar State Machine** | 🟡 Beta | Job persistence, recently added |
 | **Resilience Patterns** | 🟡 Beta | Circuit breaker, rate limiting - new features |
+| **Sentinel Resilience Engine (Phase 5)** | 🔴 Alpha | Autonomous OODA loop for chunk redundancy healing |
 | **Filter System** | 🟡 Beta | Glob/regex filters, functional but newer |
 | **Metadata Preservation** | 🟡 Beta | Works well, extended attributes are platform-specific |
 | **Guidance System** | 🟡 Beta | Config validation, recently added |
@@ -1560,6 +1562,7 @@ Orbit is built from clean, reusable crates:
 | 🛡️ `disk-guardian` | Pre-flight space & integrity checks | 🟡 Beta |
 | 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | 🟡 Beta |
 | 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | 🟡 Beta |
+| 🛡️ `orbit-sentinel` | Autonomous resilience engine (Phase 5 OODA loop) | 🔴 Alpha |
 | 🌐 `protocols` | Network protocol implementations | 🟡 S3/SSH Beta, 🔴 SMB Alpha |
 | 🌐 `orbit-server` | Headless Control Plane API (v2.2.0-alpha) | 🔴 Alpha |
 | 🎨 `orbit-dashboard` | React dashboard (v2.2.0-alpha) | 🔴 Alpha |

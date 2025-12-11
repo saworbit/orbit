@@ -4,6 +4,105 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Added - Phase 5: The Sentinel (Autonomous Resilience Engine)
+
+**OODA Loop for Data Durability** - This release implements the Sentinel, an autonomous resilience engine that continuously monitors the Orbit Grid's Universe V3 database to ensure chunk redundancy. The Sentinel runs an infinite OODA loop (Observe-Orient-Decide-Act), scanning all chunks to identify under-replicated data and autonomously triggering Phase 4 P2P transfers to restore redundancy targets.
+
+#### Core Sentinel Implementation
+
+- **`orbit-sentinel` crate**: Autonomous resilience engine
+  - **`Sentinel` daemon**: Main OODA loop executor
+    - Observe: Scan Universe V3 for all chunks via `scan_all_chunks()`
+    - Orient: Count active copies per chunk
+    - Decide: Identify chunks below `min_redundancy` threshold
+    - Act: Spawn healing tasks with semaphore-based concurrency control
+  - **`Medic`**: Healing orchestration logic
+    - Source selection: Pick survivor Star with chunk data
+    - Recruit selection: Find target Star without the chunk
+    - P2P orchestration: Generate JWT token and trigger `ReplicateFile` RPC
+    - Universe update: Record new replica location in Universe V3
+  - **`SentinelPolicy`**: Configurable operational parameters
+    - `min_redundancy`: Minimum copies required (default: 2)
+    - `max_parallel_heals`: Concurrency limit (default: 10)
+    - `scan_interval_s`: Sweep frequency (default: 3600s = 1 hour)
+    - `healing_bandwidth_limit`: Optional rate limiting
+  - **`SweepStats`**: Health metrics tracking
+    - Healthy/at-risk/lost chunk counts
+    - Healing success/failure rates
+    - Grid health percentage reporting
+
+#### Universe V3 Extensions (Breaking Change)
+
+- **`ChunkLocation` schema update**:
+  - Added `star_id: String` field to identify chunk ownership
+  - Migration: Legacy V2 data defaults to `"local"` star_id
+  - Constructor now requires: `ChunkLocation::new(star_id, path, offset, length)`
+- **New iteration methods**:
+  - `iter_all_hashes()`: Returns all unique chunk hashes
+  - `scan_all_chunks(callback)`: Streaming iteration with callback for memory-efficient sweeps
+  - Uses `range::<&[u8; 32]>(..)` on redb multimap for efficient traversal
+
+#### orbit-web Integration
+
+- **Optional `sentinel` feature** in `orbit-web/Cargo.toml`
+  - Build with Sentinel: `cargo build --features sentinel`
+  - Runtime activation: `ORBIT_SENTINEL_ENABLED=true`
+- **Environment configuration**:
+  - `ORBIT_UNIVERSE_DB`: Path to Universe V3 database (default: `universe_v3.db`)
+  - `ORBIT_AUTH_SECRET`: Shared secret for P2P JWT tokens (reuses Phase 4 auth)
+  - `ORBIT_SENTINEL_MIN_REDUNDANCY`: Minimum chunk copies (default: 2)
+  - `ORBIT_SENTINEL_SCAN_INTERVAL`: Seconds between sweeps (default: 3600)
+  - `ORBIT_SENTINEL_MAX_PARALLEL_HEALS`: Concurrent healing limit (default: 10)
+  - `ORBIT_SENTINEL_BANDWIDTH_LIMIT`: Optional bytes/sec limit (default: 50 MB/s)
+- **Daemon lifecycle**: Spawned as background tokio task after Reactor startup
+
+#### Testing & Documentation
+
+- **Resilience tests** (`sentinel_resilience_test.rs`):
+  - **Chaos Monkey test**: Simulates Star failure and validates healing
+    - Phase 1: Upload chunk to Star A (1 copy, under-replicated)
+    - Phase 2: Sentinel heals to Star B (2 copies, meets threshold)
+    - Phase 3: Simulate Star A failure
+    - Phase 4: Sentinel heals from B to C (maintains 2 copies)
+  - **Basic sweep test**: Validates healthy chunk scanning without healing
+- **Comprehensive specification**:
+  - Phase 5 spec: [`docs/specs/PHASE_5_SENTINEL_SPEC.md`](docs/specs/PHASE_5_SENTINEL_SPEC.md)
+
+#### Architecture Evolution
+
+```
+BEFORE (Phase 4): Manual redundancy management
+AFTER (Phase 5):  Autonomous self-healing Grid
+
+[Sentinel OODA Loop]
+    ↓ Observe (scan Universe V3)
+    ↓ Orient (count copies: 1 < min_redundancy:2)
+    ↓ Decide (mark chunk as at-risk)
+    ↓ Act (spawn Medic task)
+        ↓ [Medic] Pick Source (Star B has chunk)
+        ↓ [Medic] Pick Recruit (Star C available)
+        ↓ [Medic] Generate JWT token
+        ↓ [Medic] Trigger Phase 4 P2P transfer
+        ↓ [Medic] Update Universe V3
+    ↓ Continue (next chunk...)
+```
+
+### Changed
+
+- **Breaking**: `ChunkLocation` now requires `star_id` parameter in constructor
+- Updated all tests to use 4-parameter `ChunkLocation::new(star_id, path, offset, length)`
+
+### Maintenance
+
+- Fixed clippy warnings: Removed unused imports (`anyhow::Result`, `ReplicateRequest`, `error` in tracing)
+- Fixed clippy warnings: Prefixed unused variables with `_` (`_token`, `_recruit_system`)
+- Fixed clippy warning: Removed unnecessary `mut` from `locations_iter` in `universe_v3.rs`
+- Fixed clippy warning: Corrected doc comment indentation in `scan_all_chunks()`
+- Ran `cargo fmt --all` to format all code
+- Ran `cargo audit` with zero vulnerabilities found
+
+## [0.6.0-alpha.4] - 2025-12-11
+
 ### Added - Phase 4: The Data Plane (Star-to-Star Transfer)
 
 **Peer-to-Peer Data Movement** - This release implements direct Star-to-Star data transfer, eliminating the Nucleus bandwidth bottleneck. Data now flows directly between Stars without routing through the Nucleus, enabling infinite horizontal bandwidth scaling.

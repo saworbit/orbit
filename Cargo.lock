@@ -4431,6 +4431,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "orbit-sentinel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "orbit-connect",
+ "orbit-core-starmap",
+ "orbit-proto",
+ "orbit-star",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
+
+[[package]]
 name = "orbit-server"
 version = "2.2.0-beta.1"
 dependencies = [
@@ -4442,9 +4460,12 @@ dependencies = [
  "futures",
  "jsonwebtoken",
  "magnetar",
+ "orbit-connect",
  "orbit-core-audit",
  "orbit-core-manifest",
  "orbit-core-starmap",
+ "orbit-sentinel",
+ "orbit-star",
  "rand_core 0.9.3",
  "reqwest",
  "serde",
