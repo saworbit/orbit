@@ -12,6 +12,98 @@ All notable changes to Orbit will be documented in this file.
 
 ### Maintenance
 
+## [0.6.0-alpha.3] - 2025-12-11
+
+### Added - Phase 3: The Nucleus Client & RemoteSystem
+
+**Orbit Grid integration layer** - This release implements client-side connectivity, enabling the Nucleus (Hub) to orchestrate operations across remote Stars (Agents). The Nucleus can now execute jobs with transparent local/remote system abstraction.
+
+#### Core Connectivity
+
+- **`orbit-connect` crate**: Client-side gRPC orchestration
+  - **`RemoteSystem`**: Full `OrbitSystem` implementation that proxies to remote Stars
+    - Discovery operations: `exists()`, `metadata()`, `read_dir()` via `ScanDirectory` RPC
+    - Compute offloading: `calculate_hash()` via `CalculateHash` RPC (99.997% network reduction for CDC)
+    - Intelligence: `read_header()` via `ReadHeader` RPC (magic number detection)
+    - Session management: Automatic `x-orbit-session` metadata attachment
+  - **`StarManager`**: Connection pool and lifecycle management
+    - Lazy connection establishment (connect on first use)
+    - Automatic handshake with session ID caching
+    - Support for multiple concurrent Stars
+    - Registry with `StarRecord` (ID, address, token, status)
+  - **`ConnectError`**: Comprehensive error handling with conversion to `OrbitSystemError`
+  - Comprehensive README with architecture diagrams and usage examples
+  - Integration tests for registration, connection, and remote operations
+
+#### Database Schema Evolution
+
+- **New migration**: `20250103000000_add_star_columns.sql`
+  - Added `source_star_id` and `dest_star_id` columns to `jobs` table
+  - NULL = local execution (Nucleus filesystem)
+  - Non-NULL = remote execution (Star ID)
+  - Indexes for Star-based queries and cross-Star transfers
+
+#### Magnetar Integration
+
+- **Enhanced `JobStore` trait**:
+  - Updated `new_job()` signature with `source_star_id` and `dest_star_id` parameters
+  - **Backward compatible**: existing jobs (NULL star IDs) continue to work
+  - Comprehensive Phase 3 Grid Support documentation
+- **Backend implementations**:
+  - SQLite backend: Full support for Star ID persistence
+  - redb backend: Signature compatibility (job IDs not yet supported)
+  - Migration store: Transparent passthrough for Star IDs
+
+#### Documentation
+
+- **New:** `docs/specs/PHASE_3_NUCLEUS_CLIENT_SPEC.md` - Complete architecture specification
+  - Executive summary and architecture overview
+  - Detailed API design with Liskov Substitution Principle adherence
+  - Security model (token storage, session management)
+  - Testing strategy and migration path
+  - Performance analysis (compute offloading, network reduction)
+  - Phase 4 lookahead (Star-to-Star direct transfer)
+- **New:** `crates/orbit-connect/README.md` - Client library guide with usage examples
+
+### Performance Benefits
+
+- **Compute Offloading**: Hash calculation on remote Stars
+  - Old: Transfer 1GB → compute hash on Nucleus
+  - New: Compute hash on Star → transfer 32 bytes
+  - **99.997% network reduction** for 1000-chunk CDC operation
+- **Header Intelligence**: Magic number detection without full transfer
+  - Old: Transfer entire file to determine type
+  - New: Transfer first 512 bytes → detect → skip if unwanted
+- **Connection Reuse**: gRPC multiplexing
+  - Single TCP connection for all operations
+  - No per-request handshake overhead
+
+### Architecture Achievement
+
+The Nucleus can now:
+- ✅ Maintain a registry of Stars
+- ✅ Establish gRPC connections on-demand
+- ✅ Offload compute operations (hashing) to remote nodes
+- ✅ Use the same magnetar code for local and remote operations (Liskov Substitution)
+
+**Job execution modes now supported:**
+- Local-to-local: `source_star_id: None, dest_star_id: None` → LocalSystem
+- Remote source: `source_star_id: Some("star-1"), dest_star_id: None` → RemoteSystem + LocalSystem
+- Full Grid (Phase 4): `source_star_id: Some("star-1"), dest_star_id: Some("star-2")` → RemoteSystem + RemoteSystem
+
+### Build System
+
+- Updated workspace with `orbit-connect` crate
+- All crates compile with zero warnings under `clippy -D warnings`
+- Allowed `clippy::too_many_arguments` for `new_job()` API (8 parameters required for Grid support)
+
+### Testing
+
+- ✅ All existing tests passing
+- ✅ Integration tests for StarManager (registration, connection, disconnect)
+- ✅ Live integration tests for remote operations (requires running orbit-star, marked `#[ignore]`)
+- ✅ No security vulnerabilities (cargo audit clean)
+
 ## [0.6.0-alpha.2] - 2025-12-11
 
 ### Added - Phase 2: The Star Protocol & Agent

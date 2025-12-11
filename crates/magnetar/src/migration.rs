@@ -181,11 +181,21 @@ impl<S1: JobStore, S2: JobStore> JobStore for DualStore<S1, S2> {
         compress: bool,
         verify: bool,
         parallel: Option<usize>,
+        source_star_id: Option<String>,
+        dest_star_id: Option<String>,
     ) -> Result<i64> {
         // Create the job in the primary store only
         // The secondary store is read-only during migration
         self.primary
-            .new_job(source, destination, compress, verify, parallel)
+            .new_job(
+                source,
+                destination,
+                compress,
+                verify,
+                parallel,
+                source_star_id,
+                dest_star_id,
+            )
             .await
     }
 

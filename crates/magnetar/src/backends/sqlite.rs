@@ -423,15 +423,20 @@ impl JobStore for SqliteStore {
         compress: bool,
         verify: bool,
         parallel: Option<usize>,
+        source_star_id: Option<String>,
+        dest_star_id: Option<String>,
     ) -> Result<i64> {
         let result = sqlx::query(
-            "INSERT INTO jobs (source, destination, compress, verify, parallel) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO jobs (source, destination, compress, verify, parallel, source_star_id, dest_star_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&source)
         .bind(&destination)
         .bind(compress)
         .bind(verify)
         .bind(parallel.map(|p| p as i64))
+        .bind(source_star_id)
+        .bind(dest_star_id)
         .execute(&self.pool)
         .await?;
 

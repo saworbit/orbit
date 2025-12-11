@@ -22,6 +22,7 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
+- **NEW v0.6.0-alpha.3**: Phase 3 - Nucleus Client & RemoteSystem (Client-side connectivity for Nucleus-to-Star orchestration, 99.997% network reduction via compute offloading)
 - **NEW v0.6.0-alpha.2**: Phase 2 - Star Protocol & Agent (gRPC remote execution server for distributed Orbit Grid)
 - **NEW v0.6.0-alpha.1**: Phase 1 I/O Abstraction Layer - OrbitSystem trait enables future distributed topologies
 - **NEW v2.2.0-rc.1**: Full-stack CI/CD pipeline with dashboard-quality checks, professional file browser, and enhanced developer experience

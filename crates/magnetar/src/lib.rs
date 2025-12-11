@@ -297,6 +297,13 @@ pub trait JobStore: Send + Sync {
     ///
     /// Stores job metadata and returns the unique job ID that should be used
     /// for all subsequent operations (init_from_manifest, get_stats, etc.)
+    ///
+    /// # Phase 3 Grid Support
+    ///
+    /// - `source_star_id`: If Some, the source data is on a remote Star (Grid mode)
+    /// - `dest_star_id`: If Some, the destination is on a remote Star (Grid mode)
+    /// - Both None: Local-to-local transfer (Standalone mode)
+    #[allow(clippy::too_many_arguments)]
     async fn new_job(
         &mut self,
         source: String,
@@ -304,6 +311,8 @@ pub trait JobStore: Send + Sync {
         compress: bool,
         verify: bool,
         parallel: Option<usize>,
+        source_star_id: Option<String>,
+        dest_star_id: Option<String>,
     ) -> anyhow::Result<i64>;
 
     /// Delete a job and all its chunks

@@ -375,6 +375,8 @@ impl JobStore for RedbStore {
         _compress: bool,
         _verify: bool,
         _parallel: Option<usize>,
+        _source_star_id: Option<String>,
+        _dest_star_id: Option<String>,
     ) -> Result<i64> {
         // For the redb backend, we don't support auto-generated job IDs yet
         // Users should provide their own job IDs when using redb
