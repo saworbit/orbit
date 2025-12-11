@@ -1,18 +1,18 @@
-# cargo-deny configuration
+# cargo-deny configuration for version 2.x
 # Documentation: https://embarkstudios.github.io/cargo-deny/
 
-# Note: This is a minimal configuration. cargo-deny will use sensible defaults
-# for any settings not explicitly configured here.
+[graph]
+# Ensure all workspace members are included
+targets = []
 
 [advisories]
-# Ignore specific advisories if needed
+# Security vulnerability database
+version = 2
 ignore = []
 
 [licenses]
-# Fail the build if any dependency has a license we don't explicitly allow
-unlicensed = "deny"
-
-# Allow Apache-2.0 compatible licenses
+# License compliance
+version = 2
 allow = [
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
@@ -23,35 +23,22 @@ allow = [
     "CC0-1.0",
     "Zlib",
     "Unicode-DFS-2016",
-    "MPL-2.0",  # Mozilla Public License (weak copyleft, compatible with Apache-2.0)
+    "MPL-2.0",
 ]
 
-# Explicitly deny strong copyleft licenses
-deny = [
-    "GPL-2.0",
-    "GPL-3.0",
-    "AGPL-3.0",
-    "LGPL-2.0",
-    "LGPL-2.1",
-    "LGPL-3.0",
-]
-
-# Confidence threshold for license detection
-confidence-threshold = 0.8
+# Crates that don't have a license specified must be explicitly allowed
+# We'll leave this empty and handle on a case-by-case basis
+[[licenses.exceptions]]
+allow = ["Apache-2.0"]
+name = "ring"
 
 [bans]
-# Warn on multiple versions of same crate
+# Dependency banning
 multiple-versions = "warn"
-
-# Specific crates to skip for duplicate version warnings
-skip = []
-
-# Specific crates to ban entirely
 deny = []
 
 [sources]
-# Lint level for what to happen when a crate from a git repository is encountered
+# Source repository validation
+unknown-registry = "warn"
 unknown-git = "warn"
-
-# Allow git repositories
 allow-git = []
