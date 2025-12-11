@@ -85,14 +85,24 @@ mod tests {
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new("local".to_string(), PathBuf::from("/file2.txt"), 1024, 4096),
+                    ChunkLocation::new(
+                        "local".to_string(),
+                        PathBuf::from("/file2.txt"),
+                        1024,
+                        4096,
+                    ),
                 )
                 .expect("Insert failed");
 
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new("local".to_string(), PathBuf::from("/file3.txt"), 2048, 4096),
+                    ChunkLocation::new(
+                        "local".to_string(),
+                        PathBuf::from("/file3.txt"),
+                        2048,
+                        4096,
+                    ),
                 )
                 .expect("Insert failed");
         }
