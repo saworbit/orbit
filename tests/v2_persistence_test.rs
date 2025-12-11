@@ -22,6 +22,7 @@ mod tests {
         // Mock Data
         let hash = [1u8; 32]; // Fake Hash
         let location = ChunkLocation {
+            star_id: "local".to_string(),
             path: PathBuf::from("/data/video.mp4"),
             offset: 1024,
             length: 4096,
@@ -77,21 +78,21 @@ mod tests {
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new(PathBuf::from("/file1.txt"), 0, 4096),
+                    ChunkLocation::new("local".to_string(), PathBuf::from("/file1.txt"), 0, 4096),
                 )
                 .expect("Insert failed");
 
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new(PathBuf::from("/file2.txt"), 1024, 4096),
+                    ChunkLocation::new("local".to_string(), PathBuf::from("/file2.txt"), 1024, 4096),
                 )
                 .expect("Insert failed");
 
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new(PathBuf::from("/file3.txt"), 2048, 4096),
+                    ChunkLocation::new("local".to_string(), PathBuf::from("/file3.txt"), 2048, 4096),
                 )
                 .expect("Insert failed");
         }
@@ -123,7 +124,7 @@ mod tests {
             universe
                 .insert_chunk(
                     existing_hash,
-                    ChunkLocation::new(PathBuf::from("/test.bin"), 0, 1024),
+                    ChunkLocation::new("local".to_string(), PathBuf::from("/test.bin"), 0, 1024),
                 )
                 .expect("Insert failed");
         }
