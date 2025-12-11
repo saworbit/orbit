@@ -37,7 +37,12 @@ fn test_high_cardinality_insertions() {
         // Insert a batch of duplicates
         for j in 0..batch_size {
             let id = (i * batch_size) + j;
-            let loc = ChunkLocation::new(PathBuf::from(format!("/data/file_{}.bin", id)), 0, 4096);
+            let loc = ChunkLocation::new(
+                "local".to_string(),
+                PathBuf::from(format!("/data/file_{}.bin", id)),
+                0,
+                4096,
+            );
             universe.insert_chunk(hash, loc).unwrap();
         }
 
@@ -116,7 +121,10 @@ fn test_mixed_workload() {
 
     // Chunk h1: Single location
     universe
-        .insert_chunk(h1, ChunkLocation::new(PathBuf::from("file_a.bin"), 0, 1024))
+        .insert_chunk(
+            h1,
+            ChunkLocation::new("local".to_string(), PathBuf::from("file_a.bin"), 0, 1024),
+        )
         .unwrap();
 
     // Chunk h2: 10 locations
@@ -124,7 +132,12 @@ fn test_mixed_workload() {
         universe
             .insert_chunk(
                 h2,
-                ChunkLocation::new(PathBuf::from(format!("file_b_{}.bin", i)), 0, 2048),
+                ChunkLocation::new(
+                    "local".to_string(),
+                    PathBuf::from(format!("file_b_{}.bin", i)),
+                    0,
+                    2048,
+                ),
             )
             .unwrap();
     }
@@ -134,7 +147,12 @@ fn test_mixed_workload() {
         universe
             .insert_chunk(
                 h3,
-                ChunkLocation::new(PathBuf::from(format!("file_c_{}.bin", i)), 0, 4096),
+                ChunkLocation::new(
+                    "local".to_string(),
+                    PathBuf::from(format!("file_c_{}.bin", i)),
+                    0,
+                    4096,
+                ),
             )
             .unwrap();
     }
@@ -191,7 +209,12 @@ fn test_streaming_memory_efficiency() {
         universe
             .insert_chunk(
                 hash,
-                ChunkLocation::new(PathBuf::from(format!("file_{}.bin", i)), 0, 8192),
+                ChunkLocation::new(
+                    "local".to_string(),
+                    PathBuf::from(format!("file_{}.bin", i)),
+                    0,
+                    8192,
+                ),
             )
             .unwrap();
     }
@@ -244,7 +267,12 @@ fn test_persistence_across_restarts() {
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new(PathBuf::from(format!("persistent_{}.bin", i)), 0, 1024),
+                    ChunkLocation::new(
+                        "local".to_string(),
+                        PathBuf::from(format!("persistent_{}.bin", i)),
+                        0,
+                        1024,
+                    ),
                 )
                 .unwrap();
         }
@@ -289,7 +317,12 @@ fn test_benchmark_insert_performance() {
             universe
                 .insert_chunk(
                     hash,
-                    ChunkLocation::new(PathBuf::from(format!("bench_{}.bin", i)), 0, 4096),
+                    ChunkLocation::new(
+                        "local".to_string(),
+                        PathBuf::from(format!("bench_{}.bin", i)),
+                        0,
+                        4096,
+                    ),
                 )
                 .unwrap();
         }
