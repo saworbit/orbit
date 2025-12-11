@@ -86,9 +86,9 @@ async fn test_sentinel_chaos_monkey() -> anyhow::Result<()> {
     println!("✅ Phase 1: Uploaded chunk to Star A (1 copy)");
 
     // Verify initial state
-    let locations = universe.find_chunk(test_hash)?;
+    let locations: Vec<_> = universe.find_chunk(test_hash)?.collect();
     assert_eq!(locations.len(), 1, "Should have exactly 1 copy initially");
-    assert_eq!(locations.clone().nth(0).unwrap().star_id, "star-a");
+    assert_eq!(locations[0].star_id, "star-a");
 
     // ============================================================
     // PHASE 2: Sentinel Detects Under-Replication
