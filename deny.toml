@@ -1,0 +1,103 @@
+# This configuration file controls cargo-deny's behavior
+# Documentation: https://embarkstudios.github.io/cargo-deny/
+
+# =============================================================================
+# ADVISORIES: Security Vulnerability Scanning
+# =============================================================================
+[advisories]
+# The path where the advisory database is cloned/fetched into
+db-path = "~/.cargo/advisory-db"
+# The url(s) of the advisory databases to use
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# How to handle crates with security vulnerabilities
+vulnerability = "deny"
+# How to handle crates that have been marked as unmaintained
+unmaintained = "warn"
+# How to handle crates with security notices
+notice = "warn"
+# Ignore specific advisories (use sparingly, document why)
+ignore = [
+    # Example: "RUSTSEC-2020-0001",
+]
+
+# =============================================================================
+# LICENSES: Ensure License Compliance
+# =============================================================================
+[licenses]
+# Fail the build if any dependency has a license we don't allow
+unlicensed = "deny"
+# Allow specific licenses only (Apache-2.0 compatible ecosystem)
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "CC0-1.0",
+    "Zlib",
+    "Unicode-DFS-2016",
+]
+# Explicitly deny copyleft licenses incompatible with Apache-2.0
+deny = [
+    "GPL-3.0",
+    "GPL-2.0",
+    "AGPL-3.0",
+    "LGPL-3.0",
+]
+# How to handle crates with licenses not in allow or deny
+default = "deny"
+# Confidence threshold for license detection (0.0 to 1.0)
+confidence-threshold = 0.8
+# Allow specific crates with otherwise denied licenses (use sparingly)
+exceptions = [
+    # Example: { allow = ["LGPL-2.1"], name = "some-crate", version = "1.0" },
+]
+
+# Some crates use non-standard license identifiers or dual licensing
+# Document exceptions here
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
+[[licenses.clarify]]
+name = "webpki-roots"
+expression = "MPL-2.0"
+license-files = [
+    { path = "LICENSE", hash = 0x001c7e6c }
+]
+
+# =============================================================================
+# BANS: Prevent Duplicate or Problematic Dependencies
+# =============================================================================
+[bans]
+# Warn if multiple versions of the same crate are used
+multiple-versions = "warn"
+# Warn if wildcard dependencies are used (bad for reproducibility)
+wildcards = "warn"
+# Allow specific duplicate versions (document why)
+skip = [
+    # Example: { name = "syn", version = "=1.0" },
+]
+# Deny specific crates entirely
+deny = [
+    # Example: { name = "some-bad-crate" },
+]
+# Skip checking certain crates for duplicates
+skip-tree = [
+    # Example: { name = "windows-sys", version = "=0.48" },
+]
+
+# =============================================================================
+# SOURCES: Validate Dependency Sources
+# =============================================================================
+[sources]
+# Only allow dependencies from crates.io
+unknown-registry = "deny"
+unknown-git = "deny"
+# Allow Git dependencies (useful for development, but audit carefully)
+allow-git = [
+    # Example: "https://github.com/your-org/your-private-crate",
+]

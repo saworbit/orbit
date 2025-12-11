@@ -1,0 +1,33 @@
+name: Compliance & Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sundays
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deny-check:
+    name: License & Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          # Checks for:
+          # - advisories (security vulnerabilities)
+          # - bans (duplicate crates)
+          # - licenses (compliance)
+          # - sources (valid registries)
+          command: check all
+          log-level: error
+          # Fails the build if any check fails
+          arguments: --workspace
