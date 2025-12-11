@@ -49,3 +49,4 @@ test_output.txt
 *.db-journal
 jobs.db
 .vscode/settings.json
+protoc-tools/

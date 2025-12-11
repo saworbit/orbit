@@ -282,6 +282,58 @@ impl<R: Read> Iterator for ChunkStream<R> {
     }
 }
 
+/// Async file hashing support (requires "async" feature)
+#[cfg(feature = "async")]
+pub mod async_hash {
+    use std::path::Path;
+    use tokio::fs::File;
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+
+    /// Calculates the BLAKE3 hash of a file range.
+    ///
+    /// This is an async function that reads a specific range of bytes from a file
+    /// and returns its BLAKE3 hash.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the file
+    /// * `offset` - Byte offset to start reading from
+    /// * `length` - Number of bytes to read
+    ///
+    /// # Returns
+    ///
+    /// The 32-byte BLAKE3 hash of the file range
+    pub async fn hash_file_range(
+        path: &Path,
+        offset: u64,
+        length: u64,
+    ) -> std::io::Result<[u8; 32]> {
+        let mut file = File::open(path).await?;
+        file.seek(std::io::SeekFrom::Start(offset)).await?;
+
+        let mut hasher = blake3::Hasher::new();
+        let mut remaining = length;
+        let mut buffer = vec![0u8; 64 * 1024]; // 64KB buffer
+
+        while remaining > 0 {
+            let to_read = remaining.min(buffer.len() as u64) as usize;
+            let n = file.read(&mut buffer[..to_read]).await?;
+
+            if n == 0 {
+                break; // EOF
+            }
+
+            hasher.update(&buffer[..n]);
+            remaining -= n as u64;
+        }
+
+        Ok(*hasher.finalize().as_bytes())
+    }
+}
+
+#[cfg(feature = "async")]
+pub use async_hash::hash_file_range;
+
 #[cfg(test)]
 mod tests {
     use super::*;

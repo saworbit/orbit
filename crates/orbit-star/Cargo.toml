@@ -1,0 +1,41 @@
+[package]
+name = "orbit-star"
+version = "0.6.0"
+edition = "2021"
+authors = ["Orbit Contributors"]
+description = "Orbit Grid Star Agent - Remote execution server for distributed data operations"
+license = "MIT"
+
+[[bin]]
+name = "orbit-star"
+path = "src/main.rs"
+
+[dependencies]
+# Orbit crates
+orbit-proto = { path = "../orbit-proto" }
+orbit-core-cdc = { path = "../core-cdc", features = ["async"] }
+
+# gRPC
+tonic = "0.12"
+tonic-reflection = "0.12"
+
+# Async runtime
+tokio = { version = "1.42", features = ["macros", "rt-multi-thread", "fs", "sync"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Security
+uuid = { version = "1.11", features = ["v4"] }
+
+[features]
+default = []

@@ -8,6 +8,8 @@ members = [
     "crates/core-cdc",
     "crates/core-semantic",
     "crates/orbit-core-interface",  # Phase 1: I/O Abstraction Layer
+    "crates/orbit-proto",           # Phase 2: gRPC Protocol Definitions
+    "crates/orbit-star",            # Phase 2: Star Agent Binary
     "crates/magnetar",
     "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
 ]

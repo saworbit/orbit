@@ -12,6 +12,77 @@ All notable changes to Orbit will be documented in this file.
 
 ### Maintenance
 
+## [0.6.0-alpha.2] - 2025-12-11
+
+### Added - Phase 2: The Star Protocol & Agent
+
+**Orbit Grid nervous system** - This release establishes the gRPC protocol for distributed operations and implements the Star agent, a lightweight remote execution server that exposes filesystem and CPU resources to the Grid.
+
+#### Protocol Definition
+
+- **`orbit-proto` crate**: gRPC protocol definitions
+  - `orbit.proto` schema with 4 core RPC methods:
+    - `Handshake` - Token-based authentication and session establishment
+    - `ScanDirectory` - Streaming directory enumeration (handles 1M+ files)
+    - `ReadHeader` - File header reading for semantic analysis
+    - `CalculateHash` - Remote BLAKE3 hashing with content-defined chunking
+  - Generated client and server stubs via tonic/prost
+  - Build script with protoc integration (supports bundled protoc)
+  - Comprehensive README with usage examples
+
+#### Star Agent Binary
+
+- **`orbit-star` crate**: Remote execution server
+  - **Security**: PathJail sandbox for filesystem access control
+    - Prevents directory traversal (`../../etc/passwd`)
+    - Symlink resolution and canonicalization
+    - Whitelist-based path validation
+  - **Server**: Full `StarService` implementation
+    - Session-based authentication with UUID tokens
+    - Streaming directory scans via `tokio_stream`
+    - Async file hashing using enhanced `orbit-core-cdc`
+  - **CLI**: Production-ready command-line interface
+    - Multi-path jail configuration (`--allow /path1 --allow /path2`)
+    - Environment variable support (`ORBIT_STAR_TOKEN`)
+    - Structured logging with tracing
+    - Debug mode for development
+  - Comprehensive README with deployment guide
+
+#### Enhanced Core Libraries
+
+- **`orbit-core-cdc` enhancements**:
+  - New `hash_file_range()` async function for remote hashing
+  - Feature-gated async support (`async` feature)
+  - 64KB buffered I/O for efficient network transfers
+
+#### Documentation
+
+- **New:** `docs/specs/PHASE_2_STAR_PROTO_SPEC.md` - Complete architecture specification
+  - Protocol contract design
+  - Security model (token auth + path jail)
+  - Operational guide with grpcurl examples
+  - Implementation checklist and Phase 3 lookahead
+- **New:** `crates/orbit-proto/README.md` - Protocol usage guide
+- **New:** `crates/orbit-star/README.md` - Agent deployment guide
+- **Updated:** `README.md` - Added Phase 2 to project status
+
+### Build System
+
+- Updated workspace with `orbit-proto` and `orbit-star` crates
+- Resolved protoc dependency (bundled binary for Windows)
+- All crates compile with zero warnings under `clippy -D warnings`
+
+### Testing
+
+- ✅ All existing tests passing
+- ✅ PathJail unit tests for security validation
+- ✅ No security vulnerabilities (cargo audit clean)
+
+### Notes
+
+- Phase 2 establishes the "Hand" (Star agent) for the future "Brain" (Nucleus/Hub)
+- Next: Phase 3 will implement RemoteSystem for Grid connectivity
+
 ## [0.6.0-alpha.1] - 2025-12-11
 
 ### Added - Phase 1: I/O Abstraction Layer

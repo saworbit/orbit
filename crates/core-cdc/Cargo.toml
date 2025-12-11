@@ -9,6 +9,11 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 blake3 = "1.5"
 thiserror = "2.0"
+tokio = { version = "1.42", features = ["fs", "io-util"], optional = true }
+
+[features]
+default = []
+async = ["dep:tokio"]
 
 [dev-dependencies]
 criterion = "0.5"
