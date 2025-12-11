@@ -116,7 +116,9 @@ impl Sentinel {
     /// 2. Count active copies per chunk
     /// 3. Identify at-risk chunks
     /// 4. Spawn healing tasks for at-risk chunks
-    async fn run_sweep(&self) {
+    ///
+    /// Note: Public for integration testing
+    pub async fn run_sweep(&self) {
         info!("🔭 Sentinel: Starting Universe Sweep...");
         let stats_builder = Arc::new(Mutex::new(SweepStatsBuilder::new()));
 
