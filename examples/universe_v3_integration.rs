@@ -94,6 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Store chunk location in Universe
             let location = ChunkLocation::new(
+                "local".to_string(),
                 PathBuf::from(format!("/data/file_{}.bin", chunk_count)),
                 chunk.offset,
                 chunk.data.len() as u32,
@@ -126,6 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             new_chunks += 1;
             let location = ChunkLocation::new(
+                "local".to_string(),
                 PathBuf::from("/data/duplicate.bin"),
                 chunk.offset,
                 chunk.data.len() as u32,
@@ -151,7 +153,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Insert 10,000 duplicate references (this would timeout in V2!)
     let start = std::time::Instant::now();
     for i in 0..10_000 {
-        let location = ChunkLocation::new(PathBuf::from(format!("/data/dup_{}.bin", i)), 0, 4096);
+        let location = ChunkLocation::new(
+            "local".to_string(),
+            PathBuf::from(format!("/data/dup_{}.bin", i)),
+            0,
+            4096,
+        );
         universe.insert_chunk(hot_hash, location)?;
     }
     let duration = start.elapsed();
@@ -253,8 +260,12 @@ fn transfer_with_dedup(
             stats.bytes_transferred += chunk.data.len() as u64;
 
             // Store in Universe for future dedup
-            let location =
-                ChunkLocation::new(dest_path.clone(), chunk.offset, chunk.data.len() as u32);
+            let location = ChunkLocation::new(
+                "local".to_string(),
+                dest_path.clone(),
+                chunk.offset,
+                chunk.data.len() as u32,
+            );
             universe.insert_chunk(chunk.hash, location)?;
         }
     }
