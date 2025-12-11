@@ -21,6 +21,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install protobuf compiler
+        run: |
+          apt-get update && apt-get install -y protobuf-compiler
+          protoc --version
+
       - name: Generate Coverage Report
         # --out Xml: Output format for Codecov
         # --workspace: Cover all crates in the workspace
