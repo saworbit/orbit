@@ -517,6 +517,8 @@ mod tests {
                 true,
                 false,
                 Some(4),
+                None, // source_star_id
+                None, // dest_star_id
             )
             .await?;
 
