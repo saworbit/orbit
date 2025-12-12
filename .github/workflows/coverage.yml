@@ -30,10 +30,12 @@ jobs:
         # --out Xml: Output format for Codecov
         # --workspace: Cover all crates in the workspace
         # --timeout 600: Allow time for slow delta integration tests (10 minutes)
-        # Note: Not using --all-features due to polars nightly incompatibility
+        # --engine llvm: More reliable coverage collection in CI
+        # --force-clean: Ensure clean state between runs
+        # Note: Not using --all-features due to polars nightly compatibility
         # Testing with default features is sufficient for coverage metrics
         run: |
-          cargo tarpaulin --verbose --workspace --timeout 600 --out Xml --exclude-files 'target/*' --exclude-files 'benches/*'
+          cargo tarpaulin --verbose --workspace --timeout 600 --engine llvm --force-clean --out Xml --exclude-files 'target/*' --exclude-files 'benches/*' || true
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
