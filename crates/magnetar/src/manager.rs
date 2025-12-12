@@ -417,6 +417,8 @@ mod tests {
             _compress: bool,
             _verify: bool,
             _parallel: Option<usize>,
+            _source_star_id: Option<String>,
+            _dest_star_id: Option<String>,
         ) -> anyhow::Result<i64> {
             Ok(1)
         }
