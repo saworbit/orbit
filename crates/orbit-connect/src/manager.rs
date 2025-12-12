@@ -361,7 +361,6 @@ mod tests {
         let manager = StarManager::new();
 
         let result = manager.get_system("unknown").await;
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ConnectError::StarNotFound(_)));
+        assert!(matches!(result, Err(ConnectError::StarNotFound(_))));
     }
 }
