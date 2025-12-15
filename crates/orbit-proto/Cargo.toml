@@ -9,7 +9,7 @@ license = "MIT"
 [dependencies]
 # gRPC runtime
 tonic = "0.12"
-prost = "0.13"
+prost = "0.14"
 tokio-stream = "0.1"
 
 # Async runtime
