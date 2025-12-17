@@ -1593,9 +1593,21 @@ pub async fn run_server(
     tracing::info!("User DB: {}", config.user_db);
 
     // Initialize application state
-    let state = AppState::new(&config.magnetar_db, &config.user_db, reactor_notify).await?;
+    let state = AppState::new(&config.magnetar_db, &config.user_db, reactor_notify.clone()).await?;
 
     tracing::info!("Application state initialized");
+
+    // Start reactor in background for job execution
+    tracing::info!("☢️  Starting Orbit Reactor (job execution engine)...");
+    let reactor_pool = sqlx::SqlitePool::connect(&format!("sqlite:{}?mode=rwc", config.magnetar_db))
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+
+    let reactor = crate::reactor::Reactor::new(reactor_pool, reactor_notify);
+    tokio::spawn(async move {
+        reactor.run().await;
+    });
+    tracing::info!("Reactor spawned successfully");
 
     // Build Axum router
     let app = Router::new()
