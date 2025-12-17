@@ -127,7 +127,15 @@ cat > "$DEMO_SOURCE/mission_manifest.json" << EOF
 EOF
 
 TOTAL_FILES=$(ls -1 "$DEMO_SOURCE" | wc -l)
-TOTAL_SIZE=$(du -sb "$DEMO_SOURCE" | cut -f1)
+
+# macOS-compatible du command (BSD vs GNU)
+if [ "$(uname)" = "Darwin" ]; then
+    # macOS uses BSD stat
+    TOTAL_SIZE=$(find "$DEMO_SOURCE" -type f -print0 | xargs -0 stat -f%z | awk '{total+=$1} END {print total}')
+else
+    # Linux uses GNU du
+    TOTAL_SIZE=$(du -sb "$DEMO_SOURCE" | cut -f1)
+fi
 
 add_metric "test_files_count" "$TOTAL_FILES"
 add_metric "test_data_bytes" "$TOTAL_SIZE"
@@ -249,8 +257,10 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
     sleep 2
     ELAPSED=$((ELAPSED + 2))
 
-    # Get job status
-    JOB_STATUS=$(curl -s "$API_URL/api/jobs/$JOB_ID" 2>/dev/null || echo "{}")
+    # Get job status (RPC-style endpoint)
+    JOB_STATUS=$(curl -s -X POST "$API_URL/api/get_job" \
+      -H "Content-Type: application/json" \
+      -d "{\"job_id\": $JOB_ID}" 2>/dev/null || echo "{}")
     STATUS=$(echo "$JOB_STATUS" | jq -r '.status' 2>/dev/null || echo "unknown")
     PROGRESS=$(echo "$JOB_STATUS" | jq -r '.progress' 2>/dev/null || echo "0")
 
