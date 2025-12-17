@@ -216,6 +216,9 @@ backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-p
 # Control Plane API - OFF by default (use --features api to enable) - V2.2.0: Headless API server
 api = ["dep:orbit-server", "dep:tokio"]
 
+# GUI feature alias - maps to api for backward compatibility
+gui = ["api"]
+
 # Delta manifest persistence with SQLite - OFF by default
 delta-manifest = ["dep:rusqlite"]
 

@@ -4,6 +4,15 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **CLI Integration with orbit-server** (v2.2.0 compatibility)
+  - Added `gui` feature alias mapping to `api` for backward compatibility
+  - Updated `serve_gui()` function to use correct crate name (`orbit_server` instead of `orbit_web`)
+  - Updated configuration struct (`ServerConfig` instead of `WebConfig`)
+  - Added `reactor_notify` parameter to match new `start_server()` signature
+  - Files modified: `Cargo.toml`, `src/main.rs`
+
 ### Added - Phase 5: The Sentinel (Autonomous Resilience Engine)
 
 **OODA Loop for Data Durability** - This release implements the Sentinel, an autonomous resilience engine that continuously monitors the Orbit Grid's Universe V3 database to ensure chunk redundancy. The Sentinel runs an infinite OODA loop (Observe-Orient-Decide-Act), scanning all chunks to identify under-replicated data and autonomously triggering Phase 4 P2P transfers to restore redundancy targets.

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CLI Integration** - Fixed synchronization with orbit v0.6.0 main CLI
+  - Main CLI now correctly imports as `orbit_server` (matching package name)
+  - Main CLI now uses `ServerConfig` (renamed from `WebConfig`)
+  - Added `gui` feature alias in root `Cargo.toml` for backward compatibility
+  - `start_server()` now properly receives `reactor_notify` parameter from CLI
+
 ### Planned for v1.0.0
 - Telemetry dashboard with charts and graphs
 - PWA support for offline monitoring
