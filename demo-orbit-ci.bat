@@ -7,12 +7,12 @@ chcp 65001 >nul 2>&1
 REM ==============================================================================
 REM  🛰️  ORBIT E2E CI/CD HARNESS (Headless Mode)
 REM  Scenario: Deep Space Telemetry Ingestion
-REM  Version: 2.2.0-alpha
+REM  Version: 2.2.1-alpha
 REM  Purpose: Non-interactive automated testing for CI/CD pipelines
 REM ==============================================================================
 REM
 REM  TECHNICAL NOTES:
-REM  - Background processes use '< nul' stdin isolation to prevent input conflicts
+REM  - Background processes run via 'start /B' for non-blocking execution
 REM  - Headless mode: no user input required, fully automated
 REM  - UTF-8 encoding via 'chcp 65001' for proper character display
 REM ==============================================================================
@@ -99,10 +99,10 @@ cd "%ORBIT_ROOT%\crates\orbit-web"
 
 if exist "%ORBIT_ROOT%\target\release\orbit-server.exe" (
     echo [INFO] Using pre-built binary
-    start /B "Orbit-Server-CI" cmd /c ""%ORBIT_ROOT%\target\release\orbit-server.exe" < nul > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
+    start /B "Orbit-Server-CI" cmd /c ""%ORBIT_ROOT%\target\release\orbit-server.exe" > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
 ) else (
     echo [INFO] Building from source
-    start /B "Orbit-Server-CI" cmd /c "cargo run --quiet --bin orbit-server < nul > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
+    start /B "Orbit-Server-CI" cmd /c "cargo run --quiet --bin orbit-server > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
 )
 
 cd "%ORBIT_ROOT%"
@@ -110,7 +110,7 @@ cd "%ORBIT_ROOT%"
 REM Start Frontend
 echo [INFO] Launching dashboard...
 cd "%ORBIT_ROOT%\dashboard"
-start /B "Orbit-Dashboard-CI" cmd /c "npm run dev -- --host 0.0.0.0 < nul > "%ORBIT_ROOT%\orbit-dashboard.log" 2>&1"
+start /B "Orbit-Dashboard-CI" cmd /c "npm run dev -- --host 0.0.0.0 > "%ORBIT_ROOT%\orbit-dashboard.log" 2>&1"
 cd "%ORBIT_ROOT%"
 
 REM Wait for Health Check
