@@ -1,6 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
-import { Node, Edge } from "@xyflow/react";
+import type { Node, Edge } from "@xyflow/react";
+
+// Backend node/edge types
+export interface BackendNode {
+  id: string;
+  node_type: string;
+  name: string;
+  position: { x: number; y: number };
+  config?: Record<string, unknown>;
+}
+
+export interface BackendEdge {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  label?: string | null;
+}
 
 // Pipeline types matching backend
 export interface PipelineInfo {
@@ -17,8 +33,8 @@ export interface PipelineDetail {
   name: string;
   description: string;
   status: string;
-  nodes: Node[];
-  edges: Edge[];
+  nodes: BackendNode[];
+  edges: BackendEdge[];
   created_at: number;
   updated_at: number;
 }

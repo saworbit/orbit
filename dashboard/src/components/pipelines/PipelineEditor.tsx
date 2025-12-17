@@ -1,41 +1,25 @@
-import { useCallback, useState, useRef, DragEvent } from "react";
+import { useCallback, useState, useRef, useEffect, type DragEvent } from "react";
 import {
   ReactFlow,
-  Node,
-  Edge,
+  type Node,
+  type Edge,
   Controls,
   Background,
   BackgroundVariant,
   useNodesState,
   useEdgesState,
   addEdge,
-  Connection,
-  NodeTypes,
+  type Connection,
+  type NodeTypes,
   MiniMap,
   Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Save, CheckCircle, Loader2 } from "lucide-react";
-import { usePipeline, useSavePipeline } from "../../hooks/usePipelines";
-
-// Backend data types
-interface BackendNode {
-  id: string;
-  node_type: string;
-  name: string;
-  position: { x: number; y: number };
-  config?: Record<string, unknown>;
-}
-
-interface BackendEdge {
-  id: string;
-  source_node_id: string;
-  target_node_id: string;
-  label?: string | null;
-}
+import { usePipeline, useSavePipeline, type BackendNode, type BackendEdge } from "../../hooks/usePipelines";
 
 // Custom node component for pipeline nodes
-function PipelineNode({ data }: { data: { label: string; type: string } }) {
+function PipelineNode({ data }: { data: Record<string, unknown> & { label: string; type: string } }) {
   const nodeColors: Record<string, string> = {
     source: "bg-blue-500/10 border-blue-500 text-blue-700 dark:text-blue-300",
     destination:
@@ -97,16 +81,16 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
   const { data: pipeline, isLoading } = usePipeline(pipelineId);
   const savePipeline = useSavePipeline();
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [isSaving, setIsSaving] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
   // Load pipeline data into React Flow state
-  useState(() => {
+  useEffect(() => {
     if (pipeline) {
       // Map backend nodes to React Flow nodes
-      const flowNodes: Node[] = pipeline.nodes.map((node: BackendNode) => ({
+      const flowNodes: Node[] = pipeline.nodes.map((node) => ({
         id: node.id,
         type: "pipelineNode",
         position: node.position || { x: 0, y: 0 },
@@ -117,7 +101,7 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
       }));
 
       // Map backend edges to React Flow edges
-      const flowEdges: Edge[] = pipeline.edges.map((edge: BackendEdge) => ({
+      const flowEdges: Edge[] = pipeline.edges.map((edge) => ({
         id: edge.id,
         source: edge.source_node_id,
         target: edge.target_node_id,
@@ -128,7 +112,7 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
       setNodes(flowNodes);
       setEdges(flowEdges);
     }
-  });
+  }, [pipeline, setNodes, setEdges]);
 
   const onConnect = useCallback(
     (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
@@ -176,8 +160,8 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
       // Map React Flow nodes back to backend format
       const backendNodes: BackendNode[] = nodes.map((node) => ({
         id: node.id,
-        node_type: node.data.type,
-        name: node.data.label,
+        node_type: (node.data as { type: string }).type,
+        name: (node.data as { label: string }).label,
         position: node.position,
         config: {}, // Add config if needed
       }));
@@ -187,13 +171,13 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
         id: edge.id,
         source_node_id: edge.source,
         target_node_id: edge.target,
-        label: edge.label || null,
+        label: typeof edge.label === 'string' ? edge.label : null,
       }));
 
       await savePipeline.mutateAsync({
         id: pipelineId,
-        nodes: backendNodes,
-        edges: backendEdges,
+        nodes: backendNodes as unknown as Node[],
+        edges: backendEdges as unknown as Edge[],
       });
     } finally {
       setIsSaving(false);
@@ -202,8 +186,8 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
 
   const handleValidate = () => {
     const errors: string[] = [];
-    const sourceNodes = nodes.filter((n) => n.data.type === "source");
-    const destNodes = nodes.filter((n) => n.data.type === "destination");
+    const sourceNodes = nodes.filter((n) => (n.data as { type: string }).type === "source");
+    const destNodes = nodes.filter((n) => (n.data as { type: string }).type === "destination");
 
     if (sourceNodes.length === 0) errors.push("Pipeline must have a Source");
     if (destNodes.length === 0) errors.push("Pipeline must have a Destination");
