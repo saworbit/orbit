@@ -34,7 +34,8 @@ export default function UserList() {
   });
 
   const deleteUser = useMutation({
-    mutationFn: (userId: string) => api.delete(`/admin/users/${userId}`),
+    mutationFn: (userId: string) =>
+      api.post("/delete_user", { user_id: parseInt(userId) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
     },

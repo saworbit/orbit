@@ -1509,6 +1509,71 @@ async fn remove_edge_handler(
     Ok(Json("Edge removed".to_string()))
 }
 
+/// Request to sync pipeline with bulk nodes/edges update
+#[derive(Debug, Deserialize)]
+pub struct SyncPipelineRequest {
+    pub pipeline_id: String,
+    pub nodes_json: String,
+    pub edges_json: String,
+}
+
+/// Sync pipeline handler - bulk update for visual editor
+async fn sync_pipeline_handler(
+    State(state): State<AppState>,
+    Json(request): Json<SyncPipelineRequest>,
+) -> Result<Json<String>, (axum::http::StatusCode, String)> {
+    use crate::state::PipelineEdge;
+    use crate::state::PipelineNode;
+
+    // Validate JSON structure
+    let nodes: Vec<PipelineNode> = serde_json::from_str(&request.nodes_json).map_err(|e| {
+        (
+            axum::http::StatusCode::BAD_REQUEST,
+            format!("Invalid nodes JSON: {}", e),
+        )
+    })?;
+
+    let edges: Vec<PipelineEdge> = serde_json::from_str(&request.edges_json).map_err(|e| {
+        (
+            axum::http::StatusCode::BAD_REQUEST,
+            format!("Invalid edges JSON: {}", e),
+        )
+    })?;
+
+    // Update in-memory state
+    let mut pipelines = state.pipelines.write().await;
+    let pipeline = pipelines.get_mut(&request.pipeline_id).ok_or((
+        axum::http::StatusCode::NOT_FOUND,
+        "Pipeline not found".to_string(),
+    ))?;
+
+    pipeline.nodes = nodes;
+    pipeline.edges = edges;
+    pipeline.updated_at = chrono::Utc::now().timestamp();
+
+    // Update database
+    sqlx::query("UPDATE pipelines SET nodes_json = ?, edges_json = ?, updated_at = ? WHERE id = ?")
+        .bind(&request.nodes_json)
+        .bind(&request.edges_json)
+        .bind(pipeline.updated_at)
+        .bind(&request.pipeline_id)
+        .execute(&state.magnetar_pool)
+        .await
+        .map_err(|e| {
+            let msg = format!("Failed to sync pipeline: {}", e);
+            tracing::error!("{}", msg);
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, msg)
+        })?;
+
+    tracing::info!(
+        "Synced pipeline {}: {} nodes, {} edges",
+        request.pipeline_id,
+        pipeline.nodes.len(),
+        pipeline.edges.len()
+    );
+    Ok(Json("Pipeline synced".to_string()))
+}
+
 /// Run the Axum Control Plane server
 pub async fn run_server(
     config: ServerConfig,
@@ -1582,6 +1647,7 @@ pub async fn run_server(
         .route("/api/remove_node", post(remove_node_handler))
         .route("/api/add_edge", post(add_edge_handler))
         .route("/api/remove_edge", post(remove_edge_handler))
+        .route("/api/sync_pipeline", post(sync_pipeline_handler))
         // Health check
         .route(
             "/api/health",
