@@ -15,15 +15,24 @@ import {
   Panel,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import {
-  Save,
-  Play,
-  Trash2,
-  AlertCircle,
-  CheckCircle,
-  Loader2,
-} from "lucide-react";
+import { Save, CheckCircle, Loader2 } from "lucide-react";
 import { usePipeline, useSavePipeline } from "../../hooks/usePipelines";
+
+// Backend data types
+interface BackendNode {
+  id: string;
+  node_type: string;
+  name: string;
+  position: { x: number; y: number };
+  config?: Record<string, unknown>;
+}
+
+interface BackendEdge {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  label?: string | null;
+}
 
 // Custom node component for pipeline nodes
 function PipelineNode({ data }: { data: { label: string; type: string } }) {
@@ -97,7 +106,7 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
   useState(() => {
     if (pipeline) {
       // Map backend nodes to React Flow nodes
-      const flowNodes: Node[] = pipeline.nodes.map((node: any) => ({
+      const flowNodes: Node[] = pipeline.nodes.map((node: BackendNode) => ({
         id: node.id,
         type: "pipelineNode",
         position: node.position || { x: 0, y: 0 },
@@ -108,7 +117,7 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
       }));
 
       // Map backend edges to React Flow edges
-      const flowEdges: Edge[] = pipeline.edges.map((edge: any) => ({
+      const flowEdges: Edge[] = pipeline.edges.map((edge: BackendEdge) => ({
         id: edge.id,
         source: edge.source_node_id,
         target: edge.target_node_id,
@@ -165,7 +174,7 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
     setIsSaving(true);
     try {
       // Map React Flow nodes back to backend format
-      const backendNodes = nodes.map((node) => ({
+      const backendNodes: BackendNode[] = nodes.map((node) => ({
         id: node.id,
         node_type: node.data.type,
         name: node.data.label,
@@ -174,7 +183,7 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
       }));
 
       // Map React Flow edges back to backend format
-      const backendEdges = edges.map((edge) => ({
+      const backendEdges: BackendEdge[] = edges.map((edge) => ({
         id: edge.id,
         source_node_id: edge.source,
         target_node_id: edge.target,
@@ -183,8 +192,8 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
 
       await savePipeline.mutateAsync({
         id: pipelineId,
-        nodes: backendNodes as any,
-        edges: backendEdges as any,
+        nodes: backendNodes,
+        edges: backendEdges,
       });
     } finally {
       setIsSaving(false);

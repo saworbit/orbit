@@ -41,7 +41,7 @@ export function Pipelines() {
       setNewPipelineName("");
       setNewPipelineDesc("");
       setSelectedPipelineId(pipelineId);
-    } catch (error) {
+    } catch {
       alert("Failed to create pipeline");
     }
   };
