@@ -12,7 +12,7 @@ orbit-core-interface = { path = "../orbit-core-interface" }
 orbit-proto = { path = "../orbit-proto" }
 
 # gRPC
-tonic = "0.12"
+tonic = "0.14"
 prost = "0.14"
 
 # Async runtime
