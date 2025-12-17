@@ -6639,9 +6639,9 @@ dependencies = [
 
 [[package]]
 name = "smb"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85e5812a5aea11774250978e082ccef7549d3648f42396ba90d016a9c2180b56"
+checksum = "502b7620c9f63f2aabccfeb6fe454d0ea3e86731ff76f961126d9a249f06edf4"
 dependencies = [
  "aead",
  "aes",
@@ -6676,9 +6676,9 @@ dependencies = [
 
 [[package]]
 name = "smb-dtyp"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7d27f780ca3cb8862b06e7630635be44d2d40eb87f062ccef2339725a364b50"
+checksum = "4c53a2e0e811782d8ddee78553db367fe301832ed89461de9a2bd9c7596eba6f"
 dependencies = [
  "binrw",
  "modular-bitfield",
@@ -6690,9 +6690,9 @@ dependencies = [
 
 [[package]]
 name = "smb-dtyp-derive"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4aafe9cf48d49125d7236e21a0a3c3fe8468756a437085f8fc982500cdb83bcd"
+checksum = "907882c54c427b7b371121755096094d7961216fe45adb088ed8863a49b3f171"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6701,9 +6701,9 @@ dependencies = [
 
 [[package]]
 name = "smb-fscc"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0f3d21818c20d9b2976c8128cd0b226ef4b7454a4e21f32d2cdc2b72ebcb6ac"
+checksum = "c2b9929267ccfe0338eb060448ff199d1393f37046e1fc37f65344c64887b9da"
 dependencies = [
  "binrw",
  "modular-bitfield",
@@ -6715,9 +6715,9 @@ dependencies = [
 
 [[package]]
 name = "smb-msg"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "055249a7cc5d66f6c5a0a4f112e34126e1388069d330e2b4ba47b1bd6756b983"
+checksum = "796e31d6e0903fd4bdce3e27451642ee76a36d1cd90375b8543cdf8c8f696f5b"
 dependencies = [
  "binrw",
  "modular-bitfield",
@@ -6731,9 +6731,9 @@ dependencies = [
 
 [[package]]
 name = "smb-msg-derive"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "323736cd18b0b9fe048c1d60dc9e60a542ae9f39e71ce9f2f9b96189788a49c9"
+checksum = "46df670deb62a5b52ba7f1de0f5d08a0fd6123ab6f857ed1b12b80859454e917"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6742,9 +6742,9 @@ dependencies = [
 
 [[package]]
 name = "smb-rpc"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c798d3d80879fb4a439845f160f4d272e368aa50d5038af550552aa15c885d99"
+checksum = "e6fc5bf5ff09109617813740d82e4dfa275c84388d4139d583a99681c7a980c5"
 dependencies = [
  "binrw",
  "maybe-async",
@@ -6757,9 +6757,9 @@ dependencies = [
 
 [[package]]
 name = "smb-transport"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f06f448a9ea90dbf805716a25adc60c2d7a9a39ad34527535ed335c96b6001c0"
+checksum = "dad8a8257c0cd01b1c86782116ad97e1028295b5421db3463423f26aee1899fe"
 dependencies = [
  "binrw",
  "futures-core",
