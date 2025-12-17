@@ -1,4 +1,10 @@
-import { useCallback, useState, useRef, useEffect, type DragEvent } from "react";
+import {
+  useCallback,
+  useState,
+  useRef,
+  useEffect,
+  type DragEvent,
+} from "react";
 import {
   ReactFlow,
   type Node,
@@ -16,10 +22,19 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Save, CheckCircle, Loader2 } from "lucide-react";
-import { usePipeline, useSavePipeline, type BackendNode, type BackendEdge } from "../../hooks/usePipelines";
+import {
+  usePipeline,
+  useSavePipeline,
+  type BackendNode,
+  type BackendEdge,
+} from "../../hooks/usePipelines";
 
 // Custom node component for pipeline nodes
-function PipelineNode({ data }: { data: Record<string, unknown> & { label: string; type: string } }) {
+function PipelineNode({
+  data,
+}: {
+  data: Record<string, unknown> & { label: string; type: string };
+}) {
   const nodeColors: Record<string, string> = {
     source: "bg-blue-500/10 border-blue-500 text-blue-700 dark:text-blue-300",
     destination:
@@ -171,7 +186,7 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
         id: edge.id,
         source_node_id: edge.source,
         target_node_id: edge.target,
-        label: typeof edge.label === 'string' ? edge.label : null,
+        label: typeof edge.label === "string" ? edge.label : null,
       }));
 
       await savePipeline.mutateAsync({
@@ -186,8 +201,12 @@ export function PipelineEditor({ pipelineId }: { pipelineId: string }) {
 
   const handleValidate = () => {
     const errors: string[] = [];
-    const sourceNodes = nodes.filter((n) => (n.data as { type: string }).type === "source");
-    const destNodes = nodes.filter((n) => (n.data as { type: string }).type === "destination");
+    const sourceNodes = nodes.filter(
+      (n) => (n.data as { type: string }).type === "source"
+    );
+    const destNodes = nodes.filter(
+      (n) => (n.data as { type: string }).type === "destination"
+    );
 
     if (sourceNodes.length === 0) errors.push("Pipeline must have a Source");
     if (destNodes.length === 0) errors.push("Pipeline must have a Destination");
