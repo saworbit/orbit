@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Pipeline Editor** - Complete visual workflow designer with React Flow
+  - Interactive drag-and-drop canvas for building transfer workflows
+  - 7 node types: Source, Destination, Transform, Filter, Merge, Split, Conditional
+  - Color-coded node palette with drag-to-canvas support
+  - Visual connection builder with animated edges
+  - Real-time position persistence and auto-save
+  - Validation logic (requires Source + Destination nodes)
+  - MiniMap and grid background for navigation
+  - Live status panel showing node/edge counts
+  - Bulk save via `POST /api/sync_pipeline` endpoint
+
+- **Pipeline Management UI**
+  - Pipeline list view with card grid layout
+  - Create pipeline form with name and description
+  - Delete pipeline with confirmation dialog
+  - Status badges (draft, ready, running, completed, failed)
+  - Click-to-edit navigation with back button
+  - Empty state onboarding message
+  - Information panel explaining pipeline workflows
+
+- **Backend API - Pipeline Bulk Sync**
+  - New endpoint: `POST /api/sync_pipeline`
+  - Accepts: `{ pipeline_id, nodes_json, edges_json }`
+  - Validates JSON structure before database update
+  - Replaces chatty add_node/remove_edge pattern with single snapshot
+  - Updates both in-memory cache and SQLite database
+  - Logs sync statistics (node count, edge count)
+
+- **Frontend Hooks - usePipelines.ts**
+  - `usePipelines()` - List all pipelines (5s polling)
+  - `usePipeline(id)` - Get single pipeline with details (2s polling)
+  - `useCreatePipeline()` - Create new empty pipeline
+  - `useSavePipeline()` - Bulk save using sync_pipeline
+  - `useDeletePipeline()` - Delete pipeline by ID
+  - Full TypeScript support with proper types
+
 ### Fixed
 
 - **CLI Integration** - Fixed synchronization with orbit v0.6.0 main CLI
@@ -14,6 +52,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Main CLI now uses `ServerConfig` (renamed from `WebConfig`)
   - Added `gui` feature alias in root `Cargo.toml` for backward compatibility
   - `start_server()` now properly receives `reactor_notify` parameter from CLI
+
+- **User Management** - Fixed delete endpoint mismatch
+  - Frontend now uses `POST /api/delete_user` with `{ user_id: number }`
+  - Previously used `DELETE /api/admin/users/:id` (unsupported)
+  - Aligns with backend RPC-style pattern
+
+### Technical Details
+
+- **Integration Status**:
+  - ✅ JobDetail - Already connected to live API
+  - ✅ UserList - Delete endpoint fixed
+  - ✅ PipelineEditor - Fully implemented with React Flow v12.10.0
+  - ✅ FileBrowser - Already working
+
+- **Data Mapping**: Backend nodes/edges seamlessly convert to React Flow format
+- **Verification**: TypeScript checks pass, Prettier formatting applied
+- **Dependencies**: React Flow v12.10.0, all existing packages
 
 ### Planned for v1.0.0
 - Telemetry dashboard with charts and graphs
