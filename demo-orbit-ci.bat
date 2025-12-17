@@ -7,7 +7,7 @@ chcp 65001 >nul 2>&1
 REM ==============================================================================
 REM  🛰️  ORBIT E2E CI/CD HARNESS (Headless Mode)
 REM  Scenario: Deep Space Telemetry Ingestion
-REM  Version: 2.2.1-alpha
+REM  Version: 2.2.3-alpha
 REM  Purpose: Non-interactive automated testing for CI/CD pipelines
 REM ==============================================================================
 REM
@@ -99,10 +99,10 @@ cd "%ORBIT_ROOT%\crates\orbit-web"
 
 if exist "%ORBIT_ROOT%\target\release\orbit-server.exe" (
     echo [INFO] Using pre-built binary
-    start /B "Orbit-Server-CI" cmd /c ""%ORBIT_ROOT%\target\release\orbit-server.exe" > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
+    start /B "Orbit-Server-CI" "%ORBIT_ROOT%\target\release\orbit-server.exe" >"%ORBIT_ROOT%\orbit-server.log" 2>&1
 ) else (
     echo [INFO] Building from source
-    start /B "Orbit-Server-CI" cmd /c "cargo run --quiet --bin orbit-server > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
+    start /B "Orbit-Server-CI" cargo run --quiet --bin orbit-server >"%ORBIT_ROOT%\orbit-server.log" 2>&1
 )
 
 cd "%ORBIT_ROOT%"
@@ -110,7 +110,7 @@ cd "%ORBIT_ROOT%"
 REM Start Frontend
 echo [INFO] Launching dashboard...
 cd "%ORBIT_ROOT%\dashboard"
-start /B "Orbit-Dashboard-CI" cmd /c "npm run dev -- --host 0.0.0.0 > "%ORBIT_ROOT%\orbit-dashboard.log" 2>&1"
+start /B "Orbit-Dashboard-CI" npm run dev -- --host 0.0.0.0 >"%ORBIT_ROOT%\orbit-dashboard.log" 2>&1
 cd "%ORBIT_ROOT%"
 
 REM Wait for Health Check
@@ -143,18 +143,31 @@ timeout /t 3 /nobreak >nul
 REM 4. Job Injection
 echo [INFO] [4/6] Injecting Job via Magnetar API...
 
+REM Authenticate to get JWT token
+echo [INFO] Authenticating...
+set "COOKIE_JAR=%TEMP%\orbit_cookies_%RANDOM%.txt"
+
+curl -s -X POST "%API_URL%/api/auth/login" -H "Content-Type: application/json" -c "%COOKIE_JAR%" -d "{\"username\":\"admin\",\"password\":\"orbit2025\"}" > "%TEMP%\login_response.json"
+findstr /C:"\"username\"" "%TEMP%\login_response.json" >nul
+if %errorlevel% NEQ 0 (
+    echo [ERROR] Authentication failed
+    type "%TEMP%\login_response.json"
+    goto :Error
+)
+echo [SUCCESS] Authenticated as admin
+
 set "JSON_SOURCE=%DEMO_SOURCE:\=\\%"
 set "JSON_DEST=%DEMO_DEST:\=\\%"
 
 echo [INFO] Creating job...
-for /f "delims=" %%i in ('curl -s -X POST "%API_URL%/api/create_job" -H "Content-Type: application/json" -d "{\"source\": \"%JSON_SOURCE%\", \"destination\": \"%JSON_DEST%\", \"compress\": true, \"verify\": true, \"parallel_workers\": 4}"') do set "JOB_ID=%%i"
+for /f "delims=" %%i in ('curl -s -X POST "%API_URL%/api/create_job" -H "Content-Type: application/json" -b "%COOKIE_JAR%" -d "{\"source\": \"%JSON_SOURCE%\", \"destination\": \"%JSON_DEST%\", \"compress\": true, \"verify\": true, \"parallel_workers\": 4}"') do set "JOB_ID=%%i"
 
 echo %JOB_ID%| findstr /R "^[0-9][0-9]*$" >nul
 if %errorlevel% EQU 0 (
     echo [SUCCESS] Job created: ID=%JOB_ID%
 
     echo [INFO] Starting job...
-    for /f "delims=" %%i in ('curl -s -X POST "%API_URL%/api/run_job" -H "Content-Type: application/json" -d "{\"job_id\": %JOB_ID%}"') do set "RUN_RESPONSE=%%i"
+    for /f "delims=" %%i in ('curl -s -X POST "%API_URL%/api/run_job" -H "Content-Type: application/json" -b "%COOKIE_JAR%" -d "{\"job_id\": %JOB_ID%}"') do set "RUN_RESPONSE=%%i"
     echo [SUCCESS] Job started: !RUN_RESPONSE!
 ) else (
     echo [ERROR] Failed to create job: %JOB_ID%
@@ -233,6 +246,8 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173"') do (
 REM Remove test data
 if exist "%DEMO_SOURCE%" rmdir /s /q "%DEMO_SOURCE%" >nul 2>nul
 if exist "%DEMO_DEST%" rmdir /s /q "%DEMO_DEST%" >nul 2>nul
+if exist "%COOKIE_JAR%" del /q "%COOKIE_JAR%" >nul 2>nul
+if exist "%TEMP%\login_response.json" del /q "%TEMP%\login_response.json" >nul 2>nul
 
 echo [SUCCESS] Cleanup complete
 

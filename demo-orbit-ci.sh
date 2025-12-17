@@ -4,7 +4,7 @@ set -e
 # ==============================================================================
 #  🛰️  ORBIT E2E CI/CD HARNESS (Headless Mode)
 #  Scenario: Deep Space Telemetry Ingestion
-#  Version: 2.2.0-alpha
+#  Version: 2.2.2-alpha
 #  Purpose: Non-interactive automated testing for CI/CD pipelines
 # ==============================================================================
 
@@ -67,6 +67,10 @@ cleanup() {
 
     if [ -d "$DEMO_DEST" ]; then
         rm -rf "$DEMO_DEST"
+    fi
+
+    if [ -f "$COOKIE_JAR" ]; then
+        rm -f "$COOKIE_JAR"
     fi
 
     # Write metrics
@@ -209,6 +213,22 @@ sleep 3
 log_info "[4/6] Injecting Job via Magnetar API..."
 JOB_START=$(date +%s)
 
+# Login to get authentication token
+log_info "Authenticating..."
+COOKIE_JAR="/tmp/orbit_cookies_$(date +%s).txt"
+
+LOGIN_RESPONSE=$(curl -s -X POST "$API_URL/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -c "$COOKIE_JAR" \
+  -d '{"username":"admin","password":"orbit2025"}')
+
+if echo "$LOGIN_RESPONSE" | jq -e '.user.username' > /dev/null 2>&1; then
+    log_success "Authenticated as $(echo "$LOGIN_RESPONSE" | jq -r '.user.username')"
+else
+    log_error "Authentication failed: $LOGIN_RESPONSE"
+    exit 1
+fi
+
 JOB_PAYLOAD=$(cat <<EOF
 {
   "source": "$DEMO_SOURCE",
@@ -223,6 +243,7 @@ EOF
 log_info "Creating job..."
 RESPONSE=$(curl -s -X POST "$API_URL/api/create_job" \
   -H "Content-Type: application/json" \
+  -b "$COOKIE_JAR" \
   -d "$JOB_PAYLOAD")
 
 if [[ "$RESPONSE" =~ ^[0-9]+$ ]]; then
@@ -234,6 +255,7 @@ if [[ "$RESPONSE" =~ ^[0-9]+$ ]]; then
     log_info "Starting job execution..."
     RUN_RESPONSE=$(curl -s -X POST "$API_URL/api/run_job" \
       -H "Content-Type: application/json" \
+      -b "$COOKIE_JAR" \
       -d "{\"job_id\": $JOB_ID}")
 
     log_success "Job started: $RUN_RESPONSE"
@@ -260,6 +282,7 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
     # Get job status (RPC-style endpoint)
     JOB_STATUS=$(curl -s -X POST "$API_URL/api/get_job" \
       -H "Content-Type: application/json" \
+      -b "$COOKIE_JAR" \
       -d "{\"job_id\": $JOB_ID}" 2>/dev/null || echo "{}")
     STATUS=$(echo "$JOB_STATUS" | jq -r '.status' 2>/dev/null || echo "unknown")
     PROGRESS=$(echo "$JOB_STATUS" | jq -r '.progress' 2>/dev/null || echo "0")
