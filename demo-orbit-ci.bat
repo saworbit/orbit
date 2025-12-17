@@ -99,10 +99,10 @@ cd "%ORBIT_ROOT%\crates\orbit-web"
 
 if exist "%ORBIT_ROOT%\target\release\orbit-server.exe" (
     echo [INFO] Using pre-built binary
-    start /B "Orbit-Server-CI" "%ORBIT_ROOT%\target\release\orbit-server.exe" > "%ORBIT_ROOT%\orbit-server.log" 2>&1
+    start /B "Orbit-Server-CI" cmd /c ""%ORBIT_ROOT%\target\release\orbit-server.exe" < nul > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
 ) else (
     echo [INFO] Building from source
-    start /B "Orbit-Server-CI" cargo run --quiet --bin orbit-server > "%ORBIT_ROOT%\orbit-server.log" 2>&1
+    start /B "Orbit-Server-CI" cmd /c "cargo run --quiet --bin orbit-server < nul > "%ORBIT_ROOT%\orbit-server.log" 2>&1"
 )
 
 cd "%ORBIT_ROOT%"
@@ -110,7 +110,7 @@ cd "%ORBIT_ROOT%"
 REM Start Frontend
 echo [INFO] Launching dashboard...
 cd "%ORBIT_ROOT%\dashboard"
-start /B "Orbit-Dashboard-CI" npm run dev -- --host 0.0.0.0 > "%ORBIT_ROOT%\orbit-dashboard.log" 2>&1
+start /B "Orbit-Dashboard-CI" cmd /c "npm run dev -- --host 0.0.0.0 < nul > "%ORBIT_ROOT%\orbit-dashboard.log" 2>&1"
 cd "%ORBIT_ROOT%"
 
 REM Wait for Health Check
