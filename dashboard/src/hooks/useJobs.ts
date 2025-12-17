@@ -94,3 +94,15 @@ export function useDeleteJob() {
     },
   });
 }
+
+export function useJobDetail(jobId: number) {
+  return useQuery({
+    queryKey: ["job", jobId],
+    queryFn: async () => {
+      const res = await api.post<JobInfo>("/get_job", { job_id: jobId });
+      return res.data;
+    },
+    refetchInterval: 1000, // Poll every second for live updates
+    enabled: jobId > 0,
+  });
+}

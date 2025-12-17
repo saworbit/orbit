@@ -1,6 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { HardDrive, FileJson, ArrowLeft } from "lucide-react";
-import { api } from "../../lib/api";
+import { useJobDetail } from "../../hooks/useJobs";
 
 // The "Cool" Feature: Visual Chunk Map
 // Simulates a dense grid of file chunks being processed
@@ -61,20 +60,6 @@ const ChunkMap = ({
   );
 };
 
-// --- DATA SHAPE (Must match Rust API) ---
-interface Job {
-  id: number;
-  source: string;
-  destination: string;
-  status: string;
-  progress: number;
-  total_chunks: number;
-  completed_chunks: number;
-  failed_chunks: number;
-  created_at: number;
-  updated_at: number;
-}
-
 export function JobDetail({
   jobId,
   onBack,
@@ -82,13 +67,8 @@ export function JobDetail({
   jobId: number;
   onBack: () => void;
 }) {
-  // --- CONNECT TO REAL API WITH LIVE POLLING ---
-  const { data: job, isLoading } = useQuery({
-    queryKey: ["job", jobId],
-    queryFn: () =>
-      api.post<Job>("/get_job", { job_id: jobId }).then((r) => r.data),
-    refetchInterval: 1000, // Poll every second for live updates
-  });
+  // Connect to real API with live polling via useJobDetail hook
+  const { data: job, isLoading } = useJobDetail(jobId);
 
   if (isLoading || !job) {
     return (

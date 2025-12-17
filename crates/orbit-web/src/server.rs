@@ -1610,13 +1610,40 @@ pub async fn run_server(
     });
     tracing::info!("Reactor spawned successfully");
 
-    // Build Axum router
-    let app = Router::new()
-        // WebSocket endpoints
-        .route("/ws/events", get(ws::ws_handler))
-        .route("/ws/events/:job_id", get(ws::ws_handler))
-        // Auth endpoints
+    // Build Axum router with authentication layers
+
+    // Public routes (no authentication required)
+    let public_routes = Router::new()
         .route("/api/auth/login", post(api::login_handler))
+        .route(
+            "/api/health",
+            get(|| async {
+                axum::Json(serde_json::json!({
+                    "status": "ok",
+                    "service": "orbit-web",
+                    "version": "1.0.0-rc.1"
+                }))
+            }),
+        );
+
+    // Admin-only routes (require authentication + admin role)
+    let admin_routes = Router::new()
+        .route("/api/list_users", post(list_users_handler))
+        .route("/api/create_user", post(create_user_handler))
+        .route("/api/update_user", post(update_user_handler))
+        .route("/api/delete_user", post(delete_user_handler))
+        .route(
+            "/api/admin/users",
+            get(api::list_users).post(api::create_user),
+        )
+        .route_layer(axum::middleware::from_fn(crate::auth::require_role(
+            crate::auth::Role::Admin,
+        )))
+        .route_layer(axum::middleware::from_fn(crate::auth::require_auth));
+
+    // Authenticated routes (require authentication)
+    let protected_routes = Router::new()
+        // Auth endpoints
         .route("/api/auth/logout", post(api::logout_handler))
         .route("/api/auth/me", get(api::me_handler))
         // Job endpoints
@@ -1635,19 +1662,9 @@ pub async fn run_server(
         .route("/api/list_dir", post(list_dir_handler))
         .route("/api/list_drives", get(api::list_drives))
         .route("/api/upload_file", post(upload_file_handler))
-        // User management endpoints (Admin only) - v2.2.0-alpha
-        .route("/api/list_users", post(list_users_handler))
-        .route("/api/create_user", post(create_user_handler))
-        .route("/api/update_user", post(update_user_handler))
-        .route("/api/delete_user", post(delete_user_handler))
-        // Admin API - v2.2.0-beta.1
-        .route(
-            "/api/admin/users",
-            get(api::list_users).post(api::create_user),
-        )
-        // Intelligence API - v2.2.0-beta.1
+        // Intelligence API
         .route("/api/estimates/:path", get(api::get_estimate))
-        // System Stats API - v2.2.0-beta.1
+        // System Stats API
         .route("/api/stats/health", get(api::get_system_health))
         // Pipeline endpoints
         .route("/api/list_pipelines", post(list_pipelines_handler))
@@ -1661,17 +1678,16 @@ pub async fn run_server(
         .route("/api/add_edge", post(add_edge_handler))
         .route("/api/remove_edge", post(remove_edge_handler))
         .route("/api/sync_pipeline", post(sync_pipeline_handler))
-        // Health check
-        .route(
-            "/api/health",
-            get(|| async {
-                axum::Json(serde_json::json!({
-                    "status": "ok",
-                    "service": "orbit-web",
-                    "version": "1.0.0-rc.1"
-                }))
-            }),
-        );
+        .route_layer(axum::middleware::from_fn(crate::auth::require_auth));
+
+    // Combine all routes
+    let app = Router::new()
+        // WebSocket endpoints (public for now, could be protected separately)
+        .route("/ws/events", get(ws::ws_handler))
+        .route("/ws/events/:job_id", get(ws::ws_handler))
+        .merge(public_routes)
+        .merge(protected_routes)
+        .merge(admin_routes);
 
     // ---------------------------------------------------------
     // CONDITIONAL UI COMPILATION
