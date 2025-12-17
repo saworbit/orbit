@@ -1,0 +1,84 @@
+# ==============================================================================
+#  Orbit E2E Demo - Multi-stage Docker Build
+#  Version: 2.2.0-alpha
+#  Purpose: Containerized demonstration environment
+# ==============================================================================
+
+# Stage 1: Build Rust Backend
+FROM rust:1.75-slim as rust-builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+
+# Build orbit-server (release mode)
+WORKDIR /build/crates/orbit-web
+RUN cargo build --release --bin orbit-server
+
+# Stage 2: Build React Dashboard
+FROM node:20-alpine as frontend-builder
+
+WORKDIR /build
+
+# Copy dashboard files
+COPY dashboard/package*.json ./
+RUN npm ci --only=production
+
+COPY dashboard/ ./
+RUN npm run build
+
+# Stage 3: Runtime Image
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create orbit user
+RUN useradd -m -u 1000 orbit && \
+    mkdir -p /app/data /app/logs && \
+    chown -R orbit:orbit /app
+
+# Copy built artifacts
+COPY --from=rust-builder /build/target/release/orbit-server /app/
+COPY --from=frontend-builder /build/dist /app/dashboard-dist
+
+# Copy demo scripts
+COPY demo-orbit-ci.sh /app/
+COPY scripts/docker-entrypoint.sh /app/
+RUN chmod +x /app/demo-orbit-ci.sh /app/docker-entrypoint.sh
+
+# Environment variables
+ENV RUST_LOG=info \
+    ORBIT_JWT_SECRET=demo-secret-key-must-be-32-chars-long \
+    ORBIT_DEMO_HEADLESS=false \
+    API_PORT=8080 \
+    DASHBOARD_PORT=5173
+
+# Expose ports
+EXPOSE 8080 5173
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8080/api/health || exit 1
+
+# Switch to orbit user
+USER orbit
+
+# Set entrypoint
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["demo"]

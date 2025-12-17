@@ -1636,6 +1636,62 @@ npm run dev
 
 **Browser Safety**: Launch scripts open the dashboard in a **new browser tab** and will **NOT kill your other tabs** when you close the script. Safe to use with your existing browser session!
 
+### 🛰️ E2E Demo Harness - "Deep Space Telemetry Scenario"
+
+**NEW in v2.2.0!** Experience Orbit's full capabilities with an automated end-to-end demonstration that showcases real-time job management, visual chunk maps, and live telemetry tracking.
+
+**🛡️ Safety First (Recommended for First-Time Users):**
+
+Before running the demo, use the safety validator to verify your system is ready **without making any changes**:
+
+```bash
+# Unix/Linux/macOS
+./scripts/validate-demo-safety.sh
+
+# Windows (Git Bash)
+bash scripts/validate-demo-safety.sh
+```
+
+The validator checks system requirements, port availability, disk space, and shows exactly what the demo will do. See [SAFETY_FIRST.md](SAFETY_FIRST.md) for complete safety documentation.
+
+**Option 3: Run the E2E Demo** (Best for first-time users and demonstrations)
+
+```bash
+# Unix/Linux/macOS
+./demo-orbit.sh
+
+# Windows
+demo-orbit.bat
+```
+
+**Requirements:**
+- 💾 **Disk Space:** 4GB free (or 400MB if binaries already built) - [See details](DISK_SPACE_GUIDE.md)
+- ⏱️ **Duration:** ~5-10 minutes (includes build time)
+- 🌐 **Ports:** 8080 (API) and 5173 (Dashboard) must be available
+
+**What the demo does:**
+1. ✅ **Environment Validation** - Verifies Rust, Node.js, and port availability
+2. 📊 **Data Fabrication** - Generates ~170MB of synthetic telescope telemetry data
+3. 🚀 **System Ignition** - Launches both Control Plane and Dashboard
+4. 🎯 **Job Injection** - Programmatically creates and starts a transfer job via REST API
+5. 👁️ **Observation Phase** - Interactive pause to explore the dashboard's Visual Chunk Map and live telemetry graphs
+6. 🧹 **Cleanup** - Gracefully terminates services and removes temporary data
+
+**Features demonstrated:**
+- **Magnetar State Machine** - Job lifecycle management (`pending` → `running` → `completed`)
+- **Real-Time Dashboard** - Visual Chunk Map showing chunk-level transfer progress
+- **Live Telemetry** - Transfer speed graphs and statistics
+- **REST API** - Programmatic job creation and control
+- **Resilient Transfer** - Compression, verification, parallel workers (4 concurrent)
+
+**Perfect for:**
+- 🎬 **Sales Demonstrations** - Show Orbit's capabilities to stakeholders
+- 🧪 **Development Testing** - Validate full-stack functionality quickly
+- 📚 **Training** - Onboard new developers to the architecture
+- 🤖 **CI/CD Integration** - Automated E2E testing in pipelines
+
+📖 **Full Documentation:** See [`DEMO_GUIDE.md`](DEMO_GUIDE.md) for detailed usage, troubleshooting, and customization options.
+
 ### Compilation Modes: Headless vs Full UI
 
 **NEW in v2.2.0!** The Control Plane now supports **compile-time modularity** via feature flags, allowing you to build either a lightweight headless API server or a full-featured server with embedded dashboard.

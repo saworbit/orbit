@@ -1,0 +1,308 @@
+name: E2E Demo Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/orbit-web/**'
+      - 'dashboard/**'
+      - 'demo-orbit.sh'
+      - 'demo-orbit.bat'
+      - '.github/workflows/e2e-demo.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/orbit-web/**'
+      - 'dashboard/**'
+      - 'demo-orbit.sh'
+      - 'demo-orbit.bat'
+  schedule:
+    # Run daily at 2 AM UTC to catch integration issues
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      record_video:
+        description: 'Record video of the demo'
+        required: false
+        default: 'false'
+        type: boolean
+      collect_metrics:
+        description: 'Collect performance metrics'
+        required: false
+        default: 'true'
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  ORBIT_JWT_SECRET: ci-test-secret-key-must-be-32-chars-long
+  # Headless mode for CI
+  ORBIT_DEMO_HEADLESS: true
+  ORBIT_DEMO_AUTO_CONFIRM: true
+
+jobs:
+  e2e-linux:
+    name: E2E Demo (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@v1.3.1
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: false
+        swap-storage: true
+
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: dashboard/package-lock.json
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-e2e-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-e2e-cargo-
+
+    - name: Cache node modules
+      uses: actions/cache@v4
+      with:
+        path: dashboard/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl jq
+
+    - name: Build backend
+      working-directory: crates/orbit-web
+      run: cargo build --bin orbit-server --release
+
+    - name: Install frontend dependencies
+      working-directory: dashboard
+      run: npm ci
+
+    - name: Run E2E Demo (Headless)
+      run: |
+        chmod +x demo-orbit-ci.sh
+        ./demo-orbit-ci.sh
+      timeout-minutes: 10
+
+    - name: Upload demo logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-demo-logs-ubuntu
+        path: |
+          orbit-server.log
+          orbit-dashboard.log
+          e2e-metrics.json
+        retention-days: 7
+
+    - name: Upload metrics artifact
+      if: always() && (github.event.inputs.collect_metrics == 'true' || github.event_name != 'workflow_dispatch')
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-metrics-ubuntu
+        path: e2e-metrics.json
+        retention-days: 30
+
+  e2e-windows:
+    name: E2E Demo (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 25
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: dashboard/package-lock.json
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-e2e-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-e2e-cargo-
+
+    - name: Cache node modules
+      uses: actions/cache@v4
+      with:
+        path: dashboard/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Build backend
+      working-directory: crates/orbit-web
+      run: cargo build --bin orbit-server --release
+
+    - name: Install frontend dependencies
+      working-directory: dashboard
+      run: npm ci
+
+    - name: Run E2E Demo (Headless)
+      shell: cmd
+      run: demo-orbit-ci.bat
+      timeout-minutes: 10
+
+    - name: Upload demo logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-demo-logs-windows
+        path: |
+          orbit-server.log
+          orbit-dashboard.log
+          e2e-metrics.json
+        retention-days: 7
+
+    - name: Upload metrics artifact
+      if: always() && (github.event.inputs.collect_metrics == 'true' || github.event_name != 'workflow_dispatch')
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-metrics-windows
+        path: e2e-metrics.json
+        retention-days: 30
+
+  e2e-macos:
+    name: E2E Demo (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: dashboard/package-lock.json
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-e2e-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-e2e-cargo-
+
+    - name: Cache node modules
+      uses: actions/cache@v4
+      with:
+        path: dashboard/node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Build backend
+      working-directory: crates/orbit-web
+      run: cargo build --bin orbit-server --release
+
+    - name: Install frontend dependencies
+      working-directory: dashboard
+      run: npm ci
+
+    - name: Run E2E Demo (Headless)
+      run: |
+        chmod +x demo-orbit-ci.sh
+        ./demo-orbit-ci.sh
+      timeout-minutes: 10
+
+    - name: Upload demo logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-demo-logs-macos
+        path: |
+          orbit-server.log
+          orbit-dashboard.log
+          e2e-metrics.json
+        retention-days: 7
+
+    - name: Upload metrics artifact
+      if: always() && (github.event.inputs.collect_metrics == 'true' || github.event_name != 'workflow_dispatch')
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-metrics-macos
+        path: e2e-metrics.json
+        retention-days: 30
+
+  analyze-metrics:
+    name: Analyze Performance Metrics
+    needs: [e2e-linux, e2e-windows, e2e-macos]
+    runs-on: ubuntu-latest
+    if: always() && (github.event.inputs.collect_metrics == 'true' || github.event_name != 'workflow_dispatch')
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Download all metrics
+      uses: actions/download-artifact@v4
+      with:
+        pattern: e2e-metrics-*
+        path: metrics
+
+    - name: Analyze metrics
+      run: |
+        echo "## E2E Demo Performance Metrics" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        for os in ubuntu windows macos; do
+          if [ -f "metrics/e2e-metrics-$os/e2e-metrics.json" ]; then
+            echo "### $os" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat "metrics/e2e-metrics-$os/e2e-metrics.json" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+
+    - name: Upload combined metrics
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-metrics-combined
+        path: metrics/
+        retention-days: 90
