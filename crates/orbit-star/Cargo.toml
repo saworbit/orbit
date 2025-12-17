@@ -17,7 +17,7 @@ orbit-core-cdc = { path = "../core-cdc", features = ["async"] }
 
 # gRPC
 tonic = "0.12"
-tonic-reflection = "0.12"
+tonic-reflection = "0.14"
 
 # Async runtime
 tokio = { version = "1.42", features = ["macros", "rt-multi-thread", "fs", "sync"] }
