@@ -139,9 +139,8 @@ impl Reactor {
         // Create progress tracker
         let mut progress = MagnetarProgress::new(job.id, 0, pool.clone());
 
-        // TODO: This is where we'll integrate Orbit Core's copy logic
-        // For now, simulate a transfer for demonstration
-        let result = Self::simulate_transfer(&mut progress, &job).await;
+        // Perform actual file transfer
+        let result = Self::perform_local_copy(&mut progress, &job).await;
 
         // Handle final state
         match result {
@@ -176,55 +175,94 @@ impl Reactor {
         progress.finish();
     }
 
-    /// Simulate a transfer (placeholder for Orbit Core integration)
-    async fn simulate_transfer(
+    /// Perform actual local file copy
+    async fn perform_local_copy(
         progress: &mut MagnetarProgress,
         job: &Job,
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-        // In production, this will be replaced with:
-        // orbit::core::copy::perform_copy(&config).await
+        use tokio::fs;
 
-        // Simulate file size discovery
-        let total_size = Self::estimate_transfer_size(&job.source).await?;
+        let source = PathBuf::from(&job.source);
+        let destination = PathBuf::from(&job.destination);
+
+        // Ensure destination directory exists
+        fs::create_dir_all(&destination).await?;
+
+        // Calculate total size and collect files
+        info!("Scanning source directory: {}", job.source);
+        let files = Self::collect_files(source.clone()).await?;
+        let total_size: u64 = files.iter().map(|(_, size)| size).sum();
+
         progress.set_length(total_size);
-
         info!(
-            "Simulating transfer of {} bytes for job #{}",
-            total_size, job.id
+            "Starting transfer of {} files ({} bytes) for job #{}",
+            files.len(),
+            total_size,
+            job.id
         );
 
-        // Simulate chunked transfer
-        let chunk_size = 1024 * 1024; // 1MB chunks
-        let total_chunks = (total_size + chunk_size - 1) / chunk_size;
+        let mut bytes_transferred = 0u64;
 
-        for chunk_idx in 0..total_chunks {
-            // Simulate chunk processing time
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // Copy each file
+        for (idx, (file_path, _file_size)) in files.iter().enumerate() {
+            // Compute relative path
+            let relative_path = file_path
+                .strip_prefix(&source)
+                .map_err(|e| format!("Path prefix error: {}", e))?;
 
-            // Update progress
-            let bytes_this_chunk = std::cmp::min(chunk_size, total_size - (chunk_idx * chunk_size));
-            progress.inc(bytes_this_chunk);
+            let dest_path = destination.join(relative_path);
 
-            // Simulate occasional chunk completion events
-            if chunk_idx % 10 == 0 {
-                progress.chunk_completed(chunk_idx as usize, "simulated-checksum");
+            // Ensure parent directory exists
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent).await?;
             }
 
-            // Simulate occasional failures (1% failure rate)
-            if chunk_idx % 100 == 50 {
-                progress.chunk_failed(chunk_idx as usize, "simulated network timeout");
+            // Copy file
+            match fs::copy(&file_path, &dest_path).await {
+                Ok(bytes) => {
+                    progress.inc(bytes);
+                    progress.chunk_completed(idx, "copied");
+                    bytes_transferred += bytes;
+                }
+                Err(e) => {
+                    warn!("Failed to copy {:?}: {}", file_path, e);
+                    progress.chunk_failed(idx, &e.to_string());
+                    return Err(Box::new(e));
+                }
             }
         }
 
-        Ok(total_size)
+        Ok(bytes_transferred)
     }
 
-    /// Estimate transfer size (placeholder)
-    async fn estimate_transfer_size(
-        _path: &str,
-    ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-        // In production, this will use std::fs::metadata or backend-specific APIs
-        // For now, return a simulated size
-        Ok(10 * 1024 * 1024) // 10 MB simulated transfer
+    /// Recursively collect all files in a directory
+    fn collect_files(
+        path: PathBuf,
+    ) -> std::pin::Pin<
+        Box<
+            dyn std::future::Future<
+                    Output = Result<Vec<(PathBuf, u64)>, Box<dyn std::error::Error + Send + Sync>>,
+                > + Send,
+        >,
+    > {
+        Box::pin(async move {
+            use tokio::fs;
+
+            let mut files = Vec::new();
+            let metadata = fs::metadata(&path).await?;
+
+            if metadata.is_file() {
+                files.push((path.clone(), metadata.len()));
+            } else if metadata.is_dir() {
+                let mut entries = fs::read_dir(&path).await?;
+                while let Some(entry) = entries.next_entry().await? {
+                    let entry_path = entry.path();
+                    let entry_files = Self::collect_files(entry_path).await?;
+                    files.extend(entry_files);
+                }
+            }
+
+            Ok(files)
+        })
     }
 }

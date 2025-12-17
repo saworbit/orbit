@@ -1599,9 +1599,10 @@ pub async fn run_server(
 
     // Start reactor in background for job execution
     tracing::info!("☢️  Starting Orbit Reactor (job execution engine)...");
-    let reactor_pool = sqlx::SqlitePool::connect(&format!("sqlite:{}?mode=rwc", config.magnetar_db))
-        .await
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
+    let reactor_pool =
+        sqlx::SqlitePool::connect(&format!("sqlite:{}?mode=rwc", config.magnetar_db))
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
 
     let reactor = crate::reactor::Reactor::new(reactor_pool, reactor_notify);
     tokio::spawn(async move {
