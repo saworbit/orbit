@@ -4,6 +4,27 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependency Updates: tonic 0.14 Ecosystem Migration**
+  - Updated gRPC stack to tonic 0.14.2 (from 0.12.3)
+  - Updated prost to 0.14.1 (from 0.13.5)
+  - Migrated from `tonic-build` to `tonic-prost-build` for proto compilation
+  - Added `tonic-prost` runtime dependency for generated code
+  - Updated `tonic-reflection` to 0.14.2 (from 0.12.3)
+  - **Breaking Change**: Requires protoc (Protocol Buffers compiler) to be installed for builds
+  - **Files modified**:
+    - `orbit-proto/Cargo.toml`: Updated dependencies and build script
+    - `orbit-proto/build.rs`: Changed API from `tonic_build::` to `tonic_prost_build::`
+    - `orbit-star/Cargo.toml`: Updated tonic and tonic-reflection
+    - `orbit-connect/Cargo.toml`: Updated tonic
+  - See [Migration Guide](docs/guides/migration_guide.md#tonic-014-migration) for details
+
+- **Other Dependency Updates**
+  - Cargo: toml 0.8.23 → 0.9.8, smb 0.11.0 → 0.11.1, criterion 0.5.1 → 0.8.1
+  - GitHub Actions: actions/cache 4 → 5, actions/download-artifact 6 → 7, actions/checkout 4 → 6
+  - NPM/Dashboard: React 19.2.0 → 19.2.3, Vite 7.2.7 → 7.3.0, and various dev dependencies
+
 ### Fixed
 
 - **CLI Integration with orbit-server** (v2.2.0 compatibility)

@@ -2,7 +2,121 @@
 
 ---
 
-## Latest: v0.3.x → v0.4.0
+## Latest: tonic 0.14 Migration (Development)
+
+### Overview
+
+The gRPC ecosystem dependencies have been updated from tonic 0.12 to tonic 0.14, which includes breaking changes in the build tooling. This primarily affects developers building Orbit from source.
+
+### Breaking Changes
+
+#### 1. **protoc Requirement**
+
+**Impact**: Developers building from source
+
+tonic 0.14 now requires the Protocol Buffers compiler (`protoc`) to be installed on your system.
+
+**Installation**:
+
+**Windows**:
+```bash
+choco install protoc
+```
+
+**macOS**:
+```bash
+brew install protobuf
+```
+
+**Linux**:
+```bash
+# Ubuntu/Debian
+sudo apt install protobuf-compiler
+
+# Fedora/RHEL
+sudo dnf install protobuf-compiler
+```
+
+#### 2. **Build Script API Changes**
+
+**Impact**: Only affects developers modifying proto definitions
+
+The build script API has changed from `tonic-build` to `tonic-prost-build`:
+
+**Before (tonic 0.12)**:
+```rust
+// build.rs
+fn main() {
+    tonic_build::configure()
+        .build_server(true)
+        .build_client(true)
+        .compile_protos(&["proto/orbit.proto"], &["proto"])
+        .unwrap();
+}
+
+// Cargo.toml
+[build-dependencies]
+tonic-build = "0.12"
+```
+
+**After (tonic 0.14)**:
+```rust
+// build.rs
+fn main() {
+    tonic_prost_build::configure()
+        .build_server(true)
+        .build_client(true)
+        .compile_protos(&["proto/orbit.proto"], &["proto"])
+        .unwrap();
+}
+
+// Cargo.toml
+[dependencies]
+tonic = "0.14"
+tonic-prost = "0.14"  # New runtime dependency
+
+[build-dependencies]
+tonic-prost-build = "0.14"  # Changed from tonic-build
+prost-build = "0.14"
+```
+
+### Migration Steps for Developers
+
+1. **Install protoc**:
+   ```bash
+   # See installation commands above
+   protoc --version  # Verify installation
+   ```
+
+2. **Update dependencies** (already done in Orbit):
+   ```bash
+   cargo update
+   cargo build  # Should work after protoc installation
+   ```
+
+3. **If you have custom proto files**:
+   - Update your `build.rs` to use `tonic_prost_build::configure()`
+   - Add `tonic-prost` to dependencies
+   - Change `tonic-build` to `tonic-prost-build` in build-dependencies
+
+### For End Users
+
+**No changes required.** Pre-built binaries and CI builds already include the necessary dependencies.
+
+### Related Changes
+
+- prost: 0.13.5 → 0.14.1
+- tonic-reflection: 0.12.3 → 0.14.2
+- All gRPC crates updated consistently across the project
+
+### Reference
+
+- [tonic 0.14 Release Notes](https://github.com/hyperium/tonic/releases)
+- [Orbit CHANGELOG](../../CHANGELOG.md#unreleased)
+
+---
+
+## v0.3.x → v0.4.0
 
 ### Overview
 
