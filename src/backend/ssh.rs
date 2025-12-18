@@ -454,6 +454,16 @@ fn list_recursive_blocking_impl(
 
 #[async_trait]
 impl Backend for SshBackend {
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "ssh",
+            path = %path.display(),
+            host = %self.config.host,
+            port = self.config.port
+        )
+    )]
     async fn stat(&self, path: &Path) -> BackendResult<Metadata> {
         let path = path.to_path_buf();
         let sftp = self.sftp.clone();
@@ -492,6 +502,17 @@ impl Backend for SshBackend {
         })?
     }
 
+    #[tracing::instrument(
+        skip(self, options),
+        fields(
+            otel.kind = "client",
+            backend = "ssh",
+            path = %path.display(),
+            host = %self.config.host,
+            port = self.config.port,
+            recursive = options.recursive
+        )
+    )]
     async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
         use futures::stream::StreamExt;
 
@@ -515,6 +536,16 @@ impl Backend for SshBackend {
         Ok(stream)
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "ssh",
+            path = %path.display(),
+            host = %self.config.host,
+            port = self.config.port
+        )
+    )]
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
         // Warning for large files
         let metadata = self.stat(path).await?;
@@ -563,6 +594,18 @@ impl Backend for SshBackend {
         Ok(Box::pin(stream))
     }
 
+    #[tracing::instrument(
+        skip(self, reader, options),
+        fields(
+            otel.kind = "client",
+            backend = "ssh",
+            path = %path.display(),
+            host = %self.config.host,
+            port = self.config.port,
+            size_hint = ?_size_hint,
+            overwrite = options.overwrite
+        )
+    )]
     async fn write(
         &self,
         path: &Path,
@@ -627,6 +670,17 @@ impl Backend for SshBackend {
         })?
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "ssh",
+            path = %path.display(),
+            host = %self.config.host,
+            port = self.config.port,
+            recursive
+        )
+    )]
     async fn delete(&self, path: &Path, recursive: bool) -> BackendResult<()> {
         let path = path.to_path_buf();
         let sftp = self.sftp.clone();
@@ -684,6 +738,17 @@ impl Backend for SshBackend {
         })?
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "ssh",
+            path = %path.display(),
+            host = %self.config.host,
+            port = self.config.port,
+            recursive
+        )
+    )]
     async fn mkdir(&self, path: &Path, recursive: bool) -> BackendResult<()> {
         let path = path.to_path_buf();
         let sftp = self.sftp.clone();
@@ -718,6 +783,17 @@ impl Backend for SshBackend {
         })?
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "ssh",
+            src = %src.display(),
+            dest = %dest.display(),
+            host = %self.config.host,
+            port = self.config.port
+        )
+    )]
     async fn rename(&self, src: &Path, dest: &Path) -> BackendResult<()> {
         let src = src.to_path_buf();
         let dest = dest.to_path_buf();

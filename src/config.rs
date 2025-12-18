@@ -212,6 +212,17 @@ pub struct CopyConfig {
     /// Files smaller than this use the fast lane
     #[serde(default = "default_neutrino_threshold")]
     pub neutrino_threshold: u64,
+
+    // === V3 Observability Configuration ===
+    /// OpenTelemetry OTLP endpoint for distributed tracing
+    /// Example: "http://localhost:4317" (Jaeger, Honeycomb, Datadog)
+    #[serde(default)]
+    pub otel_endpoint: Option<String>,
+
+    /// Prometheus metrics HTTP endpoint port
+    /// Set to enable /metrics endpoint (e.g., 9090)
+    #[serde(default)]
+    pub metrics_port: Option<u16>,
 }
 
 impl Default for CopyConfig {
@@ -262,6 +273,8 @@ impl Default for CopyConfig {
             delta_chunk_size: default_delta_block_size(),
             transfer_profile: None,
             neutrino_threshold: default_neutrino_threshold(),
+            otel_endpoint: None,
+            metrics_port: None,
         }
     }
 }

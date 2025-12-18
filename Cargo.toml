@@ -14,6 +14,7 @@ members = [
     "crates/magnetar",              # Phase 4: Job Execution Engine
     "crates/orbit-sentinel",        # Phase 5: Autonomous Resilience Engine
     "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
+    "crates/orbit-observability",   # V3: Unified Observability & Immutable Audit Plane
 ]
 
 [package]
@@ -101,6 +102,9 @@ orbit-core-audit = { path = "crates/core-audit" }
 orbit-core-cdc = { path = "crates/core-cdc" }
 orbit-core-semantic = { path = "crates/core-semantic" }
 orbit-core-interface = { path = "crates/orbit-core-interface" }  # Phase 1: I/O Abstraction
+
+# V3 Observability
+orbit-observability = { path = "crates/orbit-observability" }
 
 # SMB native dependencies (optional, feature-gated)
 bytes = { version = "1", optional = true }
@@ -227,6 +231,9 @@ extended-metadata = ["dep:xattr"]
 
 # Unicode normalization for consistent path encoding
 unicode-normalization = ["dep:unicode-normalization"]
+
+# V3: OpenTelemetry distributed tracing - OFF by default
+opentelemetry = ["orbit-observability/opentelemetry"]
 
 # Convenience: All network protocols
 network = ["s3-native", "smb-native", "ssh-backend"]

@@ -1100,40 +1100,98 @@ orbit --source /local/data --dest smb://server/backup \
 
 ---
 
-### 📊 Audit and Telemetry
+### 📊 Audit and Telemetry (V3 Unified Observability)
 
-Every copy operation automatically emits structured audit events for full observability and compliance tracking.
+**NEW in v0.6.0**: Enterprise-grade observability with **cryptographic integrity** and distributed tracing.
 
-**Enable Audit Logging:**
+Every operation emits structured events for compliance auditing, troubleshooting, and operational monitoring.
+
+#### 🔒 Cryptographic Audit Chaining
+
+Orbit V3 provides **tamper-evident audit logs** using HMAC-SHA256 cryptographic chaining. Any modification, deletion, or reordering of audit events is immediately detectable.
+
+**Enable Secure Audit Logging:**
 ```bash
-# Via CLI flag
-orbit copy /source /dest --audit-log ./audit.log
+# Set HMAC secret key (required for cryptographic chaining)
+export ORBIT_AUDIT_SECRET=$(openssl rand -hex 32)
 
-# Via configuration file
-audit_format = "json"
-audit_log_path = "/var/log/orbit_audit.log"
+# Enable audit logging with integrity protection
+orbit copy /source /dest --audit-log ./audit.jsonl
+
+# Verify log integrity (detects any tampering)
+python3 scripts/verify_audit.py audit.jsonl
 ```
 
-**Example Audit Log (JSON Lines):**
+**V3 Event Format (JSONL with HMAC chain):**
 ```json
-{"timestamp":"2025-10-25T16:42:19Z","job":"orbit-1a2b3c4d-5e6f","source":"/local/data/","destination":"s3://my-bucket/backups/","protocol":"s3","bytes_transferred":104857600,"duration_ms":2341,"compression":"zstd","compression_ratio":2.3,"checksum_algorithm":"blake3","checksum_match":true,"storage_class":"INTELLIGENT_TIERING","multipart_parts":20,"status":"success","retries":0,"starmap_node":"orbit.node.cloud-backup"}
+{
+  "trace_id": "335f8464197139ab59c4494274e55749",
+  "span_id": "4a63b017626d3de5",
+  "timestamp": "2025-12-18T11:56:41.722338400Z",
+  "sequence": 0,
+  "integrity_hash": "a70ee3ca57a26eb650d19b4d7ed66d28d3fc187137b8edb182c5ea2d7a8eeee9",
+  "payload": {
+    "type": "file_start",
+    "source": "/data/file.bin",
+    "dest": "s3://bucket/backup/file.bin",
+    "bytes": 1048576
+  }
+}
 ```
 
-**Audit Event Lifecycle:**
-1. **started** — Emitted when operation begins (with expected bytes)
-2. **progress** — Optional periodic updates during long transfers
-3. **success/failure** — Final status with complete metrics
+#### 🌍 Distributed Tracing (W3C Trace Context)
 
-**Audit Features:**
-- **JSON Lines format** — One event per line, machine-parseable
-- **CSV format** — Alternative format for spreadsheet analysis
-- **ISO 8601 timestamps** — With timezone for global deployments
-- **Job correlation** — Unique job IDs link related events
-- **Full metrics** — Bytes, duration, compression ratio, checksum status
-- **Protocol-specific fields** — Storage class, multipart parts (S3)
-- **Graceful degradation** — Audit failures don't abort copy operations
-- **Ready for ingestion** — ELK, Loki, Datadog, Splunk compatible
-- **Starmap node correlation** — For distributed transfer tracking
+Orbit supports **W3C Trace Context** for distributed tracing across microservices and remote transfers.
+
+**Enable OpenTelemetry Export:**
+```bash
+# Export traces to Jaeger/Honeycomb/Datadog
+orbit copy /source /dest \
+  --audit-log ./audit.jsonl \
+  --otel-endpoint http://jaeger:4317
+```
+
+**Trace correlation features:**
+- **W3C-compliant** trace IDs (32-char hex) and span IDs (16-char hex)
+- **Hierarchical correlation** — trace_id → job_id → file_id → span_id
+- **Cross-service tracing** — Trace transfers across Nucleus, Star, and Sentinel components
+- **Backend instrumentation** — All 45 backend methods emit trace spans (S3, SMB, SSH, local)
+
+#### 📊 Prometheus Metrics
+
+**Expose metrics for monitoring:**
+```bash
+orbit copy /source /dest \
+  --audit-log ./audit.jsonl \
+  --metrics-port 9090
+
+# Scrape metrics at http://localhost:9090/metrics
+curl http://localhost:9090/metrics | grep orbit_
+```
+
+**Available metrics:**
+- `orbit_transfer_retries_total` — Retry attempts by protocol
+- `orbit_backend_latency_seconds` — Backend operation latency (histogram)
+- `orbit_audit_integrity_failures_total` — Audit chain breaks (CRITICAL alert)
+- `orbit_files_transferred_total` — Successful transfers
+- `orbit_bytes_transferred_total` — Total bytes transferred
+
+#### 🛡️ Security & Compliance Features
+
+- **Tamper detection** — Any modification, deletion, insertion, or reordering detected
+- **Forensic validation** — Verify chain integrity with `verify_audit.py`
+- **Secret management** — HMAC keys via `ORBIT_AUDIT_SECRET` environment variable
+- **Monotonic sequencing** — Events are strictly ordered
+- **Compliance-ready** — SOC 2, HIPAA, GDPR audit trail support
+
+#### 📖 Documentation
+
+See [docs/observability-v3.md](docs/observability-v3.md) for complete documentation including:
+- Configuration guide (environment variables, CLI flags, TOML config)
+- Integration with Jaeger, Honeycomb, Datadog, Grafana
+- Forensic validation procedures
+- Security best practices
+- Troubleshooting guide
 
 ---
 

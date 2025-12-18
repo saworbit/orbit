@@ -203,6 +203,14 @@ impl Default for LocalBackend {
 
 #[async_trait]
 impl Backend for LocalBackend {
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display()
+        )
+    )]
     async fn stat(&self, path: &Path) -> BackendResult<Metadata> {
         let resolved = self.resolve_path(path);
         let meta = fs::metadata(&resolved).await.map_err(|e| {
@@ -219,6 +227,15 @@ impl Backend for LocalBackend {
         Ok(self.convert_metadata(&resolved, meta))
     }
 
+    #[tracing::instrument(
+        skip(self, options),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            recursive = options.recursive
+        )
+    )]
     async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
         use futures::stream::StreamExt;
 
@@ -262,6 +279,14 @@ impl Backend for LocalBackend {
         Ok(stream)
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display()
+        )
+    )]
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
         let resolved = self.resolve_path(path);
         let file = fs::File::open(&resolved).await.map_err(|e| {
@@ -295,6 +320,16 @@ impl Backend for LocalBackend {
         Ok(Box::pin(stream))
     }
 
+    #[tracing::instrument(
+        skip(self, reader, options),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            size_hint = ?_size_hint,
+            overwrite = options.overwrite
+        )
+    )]
     async fn write(
         &self,
         path: &Path,
@@ -344,6 +379,15 @@ impl Backend for LocalBackend {
         Ok(bytes_written)
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            recursive
+        )
+    )]
     async fn delete(&self, path: &Path, recursive: bool) -> BackendResult<()> {
         let resolved = self.resolve_path(path);
 
@@ -384,6 +428,15 @@ impl Backend for LocalBackend {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            recursive
+        )
+    )]
     async fn mkdir(&self, path: &Path, recursive: bool) -> BackendResult<()> {
         let resolved = self.resolve_path(path);
 
@@ -413,6 +466,15 @@ impl Backend for LocalBackend {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            src = %src.display(),
+            dest = %dest.display()
+        )
+    )]
     async fn rename(&self, src: &Path, dest: &Path) -> BackendResult<()> {
         let resolved_src = self.resolve_path(src);
         let resolved_dest = self.resolve_path(dest);
@@ -462,6 +524,15 @@ impl Backend for LocalBackend {
     }
 
     // Metadata operations implementation
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            mode = format!("{:o}", mode)
+        )
+    )]
     async fn set_permissions(&self, path: &Path, mode: u32) -> BackendResult<()> {
         let resolved = self.resolve_path(path);
 
@@ -499,6 +570,16 @@ impl Backend for LocalBackend {
         }
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            has_atime = atime.is_some(),
+            has_mtime = mtime.is_some()
+        )
+    )]
     async fn set_timestamps(
         &self,
         path: &Path,
@@ -545,6 +626,14 @@ impl Backend for LocalBackend {
         })
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display()
+        )
+    )]
     async fn get_xattrs(
         &self,
         path: &Path,
@@ -593,6 +682,15 @@ impl Backend for LocalBackend {
         }
     }
 
+    #[tracing::instrument(
+        skip(self, attrs),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            attr_count = attrs.len()
+        )
+    )]
     async fn set_xattrs(
         &self,
         path: &Path,
@@ -627,6 +725,16 @@ impl Backend for LocalBackend {
         }
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "local",
+            path = %path.display(),
+            uid,
+            gid
+        )
+    )]
     async fn set_ownership(
         &self,
         path: &Path,

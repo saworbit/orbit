@@ -1,9 +1,10 @@
 /*!
- * Logging and tracing initialization
+ * Logging and tracing initialization with unified observability
  */
 
 use std::fs::File;
 use std::path::Path;
+use std::sync::Arc;
 use tracing::Level;
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
@@ -14,6 +15,9 @@ use tracing_subscriber::{
 
 use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
+
+// V3 Observability imports
+use orbit_observability::{AuditBridgeLayer, AuditSigner, UnifiedLogger};
 
 /// Initialize structured logging based on configuration
 pub fn init_logging(config: &CopyConfig) -> Result<()> {
@@ -27,18 +31,47 @@ pub fn init_logging(config: &CopyConfig) -> Result<()> {
         .or_else(|_| EnvFilter::try_new(format!("orbit={}", log_level)))
         .map_err(|e| OrbitError::Config(format!("Failed to create log filter: {}", e)))?;
 
+    // V3: Create unified audit logger if audit_log_path is configured
+    let audit_layer = if let Some(ref audit_path) = config.audit_log_path {
+        // Try to load HMAC secret from environment, fallback to disabled logger
+        let logger = match AuditSigner::from_env() {
+            Ok(signer) => {
+                eprintln!(
+                    "🔒 Initializing cryptographic audit logging to {:?}",
+                    audit_path
+                );
+                UnifiedLogger::new(Some(audit_path), signer).map_err(|e| {
+                    OrbitError::Config(format!("Failed to create audit logger: {}", e))
+                })?
+            }
+            Err(_) => {
+                eprintln!("⚠️  ORBIT_AUDIT_SECRET not set - audit logging disabled");
+                eprintln!("    Set ORBIT_AUDIT_SECRET environment variable to enable cryptographic audit chaining");
+                UnifiedLogger::disabled()
+            }
+        };
+
+        Some(AuditBridgeLayer::new(logger).with_span_events(true))
+    } else {
+        None
+    };
+
     // Create the subscriber based on log file configuration
     if let Some(ref log_path) = config.log_file {
-        init_file_logging(log_path, env_filter)?;
+        init_file_logging(log_path, env_filter, audit_layer, config)?;
     } else {
-        init_stdout_logging(env_filter);
+        init_stdout_logging(env_filter, audit_layer, config);
     }
 
     Ok(())
 }
 
 /// Initialize logging to stdout/stderr
-fn init_stdout_logging(env_filter: EnvFilter) {
+fn init_stdout_logging(
+    env_filter: EnvFilter,
+    audit_layer: Option<AuditBridgeLayer>,
+    _config: &CopyConfig,
+) {
     let fmt_layer = fmt::layer()
         .with_target(true)
         .with_thread_ids(false)
@@ -48,14 +81,53 @@ fn init_stdout_logging(env_filter: EnvFilter) {
         .with_span_events(FmtSpan::NONE)
         .compact();
 
-    tracing_subscriber::registry()
+    let registry = tracing_subscriber::registry()
         .with(env_filter)
-        .with(fmt_layer)
-        .init();
+        .with(fmt_layer);
+
+    // Add audit bridge layer if configured
+    let registry = registry.with(audit_layer);
+
+    // V3: Add OpenTelemetry layer if otel_endpoint is configured
+    #[cfg(feature = "opentelemetry")]
+    {
+        if let Some(ref endpoint) = _config.otel_endpoint {
+            use opentelemetry_otlp::WithExportConfig;
+            use opentelemetry_sdk::runtime;
+            use tracing_opentelemetry::OpenTelemetryLayer;
+
+            match opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(
+                    opentelemetry_otlp::new_exporter()
+                        .tonic()
+                        .with_endpoint(endpoint),
+                )
+                .install_batch(runtime::Tokio)
+            {
+                Ok(tracer) => {
+                    tracing::info!("OpenTelemetry tracing enabled - exporting to {}", endpoint);
+                    let otel_layer = OpenTelemetryLayer::new(tracer);
+                    registry.with(Some(otel_layer)).init();
+                    return;
+                }
+                Err(e) => {
+                    tracing::error!("Failed to initialize OpenTelemetry: {}", e);
+                }
+            }
+        }
+    }
+
+    registry.init();
 }
 
 /// Initialize logging to a file
-fn init_file_logging(log_path: &Path, env_filter: EnvFilter) -> Result<()> {
+fn init_file_logging(
+    log_path: &Path,
+    env_filter: EnvFilter,
+    audit_layer: Option<AuditBridgeLayer>,
+    _config: &CopyConfig,
+) -> Result<()> {
     let file = File::create(log_path)
         .map_err(|e| OrbitError::Config(format!("Failed to create log file: {}", e)))?;
 
@@ -70,11 +142,44 @@ fn init_file_logging(log_path: &Path, env_filter: EnvFilter) -> Result<()> {
         .with_ansi(false) // No ANSI colors in file
         .json();
 
-    tracing_subscriber::registry()
+    let registry = tracing_subscriber::registry()
         .with(env_filter)
-        .with(fmt_layer)
-        .init();
+        .with(fmt_layer);
 
+    // Add audit bridge layer if configured
+    let registry = registry.with(audit_layer);
+
+    // V3: Add OpenTelemetry layer if otel_endpoint is configured
+    #[cfg(feature = "opentelemetry")]
+    {
+        if let Some(ref endpoint) = _config.otel_endpoint {
+            use opentelemetry_otlp::WithExportConfig;
+            use opentelemetry_sdk::runtime;
+            use tracing_opentelemetry::OpenTelemetryLayer;
+
+            match opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(
+                    opentelemetry_otlp::new_exporter()
+                        .tonic()
+                        .with_endpoint(endpoint),
+                )
+                .install_batch(runtime::Tokio)
+            {
+                Ok(tracer) => {
+                    tracing::info!("OpenTelemetry tracing enabled - exporting to {}", endpoint);
+                    let otel_layer = OpenTelemetryLayer::new(tracer);
+                    registry.with(Some(otel_layer)).init();
+                    return Ok(());
+                }
+                Err(e) => {
+                    tracing::error!("Failed to initialize OpenTelemetry: {}", e);
+                }
+            }
+        }
+    }
+
+    registry.init();
     Ok(())
 }
 

@@ -1,0 +1,36 @@
+[package]
+name = "orbit-observability"
+version = "0.1.0"
+edition = "2021"
+authors = ["Orbit Contributors"]
+description = "Unified observability, audit chaining, and telemetry for Orbit"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2.0"
+ring = "0.17"           # HMAC-SHA256 cryptography
+hex = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "registry"] }
+tracing-opentelemetry = "0.28"
+opentelemetry = "0.27"
+opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+prometheus = "0.13"
+rand = "0.9"
+tokio = { version = "1", features = ["sync"] }
+
+[dev-dependencies]
+tempfile = "3.10"
+tokio = { version = "1", features = ["test-util", "macros", "rt"] }
+
+[lib]
+name = "orbit_observability"
+path = "src/lib.rs"
+
+[features]
+default = []
+opentelemetry = []

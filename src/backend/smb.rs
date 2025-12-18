@@ -275,6 +275,16 @@ impl SmbBackend {
 
 #[async_trait]
 impl Backend for SmbBackend {
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            path = %path.display(),
+            host = %self.config.host,
+            share = %self.config.share
+        )
+    )]
     async fn stat(&self, path: &Path) -> BackendResult<Metadata> {
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;
@@ -287,6 +297,17 @@ impl Backend for SmbBackend {
         Ok(self.convert_metadata(smb_meta))
     }
 
+    #[tracing::instrument(
+        skip(self, options),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            path = %path.display(),
+            host = %self.config.host,
+            share = %self.config.share,
+            recursive = options.recursive
+        )
+    )]
     async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
         use futures::stream::{self, StreamExt};
 
@@ -386,6 +407,16 @@ impl Backend for SmbBackend {
         Ok(stream)
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            path = %path.display(),
+            host = %self.config.host,
+            share = %self.config.share
+        )
+    )]
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;
@@ -403,6 +434,18 @@ impl Backend for SmbBackend {
         Ok(Box::pin(stream))
     }
 
+    #[tracing::instrument(
+        skip(self, reader, options),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            path = %path.display(),
+            host = %self.config.host,
+            share = %self.config.share,
+            size_hint = ?_size_hint,
+            overwrite = options.overwrite
+        )
+    )]
     async fn write(
         &self,
         path: &Path,
@@ -451,6 +494,17 @@ impl Backend for SmbBackend {
         Ok(len)
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            path = %path.display(),
+            host = %self.config.host,
+            share = %self.config.share,
+            recursive
+        )
+    )]
     async fn delete(&self, path: &Path, recursive: bool) -> BackendResult<()> {
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;
@@ -507,6 +561,17 @@ impl Backend for SmbBackend {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            path = %path.display(),
+            host = %self.config.host,
+            share = %self.config.share,
+            recursive
+        )
+    )]
     async fn mkdir(&self, path: &Path, recursive: bool) -> BackendResult<()> {
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;
@@ -563,6 +628,17 @@ impl Backend for SmbBackend {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            src = %src.display(),
+            dest = %dest.display(),
+            host = %self.config.host,
+            share = %self.config.share
+        )
+    )]
     async fn rename(&self, src: &Path, dest: &Path) -> BackendResult<()> {
         let src_smb_path = self.path_to_smb_path(src);
         let dest_smb_path = self.path_to_smb_path(dest);
@@ -589,6 +665,16 @@ impl Backend for SmbBackend {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "smb",
+            path = %path.display(),
+            host = %self.config.host,
+            share = %self.config.share
+        )
+    )]
     async fn exists(&self, path: &Path) -> BackendResult<bool> {
         let smb_path = self.path_to_smb_path(path);
         let client = self.client.read().await;

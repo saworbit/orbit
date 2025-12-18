@@ -347,6 +347,15 @@ impl S3Backend {
 
 #[async_trait]
 impl Backend for S3Backend {
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            path = %path.display(),
+            bucket = self.client.bucket()
+        )
+    )]
     async fn stat(&self, path: &Path) -> BackendResult<Metadata> {
         let key = self.path_to_key(path);
 
@@ -371,6 +380,16 @@ impl Backend for S3Backend {
         Ok(self.convert_metadata(s3_meta))
     }
 
+    #[tracing::instrument(
+        skip(self, options),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            path = %path.display(),
+            bucket = self.client.bucket(),
+            recursive = options.recursive
+        )
+    )]
     async fn list(&self, path: &Path, options: ListOptions) -> BackendResult<ListStream> {
         use futures::stream::{self, StreamExt};
 
@@ -534,6 +553,15 @@ impl Backend for S3Backend {
         Ok(stream)
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            path = %path.display(),
+            bucket = self.client.bucket()
+        )
+    )]
     async fn read(&self, path: &Path) -> BackendResult<ReadStream> {
         let key = self.path_to_key(path);
 
@@ -584,6 +612,17 @@ impl Backend for S3Backend {
         Ok(Box::pin(stream))
     }
 
+    #[tracing::instrument(
+        skip(self, reader, options),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            path = %path.display(),
+            bucket = self.client.bucket(),
+            size_hint = ?size_hint,
+            overwrite = options.overwrite
+        )
+    )]
     async fn write(
         &self,
         path: &Path,
@@ -648,6 +687,16 @@ impl Backend for S3Backend {
         }
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            path = %path.display(),
+            bucket = self.client.bucket(),
+            recursive
+        )
+    )]
     async fn delete(&self, path: &Path, recursive: bool) -> BackendResult<()> {
         let key = self.path_to_key(path);
 
@@ -683,6 +732,16 @@ impl Backend for S3Backend {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            path = %path.display(),
+            bucket = self.client.bucket(),
+            recursive = _recursive
+        )
+    )]
     async fn mkdir(&self, path: &Path, _recursive: bool) -> BackendResult<()> {
         // S3 doesn't have real directories, but we can create a 0-byte object with trailing /
         let key = format!("{}/", self.path_to_key(path).trim_end_matches('/'));
@@ -712,6 +771,16 @@ impl Backend for S3Backend {
     }
 
     /// Rename via copy+delete; limited to single-call copy size (5GB) until multipart copy support is added.
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            src = %src.display(),
+            dest = %dest.display(),
+            bucket = self.client.bucket()
+        )
+    )]
     async fn rename(&self, src: &Path, dest: &Path) -> BackendResult<()> {
         let src_key = self.path_to_key(src);
         let dest_key = self.path_to_key(dest);
@@ -766,6 +835,15 @@ impl Backend for S3Backend {
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(self),
+        fields(
+            otel.kind = "client",
+            backend = "s3",
+            path = %path.display(),
+            bucket = self.client.bucket()
+        )
+    )]
     async fn exists(&self, path: &Path) -> BackendResult<bool> {
         let key = self.path_to_key(path);
         self.client

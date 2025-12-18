@@ -140,6 +140,14 @@ struct Cli {
     #[arg(long, global = true)]
     audit_log: Option<PathBuf>,
 
+    /// OpenTelemetry OTLP endpoint for distributed tracing (e.g., http://localhost:4317)
+    #[arg(long, global = true)]
+    otel_endpoint: Option<String>,
+
+    /// Prometheus metrics HTTP endpoint port
+    #[arg(long, global = true)]
+    metrics_port: Option<u16>,
+
     /// Hide progress bar
     #[arg(long, global = true)]
     no_progress: bool,
@@ -466,10 +474,13 @@ fn main() -> Result<()> {
             CopyConfig::default()
         };
 
-        // Set logging config from CLI
+        // Set logging config from CLI (including audit_log_path and otel_endpoint)
         config.log_level = cli.log_level.into();
         config.log_file = cli.log.clone();
         config.verbose = cli.verbose;
+        config.audit_log_path = cli.audit_log.clone();
+        config.otel_endpoint = cli.otel_endpoint.clone();
+        config.metrics_port = cli.metrics_port;
 
         // Initialize logging
         if let Err(e) = logging::init_logging(&config) {
@@ -563,9 +574,11 @@ fn main() -> Result<()> {
         }
     }
 
-    // Configure audit logging
+    // Configure audit logging and observability
     config.audit_format = cli.audit_format.into();
     config.audit_log_path = cli.audit_log;
+    config.otel_endpoint = cli.otel_endpoint;
+    config.metrics_port = cli.metrics_port;
 
     // Configure delta detection
     config.check_mode = cli.check.into();
