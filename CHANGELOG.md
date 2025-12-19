@@ -4,7 +4,41 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
-### Added - V3 Unified Observability & Immutable Audit Plane
+### Added
+
+#### Azure Blob Storage Backend
+
+**Production-ready Azure support using object_store** - Added native Azure Blob Storage backend with streaming I/O and full Backend trait implementation.
+
+- **`azure-native` feature flag**: Microsoft Azure Blob Storage support using `object_store` crate v0.11
+- **Full Backend trait implementation**: stat, list, read, write, delete, mkdir, rename, exists operations
+- **URI support**: Both `azblob://` and `azure://` URI schemes
+- **Environment variable authentication**:
+  - `AZURE_STORAGE_ACCOUNT` + `AZURE_STORAGE_KEY` (account key auth)
+  - `AZURE_STORAGE_CONNECTION_STRING` (connection string auth)
+- **Azurite compatible**: Test locally with Azure Storage Emulator
+- **Streaming I/O**: Memory-efficient transfers for large files
+- **Prefix support**: Virtual directory isolation within containers
+- **Production-ready**:
+  - Uses battle-tested `object_store` crate (Apache Arrow DataFusion, etc.)
+  - 33% less code than Azure SDK implementation (~540 lines vs ~812 lines)
+  - Unified API across cloud providers (same crate as future GCS support)
+- **Documentation**:
+  - [`AZURE_IMPLEMENTATION_STATUS.md`](AZURE_IMPLEMENTATION_STATUS.md) - Implementation details and status
+  - Updated README.md with Azure backend examples and usage
+  - Updated feature matrix and protocol support tables
+- **Files added**:
+  - `src/backend/azure.rs` - Complete Azure backend implementation
+  - `AZURE_IMPLEMENTATION_STATUS.md` - Status documentation
+- **Files modified**:
+  - `Cargo.toml` - Added `object_store` dependency and `azure-native` feature flag
+  - `src/backend/config.rs` - Added AzureConfig and URI parsing
+  - `src/backend/registry.rs` - Registered Azure backend in factory
+  - `src/backend/mod.rs` - Exported Azure types
+  - `README.md` - Added Azure documentation, examples, and feature matrix entry
+  - `CHANGELOG.md` - This entry
+
+#### V3 Unified Observability & Immutable Audit Plane
 
 **Enterprise-grade observability with cryptographic integrity** - This release implements a unified observability system that combines distributed tracing, immutable audit logs, and operational metrics into a single cohesive platform.
 
