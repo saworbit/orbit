@@ -59,6 +59,41 @@ impl AzureConfig {
     }
 }
 
+/// Google Cloud Storage configuration
+#[cfg(feature = "gcs-native")]
+#[derive(Debug, Clone)]
+pub struct GcsConfig {
+    /// Bucket name
+    pub bucket: String,
+    /// Optional service account email
+    pub service_account: Option<String>,
+    /// Optional service account key (PEM format)
+    pub service_account_key: Option<String>,
+}
+
+#[cfg(feature = "gcs-native")]
+impl GcsConfig {
+    /// Create new GCS config with bucket name
+    pub fn new(bucket: impl Into<String>) -> Self {
+        Self {
+            bucket: bucket.into(),
+            service_account: None,
+            service_account_key: None,
+        }
+    }
+
+    /// Set service account credentials
+    pub fn with_service_account(
+        mut self,
+        service_account: impl Into<String>,
+        service_account_key: impl Into<String>,
+    ) -> Self {
+        self.service_account = Some(service_account.into());
+        self.service_account_key = Some(service_account_key.into());
+        self
+    }
+}
+
 /// Unified backend configuration
 #[derive(Debug, Clone)]
 pub enum BackendConfig {
@@ -90,6 +125,15 @@ pub enum BackendConfig {
     Azure {
         /// Azure configuration
         config: AzureConfig,
+        /// Optional prefix (like a root directory)
+        prefix: Option<String>,
+    },
+
+    /// Google Cloud Storage backend
+    #[cfg(feature = "gcs-native")]
+    Gcs {
+        /// GCS configuration
+        config: GcsConfig,
         /// Optional prefix (like a root directory)
         prefix: Option<String>,
     },
@@ -156,6 +200,24 @@ impl BackendConfig {
         }
     }
 
+    /// Create GCS backend configuration
+    #[cfg(feature = "gcs-native")]
+    pub fn gcs(config: GcsConfig) -> Self {
+        Self::Gcs {
+            config,
+            prefix: None,
+        }
+    }
+
+    /// Create GCS backend with prefix
+    #[cfg(feature = "gcs-native")]
+    pub fn gcs_with_prefix(config: GcsConfig, prefix: impl Into<String>) -> Self {
+        Self::Gcs {
+            config,
+            prefix: Some(prefix.into()),
+        }
+    }
+
     /// Get backend type name
     pub fn backend_type(&self) -> &'static str {
         match self {
@@ -168,6 +230,8 @@ impl BackendConfig {
             Self::Smb(_) => "smb",
             #[cfg(feature = "azure-native")]
             Self::Azure { .. } => "azure",
+            #[cfg(feature = "gcs-native")]
+            Self::Gcs { .. } => "gcs",
         }
     }
 }
@@ -180,6 +244,7 @@ impl BackendConfig {
 /// - `s3://bucket/prefix?region=us-east-1&endpoint=...` - S3 (requires s3-native feature)
 /// - `smb://[user[:pass]@]host[:port]/share/path` - SMB/CIFS (requires smb-native feature)
 /// - `azblob://container/prefix` or `azure://container/prefix` - Azure Blob Storage (requires azure-native feature)
+/// - `gs://bucket/prefix` or `gcs://bucket/prefix` - Google Cloud Storage (requires gcs-native feature)
 ///
 /// # Query Parameters
 ///
@@ -496,6 +561,51 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
             Ok((config, path))
         }
 
+        #[cfg(feature = "gcs-native")]
+        "gs" | "gcs" => {
+            let bucket = url
+                .host_str()
+                .ok_or_else(|| BackendError::InvalidConfig {
+                    backend: "gcs".to_string(),
+                    message: "Missing bucket in GCS URI".to_string(),
+                })?
+                .to_string();
+
+            let prefix = url.path().trim_start_matches('/').to_string();
+            let path = PathBuf::from(&prefix);
+
+            // Parse query parameters
+            let query_pairs: HashMap<String, String> = url
+                .query_pairs()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+
+            let mut gcs_config = GcsConfig::new(bucket);
+
+            // Check for service account credentials
+            if let Some(service_account) = query_pairs.get("service_account") {
+                gcs_config.service_account = Some(service_account.clone());
+            }
+
+            if let Some(service_account_key) = query_pairs.get("service_account_key") {
+                gcs_config.service_account_key = Some(service_account_key.clone());
+            }
+
+            let config = if prefix.is_empty() {
+                BackendConfig::Gcs {
+                    config: gcs_config,
+                    prefix: None,
+                }
+            } else {
+                BackendConfig::Gcs {
+                    config: gcs_config,
+                    prefix: Some(prefix),
+                }
+            };
+
+            Ok((config, path))
+        }
+
         _ => Err(BackendError::InvalidConfig {
             backend: scheme.to_string(),
             message: format!("Unsupported URI scheme: {}", scheme),
@@ -674,6 +784,34 @@ pub fn from_env() -> BackendResult<BackendConfig> {
 
             Ok(BackendConfig::Azure {
                 config: azure_config,
+                prefix,
+            })
+        }
+
+        #[cfg(feature = "gcs-native")]
+        "gcs" => {
+            let bucket = std::env::var("ORBIT_GCS_BUCKET").map_err(|_| {
+                BackendError::InvalidConfig {
+                    backend: "gcs".to_string(),
+                    message: "ORBIT_GCS_BUCKET not set".to_string(),
+                }
+            })?;
+
+            let mut gcs_config = GcsConfig::new(bucket);
+
+            // Check for service account credentials
+            if let Ok(service_account) = std::env::var("GOOGLE_SERVICE_ACCOUNT") {
+                gcs_config.service_account = Some(service_account);
+            }
+
+            if let Ok(service_account_key) = std::env::var("GOOGLE_SERVICE_ACCOUNT_KEY") {
+                gcs_config.service_account_key = Some(service_account_key);
+            }
+
+            let prefix = std::env::var("ORBIT_GCS_PREFIX").ok();
+
+            Ok(BackendConfig::Gcs {
+                config: gcs_config,
                 prefix,
             })
         }

@@ -123,8 +123,9 @@ url = { version = "2.5", optional = true }
 ssh2 = { version = "0.9", optional = true }
 secrecy = { version = "0.10", optional = true, features = ["serde"] }
 
-# Azure Blob Storage dependencies (optional, feature-gated)
-object_store = { version = "0.11", features = ["azure"], optional = true }
+# Cloud Storage backends (Azure Blob, Google Cloud Storage) - optional, feature-gated
+# Using object_store crate with azure and gcp features
+object_store = { version = "0.11", features = ["azure", "gcp"], optional = true }
 
 # Async utilities for backend abstraction
 futures = { version = "0.3", optional = true }
@@ -220,6 +221,9 @@ ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:b
 # Azure Blob Storage backend - OFF by default
 azure-native = ["dep:object_store", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
+# Google Cloud Storage backend - OFF by default
+gcs-native = ["dep:object_store", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
+
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
 
@@ -242,10 +246,10 @@ unicode-normalization = ["dep:unicode-normalization"]
 opentelemetry = ["orbit-observability/opentelemetry"]
 
 # Convenience: All network protocols
-network = ["s3-native", "smb-native", "ssh-backend", "azure-native"]
+network = ["s3-native", "smb-native", "ssh-backend", "azure-native", "gcs-native"]
 
 # NEW: Aggregated feature for all network protocols
-network-all = ["s3-native", "smb-native", "ssh-backend", "azure-native"]
+network-all = ["s3-native", "smb-native", "ssh-backend", "azure-native", "gcs-native"]
 
 # Full feature set (for development and power users)
 full = ["zero-copy", "network", "backend-abstraction", "delta-manifest", "extended-metadata", "api", "unicode-normalization"]

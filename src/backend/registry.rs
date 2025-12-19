@@ -23,6 +23,9 @@ use super::SmbBackend;
 #[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
 use super::AzureBackend;
 
+#[cfg(all(feature = "backend-abstraction", feature = "gcs-native"))]
+use super::GcsBackend;
+
 /// Factory function type for creating backends
 pub type BackendFactory =
     Arc<dyn Fn(&BackendConfig) -> BoxFuture<BackendResult<Box<dyn Backend>>> + Send + Sync>;
@@ -189,6 +192,31 @@ impl BackendRegistry {
                         _ => Err(BackendError::InvalidConfig {
                             backend: "azure".to_string(),
                             message: "Invalid configuration for Azure backend".to_string(),
+                        }),
+                    }
+                })
+            }),
+        );
+
+        // Google Cloud Storage backend
+        #[cfg(feature = "gcs-native")]
+        self.register(
+            "gcs",
+            Arc::new(|config| {
+                let config = config.clone();
+                Box::pin(async move {
+                    match config {
+                        BackendConfig::Gcs { config, prefix } => {
+                            let backend = if let Some(prefix) = prefix {
+                                GcsBackend::with_prefix(&config.bucket, prefix).await?
+                            } else {
+                                GcsBackend::new(&config.bucket).await?
+                            };
+                            Ok(Box::new(backend) as Box<dyn Backend>)
+                        }
+                        _ => Err(BackendError::InvalidConfig {
+                            backend: "gcs".to_string(),
+                            message: "Invalid configuration for GCS backend".to_string(),
                         }),
                     }
                 })

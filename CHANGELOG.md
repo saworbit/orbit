@@ -6,6 +6,32 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+#### Google Cloud Storage Backend
+
+**Production-ready GCS support using object_store** - Added native Google Cloud Storage backend with streaming I/O and full Backend trait implementation.
+
+- **`gcs-native` feature flag**: Google Cloud Storage support using `object_store` crate v0.11
+- **Full Backend trait implementation**: stat, list, read, write, delete, mkdir, rename, exists operations
+- **URI support**: Both `gs://` and `gcs://` URI schemes
+- **Environment variable authentication**:
+  - `GOOGLE_APPLICATION_CREDENTIALS` (path to service account JSON)
+  - `GOOGLE_SERVICE_ACCOUNT` + `GOOGLE_SERVICE_ACCOUNT_KEY` (credential-based auth)
+- **Streaming I/O**: Memory-efficient transfers for large files
+- **Prefix support**: Virtual directory isolation within buckets
+- **Production-ready**:
+  - Uses battle-tested `object_store` crate (Apache Arrow DataFusion, etc.)
+  - Unified API across cloud providers (same crate as S3 and Azure)
+  - Consistent implementation pattern with Azure backend (~620 lines)
+- **Files added**:
+  - `src/backend/gcs.rs` - Complete GCS backend implementation
+- **Files modified**:
+  - `Cargo.toml` - Updated `object_store` dependency with `gcp` feature and added `gcs-native` feature flag
+  - `src/backend/config.rs` - Added GcsConfig and URI parsing
+  - `src/backend/registry.rs` - Registered GCS backend in factory
+  - `src/backend/mod.rs` - Exported GCS types
+  - `README.md` - Added GCS documentation, examples, and feature matrix entry
+  - `CHANGELOG.md` - This entry
+
 #### Azure Blob Storage Backend
 
 **Production-ready Azure support using object_store** - Added native Azure Blob Storage backend with streaming I/O and full Backend trait implementation.

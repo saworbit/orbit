@@ -86,7 +86,7 @@ Orbit is a file transfer tool built in Rust that aims to combine reliability wit
 | 🛡️ **Resilient** | Smart resume with chunk verification, checksums, corruption detection |
 | 🧠 **Adaptive** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
-| 🌐 **Protocol Support** | Local, **SSH/SFTP**, SMB/CIFS (experimental), **S3**, **Azure Blob**, with unified backend API |
+| 🌐 **Protocol Support** | Local, **SSH/SFTP**, SMB/CIFS (experimental), **S3**, **Azure Blob**, **GCS**, with unified backend API |
 | 🌐 **Web Dashboard** | Modern React dashboard with OpenAPI-documented Control Plane (v2.2.0-alpha) |
 | 📊 **Auditable** | Structured JSON telemetry for operations |
 | 🧩 **Modular** | Clean architecture with reusable crates |
@@ -111,6 +111,7 @@ Understanding feature stability helps you make informed decisions about what to 
 | **S3 Backend** | 🟡 Beta | Works well, multipart upload is newer |
 | **SMB Backend** | 🟡 Beta | v0.11.0 upgrade complete, ready for integration testing |
 | **Azure Blob Backend** | 🟡 Beta | Production-ready using object_store crate, newly added in v0.6.0 |
+| **GCS Backend** | 🟡 Beta | Production-ready using object_store crate, newly added in v0.6.0 |
 | **Delta Detection (V1)** | 🟡 Beta | rsync-style algorithm, tested but newer |
 | **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, introduced in v0.5.0 |
 | **Semantic Replication** | 🔴 Alpha | Priority-based transfers, introduced in v0.5.0 |
@@ -938,7 +939,7 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 | ☁️ **S3** | 🟡 Beta | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
 | 🌐 **SMB/CIFS** | 🟡 Beta | `smb-native` | Native SMB2/3 client (pure Rust, v0.11.0, ready for testing) |
 | ☁️ **Azure Blob** | 🟡 Beta | `azure-native` | Microsoft Azure Blob Storage (using object_store crate) |
-| ☁️ **GCS** | 🚧 Planned | - | Google Cloud Storage |
+| ☁️ **GCS** | 🟡 Beta | `gcs-native` | Google Cloud Storage (using object_store crate) |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
 
 #### 🆕 Unified Backend Abstraction (v0.5.0+ - Streaming API)
@@ -946,7 +947,7 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 **NEW!** Write once, run on any storage backend. The backend abstraction provides a consistent async API with **streaming I/O** for memory-efficient large file transfers:
 
 ```rust
-use orbit::backend::{Backend, LocalBackend, SshBackend, S3Backend, SmbBackend, AzureBackend, SmbConfig, AzureConfig};
+use orbit::backend::{Backend, LocalBackend, SshBackend, S3Backend, SmbBackend, AzureBackend, GcsBackend, SmbConfig, AzureConfig, GcsConfig};
 use tokio::fs::File;
 use tokio::io::AsyncRead;
 use futures::StreamExt;
@@ -981,10 +982,11 @@ let smb = SmbBackend::new(SmbConfig::new("server", "share")
     .with_username("user")
     .with_password("pass")).await?;
 let azure = AzureBackend::new("my-container").await?;
+let gcs = GcsBackend::new("my-bucket").await?;
 ```
 
 **Features:**
-- ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, `smb://user@server/share/path`, `azblob://container/path`, etc.
+- ✅ **URI-based configuration**: `ssh://user@host/path`, `s3://bucket/key`, `smb://user@server/share/path`, `azblob://container/path`, `gs://bucket/path`, etc.
 - ✅ **Streaming I/O**: Upload files up to **5TB** to S3 with ~200MB RAM
 - ✅ **Constant Memory Listing**: List millions of S3 objects with ~10MB RAM
 - ✅ **Automatic Multipart Upload**: S3 files ≥5MB use efficient chunked transfers
@@ -1115,6 +1117,43 @@ orbit --source file.txt --dest azblob://testcontainer/file.txt
 - ✅ **Production-ready** - 33% less code than Azure SDK implementation
 
 📖 **Implementation Status:** See [`AZURE_IMPLEMENTATION_STATUS.md`](AZURE_IMPLEMENTATION_STATUS.md)
+
+#### Google Cloud Storage
+
+**NEW in v0.6.0**: Production-ready Google Cloud Storage backend using the industry-standard `object_store` crate.
+
+Transfer files seamlessly to Google Cloud Storage with streaming I/O:
+
+```bash
+# Upload to Google Cloud Storage
+orbit --source /local/dataset.tar.gz --dest gs://mybucket/backups/dataset.tar.gz
+
+# Download from GCS
+orbit --source gcs://mybucket/data/report.pdf --dest ./report.pdf
+
+# Sync directory to GCS with prefix
+orbit --source /local/photos --dest gs://mybucket/archives/photos \
+  --mode sync --resume --parallel 8 --recursive
+```
+
+**Authentication:**
+```bash
+# Service account JSON file (recommended)
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+
+# Or use service account credentials directly
+export GOOGLE_SERVICE_ACCOUNT=myaccount@myproject.iam.gserviceaccount.com
+export GOOGLE_SERVICE_ACCOUNT_KEY="-----BEGIN PRIVATE KEY-----\n..."
+```
+
+**Features:**
+- ✅ **Service account support** - GOOGLE_APPLICATION_CREDENTIALS or direct credentials
+- ✅ **Streaming I/O** - Memory-efficient large file transfers
+- ✅ **URI schemes** - Both `gs://` and `gcs://` supported
+- ✅ **Full Backend trait** - stat, list, read, write, delete, mkdir, rename, exists
+- ✅ **Prefix support** - Virtual directory isolation within buckets
+- ✅ **Strong consistency** - Google Cloud Storage guarantees
+- ✅ **Production-ready** - Using battle-tested object_store crate (same as Azure and S3)
 
 #### SMB/CIFS Network Shares
 
@@ -1280,11 +1319,12 @@ cargo install --path . --features full    # Everything
 | Feature | Description | Binary Size | Default |
 |---------|-------------|-------------|---------|
 | `zero-copy` | OS-level zero-copy syscalls for maximum speed | +1MB | ✅ Yes |
-| `network` | All network protocols (S3, SMB, SSH, Azure) | +28MB | ❌ No |
+| `network` | All network protocols (S3, SMB, SSH, Azure, GCS) | +31MB | ❌ No |
 | `s3-native` | Amazon S3 and compatible storage | +15MB | ❌ No |
 | `smb-native` | Native SMB2/3 network shares | +8MB | ❌ No |
 | `ssh-backend` | SSH/SFTP remote access | +5MB | ❌ No |
 | `azure-native` | Microsoft Azure Blob Storage | +3MB | ❌ No |
+| `gcs-native` | Google Cloud Storage | +3MB | ❌ No |
 | `api` | Control Plane REST API (v2.2.0+) | +15MB | ❌ No |
 | `delta-manifest` | SQLite-backed delta persistence | +3MB | ❌ No |
 | `extended-metadata` | xattr + ownership (Unix/Linux/macOS only) | +500KB | ❌ No |
@@ -2234,8 +2274,6 @@ orbit run --manifest <FILE>               # Execute from manifest (planned)
 - Interactive mode with prompts
 
 #### New Protocols
-- Azure Blob Storage connector
-- Google Cloud Storage (GCS)
 - WebDAV protocol support
 
 #### Advanced Features
@@ -2278,7 +2316,6 @@ cargo clippy
 
 ### Areas We Need Help
 
-- ☁️ Azure Blob and GCS implementations
 - 🌐 Resolving SMB upstream dependencies
 - 🧪 Testing on various platforms
 - 📚 Documentation improvements

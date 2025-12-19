@@ -75,6 +75,9 @@ mod smb;
 #[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
 mod azure;
 
+#[cfg(all(feature = "backend-abstraction", feature = "gcs-native"))]
+mod gcs;
+
 #[cfg(feature = "backend-abstraction")]
 mod config;
 
@@ -100,11 +103,17 @@ pub use smb::{SmbBackend, SmbConfig};
 #[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
 pub use azure::AzureBackend;
 
+#[cfg(all(feature = "backend-abstraction", feature = "gcs-native"))]
+pub use gcs::GcsBackend;
+
 #[cfg(feature = "backend-abstraction")]
 pub use config::{parse_uri, BackendConfig};
 
 #[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
 pub use config::AzureConfig;
+
+#[cfg(all(feature = "backend-abstraction", feature = "gcs-native"))]
+pub use config::GcsConfig;
 
 #[cfg(feature = "backend-abstraction")]
 pub use registry::{BackendFactory, BackendRegistry};
