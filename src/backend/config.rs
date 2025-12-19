@@ -15,6 +15,50 @@ use crate::protocol::s3::S3Config;
 #[cfg(feature = "smb-native")]
 use super::smb::SmbConfig;
 
+/// Azure Blob Storage configuration
+#[cfg(feature = "azure-native")]
+#[derive(Debug, Clone)]
+pub struct AzureConfig {
+    /// Container name
+    pub container: String,
+    /// Optional connection string (takes priority)
+    pub connection_string: Option<String>,
+    /// Storage account name
+    pub account_name: Option<String>,
+    /// Storage account key
+    pub account_key: Option<String>,
+}
+
+#[cfg(feature = "azure-native")]
+impl AzureConfig {
+    /// Create new Azure config with container name
+    pub fn new(container: impl Into<String>) -> Self {
+        Self {
+            container: container.into(),
+            connection_string: None,
+            account_name: None,
+            account_key: None,
+        }
+    }
+
+    /// Set connection string
+    pub fn with_connection_string(mut self, connection_string: impl Into<String>) -> Self {
+        self.connection_string = Some(connection_string.into());
+        self
+    }
+
+    /// Set account credentials
+    pub fn with_account_key(
+        mut self,
+        account_name: impl Into<String>,
+        account_key: impl Into<String>,
+    ) -> Self {
+        self.account_name = Some(account_name.into());
+        self.account_key = Some(account_key.into());
+        self
+    }
+}
+
 /// Unified backend configuration
 #[derive(Debug, Clone)]
 pub enum BackendConfig {
@@ -40,6 +84,15 @@ pub enum BackendConfig {
     /// SMB/CIFS network share backend
     #[cfg(feature = "smb-native")]
     Smb(SmbConfig),
+
+    /// Azure Blob Storage backend
+    #[cfg(feature = "azure-native")]
+    Azure {
+        /// Azure configuration
+        config: AzureConfig,
+        /// Optional prefix (like a root directory)
+        prefix: Option<String>,
+    },
 }
 
 impl BackendConfig {
@@ -85,6 +138,24 @@ impl BackendConfig {
         Self::Smb(config)
     }
 
+    /// Create Azure backend configuration
+    #[cfg(feature = "azure-native")]
+    pub fn azure(config: AzureConfig) -> Self {
+        Self::Azure {
+            config,
+            prefix: None,
+        }
+    }
+
+    /// Create Azure backend with prefix
+    #[cfg(feature = "azure-native")]
+    pub fn azure_with_prefix(config: AzureConfig, prefix: impl Into<String>) -> Self {
+        Self::Azure {
+            config,
+            prefix: Some(prefix.into()),
+        }
+    }
+
     /// Get backend type name
     pub fn backend_type(&self) -> &'static str {
         match self {
@@ -95,6 +166,8 @@ impl BackendConfig {
             Self::S3 { .. } => "s3",
             #[cfg(feature = "smb-native")]
             Self::Smb(_) => "smb",
+            #[cfg(feature = "azure-native")]
+            Self::Azure { .. } => "azure",
         }
     }
 }
@@ -106,6 +179,7 @@ impl BackendConfig {
 /// - `ssh://user@host:port/path` - SSH/SFTP (requires ssh-backend feature)
 /// - `s3://bucket/prefix?region=us-east-1&endpoint=...` - S3 (requires s3-native feature)
 /// - `smb://[user[:pass]@]host[:port]/share/path` - SMB/CIFS (requires smb-native feature)
+/// - `azblob://container/prefix` or `azure://container/prefix` - Azure Blob Storage (requires azure-native feature)
 ///
 /// # Query Parameters
 ///
@@ -125,6 +199,11 @@ impl BackendConfig {
 /// - `security=require_encryption` - Require SMB3 encryption (default: opportunistic)
 /// - `security=sign_only` - Only sign, no encryption
 /// - `security=opportunistic` - Use encryption if available
+///
+/// Azure URIs:
+/// - `connection_string=...` - Azure Storage connection string
+/// - `account_name=...` - Storage account name
+/// - `account_key=...` - Storage account key
 ///
 /// # Examples
 ///
@@ -367,6 +446,56 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
             Ok((BackendConfig::Smb(smb_config), path))
         }
 
+        #[cfg(feature = "azure-native")]
+        "azblob" | "azure" => {
+            let container = url
+                .host_str()
+                .ok_or_else(|| BackendError::InvalidConfig {
+                    backend: "azure".to_string(),
+                    message: "Missing container in Azure URI".to_string(),
+                })?
+                .to_string();
+
+            let prefix = url.path().trim_start_matches('/').to_string();
+            let path = PathBuf::from(&prefix);
+
+            // Parse query parameters
+            let query_pairs: HashMap<String, String> = url
+                .query_pairs()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+
+            let mut azure_config = AzureConfig::new(container);
+
+            // Check for connection string first (takes priority)
+            if let Some(conn_str) = query_pairs.get("connection_string") {
+                azure_config.connection_string = Some(conn_str.clone());
+            } else {
+                // Check for account name and key
+                if let Some(account_name) = query_pairs.get("account_name") {
+                    azure_config.account_name = Some(account_name.clone());
+                }
+
+                if let Some(account_key) = query_pairs.get("account_key") {
+                    azure_config.account_key = Some(account_key.clone());
+                }
+            }
+
+            let config = if prefix.is_empty() {
+                BackendConfig::Azure {
+                    config: azure_config,
+                    prefix: None,
+                }
+            } else {
+                BackendConfig::Azure {
+                    config: azure_config,
+                    prefix: Some(prefix),
+                }
+            };
+
+            Ok((config, path))
+        }
+
         _ => Err(BackendError::InvalidConfig {
             backend: scheme.to_string(),
             message: format!("Unsupported URI scheme: {}", scheme),
@@ -377,10 +506,11 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
 /// Parse backend configuration from environment variables
 ///
 /// Looks for variables like:
-/// - `ORBIT_BACKEND_TYPE` - Backend type (local, ssh, s3, smb)
+/// - `ORBIT_BACKEND_TYPE` - Backend type (local, ssh, s3, smb, azure)
 /// - `ORBIT_SSH_HOST`, `ORBIT_SSH_USER`, `ORBIT_SSH_KEY` - SSH config
 /// - `ORBIT_S3_BUCKET`, `ORBIT_S3_REGION`, `ORBIT_S3_ENDPOINT` - S3 config
 /// - `ORBIT_SMB_HOST`, `ORBIT_SMB_SHARE`, `ORBIT_SMB_USER`, `ORBIT_SMB_PASSWORD` - SMB config
+/// - `ORBIT_AZURE_CONTAINER`, `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_KEY` - Azure config
 #[allow(dead_code)]
 pub fn from_env() -> BackendResult<BackendConfig> {
     let backend_type = std::env::var("ORBIT_BACKEND_TYPE")
@@ -513,6 +643,39 @@ pub fn from_env() -> BackendResult<BackendConfig> {
             smb_config = smb_config.with_security(security);
 
             Ok(BackendConfig::Smb(smb_config))
+        }
+
+        #[cfg(feature = "azure-native")]
+        "azure" => {
+            let container = std::env::var("ORBIT_AZURE_CONTAINER").map_err(|_| {
+                BackendError::InvalidConfig {
+                    backend: "azure".to_string(),
+                    message: "ORBIT_AZURE_CONTAINER not set".to_string(),
+                }
+            })?;
+
+            let mut azure_config = AzureConfig::new(container);
+
+            // Check for connection string first (takes priority)
+            if let Ok(conn_str) = std::env::var("AZURE_STORAGE_CONNECTION_STRING") {
+                azure_config.connection_string = Some(conn_str);
+            } else {
+                // Fall back to account name + key
+                if let Ok(account_name) = std::env::var("AZURE_STORAGE_ACCOUNT") {
+                    azure_config.account_name = Some(account_name);
+                }
+
+                if let Ok(account_key) = std::env::var("AZURE_STORAGE_KEY") {
+                    azure_config.account_key = Some(account_key);
+                }
+            }
+
+            let prefix = std::env::var("ORBIT_AZURE_PREFIX").ok();
+
+            Ok(BackendConfig::Azure {
+                config: azure_config,
+                prefix,
+            })
         }
 
         _ => Err(BackendError::InvalidConfig {

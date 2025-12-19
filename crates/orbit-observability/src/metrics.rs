@@ -3,7 +3,7 @@
 //! This module provides Prometheus metrics for monitoring Orbit operations.
 //! Metrics are derived from the audit event stream.
 
-use prometheus::{Counter, CounterVec, Histogram, HistogramOpts, HistogramVec, Opts, Registry};
+use prometheus::{Counter, CounterVec, HistogramOpts, HistogramVec, Opts, Registry};
 use std::sync::OnceLock;
 
 /// Global Prometheus registry for Orbit metrics

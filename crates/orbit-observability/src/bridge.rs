@@ -5,12 +5,12 @@
 //! into audit events.
 
 use crate::context::TraceContext;
-use crate::event::{EventPayload, OrbitEvent};
+use crate::event::EventPayload;
 use crate::logger::UnifiedLogger;
 use std::sync::Arc;
 use std::time::Instant;
 use tracing::span::{Attributes, Id};
-use tracing::{Event, Metadata, Subscriber};
+use tracing::{Event, Subscriber};
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::Layer;

@@ -20,6 +20,9 @@ use super::S3Backend;
 #[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
 use super::SmbBackend;
 
+#[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
+use super::AzureBackend;
+
 /// Factory function type for creating backends
 pub type BackendFactory =
     Arc<dyn Fn(&BackendConfig) -> BoxFuture<BackendResult<Box<dyn Backend>>> + Send + Sync>;
@@ -161,6 +164,31 @@ impl BackendRegistry {
                         _ => Err(BackendError::InvalidConfig {
                             backend: "smb".to_string(),
                             message: "Invalid configuration for SMB backend".to_string(),
+                        }),
+                    }
+                })
+            }),
+        );
+
+        // Azure Blob Storage backend
+        #[cfg(feature = "azure-native")]
+        self.register(
+            "azure",
+            Arc::new(|config| {
+                let config = config.clone();
+                Box::pin(async move {
+                    match config {
+                        BackendConfig::Azure { config, prefix } => {
+                            let backend = if let Some(prefix) = prefix {
+                                AzureBackend::with_prefix(&config.container, prefix).await?
+                            } else {
+                                AzureBackend::new(&config.container).await?
+                            };
+                            Ok(Box::new(backend) as Box<dyn Backend>)
+                        }
+                        _ => Err(BackendError::InvalidConfig {
+                            backend: "azure".to_string(),
+                            message: "Invalid configuration for Azure backend".to_string(),
                         }),
                     }
                 })

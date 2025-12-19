@@ -248,7 +248,7 @@ impl Clone for ChainError {
     fn clone(&self) -> Self {
         match self {
             Self::Serialization(e) => Self::Serialization(serde_json::Error::io(
-                std::io::Error::new(std::io::ErrorKind::Other, e.to_string()),
+                std::io::Error::other(e.to_string()),
             )),
             Self::IntegrityFailure {
                 sequence,

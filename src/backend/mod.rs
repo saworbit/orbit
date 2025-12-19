@@ -72,6 +72,9 @@ mod s3;
 #[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
 mod smb;
 
+#[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
+mod azure;
+
 #[cfg(feature = "backend-abstraction")]
 mod config;
 
@@ -94,8 +97,14 @@ pub use s3::S3Backend;
 #[cfg(all(feature = "backend-abstraction", feature = "smb-native"))]
 pub use smb::{SmbBackend, SmbConfig};
 
+#[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
+pub use azure::AzureBackend;
+
 #[cfg(feature = "backend-abstraction")]
 pub use config::{parse_uri, BackendConfig};
+
+#[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
+pub use config::AzureConfig;
 
 #[cfg(feature = "backend-abstraction")]
 pub use registry::{BackendFactory, BackendRegistry};

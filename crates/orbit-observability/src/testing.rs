@@ -59,7 +59,7 @@ impl EventCapture {
     pub fn logger(&self) -> CapturingLogger {
         CapturingLogger {
             events: Arc::clone(&self.events),
-            logger: UnifiedLogger::disabled(),
+            _logger: UnifiedLogger::disabled(),
             chain: AuditChain::new(self.signer.clone()),
         }
     }
@@ -126,7 +126,7 @@ impl Default for EventCapture {
 /// Logger that captures events in memory
 pub struct CapturingLogger {
     events: Arc<Mutex<Vec<OrbitEvent>>>,
-    logger: UnifiedLogger,
+    _logger: UnifiedLogger,
     chain: AuditChain,
 }
 
@@ -136,7 +136,7 @@ impl CapturingLogger {
         // Sign the event
         self.chain
             .sign_event(&mut event)
-            .map_err(|e| crate::logger::LoggerError::Chain(e))?;
+            .map_err(crate::logger::LoggerError::Chain)?;
 
         // Store in memory
         self.events.lock().unwrap().push(event);

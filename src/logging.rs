@@ -4,7 +4,6 @@
 
 use std::fs::File;
 use std::path::Path;
-use std::sync::Arc;
 use tracing::Level;
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
