@@ -68,7 +68,7 @@ impl OrbitSystem for LocalSystem {
             path: path.to_path_buf(),
             len: meta.len(),
             is_dir: meta.is_dir(),
-            modified: meta.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH),
+            modified: meta.modified().unwrap_or(SystemTime::UNIX_EPOCH),
         })
     }
 
@@ -91,7 +91,7 @@ impl OrbitSystem for LocalSystem {
                     path: entry_path,
                     len: meta.len(),
                     is_dir: meta.is_dir(),
-                    modified: meta.modified().unwrap_or_else(|_| SystemTime::UNIX_EPOCH),
+                    modified: meta.modified().unwrap_or(SystemTime::UNIX_EPOCH),
                 });
             }
         }

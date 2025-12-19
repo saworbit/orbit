@@ -124,10 +124,7 @@ ssh2 = { version = "0.9", optional = true }
 secrecy = { version = "0.10", optional = true, features = ["serde"] }
 
 # Azure Blob Storage dependencies (optional, feature-gated)
-azure_core = { version = "0.21", optional = true }
-azure_storage = { version = "0.21", optional = true }
-azure_storage_blobs = { version = "0.21", optional = true }
-azure_identity = { version = "0.21", optional = true }
+object_store = { version = "0.11", features = ["azure"], optional = true }
 
 # Async utilities for backend abstraction
 futures = { version = "0.3", optional = true }
@@ -221,7 +218,7 @@ s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:as
 ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
 # Azure Blob Storage backend - OFF by default
-azure-native = ["dep:azure_core", "dep:azure_storage", "dep:azure_storage_blobs", "dep:azure_identity", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
+azure-native = ["dep:object_store", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]

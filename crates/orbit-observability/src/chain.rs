@@ -247,9 +247,9 @@ impl ValidationReport {
 impl Clone for ChainError {
     fn clone(&self) -> Self {
         match self {
-            Self::Serialization(e) => Self::Serialization(serde_json::Error::io(
-                std::io::Error::other(e.to_string()),
-            )),
+            Self::Serialization(e) => {
+                Self::Serialization(serde_json::Error::io(std::io::Error::other(e.to_string())))
+            }
             Self::IntegrityFailure {
                 sequence,
                 expected,
