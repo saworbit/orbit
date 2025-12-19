@@ -997,7 +997,7 @@ let gcs = GcsBackend::new("my-bucket").await?;
 - ✅ **Security**: Built-in secure credential handling
 
 📖 **Full Guide:** [docs/guides/BACKEND_GUIDE.md](docs/guides/BACKEND_GUIDE.md)
-📖 **Migration Guide:** [BACKEND_STREAMING_GUIDE.md](BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
+📖 **Migration Guide:** [docs/guides/BACKEND_STREAMING_GUIDE.md](docs/guides/BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
 
 #### SSH/SFTP Remote Access
 
@@ -1078,7 +1078,7 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 - ✅ **Resilience patterns** — Circuit breaker, connection pooling, and rate limiting via Magnetar ⭐
 
 📖 **Full Documentation:** See [`docs/guides/S3_USER_GUIDE.md`](docs/guides/S3_USER_GUIDE.md)
-📖 **Streaming Guide:** See [`BACKEND_STREAMING_GUIDE.md`](BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
+📖 **Streaming Guide:** See [`docs/guides/BACKEND_STREAMING_GUIDE.md`](docs/guides/BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
 
 #### Azure Blob Storage
 
@@ -1154,6 +1154,8 @@ export GOOGLE_SERVICE_ACCOUNT_KEY="-----BEGIN PRIVATE KEY-----\n..."
 - ✅ **Prefix support** - Virtual directory isolation within buckets
 - ✅ **Strong consistency** - Google Cloud Storage guarantees
 - ✅ **Production-ready** - Using battle-tested object_store crate (same as Azure and S3)
+
+📖 **Full Documentation:** See [`docs/guides/GCS_USER_GUIDE.md`](docs/guides/GCS_USER_GUIDE.md)
 
 #### SMB/CIFS Network Shares
 
