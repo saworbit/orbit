@@ -77,10 +77,7 @@ impl GcsBackend {
     /// Create a new GCS backend with a prefix
     ///
     /// All paths will be relative to this prefix.
-    pub async fn with_prefix(
-        bucket_name: &str,
-        prefix: impl Into<String>,
-    ) -> BackendResult<Self> {
+    pub async fn with_prefix(bucket_name: &str, prefix: impl Into<String>) -> BackendResult<Self> {
         let mut backend = Self::new(bucket_name).await?;
         backend.prefix = Some(prefix.into());
         Ok(backend)

@@ -790,12 +790,11 @@ pub fn from_env() -> BackendResult<BackendConfig> {
 
         #[cfg(feature = "gcs-native")]
         "gcs" => {
-            let bucket = std::env::var("ORBIT_GCS_BUCKET").map_err(|_| {
-                BackendError::InvalidConfig {
+            let bucket =
+                std::env::var("ORBIT_GCS_BUCKET").map_err(|_| BackendError::InvalidConfig {
                     backend: "gcs".to_string(),
                     message: "ORBIT_GCS_BUCKET not set".to_string(),
-                }
-            })?;
+                })?;
 
             let mut gcs_config = GcsConfig::new(bucket);
 
