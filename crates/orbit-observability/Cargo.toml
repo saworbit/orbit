@@ -16,7 +16,7 @@ hex = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "registry"] }
 tracing-opentelemetry = "0.28"
-opentelemetry = "0.27"
+opentelemetry = "0.31"
 opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
 opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
 prometheus = "0.14"
