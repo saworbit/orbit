@@ -36,7 +36,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Security
 uuid = { version = "1.11", features = ["v4"] }
-jsonwebtoken = "9.3"
+jsonwebtoken = "10.2"
 sha2 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 
