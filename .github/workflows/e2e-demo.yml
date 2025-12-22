@@ -280,7 +280,7 @@ jobs:
       uses: actions/checkout@v6
 
     - name: Download all metrics
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         pattern: e2e-metrics-*
         path: metrics
