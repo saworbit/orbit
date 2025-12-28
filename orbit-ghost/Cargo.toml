@@ -15,7 +15,7 @@ rust-version = "1.70"  # MSRV - Minimum Supported Rust Version
 publish = false  # Not ready for crates.io yet
 
 [dependencies]
-fuser = "0.14"             # Safe FUSE bindings
+fuser = "0.16"             # Safe FUSE bindings
 libc = "0.2"               # syscall constants
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
@@ -37,9 +37,10 @@ predicates = "3.1"
 name = "orbit-ghost"
 path = "src/main.rs"
 
-[[bench]]
-name = "block_fetch"
-harness = false
+# Benchmarks (TODO: implement)
+# [[bench]]
+# name = "block_fetch"
+# harness = false
 
 [profile.release]
 opt-level = 3
