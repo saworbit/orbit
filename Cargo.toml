@@ -15,6 +15,7 @@ members = [
     "crates/orbit-sentinel",        # Phase 5: Autonomous Resilience Engine
     "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
     "crates/orbit-observability",   # V3: Unified Observability & Immutable Audit Plane
+    "orbit-ghost",                  # Quantum Entanglement: FUSE-based on-demand filesystem
 ]
 
 [package]
