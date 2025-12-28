@@ -8,7 +8,6 @@
 ///   cargo run --example audit_logging_demo --features backend-abstraction
 use orbit::config::CopyConfig;
 use orbit::logging::init_logging;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

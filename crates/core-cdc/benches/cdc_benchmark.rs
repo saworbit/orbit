@@ -1,5 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use orbit_core_cdc::{ChunkConfig, ChunkStream};
+use std::hint::black_box;
 use std::io::Cursor;
 
 fn benchmark_cdc_small(c: &mut Criterion) {

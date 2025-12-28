@@ -282,6 +282,7 @@ struct TransferStats {
 }
 
 impl TransferStats {
+    #[allow(dead_code)]
     fn dedup_ratio(&self) -> f64 {
         let total_chunks = self.chunks_transferred + self.chunks_deduped;
         if total_chunks == 0 {

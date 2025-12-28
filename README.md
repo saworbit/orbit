@@ -2335,15 +2335,17 @@ cargo clippy
 - **Nebula README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **v1.0.0-alpha.2**
 - **Web Dashboard (v2.2.0):** See Control Plane documentation
 - **GUI Integration:** [`docs/GUI_INTEGRATION.md`](docs/GUI_INTEGRATION.md)
-- **S3 Guide:** [`docs/S3_USER_GUIDE.md`](docs/S3_USER_GUIDE.md)
-- **Disk Guardian:** [`docs/DISK_GUARDIAN.md`](docs/DISK_GUARDIAN.md)
+- **Testing & Validation Scripts:** [`docs/guides/TESTING_SCRIPTS_GUIDE.md`](docs/guides/TESTING_SCRIPTS_GUIDE.md) ⭐ **NEW!**
+- **S3 Guide:** [`docs/guides/S3_USER_GUIDE.md`](docs/guides/S3_USER_GUIDE.md)
+- **GCS Guide:** [`docs/guides/GCS_USER_GUIDE.md`](docs/guides/GCS_USER_GUIDE.md)
+- **Disk Guardian:** [`docs/architecture/DISK_GUARDIAN.md`](docs/architecture/DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
 - **Resilience Module:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
-- **Delta Detection:** [`docs/DELTA_DETECTION_GUIDE.md`](docs/DELTA_DETECTION_GUIDE.md) and [`docs/DELTA_QUICKSTART.md`](docs/DELTA_QUICKSTART.md) ⭐ **NEW!**
-- **Filter System:** [`docs/FILTER_SYSTEM.md`](docs/FILTER_SYSTEM.md) ⭐ **NEW!**
-- **Progress & Concurrency:** [`docs/PROGRESS_AND_CONCURRENCY.md`](docs/PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
-- **Resume System:** [`docs/RESUME_SYSTEM.md`](docs/RESUME_SYSTEM.md)
-- **Protocol Guide:** [`docs/PROTOCOL_GUIDE.md`](docs/PROTOCOL_GUIDE.md)
+- **Delta Detection:** [`docs/guides/DELTA_DETECTION_GUIDE.md`](docs/guides/DELTA_DETECTION_GUIDE.md) and [`docs/guides/DELTA_QUICKSTART.md`](docs/guides/DELTA_QUICKSTART.md) ⭐ **NEW!**
+- **Filter System:** [`docs/guides/FILTER_SYSTEM.md`](docs/guides/FILTER_SYSTEM.md) ⭐ **NEW!**
+- **Progress & Concurrency:** [`docs/architecture/PROGRESS_AND_CONCURRENCY.md`](docs/architecture/PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
+- **Resume System:** [`docs/architecture/RESUME_SYSTEM.md`](docs/architecture/RESUME_SYSTEM.md)
+- **Protocol Guide:** [`docs/guides/PROTOCOL_GUIDE.md`](docs/guides/PROTOCOL_GUIDE.md)
 
 ### Technical Documentation
 - **SMB Status:** [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md)

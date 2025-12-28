@@ -248,19 +248,20 @@ impl tracing::field::Visit for EventFieldVisitor {
 mod tests {
     use super::*;
     use crate::signer::AuditSigner;
+    use crate::OrbitEvent;
     use tempfile::NamedTempFile;
     use tracing_subscriber::prelude::*;
 
     #[test]
     fn test_bridge_layer_creation() {
-        let signer = AuditSigner::from_bytes(b"test");
+        let _signer = AuditSigner::from_bytes(b"test");
         let logger = UnifiedLogger::disabled();
         let _layer = AuditBridgeLayer::new(logger);
     }
 
     #[test]
     fn test_bridge_with_span_events() {
-        let signer = AuditSigner::from_bytes(b"test");
+        let _signer = AuditSigner::from_bytes(b"test");
         let logger = UnifiedLogger::disabled();
         let layer = AuditBridgeLayer::new(logger).with_span_events(true);
         assert!(layer.emit_spans);

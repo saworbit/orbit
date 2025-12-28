@@ -144,7 +144,7 @@ async fn test_equilibrium_partial_dedup() -> Result<()> {
     std::fs::write(file2.path(), &data2)?;
 
     // Process File 1
-    let stats1 = executor.process_file(file1.path().to_path_buf()).await?;
+    let _stats1 = executor.process_file(file1.path().to_path_buf()).await?;
 
     // Process File 2 (partial overlap)
     let stats2 = executor.process_file(file2.path().to_path_buf()).await?;
@@ -280,7 +280,7 @@ async fn test_equilibrium_cross_file_dedup() -> Result<()> {
     std::fs::write(file2.path(), &data2)?;
 
     // Process both files
-    let stats1 = executor.process_file(file1.path().to_path_buf()).await?;
+    let _stats1 = executor.process_file(file1.path().to_path_buf()).await?;
     let stats2 = executor.process_file(file2.path().to_path_buf()).await?;
 
     // File 2 should have significant deduplication due to common_pattern

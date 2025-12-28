@@ -87,7 +87,6 @@ async fn test_remote_system_connection() {
     // 2. A valid test token configured in the star
     // 3. Test data files available
 
-    use orbit_core_interface::OrbitSystem;
     use std::path::Path;
 
     let manager = StarManager::new();
@@ -124,7 +123,6 @@ async fn test_remote_hash_calculation() {
     // 1. orbit-star running on localhost:50051
     // 2. A test file at /data/test.bin on the Star
 
-    use orbit_core_interface::OrbitSystem;
     use std::path::Path;
 
     let manager = StarManager::new();

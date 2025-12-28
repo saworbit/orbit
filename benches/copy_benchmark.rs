@@ -1,9 +1,10 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use orbit::{
     config::{CompressionType, CopyConfig},
     copy_file, get_zero_copy_capabilities,
 };
 use std::fs::File;
+use std::hint::black_box;
 use std::io::Write;
 use tempfile::TempDir;
 

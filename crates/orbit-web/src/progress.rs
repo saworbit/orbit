@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 #[derive(Debug)]
 enum UpdateMsg {
     Bytes { total: u64 },
-    ChunkSuccess { index: usize },
+    ChunkSuccess,
     ChunkFail { index: usize, error: String },
     Finish,
 }
@@ -47,12 +47,12 @@ impl MagnetarProgress {
         let transferred = Arc::new(AtomicU64::new(0));
         let total = Arc::new(AtomicU64::new(initial_total));
 
-        let transferred_clone = transferred.clone();
         let total_clone = total.clone();
 
         // Spawn the debouncer task
         tokio::spawn(async move {
             let mut last_db_update = Instant::now();
+            #[allow(unused_assignments)]
             let mut dirty = false;
             let mut current_bytes = 0u64;
             let mut current_total = initial_total;
@@ -65,7 +65,7 @@ impl MagnetarProgress {
                         current_bytes = total;
                         dirty = true;
                     }
-                    UpdateMsg::ChunkSuccess { index: _ } => {
+                    UpdateMsg::ChunkSuccess => {
                         completed_chunks += 1;
                         dirty = true;
                     }
@@ -133,7 +133,10 @@ impl MagnetarProgress {
                     }
 
                     last_db_update = Instant::now();
-                    dirty = false;
+                    #[allow(unused_assignments)]
+                    {
+                        dirty = false;
+                    }
                 }
             }
         });
@@ -165,10 +168,8 @@ impl MagnetarProgress {
     }
 
     /// Record a successful chunk completion
-    pub fn chunk_completed(&mut self, chunk_idx: usize, _checksum: &str) {
-        let _ = self
-            .tx
-            .try_send(UpdateMsg::ChunkSuccess { index: chunk_idx });
+    pub fn chunk_completed(&mut self, _chunk_idx: usize, _checksum: &str) {
+        let _ = self.tx.try_send(UpdateMsg::ChunkSuccess);
     }
 
     /// Record a chunk failure

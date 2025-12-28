@@ -16,7 +16,6 @@ use orbit_sentinel::{Sentinel, SentinelPolicy};
 use orbit_star::auth::AuthService;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use tempfile::NamedTempFile;
 
 /// Test the Sentinel's ability to heal under-replicated chunks
@@ -102,7 +101,7 @@ async fn test_sentinel_chaos_monkey() -> anyhow::Result<()> {
         healing_bandwidth_limit: None,
     };
 
-    let sentinel = Sentinel::new(
+    let _sentinel = Sentinel::new(
         universe.clone(),
         auth_service.clone(),
         star_manager.clone(),
