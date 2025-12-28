@@ -1,0 +1,117 @@
+# Orbit GhostFS cargo-deny configuration
+# See: https://embarkstudios.github.io/cargo-deny/
+
+# Note: Running this requires `cargo install cargo-deny`
+# Usage: cargo deny check
+
+# This section is considered when running `cargo deny check advisories`
+[advisories]
+version = 2
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+# Ignore these specific advisories (if needed)
+ignore = [
+    # Example: "RUSTSEC-2020-0001",
+]
+
+# Warn for unmaintained crates
+unmaintained = "warn"
+
+# Warn for crates with known security vulnerabilities
+vulnerability = "deny"
+
+# Warn for crates with unsound code
+unsound = "warn"
+
+# Warn for yanked crates
+yanked = "warn"
+
+# Notice level for informational advisories
+notice = "warn"
+
+# This section is considered when running `cargo deny check licenses`
+[licenses]
+version = 2
+
+# Allow these licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "Zlib",
+]
+
+# Deny these licenses
+deny = [
+    "GPL-3.0",
+    "AGPL-3.0",
+]
+
+# Confidence threshold for license detection
+confidence-threshold = 0.8
+
+# Some crates don't have a license file, allow them if they specify in metadata
+allow-osi-fsf-free = "both"
+
+# Some crates have multiple licenses, require all to be allowed
+default = "deny"
+
+# Exceptions for specific crates
+exceptions = [
+    # Example: { allow = ["MPL-2.0"], name = "some-crate" },
+]
+
+# Clarifications for ambiguous licenses
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
+# This section is considered when running `cargo deny check bans`
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+# Deny these specific crates
+deny = [
+    # Example: { name = "bad-crate", version = "*" },
+]
+
+# Skip these crates when checking for multiple versions
+skip = [
+    # Example: { name = "windows-sys", version = "0.48" },
+]
+
+# Skip checking these dependency trees
+skip-tree = [
+    # Example: { name = "some-crate", version = "1.0" },
+]
+
+# Allow certain crates to have multiple versions (workspace compatibility)
+allow = [
+    # Example: { name = "syn", version = "1.0" },
+]
+
+# This section is considered when running `cargo deny check sources`
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+
+# Allowed git sources
+allow-git = [
+    # Example: "https://github.com/user/repo",
+]
+
+[sources.allow-org]
+github = [
+    "saworbit",
+]

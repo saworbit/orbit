@@ -1,0 +1,55 @@
+# Codecov configuration for Orbit GhostFS
+# See: https://docs.codecov.com/docs/codecov-yaml
+
+# Coverage targets
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+
+  status:
+    # Overall project coverage
+    project:
+      default:
+        target: 70%           # Minimum coverage target
+        threshold: 2%         # Allow 2% drop before failing
+        if_ci_failed: error   # Fail if CI fails
+
+    # Coverage for changes in PR
+    patch:
+      default:
+        target: 80%           # New code should be well-tested
+        threshold: 5%
+        if_ci_failed: error
+
+# Comment behavior on PRs
+comment:
+  layout: "reach,diff,flags,tree,files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+# Ignore paths from coverage
+ignore:
+  - "tests/"
+  - "benches/"
+  - "examples/"
+  - "target/"
+  - "**/*.md"
+
+# Flags for different test types (future use)
+flags:
+  unit:
+    paths:
+      - src/
+    carryforward: true
+
+  integration:
+    paths:
+      - tests/
+    carryforward: true
+
+# Annotations on files
+github_checks:
+  annotations: true

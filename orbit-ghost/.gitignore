@@ -1,0 +1,56 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local development
+orbit-ghost.log
+*.log
+
+# Cache directories (runtime)
+/tmp/orbit_cache/
+/tmp/orbit_ghost_mount/
+
+# Test artifacts
+*.profraw
+*.profdata
+
+# Coverage reports
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Benchmark results
+target/criterion/
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# OS specific
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Backup files
+*~
+\#*\#
+.\#*
+
+# Distribution / packaging
+dist/
+*.tar.gz
+*.zip
+
+# Local configuration (if added in future)
+config.local.toml
+.env
+.env.local

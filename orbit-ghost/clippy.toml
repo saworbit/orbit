@@ -1,0 +1,40 @@
+# Orbit GhostFS Clippy configuration
+# See: https://doc.rust-lang.org/clippy/configuration.html
+
+# Warn if a method has a function signature with more than this many arguments
+too-many-arguments-threshold = 8
+
+# Warn if a method has a function signature with more than this many lines
+too-many-lines-threshold = 150
+
+# Warn if a type has more than this many fields
+type-complexity-threshold = 500
+
+# Warn if a function has a cyclomatic complexity greater than this
+cognitive-complexity-threshold = 30
+
+# Maximum length for doc comments before suggesting splitting them
+doc-valid-idents = [
+    "GhostFS",
+    "Magnetar",
+    "Orbit",
+    "FUSE",
+    "WinFSP",
+    "macFUSE",
+    "BlockID",
+    "FileID",
+    "Condvar",
+    "POSIX",
+]
+
+# Allow certain abbreviations in names
+allowed-names-below-min-characters = ["i", "j", "k", "id", "fs", "io", "ok"]
+
+# Warn on unwrap and expect in code (encourage proper error handling)
+# This is controlled via allow/warn/deny attributes in code
+
+# Maximum allowed size for array literals
+array-size-threshold = 512000
+
+# Paths to ignore for lints
+# (Currently none, but can be added later)

@@ -1,0 +1,59 @@
+[package]
+name = "orbit-ghost"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shane Wall <shaneawall@gmail.com>"]
+description = "FUSE-based on-demand filesystem with block-level JIT fetching (Quantum Entanglement)"
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/saworbit/orbit"
+homepage = "https://github.com/saworbit/orbit/tree/main/orbit-ghost"
+documentation = "https://github.com/saworbit/orbit/tree/main/orbit-ghost"
+keywords = ["fuse", "filesystem", "on-demand", "remote-storage", "lazy-loading"]
+categories = ["filesystem", "network-programming", "caching"]
+rust-version = "1.70"  # MSRV - Minimum Supported Rust Version
+publish = false  # Not ready for crates.io yet
+
+[dependencies]
+fuser = "0.14"             # Safe FUSE bindings
+libc = "0.2"               # syscall constants
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.10"
+dashmap = "5.5"            # Concurrent HashMap for Inode tracking
+crossbeam-channel = "0.5"  # High-perf channels for priority signaling
+parking_lot = "0.12"       # Low-latency mutexes
+
+[dev-dependencies]
+tempfile = "3.10"
+criterion = "0.8"
+assert_fs = "1.1"
+predicates = "3.1"
+
+[[bin]]
+name = "orbit-ghost"
+path = "src/main.rs"
+
+[[bench]]
+name = "block_fetch"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.bench]
+inherits = "release"
+
+[profile.test]
+opt-level = 1  # Faster tests without full optimization
