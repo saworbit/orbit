@@ -6,16 +6,20 @@ on:
     paths:
       - 'crates/orbit-web/**'
       - 'dashboard/**'
-      - 'demo-orbit.sh'
-      - 'demo-orbit.bat'
+      - 'scripts/demo-orbit.sh'
+      - 'scripts/demo-orbit.bat'
+      - 'scripts/demo-orbit-ci.sh'
+      - 'scripts/demo-orbit-ci.bat'
       - '.github/workflows/e2e-demo.yml'
   pull_request:
     branches: [main]
     paths:
       - 'crates/orbit-web/**'
       - 'dashboard/**'
-      - 'demo-orbit.sh'
-      - 'demo-orbit.bat'
+      - 'scripts/demo-orbit.sh'
+      - 'scripts/demo-orbit.bat'
+      - 'scripts/demo-orbit-ci.sh'
+      - 'scripts/demo-orbit-ci.bat'
   schedule:
     # Run daily at 2 AM UTC to catch integration issues
     - cron: '0 2 * * *'
@@ -105,8 +109,8 @@ jobs:
 
     - name: Run E2E Demo (Headless)
       run: |
-        chmod +x demo-orbit-ci.sh
-        ./demo-orbit-ci.sh
+        chmod +x scripts/demo-orbit-ci.sh
+        ./scripts/demo-orbit-ci.sh
       timeout-minutes: 10
 
     - name: Upload demo logs
@@ -176,7 +180,7 @@ jobs:
 
     - name: Run E2E Demo (Headless)
       shell: cmd
-      run: demo-orbit-ci.bat
+      run: scripts\demo-orbit-ci.bat
       timeout-minutes: 10
 
     - name: Upload demo logs
@@ -246,8 +250,8 @@ jobs:
 
     - name: Run E2E Demo (Headless)
       run: |
-        chmod +x demo-orbit-ci.sh
-        ./demo-orbit-ci.sh
+        chmod +x scripts/demo-orbit-ci.sh
+        ./scripts/demo-orbit-ci.sh
       timeout-minutes: 10
 
     - name: Upload demo logs

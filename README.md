@@ -1130,7 +1130,7 @@ orbit --source file.txt --dest azblob://testcontainer/file.txt
 - ✅ **Strong consistency** - Azure Blob Storage guarantees
 - ✅ **Production-ready** - 33% less code than Azure SDK implementation
 
-📖 **Implementation Status:** See [`AZURE_IMPLEMENTATION_STATUS.md`](AZURE_IMPLEMENTATION_STATUS.md)
+📖 **Implementation Status:** See [`docs/project-status/AZURE_IMPLEMENTATION_STATUS.md`](docs/project-status/AZURE_IMPLEMENTATION_STATUS.md)
 
 #### Google Cloud Storage
 
@@ -1807,10 +1807,10 @@ This structure ensures isolation, testability, and reusability.
 
 ```bash
 # Unix/Linux/macOS
-./launch-orbit.sh
+./scripts/launch-orbit.sh
 
 # Windows
-launch-orbit.bat
+scripts\launch-orbit.bat
 ```
 
 **Option 2: Manual startup**
@@ -1855,16 +1855,16 @@ Before running the demo, use the safety validator to verify your system is ready
 bash scripts/validate-demo-safety.sh
 ```
 
-The validator checks system requirements, port availability, disk space, and shows exactly what the demo will do. See [SAFETY_FIRST.md](SAFETY_FIRST.md) for complete safety documentation.
+The validator checks system requirements, port availability, disk space, and shows exactly what the demo will do. See [docs/project-status/SAFETY_FIRST.md](docs/project-status/SAFETY_FIRST.md) for complete safety documentation.
 
 **Option 3: Run the E2E Demo** (Best for first-time users and demonstrations)
 
 ```bash
 # Unix/Linux/macOS
-./demo-orbit.sh
+./scripts/demo-orbit.sh
 
 # Windows
-demo-orbit.bat
+scripts\demo-orbit.bat
 ```
 
 **Requirements:**
