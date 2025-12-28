@@ -93,6 +93,11 @@ orbit-server = { path = "crates/orbit-web", optional = true, default-features = 
 # Random for backoff jitter
 rand = "0.9"
 
+# Phase 5: Onboarding wizard dependencies
+dialoguer = "0.11"
+console = "0.15"
+dirs = "5.0"
+
 # Manifest system
 orbit-core-manifest = { path = "crates/core-manifest" }
 orbit-core-starmap = { path = "crates/core-starmap" }

@@ -13,6 +13,15 @@ use std::sync::Arc;
 use tokio::sync::Notify;
 use tracing::{error, info, instrument, warn};
 
+/// Type alias for the recursive file collection future
+type FileCollectionFuture = std::pin::Pin<
+    Box<
+        dyn std::future::Future<
+                Output = Result<Vec<(PathBuf, u64)>, Box<dyn std::error::Error + Send + Sync>>,
+            > + Send,
+    >,
+>;
+
 /// Job data structure matching the database schema
 #[derive(Debug, Clone)]
 pub struct Job {
@@ -236,15 +245,7 @@ impl Reactor {
     }
 
     /// Recursively collect all files in a directory
-    fn collect_files(
-        path: PathBuf,
-    ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<
-                    Output = Result<Vec<(PathBuf, u64)>, Box<dyn std::error::Error + Send + Sync>>,
-                > + Send,
-        >,
-    > {
+    fn collect_files(path: PathBuf) -> FileCollectionFuture {
         Box::pin(async move {
             use tokio::fs;
 

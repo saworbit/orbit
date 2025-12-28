@@ -77,12 +77,14 @@ impl S3Backend {
     }
 
     /// Convert an S3 key to a Path (strip prefix if present)
+    #[allow(dead_code)]
     fn key_to_path(&self, key: &str) -> PathBuf {
         key_to_path_impl(key, self.prefix.as_deref())
     }
 }
 
 /// Convert a Path to an S3 key with optional prefix (standalone for testing)
+#[allow(dead_code)]
 fn path_to_key_impl(path: &Path, prefix: Option<&str>) -> String {
     let path_str = path.to_string_lossy().replace('\\', "/");
     let key = path_str.trim_start_matches('/');
@@ -95,6 +97,7 @@ fn path_to_key_impl(path: &Path, prefix: Option<&str>) -> String {
 }
 
 /// Convert an S3 key to a Path with optional prefix (standalone for testing)
+#[allow(dead_code)]
 fn key_to_path_impl(key: &str, prefix: Option<&str>) -> PathBuf {
     if let Some(prefix) = prefix {
         let prefix = prefix.trim_end_matches('/');
@@ -415,9 +418,7 @@ impl Backend for S3Backend {
 
                 async move {
                     // Check if we're done or hit max_entries
-                    if token_state.is_none() {
-                        return None;
-                    }
+                    token_state.as_ref()?;
 
                     if let Some(max) = options.max_entries {
                         if entries_count >= max {
@@ -642,7 +643,7 @@ impl Backend for S3Backend {
         // Determine upload strategy based on size
         // Use multipart for files >5MB to avoid PutObject limits and enable resumption
         const MULTIPART_THRESHOLD: u64 = 5 * 1024 * 1024; // 5 MB
-        let use_multipart = size_hint.map_or(true, |size| size > MULTIPART_THRESHOLD);
+        let use_multipart = size_hint.is_none_or(|size| size > MULTIPART_THRESHOLD);
 
         if use_multipart {
             // Stream upload using multipart
@@ -655,7 +656,7 @@ impl Backend for S3Backend {
             let bytes_read = reader
                 .read_to_end(&mut buffer)
                 .await
-                .map_err(|e| BackendError::Io(e))?;
+                .map_err(BackendError::Io)?;
 
             // Upload using PutObject
             let mut request = self

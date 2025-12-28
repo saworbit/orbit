@@ -310,8 +310,7 @@ fn test_stats_tracking_with_failures() {
 
     // Second operation: fails with I/O error
     let result2 = orbit::core::retry::with_retry_and_stats(&config, Some(&stats_tracker), || {
-        Err(OrbitError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        Err(OrbitError::Io(std::io::Error::other(
             "test",
         )))
     });
@@ -346,7 +345,7 @@ fn test_error_categorization() {
     assert!(validation_error.is_fatal());
     assert!(!validation_error.is_transient());
 
-    let io_error = OrbitError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test"));
+    let io_error = OrbitError::Io(std::io::Error::other("test"));
     assert_eq!(io_error.category(), ErrorCategory::IoError);
     assert!(!io_error.is_fatal());
 
@@ -402,8 +401,7 @@ fn test_stats_snapshot_formatting() {
     // Record some operations
     stats.record_success();
     stats.record_success();
-    stats.record_failure(&OrbitError::Io(std::io::Error::new(
-        std::io::ErrorKind::Other,
+    stats.record_failure(&OrbitError::Io(std::io::Error::other(
         "test",
     )));
     stats.record_retry(1);

@@ -44,7 +44,7 @@ fn test_audit_log_generated_on_file_copy() {
     // Parse JSON lines
     let lines: Vec<&str> = content.lines().collect();
     assert!(
-        lines.len() >= 1,
+        !lines.is_empty(),
         "Audit log should contain at least one entry"
     );
 

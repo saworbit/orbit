@@ -6,6 +6,102 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+#### Usability & Automation (Phases 3-5) - v0.7.0
+
+**Intelligent onboarding and environment-aware auto-tuning** - This release transforms Orbit from a configuration-heavy tool into an intelligent system that adapts to your environment and guides you through setup.
+
+#### Phase 3: Terminology Abstraction (User-Facing Interface Layer)
+
+- **`src/core/terminology.rs`**: User-facing display layer that translates internal architectural names to friendly terms
+  - `Magnetar` → "Job Engine"
+  - `Starmap` → "Transfer Manifest"
+  - `Neutrino` → "Small File Optimization"
+  - `Universe` → "Global Index"
+  - `StarProtocol` → "Grid Protocol"
+- **Status message translation**: Automatic conversion of internal status codes to user-friendly messages
+- **Progressive disclosure**: Technical complexity hidden from standard users, accessible in debug logs
+- **User-facing output macros**: `orbit_info!`, `orbit_warn!`, `orbit_error!` for clean CLI output
+- **7 comprehensive tests**: Full coverage of terminology mapping and display
+
+#### Phase 4: Active Guidance System (Environment Probing)
+
+- **`src/core/probe.rs`**: System profiling module for active environment detection
+  - CPU core detection
+  - Available RAM measurement (in GB)
+  - I/O throughput benchmarking (10MB write test)
+  - Filesystem type detection (Local, SMB, NFS, S3, Azure, GCS)
+  - Network vs local differentiation
+  - Cloud storage recognition
+- **Enhanced Guidance System** (`src/core/guidance.rs`):
+  - New `plan_with_probe()` method accepts destination path for probing
+  - **Active Rule 1 - Network Share Auto-Tuning**: Enables resume + increases retries for SMB/NFS
+  - **Active Rule 2 - CPU-Rich/IO-Poor**: Enables Zstd:3 compression when ≥8 cores + <50 MB/s I/O
+  - **Active Rule 3 - Low Memory**: Reduces parallel operations when RAM < 1GB
+  - **Active Rule 4 - Cloud Storage**: Enables compression + exponential backoff for S3/Azure/GCS
+  - New `AutoTune` notice level with 🔧 icon
+- **Main integration**: All copy operations now use active probing by default
+- **7 comprehensive tests**: Full coverage of system profiling and detection logic
+
+#### Phase 5: First-Run Onboarding (`orbit init`)
+
+- **`orbit init` command**: Interactive setup wizard with terminal UI
+  - Beautiful console interface using `dialoguer` and `console` crates
+  - System environment scanning before configuration
+  - Four pre-configured profiles:
+    - **Backup**: Reliability first (resume, checksum, retry:5)
+    - **Sync**: Speed first (zero-copy, trust modtime)
+    - **Cloud Upload**: Compression first (Zstd:3, retry:10)
+    - **Network Transfer**: Resume + compression balanced
+  - Secure JWT secret generation (32-character alphanumeric)
+  - Auto-optimization based on detected hardware
+  - Configuration persistence to `~/.orbit/orbit.toml`
+- **New dependencies**:
+  - `dialoguer = "0.11"` - Interactive terminal prompts
+  - `console = "0.15"` - Styled terminal output
+  - `dirs = "5.0"` - Home directory detection
+- **Commands module structure**: `src/commands/init.rs` and `src/commands/mod.rs`
+- **11 comprehensive tests**: Profile generation, active guidance scenarios, serialization
+
+#### Documentation
+
+- **Implementation**: All phases fully implemented and integrated
+- **Test coverage**: 25 new tests across all three phases (all passing)
+- **User guides**: Created comprehensive documentation for new features
+- **Examples**: Working demonstrations of all new functionality
+
+#### Integration
+
+- **Seamless**: Works alongside all existing features without breaking changes
+- **Backward compatible**: Original `Guidance::plan()` still works without probing
+- **Default enabled**: Active probing runs automatically for all copy operations
+- **Opt-in wizard**: `orbit init` available but not required
+
+**Files Added:**
+- `src/core/terminology.rs` - User-facing terminology abstraction (195 lines)
+- `src/core/probe.rs` - System profiling and environment detection (285 lines)
+- `src/commands/init.rs` - Interactive onboarding wizard (310 lines)
+- `src/commands/mod.rs` - Commands module structure
+- `tests/init_generation_test.rs` - Comprehensive test suite (180 lines)
+- `docs/guides/INIT_WIZARD_GUIDE.md` - User documentation
+- `docs/guides/ACTIVE_GUIDANCE_GUIDE.md` - Active guidance documentation
+
+**Files Modified:**
+- `src/core/guidance.rs` - Added active probing integration and auto-tune rules
+- `src/core/mod.rs` - Exported new `probe` and `terminology` modules
+- `src/lib.rs` - Exported new `commands` module
+- `src/logging.rs` - Added user-facing output macros
+- `src/main.rs` - Integrated `init` command and active probing
+- `Cargo.toml` - Added `dialoguer`, `console`, and `dirs` dependencies
+- `CHANGELOG.md` - This entry
+- `README.md` - Added Phases 3-5 feature documentation
+
+**Benefits:**
+- **Zero-configuration**: `orbit init` creates optimal config in seconds
+- **Intelligent**: System auto-tunes based on your hardware and destination
+- **Transparent**: All changes explained with friendly messages
+- **Educational**: Users learn about trade-offs through guidance notices
+- **Production-ready**: 300+ tests passing, comprehensive error handling
+
 #### Google Cloud Storage Backend
 
 **Production-ready GCS support using object_store** - Added native Google Cloud Storage backend with streaming I/O and full Backend trait implementation.

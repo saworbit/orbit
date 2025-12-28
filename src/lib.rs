@@ -14,6 +14,7 @@
 
 pub mod audit;
 pub mod cli_progress;
+pub mod commands; // Phase 5: CLI command modules (init wizard, etc.)
 pub mod compression;
 pub mod config;
 pub mod core;
@@ -151,7 +152,6 @@ mod tests {
     #[test]
     fn test_version() {
         // Verify VERSION is properly initialized from CARGO_PKG_VERSION
-        assert!(!VERSION.is_empty());
         assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
     }
 

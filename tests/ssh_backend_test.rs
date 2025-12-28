@@ -29,7 +29,7 @@ mod ssh_tests {
         assert_eq!(config.username, "testuser");
         assert_eq!(config.port, 22);
         assert_eq!(config.timeout_secs, 30);
-        assert_eq!(config.compress, false);
+        assert!(!config.compress);
     }
 
     /// Test SSH config builder pattern
@@ -42,7 +42,7 @@ mod ssh_tests {
 
         assert_eq!(config.port, 2222);
         assert_eq!(config.timeout_secs, 60);
-        assert_eq!(config.compress, true);
+        assert!(config.compress);
     }
 
     /// Test SSH config from URI format

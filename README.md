@@ -10,7 +10,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.6.0 Core / v2.2.0-rc.1 Control Plane)
+## ⚠️ Project Status: Alpha (v0.7.0 Core / v2.2.0-rc.1 Control Plane)
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -22,7 +22,8 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v0.6.0-alpha.5**: Phase 5 - Sentinel (Autonomous Resilience Engine) - OODA loop monitors Universe V3 and autonomously heals under-replicated chunks via Phase 4 P2P transfers
+- **NEW v0.7.0**: Usability & Automation (Phases 3-5) - Interactive `orbit init` wizard, active environment probing, and intelligent auto-tuning
+- **v0.6.0-alpha.5**: Phase 5 - Sentinel (Autonomous Resilience Engine) - OODA loop monitors Universe V3 and autonomously heals under-replicated chunks via Phase 4 P2P transfers
 - **v0.6.0-alpha.4**: Phase 4 - Data Plane (P2P Transfer) - Direct Star-to-Star data transfer eliminates Nucleus bandwidth bottleneck, enabling infinite horizontal scaling
 - **v0.6.0-alpha.3**: Phase 3 - Nucleus Client & RemoteSystem (Client-side connectivity for Nucleus-to-Star orchestration, 99.997% network reduction via compute offloading)
 - **v0.6.0-alpha.2**: Phase 2 - Star Protocol & Agent (gRPC remote execution server for distributed Orbit Grid)
@@ -123,7 +124,10 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Sentinel Resilience Engine (Phase 5)** | 🔴 Alpha | Autonomous OODA loop for chunk redundancy healing |
 | **Filter System** | 🟡 Beta | Glob/regex filters, functional but newer |
 | **Metadata Preservation** | 🟡 Beta | Works well, extended attributes are platform-specific |
-| **Guidance System** | 🟡 Beta | Config validation, recently added |
+| **Guidance System** | 🟡 Beta | Config validation with active probing (v0.7.0) |
+| **Init Wizard** | 🟡 Beta | Interactive setup with `orbit init` (v0.7.0) |
+| **Active Environment Probing** | 🟡 Beta | Auto-tuning based on hardware/destination (v0.7.0) |
+| **Terminology Abstraction** | 🟢 Stable | User-friendly interface layer (v0.7.0) |
 | **Control Plane API** | 🔴 Alpha | v2.2.0-alpha - OpenAPI/Swagger documented REST API |
 | **React Dashboard** | 🔴 Alpha | v2.2.0-alpha - Modern SPA with React Flow pipelines |
 | **Manifest System** | 🟡 Beta | File tracking and verification |
@@ -270,14 +274,18 @@ cargo run --example disk_guardian_demo
 
 ### 🛰️ Guidance System: The "Flight Computer"
 
-Automatic configuration validation and optimization that ensures safe, performant transfers.
+**NEW in v0.7.0!** Enhanced with active environment probing and intelligent auto-tuning.
+
+Automatic configuration validation and optimization that ensures safe, performant transfers, now with active hardware and destination detection.
 
 **What It Does:**
-The Guidance System acts as an intelligent pre-processor, analyzing your configuration for logical conflicts and automatically resolving them before execution begins. Think of it as a co-pilot that prevents common mistakes and optimizes settings based on hardware capabilities and use-case logic.
+The Guidance System acts as an intelligent pre-processor, analyzing your configuration for logical conflicts and automatically resolving them before execution begins. **NEW**: It now actively probes your system environment (CPU, RAM, I/O speed, destination type) and auto-tunes settings for optimal performance.
 
 **Key Benefits:**
 - 🔒 **Safety First** — Prevents data corruption from incompatible flag combinations
 - ⚡ **Performance Optimization** — Automatically selects the fastest valid strategy
+- 🧠 **Active Probing** — Detects hardware, I/O speed, and destination type (v0.7.0)
+- 🎯 **Auto-Tuning** — Optimizes for SMB, cloud storage, slow I/O, low memory (v0.7.0)
 - 🎓 **Educational** — Explains why configurations were changed
 - 🤖 **Automatic** — No manual debugging of conflicting flags
 
@@ -286,6 +294,8 @@ The Guidance System acts as an intelligent pre-processor, analyzing your configu
 ┌── 🛰️  Orbit Guidance System ───────────────────────┐
 │ 🚀 Strategy: Disabling zero-copy to allow streaming checksum verification
 │ 🛡️  Safety: Disabling resume capability to prevent compressed stream corruption
+│ 🔧 Network: Detected SMB destination. Enabling resume for reliability.
+│ 🔧 Performance: Detected slow I/O (45.2 MB/s) with 16 cores. Enabling Zstd:3.
 └────────────────────────────────────────────────────┘
 ```
 
@@ -304,6 +314,10 @@ The Guidance System acts as an intelligent pre-processor, analyzing your configu
 | **UX** | Parallel + Progress bars | Info notice (visual artifacts possible) | ℹ️ |
 | **Performance** | Sync + Checksum mode | Info notice (forces dual reads) | ℹ️ |
 | **Physics** | Compression + Encryption | Placeholder (encrypted data won't compress) | 🚀 |
+| **🆕 Network Auto-Tune** | SMB/NFS destination | Enable resume + increase retries | 🔧 |
+| **🆕 CPU/IO Optimization** | ≥8 cores + <50 MB/s I/O | Enable Zstd:3 compression | 🔧 |
+| **🆕 Low Memory** | <1GB RAM + >4 parallel | Reduce to 2 parallel operations | 🔧 |
+| **🆕 Cloud Storage** | S3/Azure/GCS destination | Enable compression + backoff | 🔧 |
 
 **Philosophy:**
 > Users express **intent**. Orbit ensures **technical correctness**.
@@ -1352,6 +1366,54 @@ cargo install orbit --features full
 # Size-optimized: Maximum compression
 cargo build --profile release-min
 ```
+
+### First-Time Setup (NEW in v0.7.0!)
+
+**Interactive Configuration Wizard** - Get started in seconds with the new `orbit init` command:
+
+```bash
+# Run the interactive setup wizard
+orbit init
+```
+
+**What it does:**
+1. 🔍 **Scans your system** — Detects CPU cores, RAM, and I/O speed
+2. 💬 **Asks about your use case** — Backup, Sync, Cloud, or Network
+3. ⚙️ **Generates optimal config** — Auto-tuned for your hardware
+4. 🔐 **Creates security secrets** — JWT secret for Web Dashboard (optional)
+5. 💾 **Saves to `~/.orbit/orbit.toml`** — Ready to use immediately
+
+**Example session:**
+```
+🪐 Welcome to Orbit Setup
+   We will scan your system and create an optimized configuration.
+
+Scanning system environment...
+  16 CPU cores detected
+  32 GB RAM available
+  I/O throughput: ~450 MB/s
+
+Configuration Setup
+? What is your primary use case?
+  > Backup (Reliability First)
+    Sync (Speed First)
+    Cloud Upload (Compression First)
+    Network Transfer (Resume + Compression)
+
+✅ Configuration saved to: /home/user/.orbit/orbit.toml
+```
+
+**Pre-configured profiles:**
+- **Backup** → Resume, checksum verification, 5 retries
+- **Sync** → Zero-copy, trust modtime, maximum speed
+- **Cloud** → Zstd compression, 10 retries, exponential backoff
+- **Network** → Resume + compression balanced for SMB/NFS
+
+After running `orbit init`, your config is ready! All transfers will use your optimized settings automatically.
+
+📖 **Full Guide:** See [`docs/guides/INIT_WIZARD_GUIDE.md`](docs/guides/INIT_WIZARD_GUIDE.md)
+
+---
 
 ### Basic Usage
 

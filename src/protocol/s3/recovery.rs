@@ -159,7 +159,7 @@ impl RetryPolicy {
 
         // Add jitter if enabled
         if matches!(self.backoff, BackoffStrategy::ExponentialWithJitter) {
-            let jitter = rand::thread_rng().gen_range(0.0..self.jitter_factor);
+            let jitter = rand::rng().random_range(0.0..self.jitter_factor);
             let jitter_amount = capped_delay.as_secs_f64() * jitter;
             capped_delay + Duration::from_secs_f64(jitter_amount)
         } else {

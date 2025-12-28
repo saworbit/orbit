@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn test_non_fatal_errors() {
-        assert!(!OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test")).is_fatal());
+        assert!(!OrbitError::Io(io::Error::other("test")).is_fatal());
         assert!(!OrbitError::Compression("test".to_string()).is_fatal());
         assert!(!OrbitError::ZeroCopyUnsupported.is_fatal());
         assert!(!OrbitError::Other("test".to_string()).is_fatal());
@@ -354,7 +354,7 @@ mod tests {
     fn test_zero_copy_unsupported_detection() {
         assert!(OrbitError::ZeroCopyUnsupported.is_zero_copy_unsupported());
         assert!(
-            !OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test"))
+            !OrbitError::Io(io::Error::other("test"))
                 .is_zero_copy_unsupported()
         );
     }
@@ -421,7 +421,7 @@ mod tests {
             ErrorCategory::Validation
         );
         assert_eq!(
-            OrbitError::Io(io::Error::new(io::ErrorKind::Other, "test")).category(),
+            OrbitError::Io(io::Error::other("test")).category(),
             ErrorCategory::IoError
         );
         assert_eq!(

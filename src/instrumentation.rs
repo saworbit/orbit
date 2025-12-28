@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_record_failure() {
         let stats = OperationStats::new();
-        let error = OrbitError::Io(std::io::Error::new(std::io::ErrorKind::Other, "test"));
+        let error = OrbitError::Io(std::io::Error::other("test"));
         stats.record_failure(&error);
 
         let snapshot = stats.snapshot();
@@ -321,8 +321,7 @@ mod tests {
         let stats = OperationStats::new();
 
         stats.record_failure(&OrbitError::SourceNotFound(PathBuf::from("/tmp")));
-        stats.record_failure(&OrbitError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        stats.record_failure(&OrbitError::Io(std::io::Error::other(
             "test",
         )));
         stats.record_failure(&OrbitError::Protocol("network error".to_string()));

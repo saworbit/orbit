@@ -6,10 +6,12 @@
  */
 
 use crate::config::{CompressionType, CopyConfig, CopyMode};
+use crate::core::probe::{FileSystemType, Probe, SystemProfile};
 use crate::core::zero_copy::ZeroCopyCapabilities;
 use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::path::Path;
 
 /// The Guidance system responsible for validating and optimizing transfer configurations.
 pub struct Guidance;
@@ -44,6 +46,21 @@ pub enum NoticeLevel {
     Optimization,
     /// Critical changes to prevent data corruption
     Safety,
+    /// Automatic configuration adjustments based on environment (Phase 4)
+    AutoTune,
+}
+
+impl Notice {
+    /// Create an auto-tune notice for environment-based configuration adjustments
+    pub fn auto_tune(category: &str, message: &str) -> Self {
+        Self {
+            level: NoticeLevel::AutoTune,
+            code: "AUTO_TUNE".to_string(),
+            category: category.to_string(),
+            message: message.to_string(),
+            caused_by: vec!["environment_probe".to_string()],
+        }
+    }
 }
 
 impl fmt::Display for Notice {
@@ -53,6 +70,7 @@ impl fmt::Display for Notice {
             NoticeLevel::Warning => "⚠️ ",
             NoticeLevel::Optimization => "🚀",
             NoticeLevel::Safety => "🛡️ ",
+            NoticeLevel::AutoTune => "🔧",
         };
         write!(f, "{} {}: {}", icon, self.category, self.message)
     }
@@ -60,9 +78,36 @@ impl fmt::Display for Notice {
 
 impl Guidance {
     /// Runs pre-flight checks to sanitize and optimize the configuration.
-    pub fn plan(mut config: CopyConfig) -> Result<FlightPlan> {
+    /// This version does not perform active environment probing.
+    pub fn plan(config: CopyConfig) -> Result<FlightPlan> {
+        Self::plan_with_probe(config, None)
+    }
+
+    /// Runs pre-flight checks with optional active environment probing.
+    /// When dest_path is provided, the system will probe the environment and auto-tune settings.
+    pub fn plan_with_probe(mut config: CopyConfig, dest_path: Option<&Path>) -> Result<FlightPlan> {
         let mut notices = Vec::new();
         let sys_caps = ZeroCopyCapabilities::detect();
+
+        // =================================================================================
+        // PHASE 4: ACTIVE PROBE (if destination path provided)
+        // =================================================================================
+        let profile = if let Some(path) = dest_path {
+            match Probe::scan(path) {
+                Ok(p) => Some(p),
+                Err(e) => {
+                    tracing::debug!("Failed to probe environment: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Apply active guidance rules if we have a profile
+        if let Some(ref prof) = profile {
+            Self::apply_active_guidance(&mut config, prof, &mut notices);
+        }
 
         // =================================================================================
         // RULE 1: Hardware Reality (Zero-Copy Support)
@@ -259,6 +304,113 @@ impl Guidance {
             notices,
         })
     }
+
+    /// Apply active guidance rules based on system profile (Phase 4)
+    fn apply_active_guidance(
+        config: &mut CopyConfig,
+        profile: &SystemProfile,
+        notices: &mut Vec<Notice>,
+    ) {
+        // =================================================================================
+        // ACTIVE RULE 1: Network Share Auto-Tuning
+        // =================================================================================
+        if matches!(
+            profile.dest_filesystem_type,
+            FileSystemType::SMB | FileSystemType::NFS
+        ) {
+            if !config.resume_enabled {
+                config.resume_enabled = true;
+                notices.push(Notice::auto_tune(
+                    "Network",
+                    &format!(
+                        "Detected {} destination. Enabling resume capability for reliability.",
+                        if matches!(profile.dest_filesystem_type, FileSystemType::SMB) {
+                            "SMB"
+                        } else {
+                            "NFS"
+                        }
+                    ),
+                ));
+            }
+
+            // Increase retry attempts for network filesystems
+            if config.retry_attempts < 5 {
+                config.retry_attempts = 5;
+                notices.push(Notice::auto_tune(
+                    "Network",
+                    "Increased retry attempts to 5 for network filesystem reliability.",
+                ));
+            }
+        }
+
+        // =================================================================================
+        // ACTIVE RULE 2: CPU-Rich / IO-Poor Optimization
+        // =================================================================================
+        // If we have abundant CPU (>= 8 cores) but slow I/O (< 50 MB/s),
+        // compression becomes essentially "free" - trading spare CPU for throughput
+        if profile.logical_cores >= 8
+            && profile.estimated_io_throughput < 50.0
+            && matches!(config.compression, CompressionType::None)
+        {
+            config.compression = CompressionType::Zstd { level: 3 };
+            notices.push(Notice::auto_tune(
+                "Performance",
+                &format!(
+                    "Detected slow I/O ({:.1} MB/s) with {} CPU cores. Enabling Zstd:3 compression to trade CPU for throughput.",
+                    profile.estimated_io_throughput,
+                    profile.logical_cores
+                )
+            ));
+        }
+
+        // =================================================================================
+        // ACTIVE RULE 3: Low Memory Warning
+        // =================================================================================
+        // Warn if available memory is very low (< 512 MB)
+        if profile.available_ram_gb < 1 && config.parallel > 4 {
+            let old_parallel = config.parallel;
+            config.parallel = 2;
+            notices.push(Notice::auto_tune(
+                "Memory",
+                &format!(
+                    "Low available memory ({} GB). Reduced parallel operations from {} to 2.",
+                    profile.available_ram_gb, old_parallel
+                ),
+            ));
+        }
+
+        // =================================================================================
+        // ACTIVE RULE 4: Cloud Storage Optimization
+        // =================================================================================
+        if profile.dest_filesystem_type.is_cloud_storage() {
+            // Cloud storage benefits from compression due to network costs
+            if matches!(config.compression, CompressionType::None) {
+                config.compression = CompressionType::Zstd { level: 3 };
+                notices.push(Notice::auto_tune(
+                    "Cloud",
+                    "Detected cloud storage destination. Enabling compression to reduce network transfer."
+                ));
+            }
+
+            // Increase retry attempts for cloud reliability
+            if config.retry_attempts < 10 {
+                config.retry_attempts = 10;
+                notices.push(Notice::auto_tune(
+                    "Cloud",
+                    "Increased retry attempts to 10 for cloud storage reliability.",
+                ));
+            }
+
+            // Enable exponential backoff for cloud services
+            if !config.exponential_backoff {
+                config.exponential_backoff = true;
+                notices.push(Notice::auto_tune(
+                    "Cloud",
+                    "Enabled exponential backoff for cloud API rate limiting.",
+                ));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -274,11 +426,11 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         // Resume must be disabled to prevent corruption
-        assert_eq!(plan.final_config.resume_enabled, false);
+        assert!(!plan.final_config.resume_enabled);
         assert!(plan
             .notices
             .iter()
-            .any(|n| n.category == "Safety".to_string()));
+            .any(|n| n.category == "Safety"));
     }
 
     #[test]
@@ -290,11 +442,11 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         // Zero-copy must be disabled to allow streaming hash
-        assert_eq!(plan.final_config.use_zero_copy, false);
+        assert!(!plan.final_config.use_zero_copy);
         assert!(plan
             .notices
             .iter()
-            .any(|n| n.category == "Strategy".to_string()));
+            .any(|n| n.category == "Strategy"));
     }
 
     #[test]
@@ -306,11 +458,11 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         // Checksum verification must be disabled on resume
-        assert_eq!(plan.final_config.verify_checksum, false);
+        assert!(!plan.final_config.verify_checksum);
         assert!(plan
             .notices
             .iter()
-            .any(|n| n.category == "Integrity".to_string()));
+            .any(|n| n.category == "Integrity"));
     }
 
     #[test]
@@ -322,11 +474,11 @@ mod tests {
 
         let plan = Guidance::plan(config).unwrap();
 
-        assert_eq!(plan.final_config.use_zero_copy, false);
+        assert!(!plan.final_config.use_zero_copy);
         assert!(plan
             .notices
             .iter()
-            .any(|n| n.category == "Visibility".to_string()));
+            .any(|n| n.category == "Visibility"));
     }
 
     #[test]
@@ -338,11 +490,11 @@ mod tests {
 
         let plan = Guidance::plan(config).unwrap();
 
-        assert_eq!(plan.final_config.use_zero_copy, false);
+        assert!(!plan.final_config.use_zero_copy);
         assert!(plan
             .notices
             .iter()
-            .any(|n| n.category == "Logic".to_string()));
+            .any(|n| n.category == "Logic"));
     }
 
     #[test]
@@ -371,7 +523,7 @@ mod tests {
 
         let plan = Guidance::plan(config).unwrap();
 
-        assert!(plan.notices.iter().any(|n| n.category == "UX".to_string()));
+        assert!(plan.notices.iter().any(|n| n.category == "UX"));
     }
 
     #[test]
@@ -386,7 +538,7 @@ mod tests {
         assert!(plan
             .notices
             .iter()
-            .any(|n| n.category == "Performance".to_string()));
+            .any(|n| n.category == "Performance"));
     }
 
     #[test]
@@ -415,9 +567,9 @@ mod tests {
         assert!(plan.notices.len() >= 2);
 
         // Resume should be disabled due to compression
-        assert_eq!(plan.final_config.resume_enabled, false);
+        assert!(!plan.final_config.resume_enabled);
         // Zero-copy should be disabled
-        assert_eq!(plan.final_config.use_zero_copy, false);
+        assert!(!plan.final_config.use_zero_copy);
     }
 
     #[test]
@@ -446,7 +598,7 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         // Zero-copy must be disabled because compression requires userspace buffering
-        assert_eq!(plan.final_config.use_zero_copy, false);
+        assert!(!plan.final_config.use_zero_copy);
         assert_eq!(plan.final_config.compression, CompressionType::Lz4);
 
         // Verify the notice

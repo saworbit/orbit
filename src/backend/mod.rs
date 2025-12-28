@@ -488,7 +488,7 @@ mod tests {
     #[test]
     fn test_module_compiles() {
         // Basic test to ensure module compiles
-        assert!(true);
+        // Test passing means compilation succeeded
     }
 
     /// Smoke test: Verify LocalBackend is available with default features

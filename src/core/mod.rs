@@ -19,10 +19,12 @@ pub mod metadata;
 pub mod metadata_ops; // Metadata preservation orchestration
 #[cfg(feature = "backend-abstraction")]
 pub mod neutrino; // Neutrino Fast Lane for small file optimization
+pub mod probe; // Phase 4: Active system probing for environment detection
 pub mod progress;
 pub mod resilient_sync; // Crash-proof sync with Magnetar integration
 pub mod resume;
 pub mod retry;
+pub mod terminology; // Phase 3: User-facing terminology abstraction
 pub mod transfer;
 pub mod transform; // Metadata and path transformation
 pub mod v2_integration; // V2 Architecture integration (CDC + Semantic + Universe Map)

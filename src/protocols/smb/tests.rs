@@ -4,7 +4,7 @@
 //! Unit tests use mocks where possible.
 
 #[cfg(test)]
-mod tests {
+mod smb_impl_tests {
     use super::super::*;
 
     /// Create a test target with default values

@@ -232,6 +232,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Initialize Orbit configuration (interactive setup wizard)
+    Init,
+
     /// Show transfer statistics
     Stats,
 
@@ -596,8 +599,8 @@ fn main() -> Result<()> {
     });
     config.neutrino_threshold = cli.neutrino_threshold * 1024; // Convert KB to bytes
 
-    // 🚀 GUIDANCE PASS: Sanitize and Optimize
-    let flight_plan = Guidance::plan(config)?;
+    // 🚀 GUIDANCE PASS: Sanitize and Optimize (with Active Probing)
+    let flight_plan = Guidance::plan_with_probe(config, Some(&dest_path))?;
 
     // Display Intelligence to User
     if !flight_plan.notices.is_empty() {
@@ -627,6 +630,8 @@ fn main() -> Result<()> {
 
 fn handle_subcommand(command: Commands) -> Result<()> {
     match command {
+        Commands::Init => orbit::commands::init::run_init_wizard()
+            .map_err(|e| OrbitError::Other(format!("Initialization failed: {}", e))),
         Commands::Stats => {
             let stats = TransferStats::default();
             stats.print();

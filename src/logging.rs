@@ -18,6 +18,35 @@ use crate::error::{OrbitError, Result};
 // V3 Observability imports
 use orbit_observability::{AuditBridgeLayer, AuditSigner, UnifiedLogger};
 
+// ============================================================================
+// User-Facing Output Macros (Phase 3: Terminology Abstraction)
+// ============================================================================
+
+/// Macro for user-facing informational output
+/// This formats cleanly for CLI users without timestamps/log levels
+#[macro_export]
+macro_rules! orbit_info {
+    ($($arg:tt)*) => {
+        tracing::info!(target: "user_facing", $($arg)*)
+    }
+}
+
+/// Macro for user-facing warning output
+#[macro_export]
+macro_rules! orbit_warn {
+    ($($arg:tt)*) => {
+        tracing::warn!(target: "user_facing", $($arg)*)
+    }
+}
+
+/// Macro for user-facing error output
+#[macro_export]
+macro_rules! orbit_error {
+    ($($arg:tt)*) => {
+        tracing::error!(target: "user_facing", $($arg)*)
+    }
+}
+
 /// Initialize structured logging based on configuration
 pub fn init_logging(config: &CopyConfig) -> Result<()> {
     let log_level = if config.verbose {

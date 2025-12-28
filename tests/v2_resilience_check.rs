@@ -207,7 +207,7 @@ fn test_chunk_size_distribution() {
     // CDC chunk sizes vary based on content, so allow wide range
     // Target is 64KB, but accept anywhere from 4KB to 128KB
     assert!(
-        avg_size >= 4 * 1024 && avg_size <= 128 * 1024,
+        (4 * 1024..=128 * 1024).contains(&avg_size),
         "Average chunk size {} KB is outside acceptable range (4KB-128KB)",
         avg_size / 1024
     );
