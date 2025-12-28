@@ -353,10 +353,7 @@ mod tests {
     #[test]
     fn test_zero_copy_unsupported_detection() {
         assert!(OrbitError::ZeroCopyUnsupported.is_zero_copy_unsupported());
-        assert!(
-            !OrbitError::Io(io::Error::other("test"))
-                .is_zero_copy_unsupported()
-        );
+        assert!(!OrbitError::Io(io::Error::other("test")).is_zero_copy_unsupported());
     }
 
     #[test]

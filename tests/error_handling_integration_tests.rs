@@ -310,9 +310,7 @@ fn test_stats_tracking_with_failures() {
 
     // Second operation: fails with I/O error
     let result2 = orbit::core::retry::with_retry_and_stats(&config, Some(&stats_tracker), || {
-        Err(OrbitError::Io(std::io::Error::other(
-            "test",
-        )))
+        Err(OrbitError::Io(std::io::Error::other("test")))
     });
     assert!(result2.is_err());
 
@@ -401,9 +399,7 @@ fn test_stats_snapshot_formatting() {
     // Record some operations
     stats.record_success();
     stats.record_success();
-    stats.record_failure(&OrbitError::Io(std::io::Error::other(
-        "test",
-    )));
+    stats.record_failure(&OrbitError::Io(std::io::Error::other("test")));
     stats.record_retry(1);
     stats.record_retry(2);
     stats.record_skip();

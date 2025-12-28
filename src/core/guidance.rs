@@ -427,10 +427,7 @@ mod tests {
 
         // Resume must be disabled to prevent corruption
         assert!(!plan.final_config.resume_enabled);
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.category == "Safety"));
+        assert!(plan.notices.iter().any(|n| n.category == "Safety"));
     }
 
     #[test]
@@ -443,10 +440,7 @@ mod tests {
 
         // Zero-copy must be disabled to allow streaming hash
         assert!(!plan.final_config.use_zero_copy);
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.category == "Strategy"));
+        assert!(plan.notices.iter().any(|n| n.category == "Strategy"));
     }
 
     #[test]
@@ -459,10 +453,7 @@ mod tests {
 
         // Checksum verification must be disabled on resume
         assert!(!plan.final_config.verify_checksum);
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.category == "Integrity"));
+        assert!(plan.notices.iter().any(|n| n.category == "Integrity"));
     }
 
     #[test]
@@ -475,10 +466,7 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         assert!(!plan.final_config.use_zero_copy);
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.category == "Visibility"));
+        assert!(plan.notices.iter().any(|n| n.category == "Visibility"));
     }
 
     #[test]
@@ -491,10 +479,7 @@ mod tests {
         let plan = Guidance::plan(config).unwrap();
 
         assert!(!plan.final_config.use_zero_copy);
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.category == "Logic"));
+        assert!(plan.notices.iter().any(|n| n.category == "Logic"));
     }
 
     #[test]
@@ -535,10 +520,7 @@ mod tests {
 
         let plan = Guidance::plan(config).unwrap();
 
-        assert!(plan
-            .notices
-            .iter()
-            .any(|n| n.category == "Performance"));
+        assert!(plan.notices.iter().any(|n| n.category == "Performance"));
     }
 
     #[test]
