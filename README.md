@@ -5,6 +5,11 @@
 **The intelligent file transfer tool that never gives up** 💪
 
 [![CI](https://github.com/saworbit/orbit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/saworbit/orbit/actions/workflows/ci.yml)
+[![Security Audit](https://github.com/saworbit/orbit/actions/workflows/compliance.yml/badge.svg)](https://github.com/saworbit/orbit/actions/workflows/compliance.yml)
+[![codecov](https://codecov.io/gh/saworbit/orbit/branch/main/graph/badge.svg)](https://codecov.io/gh/saworbit/orbit)
+[![Release](https://img.shields.io/github/v/release/saworbit/orbit)](https://github.com/saworbit/orbit/releases)
+[![Rust](https://img.shields.io/badge/rust-1.70%2B-blue)](https://www.rust-lang.org)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue)](https://ghcr.io/saworbit/orbit)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![GitHub](https://img.shields.io/github/stars/saworbit/orbit?style=social)](https://github.com/saworbit/orbit)
 
