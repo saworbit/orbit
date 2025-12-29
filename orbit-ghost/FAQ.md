@@ -12,6 +12,55 @@ Answers to common questions about Orbit GhostFS.
 - [Security & Privacy](#security--privacy)
 - [Development](#development)
 
+## Phase 2 (v0.2.0+) Questions
+
+### How do I specify which job to mount?
+
+Use the `--job-id` argument (required in v0.2.0+):
+
+```bash
+orbit-ghost --job-id 1 --database magnetar.db
+```
+
+The job ID must exist in the Magnetar database with associated artifacts.
+
+### What database schema does GhostFS expect?
+
+GhostFS requires the Magnetar database schema with the `artifacts` table (added in migration `20250104000000`). Run all Magnetar migrations:
+
+```bash
+cd crates/magnetar
+sqlx migrate run --database-url sqlite:///path/to/db
+```
+
+### How do I seed test data?
+
+```bash
+sqlite3 test.db < crates/magnetar/migrations/*.sql
+sqlite3 test.db << EOF
+INSERT INTO jobs (source, destination) VALUES ('/test', '/dest');
+INSERT INTO artifacts (id, job_id, parent_id, name, size, is_dir) VALUES
+  ('root', 1, NULL, '', 0, 1),
+  ('demo_file', 1, 'root', 'test.txt', 1024, 0);
+EOF
+```
+
+### Can I mount multiple jobs simultaneously?
+
+Not in v0.2.0. Each GhostFS instance mounts one job. For multiple jobs, run multiple instances:
+
+```bash
+# Terminal 1: Mount job 1
+orbit-ghost --job-id 1 --mount-point /mnt/job1 --database magnetar.db
+
+# Terminal 2: Mount job 2
+orbit-ghost --job-id 2 --mount-point /mnt/job2 --database magnetar.db
+```
+
+### What happened to the demo file from v0.1.0?
+
+The hardcoded `visionary_demo.mp4` has been removed. All file metadata now comes from the Magnetar database. Populate the artifacts table with your data.
+
 ## General Questions
 
 ### What is Orbit GhostFS?

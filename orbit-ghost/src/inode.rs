@@ -36,3 +36,41 @@ impl GhostFile {
         }
     }
 }
+
+// New struct for database-backed entries (Phase 2)
+#[derive(Debug, Clone)]
+pub struct GhostEntry {
+    pub id: String, // Artifact ID from database
+    pub name: String,
+    pub size: u64,
+    pub is_dir: bool,
+    pub mtime: u64, // Unix timestamp
+}
+
+impl GhostEntry {
+    pub fn to_attr(&self, inode: u64) -> FileAttr {
+        use std::time::Duration;
+
+        FileAttr {
+            ino: inode,
+            size: self.size,
+            blocks: (self.size + 511) / 512,
+            atime: UNIX_EPOCH + Duration::from_secs(self.mtime),
+            mtime: UNIX_EPOCH + Duration::from_secs(self.mtime),
+            ctime: UNIX_EPOCH + Duration::from_secs(self.mtime),
+            crtime: UNIX_EPOCH + Duration::from_secs(self.mtime),
+            kind: if self.is_dir {
+                fuser::FileType::Directory
+            } else {
+                fuser::FileType::RegularFile
+            },
+            perm: if self.is_dir { 0o755 } else { 0o644 },
+            nlink: 1,
+            uid: 501,
+            gid: 20,
+            rdev: 0,
+            blksize: 512,
+            flags: 0,
+        }
+    }
+}

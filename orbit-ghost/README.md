@@ -21,10 +21,11 @@ Orbit GhostFS implements a "Process-while-Moving" paradigm, moving beyond tradit
 
 ### Architecture Components
 
-1. **Manifest Plane**: Loads file structure into memory for instant directory listings
-2. **Ghost Driver**: FUSE interface intercepting POSIX syscalls
-3. **Entangler**: Maps OS read requests to block IDs and manages priority queue
-4. **Wormhole Client**: Handles both sequential background fill and priority fetching
+1. **Metadata Oracle**: Database-backed metadata layer (Magnetar integration)
+2. **Inode Translator**: Bidirectional mapping between FUSE inodes and artifact IDs
+3. **Ghost Driver**: FUSE interface intercepting POSIX syscalls
+4. **Entangler**: Maps OS read requests to block IDs and manages priority queue
+5. **Wormhole Client**: Handles both sequential background fill and priority fetching
 
 ## Platform Support
 
@@ -73,38 +74,73 @@ FUSE is not natively supported. Windows implementation requires WinFSP (Windows 
 
 ## Usage
 
-### Running the Demo
+### Quick Start
 
-On Linux/macOS with FUSE installed:
+**Prerequisites:**
+- Magnetar database with migrations applied
+- Job ID to mount
 
+**Step 1: Seed test database**
 ```bash
-cd orbit-ghost
-chmod +x demo_quantum.sh
-./demo_quantum.sh
+# Create test database
+sqlite3 test.db < ../crates/magnetar/migrations/*.sql
+
+# Insert test job and artifacts
+sqlite3 test.db << EOF
+INSERT INTO jobs (source, destination) VALUES ('/test/source', '/test/dest');
+INSERT INTO artifacts (id, job_id, parent_id, name, size, is_dir) VALUES
+  ('root', 1, NULL, '', 0, 1),
+  ('file1', 1, 'root', 'demo.txt', 1024, 0),
+  ('dir1', 1, 'root', 'documents', 0, 1),
+  ('file2', 1, 'dir1', 'readme.md', 2048, 0);
+EOF
 ```
 
-This demonstrates:
-1. Mounting a ghost filesystem
-2. Projecting a 50MB virtual file
-3. Reading the last 10 bytes (triggering only the final block fetch)
-4. Measuring latency vs traditional full-file transfer
-
-### Manual Operation
-
+**Step 2: Run GhostFS**
 ```bash
-# Start the ghost filesystem
-RUST_LOG=info cargo run
+# Basic usage (required argument: --job-id)
+RUST_LOG=info cargo run -- --job-id 1 --database test.db
 
+# Custom mount point and cache directory
+cargo run -- --job-id 1 \
+             --database test.db \
+             --mount-point /mnt/orbit \
+             --cache-dir /var/cache/orbit
+
+# See all options
+cargo run -- --help
+```
+
+**Step 3: Access filesystem**
+```bash
 # In another terminal:
-ls /tmp/orbit_ghost_mount
-# Files appear instantly
+ls -la /tmp/orbit_ghost_mount
+# Files from database appear instantly
 
-# Read data (triggers on-demand fetch)
-cat /tmp/orbit_ghost_mount/visionary_demo.mp4
+# Read file (triggers on-demand block fetch)
+cat /tmp/orbit_ghost_mount/demo.txt
 
-# Unmount
+# Navigate directories
+cd /tmp/orbit_ghost_mount/documents
+cat readme.md
+
+# Unmount when done
 fusermount -u /tmp/orbit_ghost_mount  # Linux
 umount /tmp/orbit_ghost_mount         # macOS
+```
+
+### CLI Options
+
+```
+orbit-ghost --job-id <ID> [OPTIONS]
+
+Options:
+  -d, --database <PATH>      Path to Magnetar database [default: magnetar.db]
+  -j, --job-id <ID>          Job ID to mount (required)
+  -m, --mount-point <PATH>   Mount point directory [default: /tmp/orbit_ghost_mount]
+  -c, --cache-dir <PATH>     Cache directory for blocks [default: /tmp/orbit_cache]
+  -h, --help                 Print help
+  -V, --version              Print version
 ```
 
 ## Performance Characteristics
@@ -131,19 +167,24 @@ This module is designed to integrate with:
 
 ## Development Status
 
-**Current Implementation:**
+**Current Implementation (v0.2.0 - Phase 2):**
 - ✅ Core FUSE filesystem
 - ✅ Block-level entanglement logic
 - ✅ Priority queue signaling
 - ✅ Simulated wormhole transport
-- ✅ Demo script
+- ✅ **Database-backed metadata** (Magnetar integration)
+- ✅ **CLI argument parsing** (clap)
+- ✅ **Inode translation layer** (lazy allocation)
+- ✅ **Error handling** (errno mapping)
+- ✅ **Async/sync bridge** (tokio runtime handle)
 
-**Production Roadiness:**
-- ⚠️ Timeout/error handling needed
-- ⚠️ Real backend integration pending
-- ⚠️ Prefetching heuristics TODO
-- ⚠️ Windows support not implemented
-- ⚠️ Production block bitmap (RoaringBitmap) not implemented
+**Next Steps (v0.3.0):**
+- ⚠️ Replace polling with Condvar::wait()
+- ⚠️ Real Orbit backend integration
+- ⚠️ Timeout/retry for database queries
+- ⚠️ Prefetching heuristics
+- ⚠️ Cache eviction policy (LRU)
+- ⚠️ Windows support (WinFSP)
 
 ## Technical Details
 
@@ -183,20 +224,50 @@ Read from cache and return data
 
 ## Configuration
 
-Key constants in [src/fs.rs](src/fs.rs):
+### Block Size
+
+Configured in [src/fs.rs](src/fs.rs:11):
 
 ```rust
 const BLOCK_SIZE: u64 = 1024 * 1024; // 1MB
 ```
 
-Key constants in [src/main.rs](src/main.rs):
+**Recommendation:** Increase to 5-16MB for production to align with cloud object storage chunk sizes.
 
-```rust
-const MOUNT_POINT: &str = "/tmp/orbit_ghost_mount";
-const CACHE_DIR: &str = "/tmp/orbit_cache";
+### Runtime Configuration
+
+All configuration is now via CLI arguments (no hardcoded constants):
+
+```bash
+orbit-ghost \
+  --job-id 1 \
+  --database /path/to/magnetar.db \
+  --mount-point /custom/mount \
+  --cache-dir /custom/cache
 ```
 
-Adjust these based on your deployment requirements.
+### Future Configuration (v0.3.0)
+
+Configuration file support planned:
+
+```toml
+# orbit-ghost.toml
+[database]
+path = "magnetar.db"
+
+[mount]
+point = "/mnt/orbit"
+cache_dir = "/var/cache/orbit"
+
+[performance]
+block_size = 5242880  # 5MB
+prefetch_count = 3
+cache_limit = 107374182400  # 100GB
+
+[timeouts]
+db_query = 5000  # 5s
+block_fetch = 30000  # 30s
+```
 
 ## Troubleshooting
 

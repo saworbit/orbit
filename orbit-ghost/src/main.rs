@@ -1,87 +1,125 @@
+mod adapter;
+mod config;
 mod entangler;
+mod error;
 mod fs;
 mod inode;
+mod oracle;
+mod translator;
 
-use crate::entangler::{BlockRequest, Entangler};
-use crate::fs::OrbitGhostFS;
-use crate::inode::GhostFile;
+use adapter::MagnetarAdapter;
+use clap::Parser;
 use crossbeam_channel::unbounded;
-use dashmap::DashMap;
+use entangler::{BlockRequest, Entangler};
+use fs::OrbitGhostFS;
 use std::sync::Arc;
 use std::thread;
+use translator::InodeTranslator;
 
-const MOUNT_POINT: &str = "/tmp/orbit_ghost_mount";
-const CACHE_DIR: &str = "/tmp/orbit_cache";
+#[derive(Parser)]
+#[clap(
+    name = "orbit-ghost",
+    about = "FUSE filesystem with on-demand block fetching from Magnetar database"
+)]
+struct Cli {
+    /// Path to Magnetar database
+    #[clap(short, long, default_value = "magnetar.db")]
+    database: String,
 
-fn main() {
+    /// Job ID to mount
+    #[clap(short, long)]
+    job_id: i64,
+
+    /// Mount point directory
+    #[clap(short, long, default_value = "/tmp/orbit_ghost_mount")]
+    mount_point: String,
+
+    /// Cache directory for downloaded blocks
+    #[clap(short, long, default_value = "/tmp/orbit_cache")]
+    cache_dir: String,
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     env_logger::init();
+    let args = Cli::parse();
+
+    log::info!("Orbit GhostFS Phase 2 - Materialization Layer");
+    log::info!("Database: {}", args.database);
+    log::info!("Job ID: {}", args.job_id);
 
     // 1. Setup Environment
-    let _ = std::fs::remove_dir_all(MOUNT_POINT);
-    let _ = std::fs::create_dir_all(MOUNT_POINT);
-    let _ = std::fs::create_dir_all(CACHE_DIR);
+    let _ = std::fs::remove_dir_all(&args.mount_point);
+    std::fs::create_dir_all(&args.mount_point)?;
+    std::fs::create_dir_all(&args.cache_dir)?;
 
-    // 2. Load Manifest (Simulated)
-    let inodes = Arc::new(DashMap::new());
-    inodes.insert(
-        2,
-        GhostFile {
-            name: "visionary_demo.mp4".to_string(),
-            size: 50 * 1024 * 1024, // 50MB
-            orbit_id: "file_123".to_string(),
-            is_dir: false,
-            blocks_present: vec![],
-        },
-    );
+    // 2. Initialize Magnetar Adapter
+    log::info!("Connecting to Magnetar database...");
+    let adapter = MagnetarAdapter::new(&args.database, args.job_id).await?;
 
-    // 3. Setup Channels
+    // Verify root artifact exists
+    let root_id = adapter.get_root_id().await?;
+    log::info!("Root artifact ID: {}", root_id);
+
+    // 3. Create InodeTranslator
+    let translator = Arc::new(InodeTranslator::new());
+
+    // 4. Setup Channels for Entangler
     let (priority_tx, priority_rx) = unbounded::<BlockRequest>();
     let entangler = Arc::new(Entangler::new(priority_tx));
 
-    // 4. Start the Wormhole Transport (Background Thread)
+    // 5. Start the Wormhole Transport (Background Thread)
+    let cache_dir_clone = args.cache_dir.clone();
     thread::spawn(move || {
-        println!("[Wormhole] Transport Layer Active.");
+        log::info!("Wormhole transport layer active");
 
         loop {
             // LISTEN for High Priority first (Quantum Mode)
             if let Ok(req) = priority_rx.recv() {
-                println!(
-                    "[Wormhole] ⚡ Intercepted PRIORITY request for Block {}",
-                    req.block_index
+                log::debug!(
+                    "Priority request for block {} of file {}",
+                    req.block_index,
+                    req.file_id
                 );
 
                 // Simulate Network Latency
                 thread::sleep(std::time::Duration::from_millis(500));
 
                 // Generate Fake Data (Simulate Download)
-                let path = format!("{}/{}_{}.bin", CACHE_DIR, req.file_id, req.block_index);
-                let data = vec![0u8; 1024 * 1024]; // 1MB dummy data
-                std::fs::write(path, data).unwrap();
-
-                println!(
-                    "[Wormhole] ✅ Block {} Downloaded & Cached.",
-                    req.block_index
+                let path = format!(
+                    "{}/{}_{}.bin",
+                    cache_dir_clone, req.file_id, req.block_index
                 );
+                let data = vec![0u8; 1024 * 1024]; // 1MB dummy data
+                if let Err(e) = std::fs::write(&path, data) {
+                    log::error!("Failed to write block {}: {}", req.block_index, e);
+                } else {
+                    log::debug!("Block {} downloaded & cached", req.block_index);
+                }
             }
         }
     });
 
-    // 5. Mount FUSE
-    let fs = OrbitGhostFS {
-        inodes,
-        entangler,
-        cache_path: CACHE_DIR.to_string(),
-    };
+    // 6. Get runtime handle BEFORE blocking on FUSE mount
+    let handle = tokio::runtime::Handle::current();
 
-    println!(
-        "[Orbit] 🌌 Projecting Holographic Filesystem at {}",
-        MOUNT_POINT
+    // 7. Create Filesystem
+    let fs = OrbitGhostFS::new(
+        Arc::new(adapter),
+        translator,
+        entangler,
+        handle,
+        args.cache_dir.clone(),
     );
+
+    // 8. Mount FUSE (blocks forever)
+    log::info!("Mounting filesystem at {}", args.mount_point);
     let options = vec![
         fuser::MountOption::RO,
         fuser::MountOption::FSName("orbit_ghost".to_string()),
         fuser::MountOption::AutoUnmount,
     ];
 
-    fuser::mount2(fs, MOUNT_POINT, &options).unwrap();
+    fuser::mount2(fs, &args.mount_point, &options)?;
+    Ok(())
 }

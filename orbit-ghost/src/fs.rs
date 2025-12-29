@@ -1,6 +1,7 @@
 use crate::entangler::Entangler;
-use crate::inode::GhostFile;
-use dashmap::DashMap;
+use crate::error::GhostError;
+use crate::oracle::MetadataOracle;
+use crate::translator::InodeTranslator;
 use fuser::{Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEntry, Request};
 use std::ffi::OsStr;
 use std::io::Read;
@@ -8,61 +9,186 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const BLOCK_SIZE: u64 = 1024 * 1024; // 1MB Blocks for simplicity
+const TTL: Duration = Duration::from_secs(1); // Attribute TTL
 
 pub struct OrbitGhostFS {
-    pub inodes: Arc<DashMap<u64, GhostFile>>,
-    pub entangler: Arc<Entangler>,
-    pub cache_path: String,
+    oracle: Arc<dyn MetadataOracle>,
+    translator: Arc<InodeTranslator>,
+    entangler: Arc<Entangler>,
+    runtime_handle: tokio::runtime::Handle,
+    cache_path: String,
+}
+
+impl OrbitGhostFS {
+    pub fn new(
+        oracle: Arc<dyn MetadataOracle>,
+        translator: Arc<InodeTranslator>,
+        entangler: Arc<Entangler>,
+        runtime_handle: tokio::runtime::Handle,
+        cache_path: String,
+    ) -> Self {
+        Self {
+            oracle,
+            translator,
+            entangler,
+            runtime_handle,
+            cache_path,
+        }
+    }
+
+    /// Helper to run async queries synchronously (blocking bridge)
+    fn block_on<F, T>(&self, future: F) -> Result<T, i32>
+    where
+        F: std::future::Future<Output = Result<T, GhostError>>,
+    {
+        self.runtime_handle.block_on(future).map_err(|e| {
+            log::error!("Query failed: {}", e);
+            e.to_errno()
+        })
+    }
 }
 
 impl Filesystem for OrbitGhostFS {
-    fn lookup(&mut self, _req: &Request, _parent: u64, name: &OsStr, reply: ReplyEntry) {
-        // Scan dashmap for parent + name. Ideally use a BTree for hierarchy.
-        // Simplified: Just returning a hardcoded match for demo.
-        let name_str = name.to_str().unwrap();
-
-        for r in self.inodes.iter() {
-            if r.value().name == name_str {
-                reply.entry(&Duration::new(1, 0), &r.value().to_attr(*r.key()), 0);
+    fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
+        let name_str = match name.to_str() {
+            Some(n) => n,
+            None => {
+                reply.error(libc::EINVAL);
                 return;
-            }
-        }
-        reply.error(libc::ENOENT);
+            },
+        };
+
+        // Translate parent inode to artifact ID
+        let parent_id = match self.translator.to_artifact_id(parent) {
+            Ok(id) => id,
+            Err(e) => {
+                reply.error(e.to_errno());
+                return;
+            },
+        };
+
+        // Query database for child
+        let entry = match self.block_on(self.oracle.lookup(&parent_id, name_str)) {
+            Ok(Some(e)) => e,
+            Ok(None) => {
+                reply.error(libc::ENOENT);
+                return;
+            },
+            Err(errno) => {
+                reply.error(errno);
+                return;
+            },
+        };
+
+        // Allocate inode for child
+        let inode = self.translator.get_or_allocate(&entry.id);
+
+        log::debug!("lookup({}, {}) -> inode {}", parent, name_str, inode);
+        reply.entry(&TTL, &entry.to_attr(inode), 0);
     }
 
     fn getattr(&mut self, _req: &Request, ino: u64, reply: ReplyAttr) {
-        match self.inodes.get(&ino) {
-            Some(f) => reply.attr(&Duration::new(1, 0), &f.to_attr(ino)),
-            None => reply.error(libc::ENOENT),
+        // Special case: root directory
+        if ino == 1 {
+            let attr = fuser::FileAttr {
+                ino: 1,
+                size: 0,
+                blocks: 0,
+                atime: std::time::UNIX_EPOCH,
+                mtime: std::time::UNIX_EPOCH,
+                ctime: std::time::UNIX_EPOCH,
+                crtime: std::time::UNIX_EPOCH,
+                kind: fuser::FileType::Directory,
+                perm: 0o755,
+                nlink: 2,
+                uid: 501,
+                gid: 20,
+                rdev: 0,
+                blksize: 512,
+                flags: 0,
+            };
+            reply.attr(&TTL, &attr);
+            return;
         }
+
+        // Translate inode to artifact ID
+        let artifact_id = match self.translator.to_artifact_id(ino) {
+            Ok(id) => id,
+            Err(e) => {
+                reply.error(e.to_errno());
+                return;
+            },
+        };
+
+        // Query database for attributes
+        let entry = match self.block_on(self.oracle.getattr(&artifact_id)) {
+            Ok(e) => e,
+            Err(errno) => {
+                reply.error(errno);
+                return;
+            },
+        };
+
+        log::debug!("getattr({}) -> {}", ino, entry.name);
+        reply.attr(&TTL, &entry.to_attr(ino));
     }
 
     fn readdir(
         &mut self,
         _req: &Request,
-        _ino: u64,
+        ino: u64,
         _fh: u64,
         offset: i64,
         mut reply: ReplyDirectory,
     ) {
-        // In standard FUSE, offset 0 is "start".
-        if offset == 0 {
-            reply.add(1, 0, fuser::FileType::Directory, ".");
-            reply.add(1, 1, fuser::FileType::Directory, "..");
+        if offset > 0 {
+            reply.ok();
+            return;
+        }
 
-            for r in self.inodes.iter() {
-                if *r.key() != 1 {
-                    // Skip root
-                    let kind = if r.value().is_dir {
-                        fuser::FileType::Directory
-                    } else {
-                        fuser::FileType::RegularFile
-                    };
-                    // The magic: users see files instantly because we fake this list from the Manifest
-                    reply.add(*r.key(), offset + 2, kind, &r.value().name);
-                }
+        // Add . and ..
+        if reply.add(ino, 0, fuser::FileType::Directory, ".") {
+            reply.ok();
+            return;
+        }
+        if reply.add(ino, 1, fuser::FileType::Directory, "..") {
+            reply.ok();
+            return;
+        }
+
+        // Translate inode to artifact ID
+        let artifact_id = match self.translator.to_artifact_id(ino) {
+            Ok(id) => id,
+            Err(e) => {
+                reply.error(e.to_errno());
+                return;
+            },
+        };
+
+        // Query database for children
+        let entries = match self.block_on(self.oracle.readdir(&artifact_id)) {
+            Ok(e) => e,
+            Err(errno) => {
+                reply.error(errno);
+                return;
+            },
+        };
+
+        log::debug!("readdir({}) -> {} entries", ino, entries.len());
+
+        for (idx, entry) in entries.iter().enumerate() {
+            let child_inode = self.translator.get_or_allocate(&entry.id);
+            let kind = if entry.is_dir {
+                fuser::FileType::Directory
+            } else {
+                fuser::FileType::RegularFile
+            };
+
+            if reply.add(child_inode, (idx + 2) as i64, kind, &entry.name) {
+                break;
             }
         }
+
         reply.ok();
     }
 
@@ -77,12 +203,14 @@ impl Filesystem for OrbitGhostFS {
         _lock: Option<u64>,
         reply: ReplyData,
     ) {
-        let inode_entry = self.inodes.get(&ino);
-        if inode_entry.is_none() {
-            reply.error(libc::ENOENT);
-            return;
-        }
-        let file_info = inode_entry.unwrap();
+        // Translate inode to artifact ID
+        let artifact_id = match self.translator.to_artifact_id(ino) {
+            Ok(id) => id,
+            Err(e) => {
+                reply.error(e.to_errno());
+                return;
+            },
+        };
 
         // 1. Calculate Block ID
         let start_block = offset as u64 / BLOCK_SIZE;
@@ -96,13 +224,10 @@ impl Filesystem for OrbitGhostFS {
             // If this call blocks, the application (e.g., Video Player) waits.
             // Behind the scenes, we are downloading at max speed.
             self.entangler
-                .ensure_block_available(&file_info.orbit_id, block_idx);
+                .ensure_block_available(&artifact_id, block_idx);
 
-            // 4. Read from Cache (Simulated)
-            let path = format!(
-                "{}/{}_{}.bin",
-                self.cache_path, file_info.orbit_id, block_idx
-            );
+            // 4. Read from Cache
+            let path = format!("{}/{}_{}.bin", self.cache_path, artifact_id, block_idx);
             if let Ok(mut f) = std::fs::File::open(&path) {
                 let mut buffer = Vec::new();
                 f.read_to_end(&mut buffer).unwrap();

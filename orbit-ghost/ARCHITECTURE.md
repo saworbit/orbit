@@ -32,10 +32,36 @@ User-initiated reads preempt background sequential transfers, ensuring responsiv
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                Ghost Driver (FUSE Handler)                   │
-│  - lookup()    : Manifest-based file resolution             │
-│  - getattr()   : Metadata without network I/O               │
-│  - readdir()   : Instant directory listing                  │
+│  - lookup()    : Database-backed file resolution (Phase 2)  │
+│  - getattr()   : Metadata from Magnetar DB                  │
+│  - readdir()   : Database query with lazy inode allocation  │
 │  - read()      : Triggers block entanglement                │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Materialization Layer (Phase 2)                 │
+│  ┌──────────────────────────────────────────────┐           │
+│  │  MetadataOracle (trait abstraction)          │           │
+│  │  - get_root_id()   : Root artifact lookup    │           │
+│  │  - lookup()        : Child name resolution   │           │
+│  │  - readdir()       : Directory listing       │           │
+│  │  - getattr()       : Attribute retrieval     │           │
+│  └──────────────────┬───────────────────────────┘           │
+│                     │                                        │
+│  ┌──────────────────▼───────────────────────────┐           │
+│  │  MagnetarAdapter (SQLite queries)            │           │
+│  │  - Job-based filtering for multi-tenancy     │           │
+│  │  - Indexed queries (parent_id, name)         │           │
+│  │  - Async/sync bridge via runtime handle      │           │
+│  └──────────────────┬───────────────────────────┘           │
+│                     │                                        │
+│  ┌──────────────────▼───────────────────────────┐           │
+│  │  InodeTranslator (u64 ↔ artifact_id)         │           │
+│  │  - Lazy inode allocation (DashMap)           │           │
+│  │  - Bidirectional mapping for consistency     │           │
+│  │  - Root inode (1) pre-allocated              │           │
+│  └──────────────────────────────────────────────┘           │
 └─────────────────────┬───────────────────────────────────────┘
                       │
                       ▼

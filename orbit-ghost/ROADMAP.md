@@ -122,17 +122,39 @@ Transform remote data access from a "store-then-process" to a "process-while-mov
 
 ---
 
-### Phase 2: Orbit Ecosystem Integration (v0.3.0 - Target: Q3 2024)
+### Phase 2: Orbit Ecosystem Integration "The Tethering" ✅ (v0.2.0 - Complete: 2025-01-04)
 
-**Goal:** Integrate with Orbit backend infrastructure for real-world usage.
+**Goal:** Integrate with Magnetar database for real metadata instead of hardcoded demo files.
 
-#### 2.1 Magnetar Integration
+**Status:** Complete
 
-- [ ] Load manifest from Magnetar catalog
-  - **Replace:** Hardcoded `GhostFile` with real manifest parsing
-  - **Format:** JSON/Protobuf from Magnetar API
-  - **Effort:** 5 days
-  - **Priority:** High
+**Achievements:**
+- ✅ Magnetar adapter with MetadataOracle trait
+- ✅ SQLite integration for artifact metadata
+- ✅ Database migration for artifacts table
+- ✅ Inode translation layer (lazy allocation)
+- ✅ CLI argument parsing (clap)
+- ✅ Async/sync bridge (tokio runtime handle)
+- ✅ Error handling with errno mapping
+- ✅ Job-based filtering for multi-tenancy
+- ✅ Indexed database queries for performance
+
+#### 2.1 Magnetar Integration ✅
+
+- [x] Load manifest from Magnetar database
+  - **Replaced:** Hardcoded `GhostFile` with database queries
+  - **Implementation:** MagnetarAdapter + MetadataOracle trait
+  - **Completed:** 2025-01-04
+
+- [x] Support directory hierarchies
+  - **Implementation:** Parent-child relationships in artifacts table
+  - **Completed:** 2025-01-04
+
+- [x] CLI argument support
+  - **Implementation:** clap-based CLI with --job-id, --database, etc.
+  - **Completed:** 2025-01-04
+
+#### 2.2 Remaining Integration Tasks (moved to v0.3.0)
 
 - [ ] Respect access control policies
   - **Behavior:** Enforce user permissions from manifest
@@ -184,9 +206,50 @@ Transform remote data access from a "store-then-process" to a "process-while-mov
 
 **Release Date:** Q3 2024
 
+**Milestone Deliverables:**
+- ✅ Database-backed metadata (no hardcoded files)
+- ✅ CLI interface with arguments
+- ✅ Job-based multi-tenancy support
+- ✅ Lazy inode allocation (scalable to 1M+ files)
+
+**Release Date:** ✅ 2025-01-04 (v0.2.0 Complete)
+
 ---
 
-### Phase 3: Advanced Features (v0.4.0 - Target: Q4 2024)
+### Phase 3: Backend Protocol Integration (v0.3.0 - Target: Q2 2025)
+
+**Goal:** Replace simulated wormhole with real Orbit backend.
+
+#### 3.1 Production Hardening (from Phase 1)
+
+- [ ] Replace polling with Condvar::wait()
+  - **Benefit:** Eliminate CPU spinning
+  - **Effort:** 2-3 days
+  - **Priority:** High
+
+- [ ] Add configurable database query timeouts
+  - **Behavior:** Return ETIMEDOUT after configurable duration
+  - **Effort:** 2 days
+  - **Priority:** High
+
+- [ ] Thread pool for parallel downloads
+  - **Target:** 4-16 threads
+  - **Benefit:** 10x faster concurrent reads
+  - **Effort:** 5 days
+  - **Priority:** High
+
+- [ ] LRU cache eviction policy
+  - **Behavior:** Maintain cache under size limit
+  - **Effort:** 3 days
+  - **Priority:** High
+
+- [ ] Configuration file support (orbit-ghost.toml)
+  - **Effort:** 3 days
+  - **Priority:** Medium
+
+---
+
+### Phase 4: Advanced Features (v0.4.0 - Target: Q4 2025)
 
 **Goal:** Add intelligent features that anticipate user needs.
 
@@ -436,12 +499,12 @@ We welcome community input on priorities and feature requests.
 
 | Version | Target Date | Focus |
 |---------|-------------|-------|
-| v0.1.0 | ✅ Complete | Proof of concept |
-| v0.2.0 | Q2 2024 | Production hardening |
-| v0.3.0 | Q3 2024 | Orbit integration |
-| v0.4.0 | Q4 2024 | Advanced features |
-| v0.5.0 | Q1 2025 | Platform expansion |
-| v1.0.0 | Q2 2025 | Enterprise launch |
+| v0.1.0 | ✅ 2024-12-29 | Proof of concept |
+| v0.2.0 | ✅ 2025-01-04 | Magnetar integration (The Tethering) |
+| v0.3.0 | Q2 2025 | Backend protocol + Production hardening |
+| v0.4.0 | Q4 2025 | Advanced features |
+| v0.5.0 | Q1 2026 | Platform expansion |
+| v1.0.0 | Q2 2026 | Enterprise launch |
 
 **Note:** Dates are targets and may shift based on complexity and contributor availability.
 

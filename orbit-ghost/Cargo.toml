@@ -27,6 +27,13 @@ dashmap = "5.5"            # Concurrent HashMap for Inode tracking
 crossbeam-channel = "0.5"  # High-perf channels for priority signaling
 parking_lot = "0.12"       # Low-latency mutexes
 
+# Phase 2 dependencies - Materialization Layer
+sqlx = { version = "0.8.1", default-features = false, features = ["runtime-tokio", "sqlite"] }
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2.0"
+clap = { version = "4", features = ["derive"] }
+
 [dev-dependencies]
 tempfile = "3.10"
 criterion = "0.8"

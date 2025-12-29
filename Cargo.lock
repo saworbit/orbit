@@ -4640,6 +4640,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_fs",
+ "async-trait",
+ "clap",
  "criterion",
  "crossbeam-channel",
  "dashmap 5.5.3",
@@ -4651,8 +4653,11 @@ dependencies = [
  "predicates",
  "serde",
  "serde_json",
+ "sqlx",
  "tempfile",
+ "thiserror 2.0.17",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

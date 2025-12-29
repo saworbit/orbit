@@ -6,6 +6,30 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+#### Orbit GhostFS v0.2.0 - "The Tethering" (2025-01-04)
+- **Materialization Layer**: Database-backed metadata from Magnetar
+  - MetadataOracle trait abstraction for metadata backends
+  - MagnetarAdapter with SQLite integration
+  - InodeTranslator for lazy inode allocation
+  - Artifacts table migration for file hierarchy
+- **CLI Interface**: Command-line argument parsing
+  - Required `--job-id` argument for job selection
+  - Optional `--database`, `--mount-point`, `--cache-dir` flags
+- **Error Handling**: Structured error types with errno mapping
+- **Async/Sync Bridge**: Tokio runtime handle integration
+- See [orbit-ghost/CHANGELOG.md](orbit-ghost/CHANGELOG.md) for full details
+
+### Changed
+
+#### Orbit GhostFS v0.2.0
+- **Breaking:** Removed hardcoded demo file - requires Magnetar database
+- **Breaking:** CLI now requires `--job-id` argument
+- **Architecture:** Complete rewrite of FUSE callbacks for database queries
+- Updated fuser to 0.16
+- See [orbit-ghost/CHANGELOG.md](orbit-ghost/CHANGELOG.md#020---2025-01-04) for migration guide
+
+### Added (Pre-Phase 2)
+
 #### Orbit GhostFS - v0.1.0 (2024-12-29)
 
 **FUSE-based on-demand filesystem with quantum entanglement (JIT block fetching)**
