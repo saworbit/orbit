@@ -76,7 +76,7 @@ jobs:
         cache-dependency-path: dashboard/package-lock.json
 
     - name: Cache cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/registry
@@ -87,7 +87,7 @@ jobs:
           ${{ runner.os }}-e2e-cargo-
 
     - name: Cache node modules
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: dashboard/node_modules
         key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
@@ -152,7 +152,7 @@ jobs:
         cache-dependency-path: dashboard/package-lock.json
 
     - name: Cache cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/registry
@@ -163,7 +163,7 @@ jobs:
           ${{ runner.os }}-e2e-cargo-
 
     - name: Cache node modules
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: dashboard/node_modules
         key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
@@ -222,7 +222,7 @@ jobs:
         cache-dependency-path: dashboard/package-lock.json
 
     - name: Cache cargo registry
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cargo/registry
@@ -233,7 +233,7 @@ jobs:
           ${{ runner.os }}-e2e-cargo-
 
     - name: Cache node modules
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: dashboard/node_modules
         key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
