@@ -202,6 +202,8 @@ struct PoolState<T> {
     idle: Vec<PooledConnection<T>>,
     /// Number of connections currently in use
     active_count: usize,
+    /// Connections being created but not yet added to the pool
+    pending_creation: usize,
 }
 
 impl<T> PoolState<T> {
@@ -209,6 +211,7 @@ impl<T> PoolState<T> {
         Self {
             idle: Vec::new(),
             active_count: 0,
+            pending_creation: 0,
         }
     }
 
@@ -375,24 +378,37 @@ impl<T: Send + 'static> ConnectionPool<T> {
 
     /// Maintain minimum idle connections
     pub async fn maintain_idle(&self) -> Result<(), ResilienceError> {
-        let state = self.state.lock().await;
+        let mut state = self.state.lock().await;
         let current_idle = state.idle.len();
-        let needed = self.config.min_idle.saturating_sub(current_idle);
+        let total_pending = state.total_count() + state.pending_creation;
+        let needed = self
+            .config
+            .min_idle
+            .saturating_sub(current_idle + state.pending_creation);
 
-        if needed == 0 || state.total_count() >= self.config.max_size {
+        if needed == 0 || total_pending >= self.config.max_size {
             return Ok(());
         }
 
-        let to_create = std::cmp::min(needed, self.config.max_size - state.total_count());
+        let to_create = std::cmp::min(needed, self.config.max_size - total_pending);
+        state.pending_creation += to_create;
         drop(state);
 
+        let mut remaining = to_create;
         for _ in 0..to_create {
+            remaining -= 1;
             match self.factory.create().await {
                 Ok(conn) => {
                     let mut state = self.state.lock().await;
+                    state.pending_creation = state.pending_creation.saturating_sub(1);
                     state.idle.push(PooledConnection::new(conn));
                 }
-                Err(e) => return Err(e),
+                Err(e) => {
+                    let mut state = self.state.lock().await;
+                    let to_subtract = 1 + remaining;
+                    state.pending_creation = state.pending_creation.saturating_sub(to_subtract);
+                    return Err(e);
+                }
             }
         }
 

@@ -16,6 +16,7 @@ The resilience module provides three core components for handling transient fail
 - **Thread-safe** - All components are `Send + Sync` and can be safely shared across threads
 - **Configurable** - Extensive configuration options for all components
 - **Type-safe** - Generic implementations that work with any connection type
+- **Pool-safe** - Pending-creation tracking prevents idle over-provisioning under concurrency
 - **Well-tested** - Comprehensive unit and integration tests
 - **Production-ready** - Used for resilient S3, SMB, and database access
 

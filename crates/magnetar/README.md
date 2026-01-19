@@ -206,6 +206,7 @@ async fn main() -> Result<(), ResilienceError> {
 - ✅ Three-state circuit breaker (Closed → Open → HalfOpen)
 - ✅ Exponential backoff with configurable retries
 - ✅ Generic connection pool with health checks
+- ? Pending-creation tracking prevents idle over-provisioning under concurrency
 - ✅ Pool statistics and monitoring
 - ✅ Idle timeout and max lifetime management
 - ✅ Rate limiting with token bucket algorithm

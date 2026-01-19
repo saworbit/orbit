@@ -25,6 +25,9 @@ All notable changes to Orbit will be documented in this file.
 - Added atomic chunk claiming in the persistent Universe to prevent duplicate transfers under concurrent executors.
 - Gigantor now uses `try_claim_chunk` instead of a check-then-act flow.
 
+#### Connection Pool
+- Track pending idle connection creation to avoid over-provisioning under concurrent maintainers.
+
 #### Orbit GhostFS v0.2.0
 - **Breaking:** Removed hardcoded demo file - requires Magnetar database
 - **Breaking:** CLI now requires `--job-id` argument

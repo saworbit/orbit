@@ -267,6 +267,8 @@ orbit sync --concurrency 8 /source /dest
 # Adjust connection pool idle timeout (default: 300s)
 orbit sync --idle-timeout 600 /source /dest
 
+Note: Idle maintenance tracks pending connection creation to avoid over-provisioning under concurrent timers.
+
 # Enable compression for text-heavy content
 orbit sync --compress /source /dest
 ```
