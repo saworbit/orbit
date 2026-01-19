@@ -99,6 +99,10 @@ dialoguer = "0.11"
 console = "0.15"
 dirs = "5.0"
 
+# CLI styling and tables
+comfy-table = "7.1"
+textwrap = "0.16"
+
 # Manifest system
 orbit-core-manifest = { path = "crates/core-manifest" }
 orbit-core-starmap = { path = "crates/core-starmap" }

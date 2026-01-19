@@ -17,9 +17,11 @@ fn test_delta_identical_files() {
     fs::write(&source, &data).unwrap();
     fs::write(&dest, &data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 64 * 1024; // 64KB blocks
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 64 * 1024, // 64KB blocks
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -48,9 +50,11 @@ fn test_delta_completely_different_files() {
     fs::write(&source, &source_data).unwrap();
     fs::write(&dest, &dest_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 32 * 1024; // 32KB blocks
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 32 * 1024, // 32KB blocks
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -72,22 +76,24 @@ fn test_delta_partial_modification() {
 
     // Create base data
     let mut dest_data = vec![0u8; 300 * 1024];
-    for i in 0..dest_data.len() {
-        dest_data[i] = (i % 256) as u8;
+    for (i, value) in dest_data.iter_mut().enumerate() {
+        *value = (i % 256) as u8;
     }
 
     // Modify middle 50KB section for source
     let mut source_data = dest_data.clone();
-    for i in (125 * 1024)..(175 * 1024) {
-        source_data[i] = 0xFF;
+    for value in source_data.iter_mut().take(175 * 1024).skip(125 * 1024) {
+        *value = 0xFF;
     }
 
     fs::write(&source, &source_data).unwrap();
     fs::write(&dest, &dest_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 25 * 1024; // 25KB blocks
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 25 * 1024, // 25KB blocks
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -117,9 +123,11 @@ fn test_delta_appended_data() {
     appended.extend(vec![0xDD; 50 * 1024]);
     fs::write(&source, &appended).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 16 * 1024;
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 16 * 1024,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -145,8 +153,10 @@ fn test_delta_no_destination() {
     let data = b"New file content for delta test";
     fs::write(&source, data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -167,8 +177,10 @@ fn test_check_mode_modtime() {
     std::thread::sleep(std::time::Duration::from_millis(100));
     fs::write(&source, b"new content").unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::ModTime;
+    let config = CopyConfig {
+        check_mode: CheckMode::ModTime,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -186,8 +198,10 @@ fn test_check_mode_size() {
     fs::write(&dest, b"old").unwrap();
     fs::write(&source, b"newer").unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Size;
+    let config = CopyConfig {
+        check_mode: CheckMode::Size,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -206,9 +220,11 @@ fn test_whole_file_flag() {
     fs::write(&source, &data).unwrap();
     fs::write(&dest, &data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.whole_file = true; // Force full copy
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        whole_file: true, // Force full copy
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -227,8 +243,10 @@ fn test_small_file_threshold() {
     fs::write(&source, &data).unwrap();
     fs::write(&dest, &data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -247,9 +265,11 @@ fn test_different_block_sizes() {
     fs::write(&dest, &data).unwrap();
 
     for block_size_kb in &[64, 256, 512, 1024] {
-        let mut config = CopyConfig::default();
-        config.check_mode = CheckMode::Delta;
-        config.delta_block_size = block_size_kb * 1024;
+        let config = CopyConfig {
+            check_mode: CheckMode::Delta,
+            delta_block_size: block_size_kb * 1024,
+            ..Default::default()
+        };
 
         let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -276,16 +296,18 @@ fn test_delta_with_binary_data() {
 
     // Modify some portions
     let mut source_data = dest_data.clone();
-    for i in (50 * 1024)..(75 * 1024) {
-        source_data[i] = !source_data[i]; // Flip bits
+    for value in source_data.iter_mut().take(75 * 1024).skip(50 * 1024) {
+        *value = !*value; // Flip bits
     }
 
     fs::write(&source, &source_data).unwrap();
     fs::write(&dest, &dest_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 32 * 1024;
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 32 * 1024,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -308,16 +330,18 @@ fn test_delta_stats_reporting() {
     let mut source_data = dest_data.clone();
 
     // Modify 20% of the data
-    for i in (200 * 1024)..(300 * 1024) {
-        source_data[i] = 0xFF;
+    for value in source_data.iter_mut().take(300 * 1024).skip(200 * 1024) {
+        *value = 0xFF;
     }
 
     fs::write(&source, &source_data).unwrap();
     fs::write(&dest, &dest_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 50 * 1024;
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 50 * 1024,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 

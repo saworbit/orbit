@@ -310,8 +310,10 @@ mod tests {
         let stars = Arc::new(StarManager::new());
 
         // Create invalid policy
-        let mut policy = SentinelPolicy::default();
-        policy.min_redundancy = 0; // Invalid!
+        let policy = SentinelPolicy {
+            min_redundancy: 0, // Invalid!
+            ..Default::default()
+        };
 
         // Should panic
         Sentinel::new(universe, auth, stars, policy);

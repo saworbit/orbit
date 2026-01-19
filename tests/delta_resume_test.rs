@@ -249,16 +249,18 @@ fn test_delta_transfer_with_resume_enabled() {
 
     // Create files > 64KB with similar content for delta
     let mut data = vec![0u8; 200 * 1024];
-    for i in 0..data.len() {
-        data[i] = (i % 256) as u8;
+    for (i, value) in data.iter_mut().enumerate() {
+        *value = (i % 256) as u8;
     }
     fs::write(&source, &data).unwrap();
     fs::write(&dest, &data[..180 * 1024]).unwrap(); // Slightly different
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 64 * 1024;
-    config.delta_resume_enabled = true;
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 64 * 1024,
+        delta_resume_enabled: true,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -283,10 +285,12 @@ fn test_delta_transfer_with_resume_disabled() {
     fs::write(&source, &data).unwrap();
     fs::write(&dest, &data[..50 * 1024]).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.check_mode = CheckMode::Delta;
-    config.delta_block_size = 32 * 1024;
-    config.delta_resume_enabled = false;
+    let config = CopyConfig {
+        check_mode: CheckMode::Delta,
+        delta_block_size: 32 * 1024,
+        delta_resume_enabled: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 

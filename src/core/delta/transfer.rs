@@ -611,9 +611,11 @@ mod tests {
         fs::write(&dest, b"test data").unwrap();
 
         // Manifest updates enabled but no path
-        let mut config = DeltaConfig::default();
-        config.update_manifest = true;
-        config.manifest_path = None;
+        let config = DeltaConfig {
+            update_manifest: true,
+            manifest_path: None,
+            ..Default::default()
+        };
 
         let result =
             update_manifest_if_configured(&config, &source, &dest, "abc123", None).unwrap();
@@ -665,8 +667,10 @@ mod tests {
             .with_manifest_updates(true)
             .with_manifest_path(manifest_path.clone());
 
-        let mut stats = DeltaStats::default();
-        stats.bytes_saved = 5000;
+        let stats = DeltaStats {
+            bytes_saved: 5000,
+            ..Default::default()
+        };
 
         let result =
             update_manifest_if_configured(&config, &source, &dest, "abc123", Some(&stats)).unwrap();

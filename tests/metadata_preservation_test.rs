@@ -180,12 +180,14 @@ fn test_directory_metadata() {
 /// Test manifest conversion round-trip
 #[test]
 fn test_manifest_conversion_roundtrip() {
-    let mut original = FileMetadata::default();
-    original.permissions = Some(0o755);
-    original.owner_uid = Some(1000);
-    original.owner_gid = Some(1000);
-    original.size = 12345;
-    original.is_file = true;
+    let original = FileMetadata {
+        permissions: Some(0o755),
+        owner_uid: Some(1000),
+        owner_gid: Some(1000),
+        size: 12345,
+        is_file: true,
+        ..Default::default()
+    };
 
     // Convert to manifest format
     let map = original.to_manifest_map();

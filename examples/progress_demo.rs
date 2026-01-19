@@ -72,9 +72,11 @@ fn demo_cli_progress(source: &Path, dest: &Path) -> Result<(), Box<dyn std::erro
     let renderer_handle = renderer.spawn();
 
     // Perform directory copy with progress events
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.show_progress = false; // Disable built-in progress bar
+    let config = CopyConfig {
+        recursive: true,
+        show_progress: false, // Disable built-in progress bar
+        ..Default::default()
+    };
 
     let stats = copy_directory_impl(source, dest, &config, Some(&publisher))?;
 
@@ -103,9 +105,11 @@ fn demo_telemetry(source: &Path, dest: &Path) -> Result<(), Box<dyn std::error::
     let logger_handle = logger.spawn();
 
     // Perform directory copy with telemetry
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        show_progress: false,
+        ..Default::default()
+    };
 
     let _stats = copy_directory_impl(source, dest, &config, Some(&publisher))?;
 
@@ -164,9 +168,11 @@ fn demo_dual_subscribers(source: &Path, dest: &Path) -> Result<(), Box<dyn std::
     );
 
     // Perform directory copy
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_directory_impl(source, dest, &config, Some(&cli_pub))?;
 

@@ -400,8 +400,10 @@ mod tests {
 
     #[test]
     fn test_metadata_filter_strip_xattrs() {
-        let mut metadata = FileMetadata::default();
-        metadata.xattrs = Some(HashMap::new());
+        let mut metadata = FileMetadata {
+            xattrs: Some(HashMap::new()),
+            ..Default::default()
+        };
 
         MetadataFilter::StripXattrs.apply(&mut metadata);
         assert!(metadata.xattrs.is_none());
@@ -409,9 +411,11 @@ mod tests {
 
     #[test]
     fn test_metadata_filter_strip_ownership() {
-        let mut metadata = FileMetadata::default();
-        metadata.owner_uid = Some(1000);
-        metadata.owner_gid = Some(1000);
+        let mut metadata = FileMetadata {
+            owner_uid: Some(1000),
+            owner_gid: Some(1000),
+            ..Default::default()
+        };
 
         MetadataFilter::StripOwnership.apply(&mut metadata);
         assert!(metadata.owner_uid.is_none());

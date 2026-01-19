@@ -125,9 +125,11 @@ fn test_progress_events_directory_copy() {
     });
 
     // Perform directory copy
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        show_progress: false,
+        ..Default::default()
+    };
 
     use orbit::core::copy_directory_impl;
     let result = copy_directory_impl(&source_dir, &dest_dir, &config, Some(&publisher));

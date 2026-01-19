@@ -419,9 +419,11 @@ mod tests {
 
     #[test]
     fn test_safety_resume_vs_compression() {
-        let mut config = CopyConfig::default();
-        config.resume_enabled = true;
-        config.compression = CompressionType::Zstd { level: 3 };
+        let config = CopyConfig {
+            resume_enabled: true,
+            compression: CompressionType::Zstd { level: 3 },
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -432,9 +434,11 @@ mod tests {
 
     #[test]
     fn test_strategy_zerocopy_vs_checksum() {
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = true;
-        config.verify_checksum = true;
+        let config = CopyConfig {
+            use_zero_copy: true,
+            verify_checksum: true,
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -445,9 +449,11 @@ mod tests {
 
     #[test]
     fn test_paradox_resume_vs_checksum() {
-        let mut config = CopyConfig::default();
-        config.resume_enabled = true;
-        config.verify_checksum = true;
+        let config = CopyConfig {
+            resume_enabled: true,
+            verify_checksum: true,
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -458,10 +464,12 @@ mod tests {
 
     #[test]
     fn test_observer_manifest_vs_zerocopy() {
-        let mut config = CopyConfig::default();
-        config.generate_manifest = true;
-        config.use_zero_copy = true;
-        config.verify_checksum = false; // Disable to avoid triggering rule 2
+        let config = CopyConfig {
+            generate_manifest: true,
+            use_zero_copy: true,
+            verify_checksum: false, // Disable to avoid triggering rule 2
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -471,10 +479,12 @@ mod tests {
 
     #[test]
     fn test_patchwork_delta_vs_zerocopy() {
-        let mut config = CopyConfig::default();
-        config.check_mode = crate::core::delta::CheckMode::Delta;
-        config.use_zero_copy = true;
-        config.verify_checksum = false; // Disable to avoid triggering rule 2
+        let config = CopyConfig {
+            check_mode: crate::core::delta::CheckMode::Delta,
+            use_zero_copy: true,
+            verify_checksum: false, // Disable to avoid triggering rule 2
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -485,10 +495,12 @@ mod tests {
     #[test]
     #[cfg(target_os = "macos")]
     fn test_speed_limit_macos_bandwidth() {
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = true;
-        config.max_bandwidth = 1_000_000; // 1 MB/s
-        config.verify_checksum = false; // Disable to avoid triggering rule 2
+        let config = CopyConfig {
+            use_zero_copy: true,
+            max_bandwidth: 1_000_000, // 1 MB/s
+            verify_checksum: false,   // Disable to avoid triggering rule 2
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -501,10 +513,12 @@ mod tests {
 
     #[test]
     fn test_visual_noise_parallel_progress() {
-        let mut config = CopyConfig::default();
-        config.parallel = 4;
-        config.show_progress = true;
-        config.use_zero_copy = false; // Avoid other rules
+        let config = CopyConfig {
+            parallel: 4,
+            show_progress: true,
+            use_zero_copy: false, // Avoid other rules
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -513,10 +527,12 @@ mod tests {
 
     #[test]
     fn test_performance_warning_sync_checksum() {
-        let mut config = CopyConfig::default();
-        config.copy_mode = CopyMode::Sync;
-        config.check_mode = crate::core::delta::CheckMode::Checksum;
-        config.use_zero_copy = false; // Avoid other rules
+        let config = CopyConfig {
+            copy_mode: CopyMode::Sync,
+            check_mode: crate::core::delta::CheckMode::Checksum,
+            use_zero_copy: false, // Avoid other rules
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -525,9 +541,11 @@ mod tests {
 
     #[test]
     fn test_clean_config_minimal_notices() {
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = false; // Avoid conflicts
-        config.verify_checksum = false; // Avoid conflicts
+        let config = CopyConfig {
+            use_zero_copy: false,   // Avoid conflicts
+            verify_checksum: false, // Avoid conflicts
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -537,11 +555,13 @@ mod tests {
 
     #[test]
     fn test_multiple_rules_triggered() {
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = true;
-        config.resume_enabled = true;
-        config.compression = CompressionType::Lz4;
-        config.verify_checksum = true;
+        let config = CopyConfig {
+            use_zero_copy: true,
+            resume_enabled: true,
+            compression: CompressionType::Lz4,
+            verify_checksum: true,
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 
@@ -572,10 +592,12 @@ mod tests {
 
     #[test]
     fn test_zerocopy_vs_compression() {
-        let mut config = CopyConfig::default();
-        config.use_zero_copy = true;
-        config.compression = CompressionType::Lz4;
-        config.verify_checksum = false; // Disable to avoid triggering rule 2
+        let config = CopyConfig {
+            use_zero_copy: true,
+            compression: CompressionType::Lz4,
+            verify_checksum: false, // Disable to avoid triggering rule 2
+            ..Default::default()
+        };
 
         let plan = Guidance::plan(config).unwrap();
 

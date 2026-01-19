@@ -53,10 +53,12 @@ fn test_streaming_directory_copy_memory_efficiency() {
     }
 
     // Configure for parallel copying
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.parallel = 4;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        parallel: 4,
+        show_progress: false,
+        ..Default::default()
+    };
 
     println!("Starting streaming copy...");
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
@@ -114,10 +116,12 @@ fn test_streaming_handles_large_directory_tree() {
     println!("✓ Created {} files in nested directory tree", file_count);
     assert_eq!(file_count, 500, "Should have created exactly 500 files");
 
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.parallel = 2;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        parallel: 2,
+        show_progress: false,
+        ..Default::default()
+    };
 
     println!("Copying large directory tree...");
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
@@ -147,10 +151,12 @@ fn test_streaming_sequential_mode() {
     }
 
     // Test with parallel = 0 (sequential mode)
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.parallel = 0;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        parallel: 0,
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
 
@@ -173,10 +179,12 @@ fn test_mirror_deletes_extra_files() {
     fs::write(dest_dir.join("keep.txt"), "old").unwrap();
     fs::write(dest_dir.join("extra.txt"), "remove").unwrap();
 
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.copy_mode = CopyMode::Mirror;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        copy_mode: CopyMode::Mirror,
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
 
@@ -198,11 +206,13 @@ fn test_mirror_respects_exclude_patterns() {
     fs::write(dest_dir.join("keep.txt"), "old").unwrap();
     fs::write(dest_dir.join("keep.log"), "preserve").unwrap();
 
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.copy_mode = CopyMode::Mirror;
-    config.show_progress = false;
-    config.exclude_patterns = vec!["*.log".to_string()];
+    let config = CopyConfig {
+        recursive: true,
+        copy_mode: CopyMode::Mirror,
+        show_progress: false,
+        exclude_patterns: vec!["*.log".to_string()],
+        ..Default::default()
+    };
 
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
 
@@ -229,11 +239,13 @@ fn test_mirror_skips_symlink_when_configured() {
     unix_fs::symlink("target", dest_dir.join("link"))
         .expect("failed to create symlink in destination");
 
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.copy_mode = CopyMode::Mirror;
-    config.show_progress = false;
-    config.symlink_mode = SymlinkMode::Skip;
+    let config = CopyConfig {
+        recursive: true,
+        copy_mode: CopyMode::Mirror,
+        show_progress: false,
+        symlink_mode: SymlinkMode::Skip,
+        ..Default::default()
+    };
 
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
 

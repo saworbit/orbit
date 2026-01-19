@@ -820,9 +820,11 @@ mod tests {
         assert!(config.validate_manifest().is_ok());
 
         // Invalid: update_manifest true without path
-        let mut config = DeltaConfig::default();
-        config.update_manifest = true;
-        config.manifest_path = None;
+        let config = DeltaConfig {
+            update_manifest: true,
+            manifest_path: None,
+            ..Default::default()
+        };
         assert!(config.validate_manifest().is_err());
     }
 

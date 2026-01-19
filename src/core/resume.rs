@@ -368,9 +368,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let dest = dir.path().join("test.txt");
 
-        let mut resume_info = ResumeInfo::default();
-        resume_info.bytes_copied = 1024;
-        resume_info.file_size = Some(2048);
+        let resume_info = ResumeInfo {
+            bytes_copied: 1024,
+            file_size: Some(2048),
+            ..Default::default()
+        };
 
         let decision = decide_resume_strategy(&dest, &resume_info);
 
@@ -401,10 +403,12 @@ mod tests {
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_secs());
 
-        let mut resume_info = ResumeInfo::default();
-        resume_info.bytes_copied = 1024;
-        resume_info.file_size = Some(1024);
-        resume_info.file_mtime = mtime;
+        let resume_info = ResumeInfo {
+            bytes_copied: 1024,
+            file_size: Some(1024),
+            file_mtime: mtime,
+            ..Default::default()
+        };
 
         let decision = decide_resume_strategy(&dest, &resume_info);
 
@@ -432,9 +436,11 @@ mod tests {
         file.write_all(&[0u8; 512]).unwrap();
         drop(file);
 
-        let mut resume_info = ResumeInfo::default();
-        resume_info.bytes_copied = 1024;
-        resume_info.file_size = Some(1024);
+        let resume_info = ResumeInfo {
+            bytes_copied: 1024,
+            file_size: Some(1024),
+            ..Default::default()
+        };
 
         let decision = decide_resume_strategy(&dest, &resume_info);
 
@@ -476,8 +482,10 @@ mod tests {
         drop(file);
 
         // Record the chunk digest
-        let mut resume_info = ResumeInfo::default();
-        resume_info.bytes_copied = 1024;
+        let mut resume_info = ResumeInfo {
+            bytes_copied: 1024,
+            ..Default::default()
+        };
         record_chunk_digest(0, &chunk_data, &mut resume_info);
 
         // Validate chunks
@@ -505,8 +513,10 @@ mod tests {
         drop(file);
 
         // Record digest for original data
-        let mut resume_info = ResumeInfo::default();
-        resume_info.bytes_copied = 1024;
+        let mut resume_info = ResumeInfo {
+            bytes_copied: 1024,
+            ..Default::default()
+        };
         record_chunk_digest(0, &chunk_data, &mut resume_info);
 
         // Validate chunks (should fail)
@@ -523,10 +533,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let dest = dir.path().join("test.txt");
 
-        let mut resume_info = ResumeInfo::default();
-        resume_info.bytes_copied = 2048;
-        resume_info.file_size = Some(4096);
-        resume_info.file_mtime = Some(1234567890);
+        let mut resume_info = ResumeInfo {
+            bytes_copied: 2048,
+            file_size: Some(4096),
+            file_mtime: Some(1234567890),
+            ..Default::default()
+        };
         resume_info.verified_chunks.insert(0, "abc123".to_string());
         resume_info.verified_chunks.insert(1, "def456".to_string());
         resume_info.verified_windows.push(0);

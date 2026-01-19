@@ -44,10 +44,12 @@ fn bench_copy_methods(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("zero-copy", size_mb), size_mb, |b, _| {
             b.iter(|| {
                 let dest = temp.path().join("dest_zc.bin");
-                let mut config = CopyConfig::default();
-                config.use_zero_copy = true;
-                config.verify_checksum = false;
-                config.show_progress = false;
+                let config = CopyConfig {
+                    use_zero_copy: true,
+                    verify_checksum: false,
+                    show_progress: false,
+                    ..Default::default()
+                };
 
                 let stats = copy_file(&source, &dest, &config).unwrap();
                 black_box(stats);
@@ -61,10 +63,12 @@ fn bench_copy_methods(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("buffered", size_mb), size_mb, |b, _| {
             b.iter(|| {
                 let dest = temp.path().join("dest_buf.bin");
-                let mut config = CopyConfig::default();
-                config.use_zero_copy = false;
-                config.verify_checksum = false;
-                config.show_progress = false;
+                let config = CopyConfig {
+                    use_zero_copy: false,
+                    verify_checksum: false,
+                    show_progress: false,
+                    ..Default::default()
+                };
 
                 let stats = copy_file(&source, &dest, &config).unwrap();
                 black_box(stats);
@@ -91,10 +95,12 @@ fn bench_checksum_impact(c: &mut Criterion) {
     group.bench_function("zero-copy-no-checksum", |b| {
         b.iter(|| {
             let dest = temp.path().join("dest.bin");
-            let mut config = CopyConfig::default();
-            config.use_zero_copy = true;
-            config.verify_checksum = false;
-            config.show_progress = false;
+            let config = CopyConfig {
+                use_zero_copy: true,
+                verify_checksum: false,
+                show_progress: false,
+                ..Default::default()
+            };
 
             let stats = copy_file(&source, &dest, &config).unwrap();
             black_box(stats);
@@ -106,10 +112,12 @@ fn bench_checksum_impact(c: &mut Criterion) {
     group.bench_function("zero-copy-with-checksum", |b| {
         b.iter(|| {
             let dest = temp.path().join("dest.bin");
-            let mut config = CopyConfig::default();
-            config.use_zero_copy = true;
-            config.verify_checksum = true;
-            config.show_progress = false;
+            let config = CopyConfig {
+                use_zero_copy: true,
+                verify_checksum: true,
+                show_progress: false,
+                ..Default::default()
+            };
 
             let stats = copy_file(&source, &dest, &config).unwrap();
             black_box(stats);
@@ -121,10 +129,12 @@ fn bench_checksum_impact(c: &mut Criterion) {
     group.bench_function("buffered-streaming-checksum", |b| {
         b.iter(|| {
             let dest = temp.path().join("dest.bin");
-            let mut config = CopyConfig::default();
-            config.use_zero_copy = false;
-            config.verify_checksum = true;
-            config.show_progress = false;
+            let config = CopyConfig {
+                use_zero_copy: false,
+                verify_checksum: true,
+                show_progress: false,
+                ..Default::default()
+            };
 
             let stats = copy_file(&source, &dest, &config).unwrap();
             black_box(stats);
@@ -152,11 +162,13 @@ fn bench_chunk_sizes(c: &mut Criterion) {
             |b, &chunk_kb| {
                 b.iter(|| {
                     let dest = temp.path().join("dest.bin");
-                    let mut config = CopyConfig::default();
-                    config.use_zero_copy = false;
-                    config.verify_checksum = false;
-                    config.show_progress = false;
-                    config.chunk_size = chunk_kb * 1024;
+                    let config = CopyConfig {
+                        use_zero_copy: false,
+                        verify_checksum: false,
+                        show_progress: false,
+                        chunk_size: chunk_kb * 1024,
+                        ..Default::default()
+                    };
 
                     let stats = copy_file(&source, &dest, &config).unwrap();
                     black_box(stats);
@@ -187,10 +199,12 @@ fn bench_small_files(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("zero-copy", size_kb), size_kb, |b, _| {
             b.iter(|| {
                 let dest = temp.path().join("dest.bin");
-                let mut config = CopyConfig::default();
-                config.use_zero_copy = true;
-                config.verify_checksum = false;
-                config.show_progress = false;
+                let config = CopyConfig {
+                    use_zero_copy: true,
+                    verify_checksum: false,
+                    show_progress: false,
+                    ..Default::default()
+                };
 
                 let stats = copy_file(&path, &dest, &config).unwrap();
                 black_box(stats);
@@ -202,10 +216,12 @@ fn bench_small_files(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("buffered", size_kb), size_kb, |b, _| {
             b.iter(|| {
                 let dest = temp.path().join("dest.bin");
-                let mut config = CopyConfig::default();
-                config.use_zero_copy = false;
-                config.verify_checksum = false;
-                config.show_progress = false;
+                let config = CopyConfig {
+                    use_zero_copy: false,
+                    verify_checksum: false,
+                    show_progress: false,
+                    ..Default::default()
+                };
 
                 let stats = copy_file(&path, &dest, &config).unwrap();
                 black_box(stats);
@@ -239,11 +255,13 @@ fn bench_compression_vs_zero_copy(c: &mut Criterion) {
     group.bench_function("zero-copy-uncompressed", |b| {
         b.iter(|| {
             let dest = temp.path().join("dest.bin");
-            let mut config = CopyConfig::default();
-            config.use_zero_copy = true;
-            config.compression = CompressionType::None;
-            config.verify_checksum = false;
-            config.show_progress = false;
+            let config = CopyConfig {
+                use_zero_copy: true,
+                compression: CompressionType::None,
+                verify_checksum: false,
+                show_progress: false,
+                ..Default::default()
+            };
 
             let stats = copy_file(&path, &dest, &config).unwrap();
             black_box(stats);
@@ -255,10 +273,12 @@ fn bench_compression_vs_zero_copy(c: &mut Criterion) {
     group.bench_function("lz4-compression", |b| {
         b.iter(|| {
             let dest = temp.path().join("dest.bin");
-            let mut config = CopyConfig::default();
-            config.compression = CompressionType::Lz4;
-            config.verify_checksum = false;
-            config.show_progress = false;
+            let config = CopyConfig {
+                compression: CompressionType::Lz4,
+                verify_checksum: false,
+                show_progress: false,
+                ..Default::default()
+            };
 
             let stats = copy_file(&path, &dest, &config).unwrap();
             black_box(stats);
@@ -270,10 +290,12 @@ fn bench_compression_vs_zero_copy(c: &mut Criterion) {
     group.bench_function("zstd-3-compression", |b| {
         b.iter(|| {
             let dest = temp.path().join("dest.bin");
-            let mut config = CopyConfig::default();
-            config.compression = CompressionType::Zstd { level: 3 };
-            config.verify_checksum = false;
-            config.show_progress = false;
+            let config = CopyConfig {
+                compression: CompressionType::Zstd { level: 3 },
+                verify_checksum: false,
+                show_progress: false,
+                ..Default::default()
+            };
 
             let stats = copy_file(&path, &dest, &config).unwrap();
             black_box(stats);

@@ -529,10 +529,12 @@ mod tests {
 
     #[test]
     fn test_manifest_conversion() {
-        let mut meta = FileMetadata::default();
-        meta.permissions = Some(0o755);
-        meta.owner_uid = Some(1000);
-        meta.owner_gid = Some(1000);
+        let meta = FileMetadata {
+            permissions: Some(0o755),
+            owner_uid: Some(1000),
+            owner_gid: Some(1000),
+            ..Default::default()
+        };
 
         let map = meta.to_manifest_map();
         assert!(map.contains_key("permissions"));

@@ -35,9 +35,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Configure logging with audit trail
-    let mut config = CopyConfig::default();
-    config.audit_log_path = Some(audit_log.clone());
-    config.verbose = true;
+    let config = CopyConfig {
+        audit_log_path: Some(audit_log.clone()),
+        verbose: true,
+        ..Default::default()
+    };
 
     println!("Initializing logging system...");
     init_logging(&config)?;

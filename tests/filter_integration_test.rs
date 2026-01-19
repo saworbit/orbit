@@ -23,10 +23,12 @@ fn test_basic_exclude_patterns() {
     fs::write(src_dir.join("README.md"), b"# README").unwrap();
 
     // Configure with exclude patterns
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.exclude_patterns = vec!["target/**".to_string(), "*.log".to_string()];
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        exclude_patterns: vec!["target/**".to_string(), "*.log".to_string()],
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Copy directory
     let result = copy_directory(src_dir, dest_dir, &config);
@@ -57,13 +59,15 @@ fn test_include_patterns_override_exclude() {
     fs::write(src_dir.join("docs/README.txt"), b"readme").unwrap();
 
     // Configure with both include and exclude
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    // Exclude all .txt files
-    config.exclude_patterns = vec!["*.txt".to_string()];
-    // But include important.txt and docs/**
-    config.include_patterns = vec!["important.txt".to_string(), "docs/**".to_string()];
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        // Exclude all .txt files
+        exclude_patterns: vec!["*.txt".to_string()],
+        // But include important.txt and docs/**
+        include_patterns: vec!["important.txt".to_string(), "docs/**".to_string()],
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Copy directory
     let result = copy_directory(src_dir, dest_dir, &config);
@@ -98,10 +102,12 @@ fn test_regex_patterns() {
     fs::write(src_dir.join("build.rs"), b"fn main() {}").unwrap();
 
     // Configure with regex pattern to exclude test files
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.exclude_patterns = vec!["regex:^tests/.*\\.rs$".to_string()];
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        exclude_patterns: vec!["regex:^tests/.*\\.rs$".to_string()],
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Copy directory
     let result = copy_directory(src_dir, dest_dir, &config);
@@ -134,10 +140,12 @@ fn test_nested_directory_filtering() {
     fs::write(src_dir.join("x/y/z/file5.txt"), b"5").unwrap();
 
     // Exclude everything under a/b/c
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.exclude_patterns = vec!["a/b/c/**".to_string()];
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        exclude_patterns: vec!["a/b/c/**".to_string()],
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Copy directory
     let result = copy_directory(src_dir, dest_dir, &config);
@@ -187,10 +195,12 @@ fn test_filter_from_file() {
     fs::write(src_dir.join("build/output.txt"), b"output").unwrap();
 
     // Configure with filter file
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.filter_from = Some(filter_file);
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        filter_from: Some(filter_file),
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Copy directory
     let result = copy_directory(src_dir, dest_dir, &config);
@@ -220,11 +230,13 @@ fn test_dry_run_shows_filtered_items() {
     fs::write(src_dir.join("exclude.log"), b"exclude").unwrap();
 
     // Configure with dry-run and exclude pattern
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.exclude_patterns = vec!["*.log".to_string()];
-    config.dry_run = true;
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        exclude_patterns: vec!["*.log".to_string()],
+        dry_run: true,
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Copy directory (dry-run)
     let result = copy_directory(src_dir, dest_dir, &config);
@@ -254,11 +266,13 @@ fn test_mirror_mode_respects_filters() {
     fs::write(dest_dir.join("exclude.log"), b"old log").unwrap();
 
     // Configure mirror mode with exclude pattern
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Mirror;
-    config.recursive = true;
-    config.exclude_patterns = vec!["*.log".to_string()];
-    config.show_progress = false;
+    let config = CopyConfig {
+        copy_mode: CopyMode::Mirror,
+        recursive: true,
+        exclude_patterns: vec!["*.log".to_string()],
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Mirror directory
     let result = copy_directory(src_dir, dest_dir, &config);
@@ -289,11 +303,13 @@ fn test_path_filter_exact_match() {
     fs::write(src_dir.join("src/Cargo.toml"), b"wrong").unwrap();
 
     // Include only specific path
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.include_patterns = vec!["path:Cargo.toml".to_string()];
-    config.exclude_patterns = vec!["*".to_string()]; // Exclude everything else
-    config.show_progress = false;
+    let config = CopyConfig {
+        recursive: true,
+        include_patterns: vec!["path:Cargo.toml".to_string()],
+        exclude_patterns: vec!["*".to_string()], // Exclude everything else
+        show_progress: false,
+        ..Default::default()
+    };
 
     // Copy directory
     let result = copy_directory(src_dir, dest_dir, &config);

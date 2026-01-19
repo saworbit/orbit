@@ -11,6 +11,11 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 use orbit::{
+    cli_style::{
+        self, capability_table, format_bytes, format_duration, guidance_box, header_box,
+        preset_table, print_error, print_info, section_header, transfer_summary_table, Icons,
+        PresetInfo, Theme, TransferSummary,
+    },
     config::{
         AuditFormat, ChunkingStrategy, CompressionType, CopyConfig, CopyMode, ErrorMode, LogLevel,
         SymlinkMode,
@@ -470,7 +475,7 @@ fn main() -> Result<()> {
     if needs_logging {
         let mut config = if let Some(ref config_path) = cli.config {
             CopyConfig::from_file(config_path).unwrap_or_else(|e| {
-                eprintln!("Warning: Failed to load config file: {}", e);
+                cli_style::print_warning(&format!("Failed to load config file: {}", e));
                 CopyConfig::default()
             })
         } else {
@@ -512,7 +517,7 @@ fn main() -> Result<()> {
     // Load or create config
     let mut config = if let Some(config_path) = cli.config {
         CopyConfig::from_file(&config_path).unwrap_or_else(|e| {
-            eprintln!("Warning: Failed to load config file: {}", e);
+            cli_style::print_warning(&format!("Failed to load config file: {}", e));
             CopyConfig::default()
         })
     } else {
@@ -604,12 +609,7 @@ fn main() -> Result<()> {
 
     // Display Intelligence to User
     if !flight_plan.notices.is_empty() {
-        println!("┌── 🛰️  Orbit Guidance System ───────────────────────┐");
-        for notice in &flight_plan.notices {
-            println!("│ {}", notice);
-        }
-        println!("└────────────────────────────────────────────────────┘");
-        println!(); // Visual separation
+        guidance_box(&flight_plan.notices);
     }
 
     // Use the optimized config from the flight plan
@@ -716,10 +716,27 @@ fn handle_manifest_plan(
     chunking: String,
     chunk_size: u32,
 ) -> Result<()> {
-    println!("📋 Creating flight plan...");
-    println!("  Source: {}", source.display());
-    println!("  Dest:   {}", dest.display());
-    println!("  Output: {}", output.display());
+    section_header(&format!("{} Creating Flight Plan", Icons::MANIFEST));
+    println!();
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Source:"),
+        Theme::value(source.display())
+    );
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Dest:"),
+        Theme::value(dest.display())
+    );
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Output:"),
+        Theme::value(output.display())
+    );
+    println!();
 
     let chunking_strategy = match chunking.as_str() {
         "cdc" => ChunkingStrategy::Cdc {
@@ -730,9 +747,9 @@ fn handle_manifest_plan(
             size_kib: chunk_size,
         },
         _ => {
-            eprintln!(
-                "❌ Invalid chunking strategy: {} (use 'cdc' or 'fixed')",
-                chunking
+            print_error(
+                &format!("Invalid chunking strategy: {}", chunking),
+                Some("Use 'cdc' or 'fixed'"),
             );
             std::process::exit(1);
         }
@@ -753,7 +770,7 @@ fn handle_manifest_plan(
             .and_then(|n| n.to_str())
             .unwrap_or("file");
 
-        println!("  Generating manifest for: {}", file_name);
+        print_info(&format!("Processing: {}", file_name));
         generator.generate_file_manifest(&source, file_name)?;
     } else if source.is_dir() {
         use walkdir::WalkDir;
@@ -767,18 +784,22 @@ fn handle_manifest_plan(
                     .to_string_lossy()
                     .to_string();
 
-                println!("  Generating manifest for: {}", relative_path);
+                println!("  {} {}", Theme::muted(Icons::ARROW_RIGHT), relative_path);
                 generator.generate_file_manifest(entry.path(), &relative_path)?;
             }
         }
     } else {
-        eprintln!("❌ Source path does not exist or is not accessible");
+        print_error(
+            "Source path does not exist or is not accessible",
+            Some("Check the path and try again"),
+        );
         std::process::exit(1);
     }
 
     generator.finalize("sha256:pending")?;
 
-    println!("✅ Flight plan created at: {}", output.display());
+    println!();
+    cli_style::print_success(&format!("Flight plan created at: {}", output.display()));
 
     Ok(())
 }
@@ -786,63 +807,137 @@ fn handle_manifest_plan(
 fn handle_manifest_verify(manifest_dir: PathBuf) -> Result<()> {
     use orbit::manifests::{CargoManifest, FlightPlan};
 
-    println!("🔍 Verifying manifests in: {}", manifest_dir.display());
+    section_header(&format!("{} Verifying Manifests", Icons::SHIELD));
+    println!();
+    println!(
+        "  {} {}",
+        Theme::muted("Directory:"),
+        Theme::value(manifest_dir.display())
+    );
+    println!();
 
     let flight_plan_path = manifest_dir.join("job.flightplan.json");
     if !flight_plan_path.exists() {
-        eprintln!("❌ Flight plan not found: {}", flight_plan_path.display());
+        print_error(
+            &format!("Flight plan not found: {}", flight_plan_path.display()),
+            Some("Run 'orbit manifest plan' first"),
+        );
         std::process::exit(1);
     }
 
     let flight_plan = FlightPlan::load(&flight_plan_path)
         .map_err(|e| OrbitError::Other(format!("Failed to load flight plan: {}", e)))?;
 
-    println!("  Job ID: {}", flight_plan.job_id);
-    println!("  Files: {}", flight_plan.files.len());
+    // Display flight plan info
+    let status = if flight_plan.is_finalized() {
+        format!("{} Finalized", Icons::SUCCESS)
+    } else {
+        format!("{} Pending", Icons::PENDING)
+    };
+
     println!(
-        "  Status: {}",
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Job ID:"),
+        Theme::value(&flight_plan.job_id)
+    );
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Files:"),
+        Theme::value(flight_plan.files.len())
+    );
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Status:"),
         if flight_plan.is_finalized() {
-            "✅ Finalized"
+            Theme::success(&status)
         } else {
-            "⏳ Pending"
+            Theme::warning(&status)
         }
     );
+    println!();
+
+    let mut verified = 0;
+    let mut failed = 0;
 
     for file_ref in &flight_plan.files {
         let cargo_path = manifest_dir.join(&file_ref.cargo);
 
         if !cargo_path.exists() {
-            println!("  ❌ {}: Cargo manifest missing", file_ref.path);
+            println!(
+                "  {} {} {}",
+                Theme::error(Icons::ERROR),
+                file_ref.path,
+                Theme::error("(missing)")
+            );
+            failed += 1;
             continue;
         }
 
         match CargoManifest::load(&cargo_path) {
             Ok(cargo) => {
                 println!(
-                    "  ✅ {}: {} windows, {} bytes",
+                    "  {} {} {} windows, {}",
+                    Theme::success(Icons::SUCCESS),
                     file_ref.path,
                     cargo.windows.len(),
-                    cargo.size
+                    format_bytes(cargo.size)
                 );
+                verified += 1;
             }
             Err(e) => {
-                println!("  ❌ {}: Invalid manifest - {}", file_ref.path, e);
+                println!(
+                    "  {} {} {}",
+                    Theme::error(Icons::ERROR),
+                    file_ref.path,
+                    Theme::error(format!("({})", e))
+                );
+                failed += 1;
             }
         }
     }
 
-    println!("✅ Verification complete");
+    println!();
+    if failed == 0 {
+        cli_style::print_success(&format!(
+            "Verification complete: {} files verified",
+            verified
+        ));
+    } else {
+        cli_style::print_warning(&format!(
+            "Verification complete: {} verified, {} failed",
+            verified, failed
+        ));
+    }
 
     Ok(())
 }
 
 fn handle_manifest_diff(manifest_dir: PathBuf, target: PathBuf) -> Result<()> {
-    println!("📊 Comparing manifests with target...");
-    println!("  Manifests: {}", manifest_dir.display());
-    println!("  Target:    {}", target.display());
+    section_header(&format!("{} Comparing Manifests", Icons::STATS));
+    println!();
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Manifests:"),
+        Theme::value(manifest_dir.display())
+    );
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("Target:"),
+        Theme::value(target.display())
+    );
+    println!();
 
-    println!("⚠️  Diff operation not yet fully implemented");
-    println!("    This will compare manifest metadata with actual files");
+    cli_style::print_warning("Diff operation not yet fully implemented");
+    println!(
+        "  {} This will compare manifest metadata with actual files",
+        Theme::muted(Icons::ARROW_RIGHT)
+    );
+    println!();
 
     Ok(())
 }
@@ -851,182 +946,305 @@ fn handle_manifest_info(path: PathBuf) -> Result<()> {
     use orbit::manifests::{CargoManifest, FlightPlan};
 
     if !path.exists() {
-        eprintln!("❌ Path not found: {}", path.display());
+        print_error(
+            &format!("Path not found: {}", path.display()),
+            Some("Check the file path and try again"),
+        );
         std::process::exit(1);
     }
 
     if let Ok(flight_plan) = FlightPlan::load(&path) {
-        println!("📋 Flight Plan");
-        println!("  Schema:  {}", flight_plan.schema);
-        println!("  Job ID:  {}", flight_plan.job_id);
-        println!("  Created: {}", flight_plan.created_utc);
-        println!(
-            "  Source:  {} ({})",
-            flight_plan.source.root, flight_plan.source.endpoint_type
-        );
-        println!(
-            "  Target:  {} ({})",
-            flight_plan.target.root, flight_plan.target.endpoint_type
-        );
-        println!("  Files:   {}", flight_plan.files.len());
+        section_header(&format!("{} Flight Plan", Icons::MANIFEST));
+        println!();
 
-        println!("  Policy:");
-        println!("    Encryption: {}", flight_plan.policy.encryption.aead);
-        if let Some(classification) = &flight_plan.policy.classification {
-            println!("    Classification: {}", classification);
+        let items = vec![
+            ("Schema", flight_plan.schema.clone()),
+            ("Job ID", flight_plan.job_id.clone()),
+            ("Created", flight_plan.created_utc.to_string()),
+            (
+                "Source",
+                format!(
+                    "{} ({})",
+                    flight_plan.source.root, flight_plan.source.endpoint_type
+                ),
+            ),
+            (
+                "Target",
+                format!(
+                    "{} ({})",
+                    flight_plan.target.root, flight_plan.target.endpoint_type
+                ),
+            ),
+            ("Files", flight_plan.files.len().to_string()),
+            ("Encryption", flight_plan.policy.encryption.aead.clone()),
+        ];
+
+        for (key, value) in items {
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted(format!("{}:", key)),
+                Theme::value(&value)
+            );
         }
 
+        if let Some(classification) = &flight_plan.policy.classification {
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Classification:"),
+                Theme::value(classification)
+            );
+        }
+
+        println!();
         return Ok(());
     }
 
     if let Ok(cargo) = CargoManifest::load(&path) {
-        println!("📦 Cargo Manifest");
-        println!("  Schema:  {}", cargo.schema);
-        println!("  Path:    {}", cargo.path);
-        println!("  Size:    {} bytes", cargo.size);
-        println!("  Chunking: {}", cargo.chunking.chunking_type);
-        println!("  Windows: {}", cargo.windows.len());
-        println!("  Chunks:  {}", cargo.total_chunks());
+        section_header(&format!("{} Cargo Manifest", Icons::FILE));
+        println!();
 
+        let items = vec![
+            ("Schema", cargo.schema.clone()),
+            ("Path", cargo.path.clone()),
+            ("Size", format_bytes(cargo.size)),
+            ("Chunking", cargo.chunking.chunking_type.clone()),
+            ("Windows", cargo.windows.len().to_string()),
+            ("Chunks", cargo.total_chunks().to_string()),
+        ];
+
+        for (key, value) in items {
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted(format!("{}:", key)),
+                Theme::value(&value)
+            );
+        }
+
+        println!();
         return Ok(());
     }
 
-    eprintln!("❌ Not a valid flight plan or cargo manifest");
+    print_error(
+        "Not a valid flight plan or cargo manifest",
+        Some("Ensure the file is a valid Orbit manifest"),
+    );
     std::process::exit(1);
 }
 
 fn print_presets() {
-    println!("Available Configuration Presets:\n");
+    cli_style::print_banner();
+    section_header(&format!("{} Configuration Presets", Icons::GEAR));
+    println!();
+    println!(
+        "  {}",
+        Theme::muted("Use --profile <preset> to apply a configuration preset")
+    );
+    println!();
 
-    println!("🚀 FAST (--preset fast)");
-    println!("   - No checksum verification");
-    println!("   - No resume capability");
-    println!("   - No compression");
-    println!("   - Zero-copy enabled");
-    println!("   - Parallel operations: auto");
-    println!("   Best for: Local copies on fast storage (NVMe, SSD)\n");
+    let presets = vec![
+        PresetInfo {
+            icon: Icons::ROCKET,
+            name: "FAST",
+            checksum: false,
+            resume: false,
+            compression: "None".to_string(),
+            zero_copy: true,
+            best_for: "Local NVMe/SSD".to_string(),
+        },
+        PresetInfo {
+            icon: Icons::SHIELD,
+            name: "SAFE",
+            checksum: true,
+            resume: true,
+            compression: "None".to_string(),
+            zero_copy: false,
+            best_for: "Critical data".to_string(),
+        },
+        PresetInfo {
+            icon: Icons::GLOBE,
+            name: "NETWORK",
+            checksum: true,
+            resume: true,
+            compression: "Zstd:3".to_string(),
+            zero_copy: false,
+            best_for: "Remote/slow networks".to_string(),
+        },
+        PresetInfo {
+            icon: Icons::LIGHTNING,
+            name: "NEUTRINO",
+            checksum: false,
+            resume: false,
+            compression: "None".to_string(),
+            zero_copy: true,
+            best_for: "Many small files".to_string(),
+        },
+    ];
 
-    println!("🛡️  SAFE (--preset safe)");
-    println!("   - Checksum verification enabled");
-    println!("   - Resume capability enabled");
-    println!("   - 5 retry attempts with exponential backoff");
-    println!("   - Zero-copy disabled (buffered for control)");
-    println!("   Best for: Critical data, unreliable media\n");
+    println!("{}", preset_table(&presets));
 
-    println!("🌐 NETWORK (--preset network)");
-    println!("   - Checksum verification enabled");
-    println!("   - Resume capability enabled");
-    println!("   - Zstd compression (level 3)");
-    println!("   - 10 retry attempts with exponential backoff");
-    println!("   - Zero-copy disabled (compression needed)");
-    println!("   Best for: Remote transfers, slow networks\n");
+    println!();
+    section_header(&format!("{} Example Usage", Icons::SPARKLE));
+    println!();
+    println!(
+        "  {} {}",
+        Theme::muted("Fast local copy:"),
+        Theme::primary("orbit -s /data -d /backup -R --profile standard")
+    );
+    println!(
+        "  {} {}",
+        Theme::muted("Safe with verify:"),
+        Theme::primary("orbit -s /data -d /backup -R --profile safe --check checksum")
+    );
+    println!(
+        "  {} {}",
+        Theme::muted("Network transfer:"),
+        Theme::primary("orbit -s /data -d smb://server/share -R --profile network")
+    );
+    println!();
 }
 
 fn print_capabilities() {
-    println!("Orbit Platform Capabilities\n");
-    println!("═══════════════════════════════════════════════\n");
+    cli_style::print_banner();
 
     let caps = get_zero_copy_capabilities();
 
-    println!("Zero-Copy Support:");
+    // Platform info
+    section_header(&format!("{} Platform", Icons::GEAR));
     println!(
-        "  Available: {}",
-        if caps.available { "✓ Yes" } else { "✗ No" }
+        "  {} {} / {}",
+        Icons::BULLET,
+        Theme::value(std::env::consts::OS),
+        Theme::muted(std::env::consts::ARCH)
     );
-    println!("  Method: {}", caps.method);
-    println!(
-        "  Cross-filesystem: {}",
-        if caps.cross_filesystem {
-            "✓ Yes"
-        } else {
-            "✗ No"
-        }
-    );
+    println!();
 
-    println!("\nPlatform: {}", std::env::consts::OS);
-    println!("Architecture: {}", std::env::consts::ARCH);
+    // Zero-copy capabilities
+    section_header(&format!("{} Zero-Copy Engine", Icons::LIGHTNING));
+    let zero_copy_items: Vec<(&str, bool, &str)> = vec![
+        ("Zero-Copy Available", caps.available, caps.method),
+        (
+            "Cross-Filesystem",
+            caps.cross_filesystem,
+            if caps.cross_filesystem {
+                "Can copy between different mounts"
+            } else {
+                "Same filesystem only"
+            },
+        ),
+    ];
+    println!("{}", capability_table(&zero_copy_items));
 
-    println!("\nCompression Support:");
-    println!("  LZ4: ✓ Yes");
-    println!("  Zstd: ✓ Yes");
+    // Compression
+    section_header(&format!("{} Compression", Icons::GEAR));
+    let compression_items: Vec<(&str, bool, &str)> = vec![
+        ("LZ4", true, "Fast compression, lower ratio"),
+        ("Zstd", true, "Balanced speed/ratio, levels 1-19"),
+    ];
+    println!("{}", capability_table(&compression_items));
 
-    println!("\nProtocol Support:");
-    println!("  Local filesystem: ✓ Production");
-    println!("  SMB/CIFS: ⚠ Experimental");
-    println!("  S3: ⏳ Planned");
-    println!("  Azure Blob: ⏳ Planned");
-    println!("  Google Cloud Storage: ⏳ Planned");
+    // Checksums
+    section_header(&format!("{} Verification", Icons::SHIELD));
+    let checksum_items: Vec<(&str, bool, &str)> = vec![
+        ("SHA-256", true, "Cryptographic, standard"),
+        ("BLAKE3", true, "Modern, parallelizable, faster"),
+    ];
+    println!("{}", capability_table(&checksum_items));
 
-    println!("\nManifest System:");
-    println!("  Flight Plans: ✓ Yes");
-    println!("  Cargo Manifests: ✓ Yes");
-    println!("  Star Maps: ✓ Yes");
-    println!("  Telemetry Logging: ✓ Yes");
-    println!("  Verification: ✓ Yes");
+    // Protocols
+    section_header(&format!("{} Storage Backends", Icons::GLOBE));
+    let protocol_items: Vec<(&str, bool, &str)> = vec![
+        ("Local Filesystem", true, "Production ready"),
+        #[cfg(feature = "smb-native")]
+        ("SMB/CIFS", true, "Native pure-Rust client"),
+        #[cfg(not(feature = "smb-native"))]
+        ("SMB/CIFS", false, "Enable with --features smb-native"),
+        #[cfg(feature = "s3-native")]
+        ("Amazon S3", true, "Multipart upload support"),
+        #[cfg(not(feature = "s3-native"))]
+        ("Amazon S3", false, "Enable with --features s3-native"),
+        #[cfg(feature = "azure-native")]
+        ("Azure Blob", true, "Via object_store"),
+        #[cfg(not(feature = "azure-native"))]
+        ("Azure Blob", false, "Enable with --features azure-native"),
+        #[cfg(feature = "gcs-native")]
+        ("Google Cloud Storage", true, "Via object_store"),
+        #[cfg(not(feature = "gcs-native"))]
+        (
+            "Google Cloud Storage",
+            false,
+            "Enable with --features gcs-native",
+        ),
+        #[cfg(feature = "ssh-backend")]
+        ("SSH/SFTP", true, "Via ssh2"),
+        #[cfg(not(feature = "ssh-backend"))]
+        ("SSH/SFTP", false, "Enable with --features ssh-backend"),
+    ];
+    println!("{}", capability_table(&protocol_items));
 
-    println!("\nPerformance Features:");
-    println!("  Resume: ✓ Yes");
-    println!("  Parallel operations: ✓ Yes");
-    println!("  Bandwidth throttling: ✓ Yes");
-    println!("  Progress tracking: ✓ Yes");
-    println!("  Checksum verification: ✓ Yes (SHA-256)");
+    // Manifest System
+    section_header(&format!("{} Manifest System", Icons::MANIFEST));
+    let manifest_items: Vec<(&str, bool, &str)> = vec![
+        ("Flight Plans", true, "Transfer planning & metadata"),
+        ("Cargo Manifests", true, "Chunk-level verification"),
+        ("Star Maps", true, "Binary index for resume"),
+        ("Audit Logging", true, "HMAC-chained event trail"),
+    ];
+    println!("{}", capability_table(&manifest_items));
 
-    println!("\n═══════════════════════════════════════════════");
+    // Performance
+    section_header(&format!("{} Performance Features", Icons::ROCKET));
+    let perf_items: Vec<(&str, bool, &str)> = vec![
+        ("Resume/Checkpoint", true, "Continue interrupted transfers"),
+        ("Parallel Operations", true, "Multi-file concurrency"),
+        ("Bandwidth Throttle", true, "Rate limiting via token bucket"),
+        ("Progress Tracking", true, "Real-time progress bars"),
+        ("Delta Detection", true, "Content-based change detection"),
+    ];
+    println!("{}", capability_table(&perf_items));
+
+    println!();
 }
 
 fn print_summary(stats: &CopyStats) {
-    println!("\n╔═══════════════════════════════════════════════╗");
-    println!("║              Transfer Complete                ║");
-    println!("╚═══════════════════════════════════════════════╝\n");
-
-    println!("Files copied: {}", stats.files_copied);
-    println!("Files skipped: {}", stats.files_skipped);
-
-    if stats.files_failed > 0 {
-        println!("Files failed: {}", stats.files_failed);
-    }
-
-    println!(
-        "Total bytes: {} ({})",
-        stats.bytes_copied,
-        format_bytes(stats.bytes_copied)
+    println!();
+    header_box(
+        "Transfer Complete",
+        Some("All operations finished successfully"),
     );
+    println!();
 
-    println!("Duration: {:?}", stats.duration);
-
-    let bytes_per_sec = stats.bytes_copied as f64 / stats.duration.as_secs_f64();
-    println!("Average speed: {}/s", format_bytes(bytes_per_sec as u64));
-
-    if let Some(ref checksum) = stats.checksum {
-        println!(
-            "Checksum: {}...{}",
-            &checksum[..8],
-            &checksum[checksum.len() - 8..]
-        );
-    }
-
-    if let Some(ratio) = stats.compression_ratio {
-        println!("Compression ratio: {:.1}%", ratio);
-    }
-}
-
-fn format_bytes(bytes: u64) -> String {
-    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
-
-    if bytes == 0 {
-        return "0 B".to_string();
-    }
-
-    let bytes_f = bytes as f64;
-    let base = 1024.0_f64;
-    let exp = (bytes_f.ln() / base.ln()).floor() as usize;
-    let exp = exp.min(UNITS.len() - 1);
-
-    let value = bytes_f / base.powi(exp as i32);
-
-    if exp == 0 {
-        format!("{} {}", bytes, UNITS[exp])
+    let bytes_per_sec = if stats.duration.as_secs_f64() > 0.0 {
+        stats.bytes_copied as f64 / stats.duration.as_secs_f64()
     } else {
-        format!("{:.2} {}", value, UNITS[exp])
-    }
+        0.0
+    };
+
+    let checksum_display = stats.checksum.as_ref().map(|c| {
+        if c.len() > 16 {
+            format!("{}...{}", &c[..8], &c[c.len() - 8..])
+        } else {
+            c.clone()
+        }
+    });
+
+    let compression_display = stats
+        .compression_ratio
+        .map(|r| format!("{:.1}% reduction", r));
+
+    let summary = TransferSummary {
+        files_copied: stats.files_copied,
+        files_skipped: stats.files_skipped,
+        files_failed: stats.files_failed,
+        total_size: format_bytes(stats.bytes_copied),
+        duration: format_duration(stats.duration.as_secs_f64()),
+        speed: format!("{}/s", format_bytes(bytes_per_sec as u64)),
+        checksum: checksum_display,
+        compression_ratio: compression_display,
+    };
+
+    println!("{}", transfer_summary_table(&summary));
+    println!();
 }

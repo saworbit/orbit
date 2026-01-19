@@ -15,9 +15,11 @@ use tempfile::tempdir;
 #[test]
 fn test_guidance_resume_vs_compression_safety() {
     // Setup: Resume + Compression should trigger safety rule
-    let mut config = CopyConfig::default();
-    config.resume_enabled = true;
-    config.compression = CompressionType::Zstd { level: 1 };
+    let config = CopyConfig {
+        resume_enabled: true,
+        compression: CompressionType::Zstd { level: 1 },
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -47,9 +49,11 @@ fn test_guidance_resume_vs_compression_safety() {
 #[test]
 fn test_guidance_zerocopy_vs_checksum_optimization() {
     // Setup: Zero-copy + Checksum should trigger optimization rule
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = true;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: true,
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -76,10 +80,12 @@ fn test_guidance_zerocopy_vs_checksum_optimization() {
 #[test]
 fn test_guidance_zerocopy_vs_resume_precision() {
     // Setup: Zero-copy + Resume should trigger precision rule
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.resume_enabled = true;
-    config.verify_checksum = false; // Disable to avoid triggering other rules
+    let config = CopyConfig {
+        use_zero_copy: true,
+        resume_enabled: true,
+        verify_checksum: false, // Disable to avoid triggering other rules
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -104,10 +110,12 @@ fn test_guidance_zerocopy_vs_resume_precision() {
 #[test]
 fn test_guidance_sync_checksum_performance_info() {
     // Setup: Sync mode + Checksum check mode should trigger performance info
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Sync;
-    config.check_mode = orbit::core::delta::CheckMode::Checksum;
-    config.use_zero_copy = false; // Avoid other rules
+    let config = CopyConfig {
+        copy_mode: CopyMode::Sync,
+        check_mode: orbit::core::delta::CheckMode::Checksum,
+        use_zero_copy: false, // Avoid other rules
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -127,11 +135,13 @@ fn test_guidance_sync_checksum_performance_info() {
 #[test]
 fn test_guidance_multiple_rules_triggered() {
     // Setup: Configuration that triggers multiple rules
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = true;
-    config.resume_enabled = true;
-    config.compression = CompressionType::Lz4;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: true,
+        resume_enabled: true,
+        compression: CompressionType::Lz4,
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -157,11 +167,13 @@ fn test_guidance_multiple_rules_triggered() {
 #[test]
 fn test_guidance_clean_config_no_notices() {
     // Setup: A clean configuration that doesn't trigger any rules
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = false;
-    config.verify_checksum = true;
-    config.resume_enabled = false;
-    config.compression = CompressionType::None;
+    let config = CopyConfig {
+        use_zero_copy: false,
+        verify_checksum: true,
+        resume_enabled: false,
+        compression: CompressionType::None,
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -182,10 +194,12 @@ fn test_guidance_with_actual_copy_operation() {
     std::fs::write(&source, b"test data for guidance integration").unwrap();
 
     // Setup: Config that should trigger guidance
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = true;
-    config.show_progress = false; // Disable progress for clean test output
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: true,
+        show_progress: false, // Disable progress for clean test output
+        ..Default::default()
+    };
 
     // Apply guidance
     let flight_plan = Guidance::plan(config).unwrap();
@@ -209,11 +223,13 @@ fn test_guidance_with_actual_copy_operation() {
 #[test]
 fn test_guidance_display_format() {
     // Test that notices have proper display format
-    let mut config = CopyConfig::default();
-    config.resume_enabled = true;
-    config.compression = CompressionType::Zstd { level: 3 };
-    config.use_zero_copy = false; // Disable to avoid triggering other rules
-    config.verify_checksum = false; // Disable to avoid triggering other rules
+    let config = CopyConfig {
+        resume_enabled: true,
+        compression: CompressionType::Zstd { level: 3 },
+        use_zero_copy: false,   // Disable to avoid triggering other rules
+        verify_checksum: false, // Disable to avoid triggering other rules
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -234,13 +250,15 @@ fn test_guidance_display_format() {
 #[test]
 fn test_guidance_preserves_other_config_options() {
     // Verify that guidance doesn't modify unrelated config options
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = true;
-    config.retry_attempts = 10;
-    config.chunk_size = 2 * 1024 * 1024;
-    config.max_bandwidth = 1000;
-    config.parallel = 4;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: true,
+        retry_attempts: 10,
+        chunk_size: 2 * 1024 * 1024,
+        max_bandwidth: 1000,
+        parallel: 4,
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -296,10 +314,12 @@ fn test_guidance_cli_output() {
 #[test]
 fn test_guidance_manifest_vs_zerocopy() {
     // Test RULE 6: The Observer Effect (Manifest vs Zero-Copy)
-    let mut config = CopyConfig::default();
-    config.generate_manifest = true;
-    config.use_zero_copy = true;
-    config.verify_checksum = false; // Disable to avoid triggering rule 2
+    let config = CopyConfig {
+        generate_manifest: true,
+        use_zero_copy: true,
+        verify_checksum: false, // Disable to avoid triggering rule 2
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -325,10 +345,12 @@ fn test_guidance_manifest_vs_zerocopy() {
 #[test]
 fn test_guidance_delta_vs_zerocopy() {
     // Test RULE 7: The Patchwork Problem (Delta vs Zero-Copy)
-    let mut config = CopyConfig::default();
-    config.check_mode = orbit::core::delta::CheckMode::Delta;
-    config.use_zero_copy = true;
-    config.verify_checksum = false; // Disable to avoid triggering rule 2
+    let config = CopyConfig {
+        check_mode: orbit::core::delta::CheckMode::Delta,
+        use_zero_copy: true,
+        verify_checksum: false, // Disable to avoid triggering rule 2
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -351,10 +373,12 @@ fn test_guidance_delta_vs_zerocopy() {
 #[test]
 fn test_guidance_parallel_progress_ux() {
     // Test RULE 9: Visual Noise (Parallel vs Progress)
-    let mut config = CopyConfig::default();
-    config.parallel = 4;
-    config.show_progress = true;
-    config.use_zero_copy = false; // Avoid other rules
+    let config = CopyConfig {
+        parallel: 4,
+        show_progress: true,
+        use_zero_copy: false, // Avoid other rules
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 
@@ -375,9 +399,11 @@ fn test_guidance_parallel_progress_ux() {
 #[test]
 fn test_guidance_resume_vs_checksum_integrity() {
     // Test RULE 3: The Integrity Paradox (Resume vs Checksum)
-    let mut config = CopyConfig::default();
-    config.resume_enabled = true;
-    config.verify_checksum = true;
+    let config = CopyConfig {
+        resume_enabled: true,
+        verify_checksum: true,
+        ..Default::default()
+    };
 
     let flight_plan = Guidance::plan(config).unwrap();
 

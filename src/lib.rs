@@ -14,6 +14,7 @@
 
 pub mod audit;
 pub mod cli_progress;
+pub mod cli_style; // CLI styling utilities for beautiful output
 pub mod commands; // Phase 5: CLI command modules (init wizard, etc.)
 pub mod compression;
 pub mod config;

@@ -20,7 +20,7 @@ use orbit_core_cdc::{ChunkConfig, ChunkStream};
 use orbit_core_starmap::universe_v3::{ChunkLocation, Universe};
 use std::fs::File;
 use std::io::Cursor;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -217,8 +217,8 @@ fn create_test_content() -> Vec<u8> {
 /// into an actual file transfer function.
 #[allow(dead_code)]
 fn transfer_with_dedup(
-    source_path: &PathBuf,
-    dest_path: &PathBuf,
+    source_path: &Path,
+    dest_path: &Path,
     universe: &Universe,
 ) -> Result<TransferStats, Box<dyn std::error::Error>> {
     let mut stats = TransferStats::default();
@@ -262,7 +262,7 @@ fn transfer_with_dedup(
             // Store in Universe for future dedup
             let location = ChunkLocation::new(
                 "local".to_string(),
-                dest_path.clone(),
+                dest_path.to_path_buf(),
                 chunk.offset,
                 chunk.data.len() as u32,
             );

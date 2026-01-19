@@ -12,13 +12,15 @@ use orbit::core::probe::{FileSystemType, SystemProfile};
 #[test]
 fn test_backup_profile_generation() {
     // Simulate "Backup" selection logic
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Copy;
-    config.verify_checksum = true;
-    config.preserve_metadata = true;
-    config.retry_attempts = 5;
-    config.exponential_backoff = true;
-    config.resume_enabled = true;
+    let config = CopyConfig {
+        copy_mode: CopyMode::Copy,
+        verify_checksum: true,
+        preserve_metadata: true,
+        retry_attempts: 5,
+        exponential_backoff: true,
+        resume_enabled: true,
+        ..Default::default()
+    };
 
     // Verify backup profile characteristics
     assert_eq!(config.copy_mode, CopyMode::Copy);
@@ -33,12 +35,14 @@ fn test_backup_profile_generation() {
 #[test]
 fn test_sync_profile_generation() {
     // Simulate "Sync" selection logic
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Sync;
-    config.verify_checksum = false; // Trust modtime for speed
-    config.preserve_metadata = true;
-    config.parallel = 0; // Auto-detect
-    config.use_zero_copy = true;
+    let config = CopyConfig {
+        copy_mode: CopyMode::Sync,
+        verify_checksum: false, // Trust modtime for speed
+        preserve_metadata: true,
+        parallel: 0, // Auto-detect
+        use_zero_copy: true,
+        ..Default::default()
+    };
 
     assert_eq!(config.copy_mode, CopyMode::Sync);
     assert!(!config.verify_checksum); // Speed over verification
@@ -50,14 +54,16 @@ fn test_sync_profile_generation() {
 #[test]
 fn test_cloud_profile_generation() {
     // Simulate "Cloud Upload" selection logic
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Copy;
-    config.compression = CompressionType::Zstd { level: 3 };
-    config.verify_checksum = true;
-    config.retry_attempts = 10;
-    config.exponential_backoff = true;
-    config.resume_enabled = true;
-    config.use_zero_copy = false; // Compression requires userspace
+    let config = CopyConfig {
+        copy_mode: CopyMode::Copy,
+        compression: CompressionType::Zstd { level: 3 },
+        verify_checksum: true,
+        retry_attempts: 10,
+        exponential_backoff: true,
+        resume_enabled: true,
+        use_zero_copy: false, // Compression requires userspace
+        ..Default::default()
+    };
 
     assert!(matches!(
         config.compression,
@@ -72,14 +78,16 @@ fn test_cloud_profile_generation() {
 /// Test network transfer profile generation
 #[test]
 fn test_network_profile_generation() {
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Copy;
-    config.compression = CompressionType::Zstd { level: 3 };
-    config.verify_checksum = true;
-    config.resume_enabled = true;
-    config.retry_attempts = 10;
-    config.exponential_backoff = true;
-    config.parallel = 4;
+    let config = CopyConfig {
+        copy_mode: CopyMode::Copy,
+        compression: CompressionType::Zstd { level: 3 },
+        verify_checksum: true,
+        resume_enabled: true,
+        retry_attempts: 10,
+        exponential_backoff: true,
+        parallel: 4,
+        ..Default::default()
+    };
 
     assert!(matches!(config.compression, CompressionType::Zstd { .. }));
     assert!(config.resume_enabled);
@@ -93,13 +101,16 @@ fn test_probe_logic_slow_io_with_abundant_cpu() {
     let cores = 16;
     let io_speed = 40.0; // Slow I/O (< 50 MB/s)
 
-    let mut config = CopyConfig::default();
-
     // Apply Active Guidance logic manually for test
     // This simulates what the Guidance system would do
-    if cores >= 8 && io_speed < 50.0 {
-        config.compression = CompressionType::Zstd { level: 3 };
-    }
+    let config = if cores >= 8 && io_speed < 50.0 {
+        CopyConfig {
+            compression: CompressionType::Zstd { level: 3 },
+            ..Default::default()
+        }
+    } else {
+        CopyConfig::default()
+    };
 
     assert!(matches!(
         config.compression,
@@ -110,19 +121,18 @@ fn test_probe_logic_slow_io_with_abundant_cpu() {
 /// Test network filesystem auto-tuning
 #[test]
 fn test_network_filesystem_auto_tune() {
-    let mut config = CopyConfig::default();
-
     // Simulate detecting SMB filesystem
     let fs_type = FileSystemType::SMB;
 
-    if matches!(fs_type, FileSystemType::SMB | FileSystemType::NFS) {
-        if !config.resume_enabled {
-            config.resume_enabled = true;
+    let config = if matches!(fs_type, FileSystemType::SMB | FileSystemType::NFS) {
+        CopyConfig {
+            resume_enabled: true,
+            retry_attempts: 5,
+            ..Default::default()
         }
-        if config.retry_attempts < 5 {
-            config.retry_attempts = 5;
-        }
-    }
+    } else {
+        CopyConfig::default()
+    };
 
     assert!(config.resume_enabled);
     assert_eq!(config.retry_attempts, 5);
@@ -131,22 +141,19 @@ fn test_network_filesystem_auto_tune() {
 /// Test cloud storage optimization
 #[test]
 fn test_cloud_storage_optimization() {
-    let mut config = CopyConfig::default();
-
     // Simulate detecting cloud storage
     let fs_type = FileSystemType::S3;
 
-    if fs_type.is_cloud_storage() {
-        if matches!(config.compression, CompressionType::None) {
-            config.compression = CompressionType::Zstd { level: 3 };
+    let config = if fs_type.is_cloud_storage() {
+        CopyConfig {
+            compression: CompressionType::Zstd { level: 3 },
+            retry_attempts: 10,
+            exponential_backoff: true,
+            ..Default::default()
         }
-        if config.retry_attempts < 10 {
-            config.retry_attempts = 10;
-        }
-        if !config.exponential_backoff {
-            config.exponential_backoff = true;
-        }
-    }
+    } else {
+        CopyConfig::default()
+    };
 
     assert!(matches!(config.compression, CompressionType::Zstd { .. }));
     assert_eq!(config.retry_attempts, 10);
@@ -156,15 +163,20 @@ fn test_cloud_storage_optimization() {
 /// Test low memory optimization
 #[test]
 fn test_low_memory_optimization() {
-    let mut config = CopyConfig::default();
-    config.parallel = 8;
-
     // Simulate low memory scenario
     let available_ram_gb = 0; // < 1 GB
 
-    if available_ram_gb < 1 && config.parallel > 4 {
-        config.parallel = 2;
-    }
+    let config = if available_ram_gb < 1 {
+        CopyConfig {
+            parallel: 2,
+            ..Default::default()
+        }
+    } else {
+        CopyConfig {
+            parallel: 8,
+            ..Default::default()
+        }
+    };
 
     assert_eq!(config.parallel, 2);
 }
@@ -172,10 +184,12 @@ fn test_low_memory_optimization() {
 /// Test configuration serialization and deserialization
 #[test]
 fn test_config_serialization() {
-    let mut config = CopyConfig::default();
-    config.copy_mode = CopyMode::Copy;
-    config.compression = CompressionType::Zstd { level: 5 };
-    config.verify_checksum = true;
+    let config = CopyConfig {
+        copy_mode: CopyMode::Copy,
+        compression: CompressionType::Zstd { level: 5 },
+        verify_checksum: true,
+        ..Default::default()
+    };
 
     // Serialize to TOML
     let toml_string = toml::to_string(&config).expect("Failed to serialize config");

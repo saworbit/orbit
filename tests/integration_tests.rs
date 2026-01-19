@@ -44,8 +44,10 @@ fn test_compression_lz4() {
     let test_data = b"This is test data that will be compressed with LZ4. ".repeat(100);
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.compression = CompressionType::Lz4;
+    let config = CopyConfig {
+        compression: CompressionType::Lz4,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -64,9 +66,11 @@ fn test_resume_capability() {
     let test_data: Vec<u8> = (0..10_000).map(|i| (i % 256) as u8).collect();
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.resume_enabled = true;
-    config.verify_checksum = false;
+    let config = CopyConfig {
+        resume_enabled: true,
+        verify_checksum: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -96,8 +100,10 @@ fn test_dry_run_mode() {
 
     std::fs::write(&source, b"Test data").unwrap();
 
-    let mut config = CopyConfig::default();
-    config.dry_run = true;
+    let config = CopyConfig {
+        dry_run: true,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -114,8 +120,10 @@ fn test_preserve_metadata() {
 
     std::fs::write(&source, b"Test").unwrap();
 
-    let mut config = CopyConfig::default();
-    config.preserve_metadata = true;
+    let config = CopyConfig {
+        preserve_metadata: true,
+        ..Default::default()
+    };
 
     copy_file(&source, &dest, &config).unwrap();
 
@@ -143,8 +151,10 @@ fn test_checksum_verification() {
 
     std::fs::write(&source, b"Checksum test data").unwrap();
 
-    let mut config = CopyConfig::default();
-    config.verify_checksum = true;
+    let config = CopyConfig {
+        verify_checksum: true,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -169,9 +179,11 @@ fn test_parallel_directory_copy() {
         .unwrap();
     }
 
-    let mut config = CopyConfig::default();
-    config.recursive = true;
-    config.parallel = 4;
+    let config = CopyConfig {
+        recursive: true,
+        parallel: 4,
+        ..Default::default()
+    };
 
     let stats = copy_directory(&source_dir, &dest_dir, &config).unwrap();
 
@@ -226,10 +238,12 @@ fn test_zero_copy_basic_functionality() {
     let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = false; // Disable to allow zero-copy path
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: false, // Disable to allow zero-copy path
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -247,10 +261,12 @@ fn test_zero_copy_with_post_verification() {
     let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = true; // Should do post-copy verification
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: true, // Should do post-copy verification
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -268,10 +284,12 @@ fn test_zero_copy_disabled_by_resume() {
     let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.resume_enabled = true; // Should disable zero-copy
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        resume_enabled: true, // Should disable zero-copy
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -289,10 +307,12 @@ fn test_zero_copy_disabled_by_compression() {
     let test_data = b"Compressible data ".repeat(1000);
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.compression = CompressionType::Lz4; // Should use compression path
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        compression: CompressionType::Lz4, // Should use compression path
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -310,10 +330,12 @@ fn test_zero_copy_disabled_by_bandwidth_limit() {
     let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.max_bandwidth = 1024 * 1024; // 1 MB/s limit should disable zero-copy
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        max_bandwidth: 1024 * 1024, // 1 MB/s limit should disable zero-copy
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -332,10 +354,12 @@ fn test_zero_copy_skipped_for_small_files() {
     let test_data: Vec<u8> = (0..1000).map(|i| (i % 256) as u8).collect();
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = false;
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: false,
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -353,10 +377,12 @@ fn test_zero_copy_explicit_disable() {
     let test_data: Vec<u8> = (0..128_000).map(|i| (i % 256) as u8).collect();
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = false; // Explicitly disabled
-    config.verify_checksum = false;
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: false, // Explicitly disabled
+        verify_checksum: false,
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 
@@ -381,10 +407,12 @@ fn test_zero_copy_data_integrity() {
     }
     std::fs::write(&source, &test_data).unwrap();
 
-    let mut config = CopyConfig::default();
-    config.use_zero_copy = true;
-    config.verify_checksum = true; // Enable verification
-    config.show_progress = false;
+    let config = CopyConfig {
+        use_zero_copy: true,
+        verify_checksum: true, // Enable verification
+        show_progress: false,
+        ..Default::default()
+    };
 
     let stats = copy_file(&source, &dest, &config).unwrap();
 

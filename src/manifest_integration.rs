@@ -290,13 +290,20 @@ mod tests {
 
     #[test]
     fn test_should_generate_manifest() {
-        let mut config = CopyConfig::default();
+        let config = CopyConfig::default();
         assert!(!should_generate_manifest(&config));
 
-        config.generate_manifest = true;
+        let config = CopyConfig {
+            generate_manifest: true,
+            ..Default::default()
+        };
         assert!(!should_generate_manifest(&config)); // Still false, no output dir
 
-        config.manifest_output_dir = Some(PathBuf::from("/tmp/manifests"));
+        let config = CopyConfig {
+            generate_manifest: true,
+            manifest_output_dir: Some(PathBuf::from("/tmp/manifests")),
+            ..Default::default()
+        };
         assert!(should_generate_manifest(&config));
     }
 
@@ -306,8 +313,10 @@ mod tests {
         let source = temp_dir.path().join("source");
         let dest = temp_dir.path().join("dest");
 
-        let mut config = CopyConfig::default();
-        config.manifest_output_dir = Some(temp_dir.path().join("manifests"));
+        let config = CopyConfig {
+            manifest_output_dir: Some(temp_dir.path().join("manifests")),
+            ..Default::default()
+        };
 
         let generator = ManifestGenerator::new(&source, &dest, &config);
         assert!(generator.is_ok());
@@ -326,9 +335,11 @@ mod tests {
         let source = temp_dir.path().join("source");
         let dest = temp_dir.path().join("dest");
 
-        let mut config = CopyConfig::default();
-        config.manifest_output_dir = Some(temp_dir.path().join("manifests"));
-        config.chunking_strategy = ChunkingStrategy::Fixed { size_kib: 1 };
+        let config = CopyConfig {
+            manifest_output_dir: Some(temp_dir.path().join("manifests")),
+            chunking_strategy: ChunkingStrategy::Fixed { size_kib: 1 },
+            ..Default::default()
+        };
 
         let generator = ManifestGenerator::new(&source, &dest, &config).unwrap();
 

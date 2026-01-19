@@ -268,6 +268,6 @@ mod no_ssh {
     #[test]
     fn test_ssh_feature_disabled() {
         // This test ensures the test file compiles even without ssh-backend feature
-        assert!(true, "SSH backend feature is disabled");
+        println!("SSH backend feature is disabled");
     }
 }

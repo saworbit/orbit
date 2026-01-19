@@ -110,20 +110,25 @@ mod tests {
 
     #[test]
     fn test_validation_failures() {
-        let mut policy = SentinelPolicy::default();
-
         // Test min_redundancy = 0
-        policy.min_redundancy = 0;
+        let policy = SentinelPolicy {
+            min_redundancy: 0,
+            ..Default::default()
+        };
         assert!(policy.validate().is_err());
-        policy.min_redundancy = 2; // Reset
 
         // Test max_parallel_heals = 0
-        policy.max_parallel_heals = 0;
+        let policy = SentinelPolicy {
+            max_parallel_heals: 0,
+            ..Default::default()
+        };
         assert!(policy.validate().is_err());
-        policy.max_parallel_heals = 10; // Reset
 
         // Test scan_interval_s = 0
-        policy.scan_interval_s = 0;
+        let policy = SentinelPolicy {
+            scan_interval_s: 0,
+            ..Default::default()
+        };
         assert!(policy.validate().is_err());
     }
 }

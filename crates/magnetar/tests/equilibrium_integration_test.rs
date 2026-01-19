@@ -116,7 +116,7 @@ async fn test_equilibrium_chunk_sizes() -> Result<()> {
     // Verify we got reasonable chunk sizes (min 8KB, max 256KB from config)
     let avg_chunk_size = stats.bytes_transferred / stats.total_chunks as u64;
     assert!(
-        avg_chunk_size >= 8 * 1024 && avg_chunk_size <= 256 * 1024,
+        (8 * 1024..=256 * 1024).contains(&avg_chunk_size),
         "Expected avg chunk size 8-256KB, got {}KB",
         avg_chunk_size / 1024
     );
