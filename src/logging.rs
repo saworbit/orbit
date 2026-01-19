@@ -4,6 +4,7 @@
 
 use std::fs::File;
 use std::path::Path;
+use std::env;
 use tracing::Level;
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
@@ -59,6 +60,14 @@ pub fn init_logging(config: &CopyConfig) -> Result<()> {
         .or_else(|_| EnvFilter::try_new(format!("orbit={}", log_level)))
         .map_err(|e| OrbitError::Config(format!("Failed to create log filter: {}", e)))?;
 
+    let log_mode = env::var("TEST_LOG")
+        .ok()
+        .or_else(|| env::var("ORBIT_LOG_MODE").ok());
+    if log_mode.as_deref() == Some("llm-debug") {
+        init_llm_debug_logging(env_filter, config.log_file.as_deref())?;
+        return Ok(());
+    }
+
     // V3: Create unified audit logger if audit_log_path is configured
     let audit_layer = if let Some(ref audit_path) = config.audit_log_path {
         // Try to load HMAC secret from environment, fallback to disabled logger
@@ -89,6 +98,32 @@ pub fn init_logging(config: &CopyConfig) -> Result<()> {
         init_file_logging(log_path, env_filter, audit_layer, config)?;
     } else {
         init_stdout_logging(env_filter, audit_layer, config);
+    }
+
+    Ok(())
+}
+
+fn init_llm_debug_logging(env_filter: EnvFilter, log_path: Option<&Path>) -> Result<()> {
+    let fmt_layer = fmt::layer()
+        .json()
+        .flatten_event(true)
+        .with_span_list(true)
+        .with_current_span(true)
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(false)
+        .with_thread_ids(false)
+        .with_thread_names(false)
+        .with_span_events(FmtSpan::NONE);
+
+    let registry = tracing_subscriber::registry().with(env_filter);
+
+    if let Some(path) = log_path {
+        let file = File::create(path)
+            .map_err(|e| OrbitError::Config(format!("Failed to create log file: {}", e)))?;
+        registry.with(fmt_layer.with_writer(file)).init();
+    } else {
+        registry.with(fmt_layer).init();
     }
 
     Ok(())

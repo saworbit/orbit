@@ -621,7 +621,9 @@ impl Backend for S3Backend {
             path = %path.display(),
             bucket = self.client.bucket(),
             size_hint = ?size_hint,
-            overwrite = options.overwrite
+            overwrite = options.overwrite,
+            key = tracing::field::Empty,
+            size = tracing::field::Empty
         )
     )]
     async fn write(
@@ -632,6 +634,10 @@ impl Backend for S3Backend {
         options: WriteOptions,
     ) -> BackendResult<u64> {
         let key = self.path_to_key(path);
+        let size = size_hint.unwrap_or(0);
+        let span = tracing::Span::current();
+        span.record("key", &tracing::field::display(&key));
+        span.record("size", &size);
 
         // Check if exists
         if !options.overwrite && self.client.exists(&key).await.unwrap_or(false) {
@@ -647,8 +653,17 @@ impl Backend for S3Backend {
 
         if use_multipart {
             // Stream upload using multipart
-            self.upload_from_reader(&key, reader, size_hint, &options)
+            tracing::debug!("Starting multipart upload");
+            match self
+                .upload_from_reader(&key, reader, size_hint, &options)
                 .await
+            {
+                Ok(bytes) => Ok(bytes),
+                Err(err) => {
+                    tracing::error!(error = ?err, "S3 multipart upload failed");
+                    Err(err)
+                }
+            }
         } else {
             // Small file: buffer in memory and use PutObject for efficiency
             use tokio::io::AsyncReadExt;
@@ -679,10 +694,16 @@ impl Backend for S3Backend {
                 }
             }
 
-            request.send().await.map_err(|e| BackendError::Other {
-                backend: "s3".to_string(),
-                message: format!("Failed to put object: {}", e),
-            })?;
+            match request.send().await {
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::error!(error = ?e, "S3 put_object failed");
+                    return Err(BackendError::Other {
+                        backend: "s3".to_string(),
+                        message: format!("Failed to put object: {}", e),
+                    });
+                }
+            }
 
             Ok(bytes_read as u64)
         }

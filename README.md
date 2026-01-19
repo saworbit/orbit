@@ -1257,6 +1257,19 @@ orbit copy /source /dest \
 - **Cross-service tracing** — Trace transfers across Nucleus, Star, and Sentinel components
 - **Backend instrumentation** — All 45 backend methods emit trace spans (S3, SMB, SSH, local)
 
+#### LLM-Native Debug Logging (Developer Mode)
+
+When you need clean, LLM-friendly logs without audit/HMAC or OTel layers, enable the JSON-only debug mode:
+
+```bash
+TEST_LOG=llm-debug RUST_LOG=debug \
+  cargo test --test integration_tests -- --nocapture
+
+# Or for normal runs
+ORBIT_LOG_MODE=llm-debug RUST_LOG=debug \
+  orbit copy /source /dest
+```
+
 #### 📊 Prometheus Metrics
 
 **Expose metrics for monitoring:**

@@ -35,6 +35,14 @@ where
     let mut last_error: Option<OrbitError> = None;
 
     while attempt <= config.retry_attempts {
+        let attempt_number = attempt + 1;
+        let attempt_span = tracing::info_span!(
+            "retry_attempt",
+            attempt = attempt_number,
+            max_attempts = config.retry_attempts + 1
+        );
+        let _attempt_guard = attempt_span.enter();
+
         if attempt > 0 {
             let delay = calculate_backoff_delay(config, attempt);
 

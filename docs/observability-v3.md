@@ -156,6 +156,10 @@ export OTEL_EXPORTER_OTLP_ENDPOINT="http://jaeger:4317"
 
 # OPTIONAL for Prometheus metrics
 export ORBIT_METRICS_PORT="9090"
+
+# OPTIONAL for LLM-native debug logs (bypasses audit/OTel)
+export TEST_LOG="llm-debug"
+# or: export ORBIT_LOG_MODE="llm-debug"
 ```
 
 ### Command-Line Options
@@ -218,7 +222,23 @@ open http://localhost:16686
 curl http://localhost:9090/metrics
 ```
 
-### Example 3: Compliance Workflow
+### Example 3: LLM-Native Debug Logging
+
+Emit flattened JSON logs for LLM debugging without audit/HMAC or OTel layers:
+
+```bash
+TEST_LOG=llm-debug RUST_LOG=debug \
+  cargo test --test integration_tests -- --nocapture
+```
+
+You can also run a normal command with the same mode:
+
+```bash
+ORBIT_LOG_MODE=llm-debug RUST_LOG=debug \
+  orbit copy --src ./data --dest /backup
+```
+
+### Example 4: Compliance Workflow
 
 ```bash
 # 1. Run audited transfer
