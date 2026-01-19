@@ -158,6 +158,7 @@ Understanding feature stability helps you make informed decisions about what to 
 - **Flexible Error Modes** — Abort, Skip, or Partial (keep incomplete files for resume)
 - **Default Statistics Tracking** — Retry metrics (attempts, successes, failures) are collected and emitted automatically during copy operations
 - **Structured Logging** — Tracing integration for detailed diagnostics
+- **Resilient Sync Verification** — Detects source changes during copy and retries or fails safely
 
 **Default Retry Metrics:**
 

@@ -40,6 +40,10 @@ All notable changes to Orbit will be documented in this file.
 #### Magnetar JobManager
 - Prevented updates from being dropped during shutdown by draining the Disk Guardian queue until the update channel closes.
 
+#### Resilient Sync
+- Guarded against source file changes during copy with pre/post transfer metadata checks.
+- Switched sync stats accounting to atomic counters to reduce lock contention.
+
 ### Added (Pre-Phase 2)
 
 #### Orbit GhostFS - v0.1.0 (2024-12-29)

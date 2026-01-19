@@ -39,6 +39,7 @@ Built-in reliability features:
 - **State tracking** via Magnetar state machine
 - **Resume capability** after interruptions
 - **Pre-flight disk space validation**
+- **Post-copy verification** to detect source changes during transfer and trigger retry/failure
 
 ### Dry-Run Mode
 
