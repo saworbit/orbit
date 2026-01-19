@@ -22,17 +22,6 @@ use_field_init_shorthand = true
 # Use try shorthand (? operator)
 use_try_shorthand = true
 
-# Format code in doc comments
-format_code_in_doc_comments = true
-
-# Format string literals where possible
-format_strings = true
-
-# Normalize comments to use // instead of /**/
-normalize_comments = true
-
-# Wrap comments at max_width
-wrap_comments = true
 
 # Remove nested parentheses
 remove_nested_parens = true
@@ -46,11 +35,15 @@ reorder_modules = true
 # Put a trailing comma after a block based match arm
 match_block_trailing_comma = true
 
-# Break on trailing comma for enum variants
-enum_discrim_align_threshold = 20
 
 # Unstable options (require nightly rustfmt, commented out for stability)
 # Uncomment if using nightly:
+
+# format_code_in_doc_comments = true
+# format_strings = true
+# normalize_comments = true
+# wrap_comments = true
+# enum_discrim_align_threshold = 20
 
 # imports_granularity = "Crate"
 # group_imports = "StdExternalCrate"
