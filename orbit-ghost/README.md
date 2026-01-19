@@ -21,11 +21,16 @@ Orbit GhostFS implements a "Process-while-Moving" paradigm, moving beyond tradit
 
 ### Architecture Components
 
-1. **Metadata Oracle**: Database-backed metadata layer (Magnetar integration)
-2. **Inode Translator**: Bidirectional mapping between FUSE inodes and artifact IDs
-3. **Ghost Driver**: FUSE interface intercepting POSIX syscalls
-4. **Entangler**: Maps OS read requests to block IDs and manages priority queue
-5. **Wormhole Client**: Handles both sequential background fill and priority fetching
+| Module | Component | Purpose |
+|--------|-----------|---------|
+| `oracle.rs` | MetadataOracle | Trait abstraction for metadata backends |
+| `adapter.rs` | MagnetarAdapter | SQLite implementation of MetadataOracle |
+| `translator.rs` | InodeTranslator | Bidirectional u64 ↔ artifact_id mapping |
+| `fs.rs` | OrbitGhostFS | FUSE interface intercepting POSIX syscalls |
+| `entangler.rs` | Entangler | Block coordination and priority queue |
+| `main.rs` | Wormhole thread | Background block fetching (simulated) |
+
+Supporting modules: `inode.rs` (GhostEntry), `error.rs` (GhostError), `config.rs` (GhostConfig)
 
 ## Platform Support
 
@@ -154,9 +159,11 @@ Options:
 - **Caching**: Downloaded blocks persist in `/tmp/orbit_cache/`
 - **Concurrency**: Multiple threads can read different blocks simultaneously
 
-### Failure Modes
-- **Network Loss**: Read syscalls will hang unless timeout implemented
-- **Recommendation**: Add timeout in Entangler loop to return EIO gracefully
+### Current Limitations
+- **Network Loss**: Read syscalls will hang indefinitely (no timeout in polling loop)
+- **Polling Overhead**: 10ms sleep loop wastes CPU vs Condvar::wait()
+- **Single Download Thread**: Sequential block fetching (no parallel downloads)
+- **Recommendation**: Add timeout in Entangler to return ETIMEDOUT gracefully
 
 ## Integration Points
 
@@ -167,69 +174,83 @@ This module is designed to integrate with:
 
 ## Development Status
 
-**Current Implementation (v0.2.0 - Phase 2):**
-- ✅ Core FUSE filesystem
-- ✅ Block-level entanglement logic
-- ✅ Priority queue signaling
+**Current Implementation (v0.1.0 - Phase 2: Materialization Layer):**
+- ✅ Core FUSE filesystem (OrbitGhostFS)
+- ✅ Block-level entanglement logic (Entangler)
+- ✅ Priority queue signaling (crossbeam-channel)
 - ✅ Simulated wormhole transport
-- ✅ **Database-backed metadata** (Magnetar integration)
-- ✅ **CLI argument parsing** (clap)
-- ✅ **Inode translation layer** (lazy allocation)
-- ✅ **Error handling** (errno mapping)
-- ✅ **Async/sync bridge** (tokio runtime handle)
+- ✅ Database-backed metadata (MagnetarAdapter)
+- ✅ CLI argument parsing (clap)
+- ✅ Inode translation layer (InodeTranslator with DashMap)
+- ✅ Error handling with errno mapping (GhostError)
+- ✅ Async/sync bridge (tokio runtime handle)
+- ✅ Pluggable metadata abstraction (MetadataOracle trait)
 
-**Next Steps (v0.3.0):**
+**Next Steps (v0.2.0 - Phase 3: Production Hardening):**
 - ⚠️ Replace polling with Condvar::wait()
+- ⚠️ Add timeout to ensure_block_available()
 - ⚠️ Real Orbit backend integration
-- ⚠️ Timeout/retry for database queries
+- ⚠️ Thread pool for parallel downloads
 - ⚠️ Prefetching heuristics
 - ⚠️ Cache eviction policy (LRU)
+- ⚠️ Configuration file support (TOML)
 - ⚠️ Windows support (WinFSP)
 
 ## Technical Details
 
 ### FUSE Operations Implemented
 
-- `lookup()`: Instant file/directory resolution from manifest
-- `getattr()`: Metadata retrieval without network I/O
-- `readdir()`: Directory listing from in-memory manifest
-- `read()`: Triggers quantum entanglement for block fetching
+- `lookup()`: Database-backed file/directory resolution via MetadataOracle
+- `getattr()`: Metadata retrieval from Magnetar DB (no block I/O)
+- `readdir()`: Directory listing from database with lazy inode allocation
+- `read()`: Triggers block entanglement for on-demand fetching
 
 ### Block Request Flow
 
 ```
 Application read() syscall
     ↓
-FUSE read() handler
+FUSE read() handler (OrbitGhostFS)
     ↓
-Calculate block range
+Translate inode → artifact_id (InodeTranslator)
+    ↓
+Calculate block range (offset / BLOCK_SIZE)
     ↓
 Entangler.ensure_block_available()
+    ├─→ [Cache hit] Return immediately
+    └─→ [Cache miss] Send BlockRequest via channel
+                        ↓
+                    Wormhole thread receives request
+                        ↓
+                    Simulate 500ms network latency
+                        ↓
+                    Write block to {cache_dir}/{file_id}_{block}.bin
+                        ↓
+                    Entangler polling detects file exists
     ↓
-Check local cache
+Read block from cache, slice to exact byte range
     ↓
-[If missing] Send priority signal to Wormhole
-    ↓
-Block until block appears in cache
-    ↓
-Read from cache and return data
+Return data to kernel
 ```
 
 ### Concurrency Model
 
 - **FUSE threads**: Multiple read operations can occur concurrently
-- **Entangler**: Thread-safe via Arc<Mutex<HashMap>>
-- **Wormhole**: Single background thread with channel-based priority queue
+- **InodeTranslator**: Lock-free via DashMap + AtomicU64
+- **Entangler**: Thread-safe via Arc<Mutex<HashMap>> for waiting rooms
+- **Wormhole**: Single background thread with crossbeam-channel priority queue
+- **Current limitation**: Polling loop (10ms sleep) instead of Condvar::wait()
 - **Production**: Scale to thread pool for parallel downloads
 
 ## Configuration
 
 ### Block Size
 
-Configured in [src/fs.rs](src/fs.rs:11):
+Configured in [fs.rs:11](src/fs.rs#L11):
 
 ```rust
 const BLOCK_SIZE: u64 = 1024 * 1024; // 1MB
+const TTL: Duration = Duration::from_secs(1); // Attribute cache TTL
 ```
 
 **Recommendation:** Increase to 5-16MB for production to align with cloud object storage chunk sizes.
