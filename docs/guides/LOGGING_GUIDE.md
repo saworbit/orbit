@@ -408,6 +408,19 @@ export RUST_LOG=orbit_web=trace,orbit_core=debug
 export RUST_LOG=orbit_web=debug,tower_http=warn
 ```
 
+### LLM-Native Debug Logging
+
+Emit flattened JSON logs for LLM debugging without audit/HMAC or OTel layers:
+
+```bash
+# Demo run
+ORBIT_LOG_MODE=llm-debug RUST_LOG=debug ./demo-orbit.sh
+
+# Integration tests
+TEST_LOG=llm-debug RUST_LOG=debug \
+  cargo test --test integration_tests -- --nocapture
+```
+
 ### Network Diagnostics
 
 ```bash

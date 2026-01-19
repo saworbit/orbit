@@ -218,6 +218,24 @@ cat orbit_audit.log | column -t -s,
 
 ---
 
+## LLM-Native Debug Logging (Developer Mode)
+
+When you need LLM-friendly JSON logs without audit/HMAC or OTel layers, set a log mode environment variable:
+
+```bash
+ORBIT_LOG_MODE=llm-debug RUST_LOG=debug \
+  orbit copy /source /dest
+```
+
+For integration tests:
+
+```bash
+TEST_LOG=llm-debug RUST_LOG=debug \
+  cargo test --test integration_tests -- --nocapture
+```
+
+---
+
 ## 🎯 CLI Flags Quick Reference
 
 | Flag | Short | Description | Example |
