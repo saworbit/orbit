@@ -29,10 +29,20 @@ quiet = false
 # Risk: Low (not a security vulnerability, just unmaintained)
 # Plan: Remove once AWS SDK updates to rustls-pki-types 1.9+
 # Advisory Date: 2025-11-28 (very recent, AWS SDK fix expected soon)
+# RUSTSEC-2025-0141: bincode unmaintained (core-starmap + polars transitive)
+# Status: Used by orbit-core-starmap and polars (analytics stack)
+# Risk: Low (no known vulnerability, maintenance-only advisory)
+# Plan: Migration tracked in docs/DEPENDABOT_ISSUES.md
+# RUSTSEC-2026-0002: lru unsound IterMut (via aws-sdk-s3)
+# Status: Transitive dependency through AWS SDK S3 client
+# Risk: Medium (unsoundness could cause UB in edge cases)
+# Plan: Remove once AWS SDK updates lru
 ignore = [
     "RUSTSEC-2023-0071",  # RSA timing side-channel (SMB feature only)
     "RUSTSEC-2024-0436",  # paste - compile-time macro only
     "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained (AWS SDK transitive dep)
+    "RUSTSEC-2025-0141",  # bincode unmaintained (core-starmap + polars)
+    "RUSTSEC-2026-0002",  # lru unsound IterMut (AWS SDK transitive dep)
 ]
 
 # Yanked Crates

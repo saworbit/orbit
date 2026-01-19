@@ -149,7 +149,7 @@ chmod 600 ~/.orbit/orbit.toml
 
 ### Dependency Security Audit
 
-We regularly run `cargo audit` to monitor security advisories in our dependency tree. Current status as of dependency update (2025-12-04):
+We regularly run `cargo audit` to monitor security advisories in our dependency tree. Current status as of dependency update (2026-01-19):
 
 #### ✅ Default Build: No Active Vulnerabilities
 
@@ -174,6 +174,27 @@ The default build configuration (`cargo build`) has **zero runtime security vuln
 - **Impact:** No runtime security risk (macros only used during compilation)
 - **Mitigation:** Monitoring for replacement or upstream maintenance resumption
 - **Actual Risk:** Minimal (no runtime code execution)
+
+**Unmaintained Dependency: `bincode` (RUSTSEC-2025-0141)**
+- **Status:** Used by `orbit-core-starmap` and transitive through `polars`
+- **Dependency Chain:** `bincode 1.3.3` -> `orbit-core-starmap` -> `orbit`; `bincode 2.0.1` -> `polars` -> `magnetar` -> `orbit-server`
+- **Impact:** Maintenance-only advisory; no known vulnerability; no safe upgrade path
+- **Mitigation:** Migration plan tracked in `docs/DEPENDABOT_ISSUES.md`
+- **Actual Risk:** Low (no known exploit; monitoring alternatives)
+
+**Unmaintained Dependency: `rustls-pemfile` (RUSTSEC-2025-0134)**
+- **Status:** Transitive dependency via AWS SDK (not a direct dependency)
+- **Dependency Chain:** `rustls-pemfile` -> `hyper-rustls` -> `aws-smithy-runtime` -> `aws-sdk-s3`
+- **Impact:** Maintenance-only advisory; no known vulnerability
+- **Mitigation:** Remove once AWS SDK updates to rustls-pki-types 1.9+
+- **Actual Risk:** Low (transitive, no known exploit)
+
+**Unsound Dependency: `lru` (RUSTSEC-2026-0002)**
+- **Status:** Transitive dependency through `aws-sdk-s3`
+- **Dependency Chain:** `lru` -> `aws-sdk-s3` -> `orbit`
+- **Impact:** `IterMut` unsoundness could lead to undefined behavior in edge cases
+- **Mitigation:** Remove once AWS SDK updates the `lru` dependency
+- **Actual Risk:** Low to Medium (transitive, not directly exposed)
 
 #### 🎯 Security Posture by Feature Set
 
