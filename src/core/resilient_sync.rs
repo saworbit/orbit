@@ -19,8 +19,9 @@ use crate::core::validation::should_copy_file;
 use crate::error::{OrbitError, Result};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
 use walkdir::WalkDir;
 
 /// Task types for resilient sync operations
@@ -30,7 +31,8 @@ pub enum SyncTask {
     Copy {
         source: PathBuf,
         dest: PathBuf,
-        size: u64,
+        expected_size: Option<u64>,
+        expected_mtime: Option<SystemTime>,
     },
     /// Delete a file at destination (mirror mode)
     Delete { path: PathBuf },
@@ -96,6 +98,42 @@ impl ResilientSyncStats {
     /// Check if sync completed successfully
     pub fn is_success(&self) -> bool {
         self.files_failed == 0
+    }
+}
+
+#[derive(Debug, Default)]
+struct ResilientSyncCounters {
+    files_copied: AtomicU64,
+    files_deleted: AtomicU64,
+    files_skipped: AtomicU64,
+    files_failed: AtomicU64,
+    bytes_copied: AtomicU64,
+    bytes_saved_by_delta: AtomicU64,
+    dirs_created: AtomicU64,
+    total_tasks: AtomicU64,
+    completed_tasks: AtomicU64,
+    duration_ms: AtomicU64,
+}
+
+impl ResilientSyncCounters {
+    fn snapshot(&self) -> ResilientSyncStats {
+        ResilientSyncStats {
+            files_copied: self.files_copied.load(Ordering::Relaxed),
+            files_deleted: self.files_deleted.load(Ordering::Relaxed),
+            files_skipped: self.files_skipped.load(Ordering::Relaxed),
+            files_failed: self.files_failed.load(Ordering::Relaxed),
+            bytes_copied: self.bytes_copied.load(Ordering::Relaxed),
+            bytes_saved_by_delta: self.bytes_saved_by_delta.load(Ordering::Relaxed),
+            dirs_created: self.dirs_created.load(Ordering::Relaxed),
+            total_tasks: self.total_tasks.load(Ordering::Relaxed),
+            completed_tasks: self.completed_tasks.load(Ordering::Relaxed),
+            duration: Duration::from_millis(self.duration_ms.load(Ordering::Relaxed)),
+        }
+    }
+
+    fn set_duration(&self, duration: Duration) {
+        self.duration_ms
+            .store(duration.as_millis() as u64, Ordering::Relaxed);
     }
 }
 
@@ -174,11 +212,14 @@ impl SyncPlanner {
                 };
 
                 if needs_copy {
-                    let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    let metadata = entry.metadata().ok();
+                    let expected_size = metadata.as_ref().map(|meta| meta.len());
+                    let expected_mtime = metadata.and_then(|meta| meta.modified().ok());
                     tasks.push(TrackedTask::new(SyncTask::Copy {
                         source: src_path.to_path_buf(),
                         dest: dest_path,
-                        size,
+                        expected_size,
+                        expected_mtime,
                     }));
                 }
             }
@@ -238,7 +279,7 @@ impl SyncPlanner {
 /// optional state persistence.
 pub struct SyncExecutor {
     config: CopyConfig,
-    stats: Arc<Mutex<ResilientSyncStats>>,
+    stats: Arc<ResilientSyncCounters>,
 }
 
 impl SyncExecutor {
@@ -246,7 +287,7 @@ impl SyncExecutor {
     pub fn new(config: CopyConfig) -> Self {
         Self {
             config,
-            stats: Arc::new(Mutex::new(ResilientSyncStats::default())),
+            stats: Arc::new(ResilientSyncCounters::default()),
         }
     }
 
@@ -254,10 +295,9 @@ impl SyncExecutor {
     pub fn execute(&self, tasks: &mut [TrackedTask]) -> Result<ResilientSyncStats> {
         let start = Instant::now();
 
-        {
-            let mut stats = self.stats.lock().unwrap();
-            stats.total_tasks = tasks.len() as u64;
-        }
+        self.stats
+            .total_tasks
+            .store(tasks.len() as u64, Ordering::Relaxed);
 
         // Dry run mode
         if self.config.dry_run {
@@ -276,8 +316,7 @@ impl SyncExecutor {
             match result {
                 Ok(()) => {
                     task.status = TaskStatus::Completed;
-                    let mut stats = self.stats.lock().unwrap();
-                    stats.completed_tasks += 1;
+                    self.stats.completed_tasks.fetch_add(1, Ordering::Relaxed);
                 }
                 Err(e) => {
                     task.error = Some(e.to_string());
@@ -298,16 +337,15 @@ impl SyncExecutor {
                     match self.config.error_mode {
                         ErrorMode::Abort => return Err(e),
                         ErrorMode::Skip | ErrorMode::Partial => {
-                            let mut stats = self.stats.lock().unwrap();
-                            stats.files_failed += 1;
+                            self.stats.files_failed.fetch_add(1, Ordering::Relaxed);
                         }
                     }
                 }
             }
         }
 
-        let mut final_stats = self.stats.lock().unwrap().clone();
-        final_stats.duration = start.elapsed();
+        self.stats.set_duration(start.elapsed());
+        let final_stats = self.stats.snapshot();
 
         Ok(final_stats)
     }
@@ -315,18 +353,70 @@ impl SyncExecutor {
     /// Execute a single task
     fn execute_task(&self, task: &TrackedTask) -> Result<()> {
         match &task.task {
-            SyncTask::Copy { source, dest, size } => {
+            SyncTask::Copy {
+                source,
+                dest,
+                expected_size,
+                expected_mtime,
+            } => {
                 // Create parent directories
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
 
+                let pre_meta = std::fs::metadata(source)?;
+                let pre_size = pre_meta.len();
+                let pre_mtime = pre_meta.modified().ok();
+
+                if let Some(expected_size) = expected_size {
+                    if pre_size != *expected_size {
+                        return Err(OrbitError::MetadataFailed(format!(
+                            "Source changed before copy (size {} -> {}) for {}",
+                            expected_size,
+                            pre_size,
+                            source.display()
+                        )));
+                    }
+                }
+
+                if let (Some(expected_mtime), Some(pre_mtime)) = (expected_mtime, pre_mtime) {
+                    if pre_mtime != *expected_mtime {
+                        return Err(OrbitError::MetadataFailed(format!(
+                            "Source changed before copy (mtime) for {}",
+                            source.display()
+                        )));
+                    }
+                }
+
                 // Copy file using existing copy infrastructure
                 std::fs::copy(source, dest)?;
 
-                let mut stats = self.stats.lock().unwrap();
-                stats.files_copied += 1;
-                stats.bytes_copied += size;
+                let post_meta = std::fs::metadata(source)?;
+                let post_size = post_meta.len();
+                let post_mtime = post_meta.modified().ok();
+
+                if post_size != pre_size {
+                    return Err(OrbitError::MetadataFailed(format!(
+                        "Source changed during copy (size {} -> {}) for {}",
+                        pre_size,
+                        post_size,
+                        source.display()
+                    )));
+                }
+
+                if let (Some(pre_mtime), Some(post_mtime)) = (pre_mtime, post_mtime) {
+                    if post_mtime != pre_mtime {
+                        return Err(OrbitError::MetadataFailed(format!(
+                            "Source changed during copy (mtime) for {}",
+                            source.display()
+                        )));
+                    }
+                }
+
+                self.stats.files_copied.fetch_add(1, Ordering::Relaxed);
+                self.stats
+                    .bytes_copied
+                    .fetch_add(post_size, Ordering::Relaxed);
             }
             SyncTask::Delete { path } => {
                 if path.is_dir() {
@@ -335,14 +425,12 @@ impl SyncExecutor {
                     std::fs::remove_file(path)?;
                 }
 
-                let mut stats = self.stats.lock().unwrap();
-                stats.files_deleted += 1;
+                self.stats.files_deleted.fetch_add(1, Ordering::Relaxed);
             }
             SyncTask::CreateDir { path } => {
                 std::fs::create_dir_all(path)?;
 
-                let mut stats = self.stats.lock().unwrap();
-                stats.dirs_created += 1;
+                self.stats.dirs_created.fetch_add(1, Ordering::Relaxed);
             }
         }
 
@@ -362,7 +450,13 @@ impl SyncExecutor {
 
         for task in tasks {
             match &task.task {
-                SyncTask::Copy { source, dest, size } => {
+                SyncTask::Copy {
+                    source,
+                    dest,
+                    expected_size,
+                    ..
+                } => {
+                    let size = expected_size.unwrap_or(0);
                     println!(
                         "COPY: {} -> {} ({} bytes)",
                         source.display(),
@@ -392,7 +486,7 @@ impl SyncExecutor {
 
     /// Get current statistics
     pub fn stats(&self) -> ResilientSyncStats {
-        self.stats.lock().unwrap().clone()
+        self.stats.snapshot()
     }
 }
 
