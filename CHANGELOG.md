@@ -35,6 +35,10 @@ All notable changes to Orbit will be documented in this file.
 - Updated fuser to 0.16
 - See [orbit-ghost/CHANGELOG.md](orbit-ghost/CHANGELOG.md#020---2025-01-04) for migration guide
 
+#### Maintenance
+- Bumped smb crate to 0.11.1 for SMB/CIFS backend support.
+- Updated GitHub Actions upload-artifact to v6.
+
 ### Fixed
 
 #### Magnetar JobManager

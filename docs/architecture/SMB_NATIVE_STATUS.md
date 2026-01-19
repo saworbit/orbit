@@ -9,7 +9,7 @@
 ## Executive Summary
 
 The native SMB2/3 implementation for Orbit is **fully functional and compiles successfully**. All compilation errors have been resolved, including:
-- ✅ Updated to smb crate v0.11.0 with full API compatibility
+- ✅ Updated to smb crate v0.11.1 with full API compatibility
 - ✅ Migrated from deprecated `list()` to `Directory::query()` API
 - ✅ Implemented Smart Fallback logic (Encryption → Signing if Opportunistic)
 - ✅ Robust connection with retry logic (3 attempts)
@@ -19,7 +19,7 @@ The native SMB2/3 implementation for Orbit is **fully functional and compiles su
 
 **Changes in v0.5.1:**
 - Migrated from deprecated `list()` to `Directory::query()`
-- Upgraded smb crate to v0.11.0
+- Upgraded smb crate to v0.11.1
 - Implemented SmbSecurity policy enforcement
 - Added retry connection logic with exponential backoff
 - Optimized directory queries with FileNamesInformation
@@ -63,9 +63,9 @@ All components are implemented and ready:
 
 ### ✅ v0.5.1 - SMB v0.11.0 Remediation
 
-The implementation has been upgraded to smb crate v0.11.0 for long-term stability:
+The implementation has been upgraded to smb crate v0.11.1 for long-term stability:
 
-1. **Updated to smb crate v0.11.0**
+1. **Updated to smb crate v0.11.1**
    - Pinned to v0.11.0 for API stability
    - Removed deprecated features (sign_hmac, sign_gmac, sign_cmac, compress_lz4, compress_pattern_v1)
    - Streamlined feature flags: async, encrypt_aesgcm, encrypt_aesccm, std-fs-impls, netbios-transport
@@ -154,7 +154,7 @@ Despite the compilation issue, the SMB implementation is **production-ready**:
 **SMB support is now fully functional with v0.11.0:**
 
 1. ✅ All code compiles successfully with `smb-native` feature
-2. ✅ API fully updated to smb crate v0.11.0
+2. ✅ API fully updated to smb crate v0.11.1
 3. ✅ Directory listing migrated to `query()` API
 4. ✅ Retry logic with exponential backoff
 5. ✅ Custom port support implemented
@@ -278,7 +278,7 @@ For v0.5.1 release notes:
   **Status:** ✅ Compilation successful, ready for integration testing
 
   **Changes in v0.5.1:**
-  - Upgraded smb crate from v0.10.2 to v0.11.0
+  - Upgraded smb crate from v0.10.2 to v0.11.1
   - Migrated from deprecated `list()` to `Directory::query()` API
   - Implemented retry logic with exponential backoff (3 attempts)
   - Added Smart Fallback for encryption (tries encryption, falls back to signing)
@@ -300,7 +300,7 @@ For v0.5.1 release notes:
   **Enable with:** `cargo build --features smb-native`
 
   **API Updates:**
-  - Updated to smb crate v0.11.0
+  - Updated to smb crate v0.11.1
   - Migrated to current query() API for directory operations
   - Result type aliases for cleaner error handling
   - Trait-based I/O operations (ReadAt, WriteAt, GetLen)
@@ -337,7 +337,7 @@ Once working, the following documentation should be created:
 
 The SMB native implementation for Orbit v0.5.1 is **fully functional and ready for use**. All compilation issues have been resolved, and the implementation is production-ready with the following key achievements:
 
-✅ **Complete API Migration:** Updated to smb crate v0.11.0 with all current APIs
+✅ **Complete API Migration:** Updated to smb crate v0.11.1 with all current APIs
 ✅ **Directory Listing:** Migrated from deprecated `list()` to `Directory::query()` API
 ✅ **Retry Logic:** 3 connection attempts with exponential backoff for robustness
 ✅ **Smart Fallback:** Tries encryption, falls back to signing if opportunistic

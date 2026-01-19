@@ -959,7 +959,7 @@ Orbit supports multiple storage backends through a **unified backend abstraction
 | 🗂️ **Local** | 🟢 Stable | Built-in | Local filesystem with zero-copy optimization |
 | 🔐 **SSH/SFTP** | 🟡 Beta | `ssh-backend` | Remote filesystem access via SSH/SFTP with async I/O |
 | ☁️ **S3** | 🟡 Beta | `s3-native` | Amazon S3 and compatible object storage (MinIO, LocalStack) |
-| 🌐 **SMB/CIFS** | 🟡 Beta | `smb-native` | Native SMB2/3 client (pure Rust, v0.11.0, ready for testing) |
+| 🌐 **SMB/CIFS** | 🟡 Beta | `smb-native` | Native SMB2/3 client (pure Rust, v0.11.1, ready for testing) |
 | ☁️ **Azure Blob** | 🟡 Beta | `azure-native` | Microsoft Azure Blob Storage (using object_store crate) |
 | ☁️ **GCS** | 🟡 Beta | `gcs-native` | Google Cloud Storage (using object_store crate) |
 | 🌐 **WebDAV** | 🚧 Planned | - | WebDAV protocol support |
