@@ -270,13 +270,13 @@ where
         for chunk in chunks {
             let chunk_size = chunk.length as u64;
 
-            // Check Universe Map (Is this chunk already known globally?)
-            let exists = self
+            // Atomically claim this chunk to avoid duplicate transfers.
+            let claimed = self
                 .universe
-                .has_chunk(&chunk.hash)
-                .context("Failed to query Universe index")?;
+                .try_claim_chunk(chunk.hash)
+                .context("Failed to claim Universe index")?;
 
-            if !exists {
+            if claimed {
                 // New chunk - need to transfer
                 // In a real implementation, we would:
                 // 1. Acquire connection from pool

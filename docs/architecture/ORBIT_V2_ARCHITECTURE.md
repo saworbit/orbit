@@ -348,14 +348,16 @@ use std::path::PathBuf;
 // Open or create database
 let universe = Universe::open("repo.universe.db").unwrap();
 
-// Insert chunk location
+// Atomically claim before transfer to avoid duplicate work
 let hash = [0x42; 32];
-let location = ChunkLocation::new(
-    PathBuf::from("/data/video.mp4"),
-    1024,  // offset
-    4096   // length
-);
-universe.insert_chunk(hash, location).unwrap();
+if universe.try_claim_chunk(hash).unwrap() {
+    let location = ChunkLocation::new(
+        PathBuf::from("/data/video.mp4"),
+        1024,  // offset
+        4096   // length
+    );
+    universe.insert_chunk(hash, location).unwrap();
+}
 
 // Find all locations for a chunk
 let locations = universe.find_chunk(&hash).unwrap();

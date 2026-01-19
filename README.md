@@ -618,6 +618,7 @@ orbit --source /critical --dest /backup \
   - Uses redb for zero-copy, memory-mapped storage with full ACID guarantees
   - Data survives application restarts (verified with drop & re-open tests)
   - ChunkLocation tracking: Full path + offset + length for precise deduplication
+  - Atomic chunk claims (`try_claim_chunk`) avoid duplicate transfers under concurrency
   - 4/4 persistence tests passing
 - **See:** [ORBIT_V2_ARCHITECTURE.md](ORBIT_V2_ARCHITECTURE.md) for complete details
 

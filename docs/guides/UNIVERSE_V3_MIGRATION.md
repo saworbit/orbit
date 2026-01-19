@@ -126,6 +126,16 @@ fn check_dedup_v3(universe: &orbit_core_starmap::universe_v3::Universe, hash: &[
 }
 ```
 
+Note: For concurrent workers using the V2 persistent Universe, prefer an atomic claim to avoid check-then-act races:
+
+```rust
+fn claim_dedup_v2(universe: &orbit_core_starmap::universe::Universe, hash: [u8; 32]) -> Result<bool> {
+    universe.try_claim_chunk(hash)
+}
+```
+
+If `try_claim_chunk` returns true, transfer the chunk and then register its location.
+
 ### Transfer with Deduplication
 
 ```rust

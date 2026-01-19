@@ -98,6 +98,22 @@ universe.add_chunk(&hash, Location::new(file1, 0, 4096));
 let locations = universe.get_locations(&hash).unwrap();
 ```
 
+### Persistent Universe (Stage 4)
+
+```rust
+use orbit_core_starmap::{Universe, ChunkLocation};
+use std::path::PathBuf;
+
+let universe = Universe::open("repo.universe.db")?;
+let hash = [0x42; 32];
+
+// Atomically claim before transfer to avoid duplicate work.
+if universe.try_claim_chunk(hash)? {
+    let location = ChunkLocation::new(PathBuf::from("/data/file.bin"), 0, 4096);
+    universe.insert_chunk(hash, location)?;
+}
+```
+
 ## Performance Comparison
 
 | Feature | Universe V2 | Universe V3 | Improvement |

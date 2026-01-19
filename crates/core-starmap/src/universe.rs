@@ -411,6 +411,17 @@ mod tests {
         assert_eq!(stats.unique_chunks, 0);
         assert_eq!(stats.space_savings_pct(), 0.0);
     }
+
+    #[test]
+    fn test_try_claim_chunk_persistent() {
+        let temp_file = NamedTempFile::new().unwrap();
+        let universe = Universe::open(temp_file.path()).unwrap();
+        let hash = [0x11; 32];
+
+        assert!(universe.try_claim_chunk(hash).unwrap());
+        assert!(!universe.try_claim_chunk(hash).unwrap());
+        assert!(universe.has_chunk(&hash).unwrap());
+    }
 }
 
 // ============================================================================
@@ -546,6 +557,50 @@ impl Universe {
             Ok(None) => Ok(None),
             Err(e) => Err(Error::Other(format!("Failed to read chunk: {}", e))),
         }
+    }
+
+    /// Atomically claim a chunk hash if it doesn't already exist.
+    ///
+    /// Returns true if this call inserted a new entry.
+    /// Callers should append a location after successful transfer.
+    pub fn try_claim_chunk(&self, hash: [u8; 32]) -> Result<bool> {
+        let write_txn = self
+            .db
+            .begin_write()
+            .map_err(|e| Error::Other(format!("Failed to begin write transaction: {}", e)))?;
+
+        let mut inserted = false;
+
+        {
+            let mut table = write_txn
+                .open_table(CHUNKS_TABLE)
+                .map_err(|e| Error::Other(format!("Failed to open chunks table: {}", e)))?;
+
+            let exists = match table.get(&hash) {
+                Ok(Some(_)) => true,
+                Ok(None) => false,
+                Err(e) => return Err(Error::Other(format!("Failed to read chunk: {}", e))),
+            };
+
+            if !exists {
+                let serialized = bincode::serialize(&Vec::<ChunkLocation>::new())
+                    .map_err(|e| Error::SerializationError(e.to_string()))?;
+
+                table
+                    .insert(&hash, serialized.as_slice())
+                    .map_err(|e| Error::Other(format!("Failed to insert chunk: {}", e)))?;
+
+                inserted = true;
+            }
+        }
+
+        if inserted {
+            write_txn
+                .commit()
+                .map_err(|e| Error::Other(format!("Failed to commit transaction: {}", e)))?;
+        }
+
+        Ok(inserted)
     }
 
     /// Check if a chunk exists in the database
