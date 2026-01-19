@@ -2,9 +2,9 @@
  * Logging and tracing initialization with unified observability
  */
 
+use std::env;
 use std::fs::File;
 use std::path::Path;
-use std::env;
 use tracing::Level;
 use tracing_subscriber::{
     fmt::{self, format::FmtSpan},
