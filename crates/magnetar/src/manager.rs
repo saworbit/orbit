@@ -83,7 +83,7 @@ pub struct JobManager {
     /// Job ID this manager is responsible for
     job_id: i64,
     /// Channel for workers to send updates
-    update_tx: mpsc::Sender<JobUpdate>,
+    update_tx: Arc<RwLock<Option<mpsc::Sender<JobUpdate>>>>,
     /// Shutdown signal
     shutdown_tx: Arc<RwLock<Option<tokio::sync::oneshot::Sender<()>>>>,
     /// Reference to the underlying store (for reads)
@@ -121,7 +121,7 @@ impl JobManager {
 
         let manager = Self {
             job_id,
-            update_tx,
+            update_tx: Arc::new(RwLock::new(Some(update_tx))),
             shutdown_tx: Arc::new(RwLock::new(Some(shutdown_tx))),
             store,
         };
@@ -146,7 +146,16 @@ impl JobManager {
             error,
         };
 
-        self.update_tx
+        let update_tx = {
+            let update_tx = self.update_tx.read().await;
+            update_tx.as_ref().cloned()
+        };
+
+        let Some(update_tx) = update_tx else {
+            return Err(anyhow::anyhow!("JobManager is shutting down"));
+        };
+
+        update_tx
             .send(update)
             .await
             .map_err(|_| anyhow::anyhow!("Disk Guardian task has stopped"))?;
@@ -172,10 +181,13 @@ impl JobManager {
 
     /// Gracefully shutdown the manager
     ///
-    /// This signals the Disk Guardian to flush all pending updates
-    /// and then stop. You should await the guardian_handle to ensure
-    /// all updates are persisted.
+    /// This stops accepting new updates and signals the Disk Guardian
+    /// to flush all pending updates before stopping. You should await
+    /// the guardian_handle to ensure all updates are persisted.
     pub async fn shutdown(&self) -> Result<()> {
+        let mut update_tx = self.update_tx.write().await;
+        update_tx.take();
+
         let mut shutdown = self.shutdown_tx.write().await;
         if let Some(tx) = shutdown.take() {
             let _ = tx.send(());
@@ -201,6 +213,7 @@ async fn run_persistence_loop(
     let mut buffer = Vec::with_capacity(config.batch_size);
     let mut flush_timer = tokio::time::interval(config.flush_interval);
     flush_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let mut shutdown_requested = false;
 
     info!(
         job_id,
@@ -212,12 +225,28 @@ async fn run_persistence_loop(
     loop {
         tokio::select! {
             // Receive update from workers
-            Some(update) = update_rx.recv() => {
-                buffer.push(update);
+            update = update_rx.recv() => {
+                match update {
+                    Some(update) => {
+                        buffer.push(update);
 
-                // Flush if batch size reached
-                if buffer.len() >= config.batch_size {
-                    flush_updates(&store, job_id, &mut buffer).await?;
+                        // Flush if batch size reached
+                        if buffer.len() >= config.batch_size {
+                            flush_updates(&store, job_id, &mut buffer).await?;
+                        }
+                    }
+                    None => {
+                        if !buffer.is_empty() {
+                            flush_updates(&store, job_id, &mut buffer).await?;
+                        }
+
+                        if !shutdown_requested {
+                            info!(job_id, "Disk Guardian update channel closed");
+                        }
+
+                        info!(job_id, "Disk Guardian stopped gracefully");
+                        break;
+                    }
                 }
             }
 
@@ -230,24 +259,8 @@ async fn run_persistence_loop(
 
             // Shutdown signal received
             _ = &mut shutdown_rx => {
+                shutdown_requested = true;
                 info!(job_id, pending_updates = buffer.len(), "Disk Guardian shutdown signal received");
-
-                // Flush all remaining updates
-                if !buffer.is_empty() {
-                    flush_updates(&store, job_id, &mut buffer).await?;
-                }
-
-                // Drain the channel to catch any final updates
-                while let Ok(update) = update_rx.try_recv() {
-                    buffer.push(update);
-                }
-
-                if !buffer.is_empty() {
-                    flush_updates(&store, job_id, &mut buffer).await?;
-                }
-
-                info!(job_id, "Disk Guardian stopped gracefully");
-                break;
             }
         }
     }

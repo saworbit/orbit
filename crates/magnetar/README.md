@@ -126,6 +126,33 @@ for chunk in pending {
 }
 ```
 
+### JobManager (Disk Guardian)
+
+Magnetar includes a JobManager helper that batches status updates and flushes
+them asynchronously via a background "Disk Guardian" task.
+
+```rust
+use magnetar::{JobManager, JobStatus};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let store = magnetar::open("jobs.db").await?;
+    let (manager, guardian) = JobManager::spawn(store, 42).await?;
+
+    manager.update_status(1, JobStatus::Processing, None, None).await?;
+    manager.update_status(1, JobStatus::Done, None, None).await?;
+
+    // Stop accepting new updates, flush pending writes, then stop.
+    manager.shutdown().await?;
+    guardian.await??;
+
+    Ok(())
+}
+```
+
+After shutdown begins, new updates are rejected so the guardian can drain the
+channel and persist any buffered updates before exiting.
+
 ## Architecture
 
 ### Core Abstraction
