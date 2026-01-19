@@ -35,6 +35,11 @@ All notable changes to Orbit will be documented in this file.
 - Updated fuser to 0.16
 - See [orbit-ghost/CHANGELOG.md](orbit-ghost/CHANGELOG.md#020---2025-01-04) for migration guide
 
+### Fixed
+
+#### Magnetar JobManager
+- Prevented updates from being dropped during shutdown by draining the Disk Guardian queue until the update channel closes.
+
 ### Added (Pre-Phase 2)
 
 #### Orbit GhostFS - v0.1.0 (2024-12-29)
