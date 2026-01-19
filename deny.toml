@@ -8,7 +8,10 @@ targets = []
 [advisories]
 # Security vulnerability database
 version = 2
-ignore = []
+ignore = [
+    # bincode 1.x is used in core-starmap/magnetar; migration to 2.x is tracked separately.
+    "RUSTSEC-2025-0141",
+]
 
 [licenses]
 # License compliance
