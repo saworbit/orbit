@@ -318,12 +318,12 @@ impl S3Client {
                 .iter()
                 .map(|key| ObjectIdentifier::builder().key(key).build())
                 .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(|e| S3Error::Other(format!("Failed to build object identifier: {}", e)))?;
+                .map_err(|e| S3Error::Sdk(format!("Failed to build object identifier: {}", e)))?;
 
             let delete = Delete::builder()
                 .set_objects(Some(objects))
                 .build()
-                .map_err(|e| S3Error::Other(format!("Failed to build delete request: {}", e)))?;
+                .map_err(|e| S3Error::Sdk(format!("Failed to build delete request: {}", e)))?;
 
             self.client
                 .delete_objects()
