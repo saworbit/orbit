@@ -67,7 +67,7 @@ pub fn load_resume_info(destination_path: &Path, compressed: bool) -> Result<Res
 
     // Try JSON format first (new format)
     if let Ok(info) = serde_json::from_str::<ResumeInfo>(&resume_data) {
-        println!(
+        tracing::info!(
             "Loaded resume info: {} bytes, {} chunks verified",
             info.bytes_copied,
             info.verified_chunks.len()
@@ -88,7 +88,7 @@ pub fn load_resume_info(destination_path: &Path, compressed: bool) -> Result<Res
         None
     };
 
-    println!("Loaded legacy resume info: {} bytes copied", bytes_copied);
+    tracing::info!("Loaded legacy resume info: {} bytes copied", bytes_copied);
 
     Ok(ResumeInfo {
         bytes_copied,

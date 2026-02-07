@@ -552,6 +552,8 @@ pub fn try_zero_copy_direct(
             return Err(OrbitError::ZeroCopyUnsupported);
         }
         ZeroCopyResult::Failed(e) => {
+            // Clean up the partially-written (truncated) destination file
+            let _ = std::fs::remove_file(dest_path);
             return Err(OrbitError::Io(e));
         }
     };

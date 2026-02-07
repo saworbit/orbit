@@ -159,12 +159,14 @@ impl JobStore for SqliteStore {
             .execute(&self.pool)
             .await?;
         } else {
-            sqlx::query("UPDATE chunks SET status = ? WHERE job_id = ? AND chunk = ?")
-                .bind(status.to_string())
-                .bind(job_id)
-                .bind(chunk as i64)
-                .execute(&self.pool)
-                .await?;
+            sqlx::query(
+                "UPDATE chunks SET status = ?, error = NULL WHERE job_id = ? AND chunk = ?",
+            )
+            .bind(status.to_string())
+            .bind(job_id)
+            .bind(chunk as i64)
+            .execute(&self.pool)
+            .await?;
         }
 
         Ok(())

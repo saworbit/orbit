@@ -6,9 +6,11 @@ We release patches for security vulnerabilities in the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.7.x   | :white_check_mark: |
+| 0.6.x   | :white_check_mark: |
+| 0.5.x   | :white_check_mark: |
 | 0.4.x   | :white_check_mark: |
-| 0.3.x   | :white_check_mark: |
-| < 0.3.0 | :x:                |
+| < 0.4.0 | :x:                |
 
 **Note:** We strongly recommend always using the latest version of Orbit.
 
@@ -54,7 +56,7 @@ Instead, please report security issues privately:
 
 ### ✅ Built-in Security
 
-- **SHA-256 Checksums** - Verify file integrity on all transfers
+- **BLAKE3 Checksums** - Verify file integrity on all transfers (CDC chunks use BLAKE3 content hashing)
 - **Memory Safety** - Written in Rust with no unsafe code in core operations
 - **Audit Logging** - All operations logged with timestamps and checksums
 - **No Network Code in Core** - File operations isolated from network concerns

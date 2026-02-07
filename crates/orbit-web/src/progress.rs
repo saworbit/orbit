@@ -163,8 +163,23 @@ impl MagnetarProgress {
 
     /// Mark the transfer as finished
     pub fn finish(&mut self) {
-        // Ensure the finish message always gets through
-        let _ = self.tx.blocking_send(UpdateMsg::Finish);
+        // Use try_send to avoid panicking in async context (blocking_send panics in tokio runtime)
+        match self.tx.try_send(UpdateMsg::Finish) {
+            Ok(()) => {}
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                // Channel is full — spawn a task to ensure delivery
+                let tx = self.tx.clone();
+                tokio::spawn(async move {
+                    let _ = tx.send(UpdateMsg::Finish).await;
+                });
+            }
+            Err(mpsc::error::TrySendError::Closed(_)) => {
+                tracing::warn!(
+                    "Progress channel closed before finish for job {}",
+                    self.job_id
+                );
+            }
+        }
     }
 
     /// Record a successful chunk completion

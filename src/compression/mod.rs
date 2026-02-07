@@ -114,9 +114,13 @@ pub fn copy_with_lz4(
     }
 
     let compressed_size = std::fs::metadata(&temp_compressed)?.len();
-    let compression_ratio = (compressed_size as f64 / source_size as f64) * 100.0;
+    let compression_ratio = if source_size > 0 {
+        (compressed_size as f64 / source_size as f64) * 100.0
+    } else {
+        0.0
+    };
 
-    println!(
+    info!(
         "Compression: {} bytes -> {} bytes ({:.1}%)",
         source_size, compressed_size, compression_ratio
     );
@@ -138,7 +142,7 @@ pub fn copy_with_lz4(
             )));
         }
 
-        println!("Decompressed {} bytes", bytes_written);
+        info!("Decompressed {} bytes", bytes_written);
     }
 
     if config.resume_enabled {
@@ -250,9 +254,13 @@ pub fn copy_with_zstd(
     }
 
     let compressed_size = std::fs::metadata(&temp_compressed)?.len();
-    let compression_ratio = (compressed_size as f64 / source_size as f64) * 100.0;
+    let compression_ratio = if source_size > 0 {
+        (compressed_size as f64 / source_size as f64) * 100.0
+    } else {
+        0.0
+    };
 
-    println!(
+    info!(
         "Compression: {} bytes -> {} bytes ({:.1}%)",
         source_size, compressed_size, compression_ratio
     );
@@ -296,7 +304,7 @@ pub fn copy_with_zstd(
             )));
         }
 
-        println!("Decompressed {} bytes", bytes_written);
+        info!("Decompressed {} bytes", bytes_written);
     }
 
     if config.resume_enabled {
@@ -334,10 +342,7 @@ impl Drop for TempFileCleanup {
     fn drop(&mut self) {
         if self.path.exists() {
             if let Err(e) = std::fs::remove_file(&self.path) {
-                eprintln!(
-                    "Warning: Failed to clean up temporary file {:?}: {}",
-                    self.path, e
-                );
+                tracing::warn!("Failed to clean up temporary file {:?}: {}", self.path, e);
             }
         }
     }

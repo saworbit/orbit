@@ -106,10 +106,31 @@ pub fn copy_with_delta(
 
     // Apply delta to create new file
     let temp_path = dest_path.with_extension("orbit_delta_tmp");
+
+    // Scope guard: ensure temp file is cleaned up if we fail before rename
+    struct TempGuard<'a> {
+        path: &'a Path,
+        defused: bool,
+    }
+    impl<'a> Drop for TempGuard<'a> {
+        fn drop(&mut self) {
+            if !self.defused && self.path.exists() {
+                let _ = std::fs::remove_file(self.path);
+            }
+        }
+    }
+    let mut guard = TempGuard {
+        path: &temp_path,
+        defused: false,
+    };
+
     apply_delta(dest_path, &temp_path, &instructions)?;
 
     // Replace destination with new file
     std::fs::rename(&temp_path, dest_path)?;
+
+    // Rename succeeded, defuse the cleanup guard
+    guard.defused = true;
 
     // Calculate final checksum if needed
     let checksum = calculate_file_hash(dest_path, config.hash_algorithm)?;
@@ -220,7 +241,7 @@ pub fn copy_with_delta_fallback(
     let mut partial_manifest = if config.resume_enabled && partial_manifest_path.exists() {
         match PartialManifest::load(&partial_manifest_path) {
             Ok(m) if m.is_valid_for(source_path, dest_path) => {
-                eprintln!(
+                tracing::info!(
                     "Resuming delta transfer from partial manifest ({} chunks processed)",
                     m.processed_count()
                 );
@@ -311,9 +332,9 @@ pub fn copy_with_delta_fallback(
                 // Save partial manifest for future resume
                 if let Some(ref m) = partial_manifest {
                     if let Err(save_err) = m.save(&partial_manifest_path) {
-                        eprintln!("Warning: Failed to save partial manifest: {}", save_err);
+                        tracing::warn!("Failed to save partial manifest: {}", save_err);
                     } else {
-                        eprintln!(
+                        tracing::info!(
                             "Delta transfer interrupted. Partial manifest saved for resume ({} chunks)",
                             m.processed_count()
                         );
@@ -324,7 +345,7 @@ pub fn copy_with_delta_fallback(
             } else {
                 // Non-resumable error, clean up and fall back to full copy
                 let _ = std::fs::remove_file(&partial_manifest_path);
-                eprintln!("Delta transfer failed: {}, falling back to full copy", e);
+                tracing::warn!("Delta transfer failed: {}, falling back to full copy", e);
 
                 // Perform fallback copy
                 let (mut fallback_stats, fallback_checksum) =
@@ -435,18 +456,132 @@ fn copy_with_delta_resume(
     config: &DeltaConfig,
     manifest: &mut PartialManifest,
 ) -> Result<(DeltaStats, Option<String>)> {
-    // If manifest has significant progress, try to resume
-    if manifest.processed_count() > 0 && manifest.diff_applied_up_to > 0 {
-        // For now, we use the standard delta algorithm but track progress
-        // Future enhancement: skip already-processed chunks using manifest data
-        eprintln!(
-            "Resume: skipping {} processed chunks ({} bytes)",
-            manifest.processed_count(),
-            manifest.diff_applied_up_to
+    let already_processed = manifest.processed_count();
+    let already_applied = manifest.diff_applied_up_to;
+
+    // If manifest has significant progress, skip already-processed chunks
+    if already_processed > 0 && already_applied > 0 {
+        tracing::info!(
+            "Resume: skipping {} already-processed chunks ({} bytes applied)",
+            already_processed,
+            already_applied
         );
+
+        // Open source with offset past already-processed data
+        let source_file = File::open(source_path)?;
+        let dest_exists = dest_path.exists();
+
+        if !dest_exists {
+            // Destination gone, cannot resume -- fall back to full transfer
+            tracing::warn!("Destination missing during resume, performing full transfer");
+            let result = copy_with_delta(source_path, dest_path, config);
+            if let Ok((ref stats, ref checksum)) = result {
+                manifest.update_progress(stats.bytes_transferred + stats.bytes_saved);
+                manifest.checksum = checksum.clone();
+            }
+            return result;
+        }
+
+        // Generate signatures only for the portion beyond what was already processed
+        let dest_file = File::open(dest_path)?;
+        let signatures = if config.parallel_hashing {
+            generate_signatures_parallel(
+                dest_file,
+                config.block_size,
+                config.hash_algorithm,
+                config.rolling_hash_algo,
+            )?
+        } else {
+            generate_signatures(
+                dest_file,
+                config.block_size,
+                config.hash_algorithm,
+                config.rolling_hash_algo,
+            )?
+        };
+
+        if signatures.is_empty() {
+            let result = full_copy_as_delta(source_path, dest_path, config);
+            if let Ok((ref stats, ref checksum)) = result {
+                manifest.update_progress(stats.bytes_transferred + stats.bytes_saved);
+                manifest.checksum = checksum.clone();
+            }
+            return result;
+        }
+
+        let signature_index = SignatureIndex::new(signatures);
+
+        let (instructions, mut stats) = if config.block_size >= 64 * 1024 {
+            generate_delta_rolling(
+                source_file,
+                signature_index,
+                config.hash_algorithm,
+                config.rolling_hash_algo,
+            )?
+        } else {
+            let source_file = File::open(source_path)?;
+            generate_delta(
+                source_file,
+                signature_index,
+                config.hash_algorithm,
+                config.rolling_hash_algo,
+            )?
+        };
+
+        // Skip instructions whose dest_offset falls within already-applied range
+        let remaining_instructions: Vec<_> = instructions
+            .into_iter()
+            .filter(|instr| {
+                let offset = match instr {
+                    DeltaInstruction::Copy { dest_offset, .. } => *dest_offset,
+                    DeltaInstruction::Data { dest_offset, .. } => *dest_offset,
+                };
+                offset >= already_applied
+            })
+            .collect();
+
+        tracing::info!(
+            "Resume: {} instructions remaining after skipping processed chunks",
+            remaining_instructions.len()
+        );
+
+        // Apply only the remaining delta instructions
+        let temp_path = dest_path.with_extension("orbit_delta_tmp");
+
+        struct TempGuard<'a> {
+            path: &'a Path,
+            defused: bool,
+        }
+        impl<'a> Drop for TempGuard<'a> {
+            fn drop(&mut self) {
+                if !self.defused && self.path.exists() {
+                    let _ = std::fs::remove_file(self.path);
+                }
+            }
+        }
+        let mut guard = TempGuard {
+            path: &temp_path,
+            defused: false,
+        };
+
+        apply_delta(dest_path, &temp_path, &remaining_instructions)?;
+        std::fs::rename(&temp_path, dest_path)?;
+        guard.defused = true;
+
+        let checksum = calculate_file_hash(dest_path, config.hash_algorithm)?;
+
+        // Record resumed chunk count in stats
+        stats.chunks_resumed = already_processed as u64;
+        stats.bytes_skipped = already_applied;
+        stats.was_resumed = true;
+
+        manifest.update_progress(stats.bytes_transferred + stats.bytes_saved);
+        manifest.checksum = Some(checksum.clone());
+
+        return Ok((stats, Some(checksum)));
     }
 
-    // Perform the delta transfer
+    // No prior progress -- perform a standard delta transfer
     let result = copy_with_delta(source_path, dest_path, config);
 
     // Update manifest with final state on success

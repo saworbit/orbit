@@ -385,15 +385,23 @@ impl Backend for SmbBackend {
                     };
 
                     if let Ok(mut sub_stream) = Box::pin(self.list(&dir_path, sub_options)).await {
-                        // Collect sub-entries from stream
+                        // Collect sub-entries from stream, fixing relative paths
+                        // by prepending the parent directory name so paths are
+                        // relative to the original listing root, not the subdirectory.
+                        let dir_relative = dir_path
+                            .strip_prefix(if smb_path.is_empty() { "" } else { &smb_path })
+                            .unwrap_or(&dir_path);
+
                         while let Some(sub_entry) = sub_stream.next().await {
-                            if let Ok(entry) = sub_entry {
+                            if let Ok(mut entry) = sub_entry {
                                 // Check max_entries limit
                                 if let Some(max) = options.max_entries {
                                     if entries.len() >= max {
                                         break;
                                     }
                                 }
+                                // Prepend the parent dir to make path relative to original root
+                                entry.path = dir_relative.join(&entry.path);
                                 entries.push(entry);
                             }
                         }

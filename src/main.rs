@@ -464,6 +464,16 @@ enum ProfileArg {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // Load config file once and reuse for both logging init and transfer config
+    let base_config = if let Some(ref config_path) = cli.config {
+        CopyConfig::from_file(config_path).unwrap_or_else(|e| {
+            cli_style::print_warning(&format!("Failed to load config file: {}", e));
+            CopyConfig::default()
+        })
+    } else {
+        CopyConfig::default()
+    };
+
     // Check if we need to initialize logging for the command
     let needs_logging = if let Some(ref command) = cli.command {
         matches!(command, Commands::Manifest(_))
@@ -473,25 +483,18 @@ fn main() -> Result<()> {
 
     // Initialize logging if needed
     if needs_logging {
-        let mut config = if let Some(ref config_path) = cli.config {
-            CopyConfig::from_file(config_path).unwrap_or_else(|e| {
-                cli_style::print_warning(&format!("Failed to load config file: {}", e));
-                CopyConfig::default()
-            })
-        } else {
-            CopyConfig::default()
-        };
+        let mut log_config = base_config.clone();
 
         // Set logging config from CLI (including audit_log_path and otel_endpoint)
-        config.log_level = cli.log_level.into();
-        config.log_file = cli.log.clone();
-        config.verbose = cli.verbose;
-        config.audit_log_path = cli.audit_log.clone();
-        config.otel_endpoint = cli.otel_endpoint.clone();
-        config.metrics_port = cli.metrics_port;
+        log_config.log_level = cli.log_level.into();
+        log_config.log_file = cli.log.clone();
+        log_config.verbose = cli.verbose;
+        log_config.audit_log_path = cli.audit_log.clone();
+        log_config.otel_endpoint = cli.otel_endpoint.clone();
+        log_config.metrics_port = cli.metrics_port;
 
         // Initialize logging
-        if let Err(e) = logging::init_logging(&config) {
+        if let Err(e) = logging::init_logging(&log_config) {
             eprintln!("Warning: Failed to initialize logging: {}", e);
         }
     }
@@ -514,15 +517,8 @@ fn main() -> Result<()> {
     let (_source_protocol, source_path) = Protocol::from_uri(&source)?;
     let (_dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
 
-    // Load or create config
-    let mut config = if let Some(config_path) = cli.config {
-        CopyConfig::from_file(&config_path).unwrap_or_else(|e| {
-            cli_style::print_warning(&format!("Failed to load config file: {}", e));
-            CopyConfig::default()
-        })
-    } else {
-        CopyConfig::default()
-    };
+    // Reuse the already-loaded config
+    let mut config = base_config;
 
     // Override config with CLI arguments
     config.copy_mode = cli.mode.into();
@@ -539,8 +535,8 @@ fn main() -> Result<()> {
     config.retry_attempts = cli.retry_attempts;
     config.retry_delay_secs = cli.retry_delay;
     config.exponential_backoff = cli.exponential_backoff;
-    config.chunk_size = cli.chunk_size * 1024;
-    config.max_bandwidth = cli.max_bandwidth * 1024 * 1024;
+    config.chunk_size = cli.chunk_size.saturating_mul(1024);
+    config.max_bandwidth = cli.max_bandwidth.saturating_mul(1024 * 1024);
     config.parallel = cli.parallel;
     config.include_patterns = cli.include_patterns;
     config.exclude_patterns = cli.exclude_patterns;
@@ -590,7 +586,7 @@ fn main() -> Result<()> {
 
     // Configure delta detection
     config.check_mode = cli.check.into();
-    config.delta_block_size = cli.block_size * 1024; // Convert KB to bytes
+    config.delta_block_size = cli.block_size.saturating_mul(1024); // Convert KB to bytes
     config.whole_file = cli.whole_file;
     config.update_manifest = cli.update_manifest;
     config.ignore_existing = cli.ignore_existing;
@@ -602,7 +598,7 @@ fn main() -> Result<()> {
         ProfileArg::Neutrino => "neutrino".to_string(),
         ProfileArg::Adaptive => "adaptive".to_string(),
     });
-    config.neutrino_threshold = cli.neutrino_threshold * 1024; // Convert KB to bytes
+    config.neutrino_threshold = cli.neutrino_threshold.saturating_mul(1024); // Convert KB to bytes
 
     // 🚀 GUIDANCE PASS: Sanitize and Optimize (with Active Probing)
     let flight_plan = Guidance::plan_with_probe(config, Some(&dest_path))?;

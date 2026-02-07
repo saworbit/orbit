@@ -74,14 +74,17 @@ pub fn ensure_sufficient_space(
     let disks = Disks::new_with_refreshed_list();
 
     // Find the disk that contains the destination path
-    let destination_disk = disks.iter().find(|disk| {
-        // Handle both the path itself and its parent directory
-        dest_path.starts_with(disk.mount_point())
-            || dest_path
-                .parent()
-                .map(|p| p.starts_with(disk.mount_point()))
-                .unwrap_or(false)
-    });
+    let destination_disk = disks
+        .iter()
+        .filter(|disk| {
+            // Handle both the path itself and its parent directory
+            dest_path.starts_with(disk.mount_point())
+                || dest_path
+                    .parent()
+                    .map(|p| p.starts_with(disk.mount_point()))
+                    .unwrap_or(false)
+        })
+        .max_by_key(|disk| disk.mount_point().as_os_str().len());
 
     if let Some(disk) = destination_disk {
         let available = disk.available_space();
@@ -101,18 +104,19 @@ pub fn ensure_sufficient_space(
 
         // Additional warning if available space is getting low (< 5% of total)
         let total = disk.total_space();
-        let usage_ratio = (total - available) as f64 / total as f64;
+        if total == 0 {
+            // Virtual filesystem or container with no reported total — skip ratio check
+            return Ok(());
+        }
+        let usage_ratio = (total.saturating_sub(available)) as f64 / total as f64;
         if usage_ratio > 0.95 {
-            eprintln!(
-                "Warning: Disk is more than 95% full ({:.1}% used)",
+            tracing::warn!(
+                "Disk is more than 95% full ({:.1}% used)",
                 usage_ratio * 100.0
             );
         }
     } else {
-        eprintln!(
-            "Warning: Could not determine disk for path: {:?}",
-            dest_path
-        );
+        tracing::warn!("Could not determine disk for path: {:?}", dest_path);
     }
 
     Ok(())

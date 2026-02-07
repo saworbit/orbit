@@ -10,8 +10,11 @@ use crate::progress::MagnetarProgress;
 use sqlx::{Pool, Row, Sqlite};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, Semaphore};
 use tracing::{error, info, instrument, warn};
+
+/// Maximum number of concurrent job executions
+const MAX_CONCURRENT_JOBS: usize = 8;
 
 /// Type alias for the recursive file collection future
 type FileCollectionFuture = std::pin::Pin<
@@ -38,12 +41,17 @@ pub struct Job {
 pub struct Reactor {
     pool: Pool<Sqlite>,
     notify: Arc<Notify>,
+    semaphore: Arc<Semaphore>,
 }
 
 impl Reactor {
     /// Create a new Reactor instance
     pub fn new(pool: Pool<Sqlite>, notify: Arc<Notify>) -> Self {
-        Self { pool, notify }
+        Self {
+            pool,
+            notify,
+            semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_JOBS)),
+        }
     }
 
     /// Main event loop - runs forever
@@ -61,10 +69,13 @@ impl Reactor {
 
                     // 2. Clone handles for the worker task
                     let pool_handle = self.pool.clone();
+                    let semaphore = self.semaphore.clone();
 
-                    // 3. Spawn isolated worker (reactor doesn't block)
+                    // 3. Acquire permit and spawn isolated worker (reactor doesn't block)
+                    let permit = semaphore.acquire_owned().await.expect("semaphore closed");
                     tokio::spawn(async move {
                         Self::execute_transfer(pool_handle, job).await;
+                        drop(permit);
                     });
                 }
                 Ok(None) => {

@@ -30,6 +30,8 @@ Thanks for your interest in contributing to Orbit! We welcome community contribu
 - Try to match the existing formatting and structure
 - Follow naming conventions and doc-comment (`///`) where applicable
 - One logical change per PR
+- Use `tracing` macros (`info!`, `warn!`, `error!`, `debug!`) instead of `println!`/`eprintln!` for all output
+- Run `cargo fmt --all && cargo clippy --workspace --exclude orbit-ghost` before submitting
 
 ---
 

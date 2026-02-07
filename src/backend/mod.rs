@@ -460,23 +460,13 @@ pub trait Backend: Send + Sync {
     ///
     /// `true` if the operation is supported
     fn supports(&self, operation: &str) -> bool {
-        // Default implementations support all core operations
-        // Metadata operations have default implementations that return Unsupported
+        // Default: only report core operations as supported.
+        // Metadata operations (set_permissions, set_timestamps, get_xattrs,
+        // set_xattrs, set_ownership) have default implementations that return
+        // Unsupported, so backends must explicitly opt-in by overriding supports().
         matches!(
             operation,
-            "stat"
-                | "list"
-                | "read"
-                | "write"
-                | "delete"
-                | "mkdir"
-                | "rename"
-                | "exists"
-                | "set_permissions"
-                | "set_timestamps"
-                | "get_xattrs"
-                | "set_xattrs"
-                | "set_ownership"
+            "stat" | "list" | "read" | "write" | "delete" | "mkdir" | "rename" | "exists"
         )
     }
 }

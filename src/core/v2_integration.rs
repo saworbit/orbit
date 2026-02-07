@@ -129,7 +129,7 @@ pub async fn perform_smart_sync(
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
-                eprintln!("Warning: Failed to read entry: {}", e);
+                tracing::warn!("Failed to read entry: {}", e);
                 continue;
             }
         };
@@ -291,7 +291,7 @@ pub async fn perform_smart_sync(
                 }
             }
             Err(e) => {
-                eprintln!("   [ERROR] Neutrino batch failed: {}", e);
+                tracing::error!("Neutrino batch failed: {}", e);
                 stats.files_failed += fast_lane_jobs.len() as u64;
 
                 if config.error_mode == crate::config::ErrorMode::Abort {
@@ -333,7 +333,7 @@ pub async fn perform_smart_sync(
                 stats.files_copied += 1;
             }
             Err(e) => {
-                eprintln!("   [ERROR] Failed to copy {:?}: {}", job.source_path, e);
+                tracing::error!("Failed to copy {:?}: {}", job.source_path, e);
                 stats.files_failed += 1;
 
                 // Respect error mode

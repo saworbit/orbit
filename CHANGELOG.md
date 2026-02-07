@@ -4,6 +4,44 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+#### Correctness & Safety
+- **Path traversal protection** (`backend/local.rs`): Resolved symlink-based path traversal in the local backend by manually normalizing `..` components instead of relying on `fs::canonicalize` (which fails on non-existent paths). Paths that escape the configured root now clamp to root.
+- **Compression NaN ratio** (`compression/mod.rs`): Fixed division-by-zero producing NaN compression ratio when source file is empty (0 bytes). Now returns 0.0%.
+- **Checkpoint durability** (`core/buffered.rs`): Added `sync_data()` after `flush()` when writing resume checkpoints, ensuring data reaches disk before the checkpoint is recorded. Previously a crash after flush-but-before-sync could produce a checkpoint pointing to unwritten data.
+- **Producer error propagation** (`core/directory.rs`): Directory walk errors from the producer thread are now propagated to the caller instead of being silently logged. Also fixed `files_failed`, `bytes_skipped`, and `chunks_resumed` not being aggregated into total stats.
+- **Bandwidth limiter divide-by-zero** (`core/bandwidth.rs`): Guard against very low bandwidth values where integer division `max_bytes_per_sec / 1000` would yield 0 `bytes_per_token`, causing an infinite-loop. Now clamps to a minimum of 1.
+- **Rate limiter busy-wait** (`core-resilience/rate_limiter.rs`): Replaced `try_execute()` spin-loop with the same sleep-based throttling used by `execute()`, eliminating 100% CPU usage under rate-limited workloads.
+
+#### Error Classification
+- **Compression/Decompression errors reclassified as non-transient** (`error.rs`): Corrupt data and bad format errors are permanent and will never resolve on retry. Previously these were classified as transient, wasting retry budget.
+- **Resume errors reclassified as non-transient** (`error.rs`): Corrupt checkpoint data is permanent.
+
+#### Content-Defined Chunking (CDC)
+- **Gear hash table replaced** (`core-cdc/gear.rs`): Replaced the original hand-crafted gear hash table (which had only ~48 unique values with byte-rotation patterns) with 256 independently derived values from `BLAKE3("gear_table_{i}")`. The old table produced only ~526 distinct lower-16-bit hash values, making mask-based cut detection unreliable.
+- **Cut detection restored to threshold-based approach** (`core-cdc/lib.rs`): Reverted from exact-zero mask check (`hash & mask == 0`) to the original threshold-based approach (`hash & mask < 32`). The gear hash's shift-add algorithm produces limited entropy per cycle for short-period data, and the threshold approach is robust to this by accepting multiple matching values.
+- **Cut mask now derived from avg_size** (`core-cdc/lib.rs`): `cut_mask()` derives its mask from the configured `avg_size` instead of being hardcoded, capped at 12 bits to ensure sufficient hash entropy for reliable cut detection.
+
+### Changed
+
+#### Performance
+- **Delta detection skip optimization** (`core/delta/algorithm.rs`): Added `has_weak_match()` pre-check to `SignatureIndex`. The expensive BLAKE3 strong hash is now only computed when the cheap rolling hash has candidate matches, avoiding unnecessary hashing on non-matching blocks.
+- **S3 batch delete** (`protocol/s3/client.rs`, `backend/s3.rs`): Added `delete_batch()` using the S3 `DeleteObjects` API (up to 1000 keys per request), replacing the previous one-by-one deletion loop. Reduces API calls by up to 1000x for bulk deletions.
+- **S3 upload memory optimization** (`backend/s3.rs`): Eliminated double memory allocation in `upload_from_reader` by reading directly into a single buffer instead of copying through an intermediate `Vec`.
+- **Regex caching** (`cli_style.rs`): ANSI-stripping regex is now compiled once via `LazyLock` instead of being recompiled on every call to `strip_ansi()`.
+- **Clippy-suggested derive optimizations** (`config.rs`, `core/delta/types.rs`): Replaced manual `Default` impls with `#[derive(Default)]` + `#[default]` attributes for `AuditFormat`, `CheckMode`, `RollingHashAlgo`, and `HashAlgorithm`.
+
+#### Logging
+- **Replaced all `println!`/`eprintln!` with `tracing` macros** across the codebase:
+  - `compression/mod.rs`: Compression stats and temp file cleanup warnings
+  - `core/buffered.rs`: Copy progress, resume info, and checkpoint logging
+  - `core/resume.rs`: Resume state loading
+  - `core/directory.rs`: Directory walk and per-file copy progress
+  - `core/disk_guardian.rs`: Disk space warnings
+  - `core/validation.rs`: Disk space validation warnings
+  - `core/v2_integration.rs`: V2 pipeline errors and warnings
+
 ### Added
 
 #### Orbit GhostFS v0.2.0 - "The Tethering" (2025-01-04)

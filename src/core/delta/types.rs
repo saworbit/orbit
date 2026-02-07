@@ -10,8 +10,10 @@ use std::time::SystemTime;
 /// Detection mode for determining which files to transfer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum CheckMode {
     /// Compare modification time and size (fastest, like rclone default)
+    #[default]
     ModTime,
 
     /// Compare size only
@@ -22,12 +24,6 @@ pub enum CheckMode {
 
     /// Block-based diff for partial updates (rsync-inspired)
     Delta,
-}
-
-impl Default for CheckMode {
-    fn default() -> Self {
-        Self::ModTime
-    }
 }
 
 impl fmt::Display for CheckMode {
@@ -61,19 +57,15 @@ impl std::str::FromStr for CheckMode {
 /// Rolling hash algorithm for delta detection
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum RollingHashAlgo {
     /// Adler-32 (legacy, 32-bit, prone to collisions)
     Adler32,
 
     /// Gear Hash (64-bit, FastCDC-style, default)
     /// Superior collision resistance and SIMD-friendly
+    #[default]
     Gear64,
-}
-
-impl Default for RollingHashAlgo {
-    fn default() -> Self {
-        Self::Gear64
-    }
 }
 
 impl fmt::Display for RollingHashAlgo {
@@ -88,8 +80,10 @@ impl fmt::Display for RollingHashAlgo {
 /// Hash algorithm for checksums
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum HashAlgorithm {
     /// BLAKE3 (fast, secure, default)
+    #[default]
     Blake3,
 
     /// MD5 (legacy compatibility)
@@ -97,12 +91,6 @@ pub enum HashAlgorithm {
 
     /// SHA-256
     Sha256,
-}
-
-impl Default for HashAlgorithm {
-    fn default() -> Self {
-        Self::Blake3
-    }
 }
 
 impl fmt::Display for HashAlgorithm {
@@ -508,8 +496,11 @@ impl PartialManifest {
 
     /// Check if a chunk has already been processed
     pub fn is_chunk_processed(&self, chunk_index: usize) -> bool {
+        // Use binary search if the list is sorted by index, otherwise linear scan.
+        // For typical sequential processing, checking the last few entries is fastest.
         self.processed_chunks
             .iter()
+            .rev()
             .any(|(idx, _)| *idx == chunk_index)
     }
 

@@ -419,8 +419,10 @@ fn bool_cell(value: bool) -> Cell {
 
 /// Strip ANSI escape codes from a string (for length calculation)
 fn strip_ansi(s: &str) -> String {
-    let re = regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap();
-    re.replace_all(s, "").to_string()
+    use std::sync::LazyLock;
+    static RE: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap());
+    RE.replace_all(s, "").to_string()
 }
 
 /// Format bytes into human-readable string

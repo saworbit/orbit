@@ -34,8 +34,9 @@ impl BandwidthLimiter {
 
         // Configure token bucket: replenish at rate to achieve target bandwidth
         // Use 1000 tokens/sec, each token = bytes_per_sec/1000 bytes
+        // Guard against very low bandwidth values where integer division would yield 0
         let tokens_per_sec = 1000u32;
-        let bytes_per_token = max_bytes_per_sec / tokens_per_sec as u64;
+        let bytes_per_token = (max_bytes_per_sec / tokens_per_sec as u64).max(1);
 
         let quota = Quota::per_second(NonZeroU32::new(tokens_per_sec).unwrap());
 

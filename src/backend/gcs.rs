@@ -335,8 +335,16 @@ impl Backend for GcsBackend {
                         path: path.to_path_buf(),
                     });
                 }
-                Err(_) => {
-                    // Object doesn't exist, continue
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("404") || msg.contains("NotFound") {
+                        // Object doesn't exist, continue
+                    } else {
+                        return Err(BackendError::Other {
+                            backend: "gcs".to_string(),
+                            message: format!("Failed to check object existence: {}", e),
+                        });
+                    }
                 }
             }
         }

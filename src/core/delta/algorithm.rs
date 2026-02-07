@@ -39,6 +39,11 @@ impl SignatureIndex {
         }
     }
 
+    /// Check if any signatures exist for the given weak hash (fast pre-check)
+    pub fn has_weak_match(&self, weak_hash: u64) -> bool {
+        self.weak_hash_map.contains_key(&weak_hash)
+    }
+
     /// Find a matching block signature for the given weak and strong hashes
     pub fn find_match(&self, weak_hash: u64, strong_hash: &[u8]) -> Option<&BlockSignature> {
         // First check weak hash
@@ -97,13 +102,20 @@ pub fn generate_delta<R: Read>(
         let chunk_size = remaining.min(block_size);
         let chunk = &buffer[pos..pos + chunk_size];
 
-        // Calculate checksums for this block
+        // Calculate weak checksum first (cheap)
         let rolling = RollingHash::from_data(chunk, rolling_algo);
         let weak_hash = rolling.hash();
-        let strong_hash = calculate_strong_hash(chunk, hash_algorithm);
+
+        // Only compute expensive strong hash if weak hash has candidates
+        let matched = if dest_signatures.has_weak_match(weak_hash) {
+            let strong_hash = calculate_strong_hash(chunk, hash_algorithm);
+            dest_signatures.find_match(weak_hash, &strong_hash)
+        } else {
+            None
+        };
 
         // Look for a match in destination signatures
-        if let Some(sig) = dest_signatures.find_match(weak_hash, &strong_hash) {
+        if let Some(sig) = matched {
             // Found a match! Flush any pending data first
             if pos > pending_start {
                 let bytes = buffer[pending_start..pos].to_vec();
@@ -206,7 +218,7 @@ pub fn generate_delta_rolling<R: Read>(
 
         // Calculate strong hash only if weak hash matches
         let chunk = &buffer[pos..pos + block_size];
-        if dest_signatures.weak_hash_map.contains_key(&weak_hash) {
+        if dest_signatures.has_weak_match(weak_hash) {
             let strong_hash = calculate_strong_hash(chunk, hash_algorithm);
 
             if let Some(sig) = dest_signatures.find_match(weak_hash, &strong_hash) {

@@ -70,6 +70,29 @@ pub enum BackendError {
 }
 
 impl BackendError {
+    /// Create a BackendError from an io::Error with path and backend context.
+    ///
+    /// This is preferred over the `From<io::Error>` impl when the caller has
+    /// path and backend information available, since the trait impl cannot
+    /// carry that context.
+    pub fn from_io_with_context(
+        err: io::Error,
+        path: impl Into<PathBuf>,
+        backend: impl Into<String>,
+    ) -> Self {
+        let path = path.into();
+        let backend = backend.into();
+        match err.kind() {
+            io::ErrorKind::NotFound => BackendError::NotFound { path, backend },
+            io::ErrorKind::PermissionDenied => BackendError::PermissionDenied {
+                path,
+                message: err.to_string(),
+            },
+            io::ErrorKind::AlreadyExists => BackendError::AlreadyExists { path },
+            _ => BackendError::Io(err),
+        }
+    }
+
     /// Check if this error is retriable (transient)
     pub fn is_retriable(&self) -> bool {
         match self {

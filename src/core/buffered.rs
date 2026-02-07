@@ -118,7 +118,7 @@ pub fn copy_buffered(
     // Determine start offset based on decision
     let start_offset = match resume_decision {
         ResumeDecision::Resume { from_offset, .. } => {
-            println!(
+            info!(
                 "Resuming from byte {} ({} chunks verified)",
                 from_offset,
                 resume_info.verified_chunks.len()
@@ -126,12 +126,12 @@ pub fn copy_buffered(
             from_offset
         }
         ResumeDecision::Revalidate { ref reason } => {
-            println!("Revalidating file: {}", reason);
-            println!("Re-hashing from beginning but preserving partial transfer");
+            info!("Revalidating file: {}", reason);
+            debug!("Re-hashing from beginning but preserving partial transfer");
             resume_info.bytes_copied
         }
         ResumeDecision::Restart { ref reason } => {
-            println!("Restarting transfer: {}", reason);
+            info!("Restarting transfer: {}", reason);
             if dest_path.exists() {
                 std::fs::remove_file(dest_path)?;
             }
@@ -186,7 +186,7 @@ pub fn copy_buffered(
     if matches!(resume_decision, ResumeDecision::Revalidate { .. })
         && !resume_info.verified_chunks.is_empty()
     {
-        println!(
+        info!(
             "Validating {} existing chunks...",
             resume_info.verified_chunks.len()
         );
@@ -199,17 +199,17 @@ pub fn copy_buffered(
         ) {
             Ok(failures) => {
                 if failures > 0 {
-                    println!(
+                    info!(
                         "Warning: {} chunks failed validation, will be re-verified",
                         failures
                     );
                     resume_info.verified_chunks.clear();
                 } else {
-                    println!("All chunks validated successfully");
+                    info!("All chunks validated successfully");
                 }
             }
             Err(e) => {
-                println!("Chunk validation error: {}, clearing verified chunks", e);
+                info!("Chunk validation error: {}, clearing verified chunks", e);
                 resume_info.verified_chunks.clear();
             }
         }
@@ -258,9 +258,10 @@ pub fn copy_buffered(
             last_progress_event = Instant::now();
         }
 
-        // Checkpoint for resume
+        // Checkpoint for resume - sync to disk for durability
         if config.resume_enabled && last_checkpoint.elapsed() > Duration::from_secs(5) {
             dest_file.flush()?;
+            dest_file.get_ref().sync_data()?;
             resume_info.bytes_copied = bytes_copied;
             save_resume_info_full(dest_path, &resume_info, false)?;
             last_checkpoint = Instant::now();

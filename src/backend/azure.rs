@@ -338,8 +338,16 @@ impl Backend for AzureBackend {
                         path: path.to_path_buf(),
                     });
                 }
-                Err(_) => {
-                    // Blob doesn't exist, continue
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("404") || msg.contains("NotFound") {
+                        // Blob doesn't exist, continue
+                    } else {
+                        return Err(BackendError::Other {
+                            backend: "azure".to_string(),
+                            message: format!("Failed to check blob existence: {}", e),
+                        });
+                    }
                 }
             }
         }

@@ -117,6 +117,10 @@ async fn handle_socket(
                             }
                         }
                     }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("Client lagged behind, skipped {} events", n);
+                        continue;
+                    }
                     Err(e) => {
                         tracing::error!("Event broadcast error: {}", e);
                         break;

@@ -111,7 +111,7 @@ Understanding feature stability helps you make informed decisions about what to 
 | **OrbitSystem Abstraction (Phase 1)** | 🟢 Stable | I/O abstraction layer, foundation for Grid topology |
 | **Resume/Checkpoint** | 🟡 Beta | Works well, needs more edge-case testing |
 | **Compression (LZ4, Zstd)** | 🟢 Stable | Reliable for most workloads |
-| **Checksum Verification** | 🟢 Stable | SHA-256, BLAKE3 well-tested |
+| **Checksum Verification** | 🟢 Stable | BLAKE3 (default), SHA-256 well-tested |
 | **Local Filesystem** | 🟢 Stable | Primary use case, thoroughly tested |
 | **SSH/SFTP Backend** | 🟡 Beta | Functional, needs more real-world testing |
 | **S3 Backend** | 🟡 Beta | Works well, multipart upload is newer |
@@ -177,9 +177,9 @@ Control emission with the `ORBIT_STATS` environment variable:
 - **Skip** — Skip failed files, continue with remaining files
 - **Partial** — Keep partial files and retry, perfect for unstable networks
 
-**Smart Retry Logic (NEW):**
-- ⚡ **Permanent errors fail fast** — `PermissionDenied`, `AlreadyExists` skip retries (saves 35+ seconds per error)
-- 🔄 **Transient errors retry** — `TimedOut`, `ConnectionRefused` use full exponential backoff
+**Smart Retry Logic:**
+- ⚡ **Permanent errors fail fast** — `PermissionDenied`, `AlreadyExists`, `Compression`, `Decompression` skip retries entirely
+- 🔄 **Transient errors retry** — `TimedOut`, `ConnectionRefused`, `Protocol` use full exponential backoff
 - 🎯 **Intelligent classification** — Allow-list approach ensures only truly transient errors are retried
 
 ```bash

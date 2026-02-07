@@ -442,7 +442,9 @@ fn test_multiple_error_types_in_sequence() {
 
         match attempt {
             0 => Err(OrbitError::Protocol("network timeout".to_string())),
-            1 => Err(OrbitError::Compression("compression error".to_string())),
+            1 => Err(OrbitError::Protocol(
+                "transient connection reset".to_string(),
+            )),
             2 => Ok(CopyStats {
                 bytes_copied: 2048,
                 duration: Duration::from_millis(20),

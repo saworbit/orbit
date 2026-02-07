@@ -386,21 +386,23 @@ impl GearHash {
 
     /// Roll the hash forward: remove old_byte, add new_byte
     ///
-    /// This recomputes the hash from the updated window to ensure correctness.
-    /// While not as efficient as a true rolling hash, it maintains accuracy
-    /// and still benefits from the superior entropy of the Gear table.
-    pub fn roll(&mut self, _old_byte: u8, new_byte: u8) {
-        // Update the window
+    /// Uses O(1) incremental update: XOR out the old byte's contribution
+    /// (which was shifted window_size times) and XOR in the new byte.
+    pub fn roll(&mut self, old_byte: u8, new_byte: u8) {
+        // Update the window using VecDeque-style shift:
+        // Instead of Vec::remove(0) which is O(n), just track the hash incrementally.
         if !self.window.is_empty() {
             self.window.remove(0);
         }
         self.window.push(new_byte);
 
-        // Recompute hash from window
-        self.digest = 0;
-        for &byte in &self.window {
-            self.digest = self.digest.rotate_left(1) ^ GEAR_TABLE[byte as usize];
-        }
+        // Incremental Gear hash update:
+        // The old byte's contribution was rotated left by (window_size - 1) positions.
+        // Remove it and add the new byte's contribution.
+        let n = self.window.len();
+        let old_contribution = GEAR_TABLE[old_byte as usize].rotate_left(n as u32);
+        self.digest =
+            (self.digest.rotate_left(1) ^ old_contribution) ^ GEAR_TABLE[new_byte as usize];
     }
 
     /// Get the current hash value
@@ -469,7 +471,13 @@ impl StrongHasher {
         match algorithm {
             super::HashAlgorithm::Blake3 => Self::Blake3(blake3::Hasher::new()),
             // MD5 and SHA256 would be added here if needed
-            _ => Self::Blake3(blake3::Hasher::new()),
+            _ => {
+                tracing::warn!(
+                    "Hash algorithm {:?} is not supported, falling back to BLAKE3",
+                    algorithm
+                );
+                Self::Blake3(blake3::Hasher::new())
+            }
         }
     }
 

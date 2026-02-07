@@ -100,8 +100,8 @@ impl RateLimiter {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = Result<T, ResilienceError>>,
     {
-        // For a simple implementation, always allow
-        // In production, you'd check token availability
+        // Apply the same rate limiting as execute() — sleep-based throttling
+        self.wait().await;
         op().await
     }
 

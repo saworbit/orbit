@@ -301,12 +301,22 @@ impl AuditLogger {
             *header_written = true;
         }
 
-        // Escape CSV fields that might contain commas or quotes
+        // Escape CSV fields: handle commas, quotes, newlines, and formula injection
         let escape_csv = |s: &str| {
-            if s.contains(',') || s.contains('"') || s.contains('\n') {
-                format!("\"{}\"", s.replace('"', "\"\""))
+            // Prefix formula-triggering characters to prevent CSV injection in spreadsheets
+            let safe = if s.starts_with('=')
+                || s.starts_with('+')
+                || s.starts_with('-')
+                || s.starts_with('@')
+            {
+                format!("'{}", s)
             } else {
                 s.to_string()
+            };
+            if safe.contains(',') || safe.contains('"') || safe.contains('\n') {
+                format!("\"{}\"", safe.replace('"', "\"\""))
+            } else {
+                safe
             }
         };
 
@@ -395,7 +405,7 @@ impl AuditLogger {
         let event = AuditEvent::new(job, source, destination, protocol, "success")
             .with_bytes(bytes)
             .with_duration_ms(duration_ms)
-            .with_checksum("blake3", checksum_match);
+            .with_checksum("sha256", checksum_match);
         self.emit(&event)
     }
 
@@ -454,7 +464,7 @@ impl AuditLogger {
 
         // Add checksum info if available
         if let Some(ref checksum) = stats.checksum {
-            event = event.with_checksum("blake3", !checksum.is_empty());
+            event = event.with_checksum("sha256", !checksum.is_empty());
         }
 
         // Add error if present
@@ -479,10 +489,9 @@ impl AuditLogger {
     }
 }
 
-// Thread safety markers - BufWriter<File> is Send but not Sync
-// We wrap it in Mutex for interior mutability
-unsafe impl Send for AuditLogger {}
-unsafe impl Sync for AuditLogger {}
+// Safety: AuditLogger's interior state is protected by Arc<Mutex<...>>,
+// so Send and Sync are automatically derived. The unsafe impls are removed
+// to let the compiler verify these traits correctly.
 
 /// Legacy audit log entry (kept for backward compatibility)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -620,15 +629,17 @@ pub fn read_audit_log(log_path: &Path, format: AuditFormat) -> Result<Vec<AuditE
     }
 }
 
-/// Parse a single CSV line into an AuditEntry (simplified)
+/// Parse a single CSV line into an AuditEntry
+///
+/// Handles quoted fields containing commas (RFC 4180 basic support).
 fn parse_csv_line(line: &str) -> Option<AuditEntry> {
-    let parts: Vec<&str> = line.split(',').collect();
+    let parts = parse_csv_fields(line);
     if parts.len() < 9 {
         return None;
     }
 
     Some(AuditEntry {
-        timestamp: parts[0].to_string(),
+        timestamp: parts[0].clone(),
         source: PathBuf::from(parts[1].trim_matches('"')),
         destination: PathBuf::from(parts[2].trim_matches('"')),
         bytes_copied: parts[3].parse().ok()?,
@@ -636,17 +647,48 @@ fn parse_csv_line(line: &str) -> Option<AuditEntry> {
         checksum: if parts[5].is_empty() {
             None
         } else {
-            Some(parts[5].to_string())
+            Some(parts[5].clone())
         },
         compression_ratio: parts[6].parse().ok(),
-        status: parts[7].to_string(),
+        status: parts[7].clone(),
         attempts: parts[8].parse().ok()?,
         error: if parts.len() > 9 && !parts[9].is_empty() {
-            Some(parts[9].to_string())
+            Some(parts[9].clone())
         } else {
             None
         },
     })
+}
+
+/// Parse CSV fields respecting quoted values (handles commas inside quotes)
+fn parse_csv_fields(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut chars = line.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            '"' if in_quotes => {
+                if chars.peek() == Some(&'"') {
+                    // Escaped quote
+                    current.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = false;
+                }
+            }
+            '"' if !in_quotes && current.is_empty() => {
+                in_quotes = true;
+            }
+            ',' if !in_quotes => {
+                fields.push(std::mem::take(&mut current));
+            }
+            _ => current.push(ch),
+        }
+    }
+    fields.push(current);
+    fields
 }
 
 #[cfg(test)]
@@ -839,7 +881,7 @@ mod tests {
         .with_bytes(8192)
         .with_duration_ms(200)
         .with_compression("zstd", Some(0.75))
-        .with_checksum("blake3", true)
+        .with_checksum("sha256", true)
         .with_retries(2)
         .with_storage_class("STANDARD")
         .with_multipart_parts(5)
@@ -851,7 +893,7 @@ mod tests {
         assert_eq!(event.duration_ms, 200);
         assert_eq!(event.compression, Some("zstd".to_string()));
         assert_eq!(event.compression_ratio, Some(0.75));
-        assert_eq!(event.checksum_algorithm, Some("blake3".to_string()));
+        assert_eq!(event.checksum_algorithm, Some("sha256".to_string()));
         assert_eq!(event.checksum_match, Some(true));
         assert_eq!(event.retries, 2);
         assert_eq!(event.storage_class, Some("STANDARD".to_string()));

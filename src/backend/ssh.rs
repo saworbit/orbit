@@ -831,11 +831,14 @@ impl Backend for SshBackend {
     }
 }
 
-// Note: Drop implementation to properly close SSH connection
+// Note: Drop implementation for SSH connection cleanup
 impl Drop for SshBackend {
     fn drop(&mut self) {
-        // Close SFTP channel and SSH session
-        // ssh2::Sftp and Session handle cleanup automatically
-        let _ = self.session.disconnect(None, "Closing connection", None);
+        // Do not call self.session.disconnect() here as it performs blocking
+        // network I/O which must not run inside Drop (risks blocking the async
+        // runtime and panicking if called from an async context).
+        // The underlying ssh2::Session and TcpStream will close the connection
+        // when they are dropped.
+        tracing::debug!("SshBackend dropped, session will be cleaned up on resource drop");
     }
 }

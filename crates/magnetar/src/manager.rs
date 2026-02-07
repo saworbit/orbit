@@ -289,10 +289,9 @@ async fn flush_updates(
             Ok(())
         }
         Err(e) => {
-            error!(job_id, count, error = %e, "Failed to flush updates");
-            // On error, we keep the buffer and will retry on next flush
-            // In production, you might want more sophisticated error handling
-            Err(e)
+            error!(job_id, count, error = %e, "Failed to flush updates, will retry on next flush");
+            // Keep the buffer intact so updates are retried on the next flush cycle
+            Ok(())
         }
     }
 }

@@ -25,7 +25,7 @@ Orbit V2 transforms the file synchronization engine from fixed-block delta detec
 **Status**: COMPLETE - 7/7 tests passing including resilience verification
 
 **What it does**:
-- Gear Hash CDC implementation with 256-entry lookup table
+- Gear Hash CDC implementation with BLAKE3-derived 256-entry lookup table
 - Variable-sized chunks: 8KB min, 64KB avg, 256KB max (configurable)
 - BLAKE3 content hashing for cryptographic chunk identification
 - **99.1% chunk preservation** after single-byte insertion (solves shift problem!)

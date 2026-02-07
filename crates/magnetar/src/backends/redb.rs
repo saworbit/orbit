@@ -139,7 +139,9 @@ impl JobStore for RedbStore {
                 if let Some(cs) = checksum {
                     state.checksum = cs;
                 }
-                state.error = None;
+                if status != JobStatus::Failed {
+                    state.error = None;
+                }
 
                 let new_bytes = Self::serialize_state(&state)?;
                 table.insert((job_id, chunk), new_bytes.as_slice())?;

@@ -124,13 +124,9 @@ where
                 // Check error mode for non-fatal, transient errors
                 match config.error_mode {
                     ErrorMode::Abort => {
-                        debug!("Error mode is Abort, stopping on error");
-
-                        if let Some(stats_tracker) = stats {
-                            stats_tracker.record_failure(&e);
-                        }
-
-                        return Err(e);
+                        // Abort mode stops the batch, but still retries the individual operation
+                        // Fall through to retry logic below; if retries exhaust, then abort
+                        debug!("Error mode is Abort, will retry then abort if all attempts fail");
                     }
                     ErrorMode::Skip => {
                         warn!("Error mode is Skip, skipping failed operation");

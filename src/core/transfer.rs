@@ -35,9 +35,17 @@ pub fn perform_copy(
             copy_direct(source_path, dest_path, source_size, config, publisher)
         }
         CompressionType::Lz4 => {
+            // NOTE: Progress publisher is not forwarded to compression path.
+            // The LZ4 copy loop already tracks bytes_read internally and could
+            // emit ProgressEvent::BytesCopied updates if publisher were threaded through.
+            tracing::debug!("LZ4 compression path does not emit progress events");
             compression::copy_with_lz4(source_path, dest_path, source_size, config)
         }
         CompressionType::Zstd { level } => {
+            // NOTE: Progress publisher is not forwarded to compression path.
+            // The Zstd copy loop already tracks bytes_read internally and could
+            // emit ProgressEvent::BytesCopied updates if publisher were threaded through.
+            tracing::debug!("Zstd compression path does not emit progress events");
             compression::copy_with_zstd(source_path, dest_path, source_size, level, config)
         }
     }
@@ -58,6 +66,10 @@ fn copy_direct(
 ) -> Result<CopyStats> {
     // Check if delta transfer should be used
     if validation::should_use_delta_transfer(source_path, dest_path, config)? {
+        // NOTE: Progress publisher is not forwarded to delta path.
+        // Delta transfer tracks bytes_transferred/bytes_saved in DeltaStats and could
+        // emit progress events if publisher were threaded through.
+        tracing::debug!("Delta transfer path does not emit progress events");
         return copy_with_delta_integration(source_path, dest_path, source_size, config);
     }
 

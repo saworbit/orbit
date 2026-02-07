@@ -68,15 +68,19 @@ impl ChunkConfig {
         }
     }
 
-    /// Calculate the mask for cut-point detection
-    /// We use a mask based on the target size to control cut frequency
-    /// For avg_size = 64KB, we want cuts approximately every 64KB
+    /// Calculate the mask for cut-point detection.
+    /// Uses bottom 12 bits of the gear hash, which have good entropy
+    /// from carry propagation in the shift-add algorithm.
+    /// The actual average chunk size is controlled by the threshold in
+    /// find_cut_point, not by this mask alone.
     fn cut_mask(&self) -> u64 {
-        // Use a smaller mask than the full avg_size for better hash distribution
-        // Instead of bottom 16 bits for 64KB, use bottom 12 bits (4KB effective)
-        // Then adjust cut frequency by checking less often
-        // This ensures we actually get hits on the mask condition
-        0xFFF // 4095 - gives cuts every ~4KB on average
+        // Derive mask from avg_size, capped to ensure sufficient hash entropy.
+        // The gear hash's shift-add produces reliable entropy only in lower bits.
+        // For avg_size <= 4KB, use avg_size - 1 directly.
+        // For larger avg_size, cap at 12 bits (0xFFF) to ensure the threshold
+        // approach can find cut points even in repetitive data patterns.
+        let bits = (self.avg_size as u64).trailing_zeros().min(12);
+        (1u64 << bits) - 1
     }
 }
 
@@ -173,9 +177,10 @@ impl<R: Read> ChunkStream<R> {
         let mut hasher = GearHash::new();
         let mask = self.config.cut_mask();
 
-        // Use a fixed threshold that provides good balance
-        // threshold=32 gives reasonable chunk sizes averaging around target
-        // This value works well with the Gear hash distribution
+        // Threshold-based cut detection: check if the masked hash value
+        // falls below a threshold. This is more robust than exact-zero
+        // checks because it tolerates data with short repeating patterns
+        // where only a limited set of hash values appear.
         let threshold = 32u64;
 
         // Scan from start to end looking for a cut point
@@ -185,13 +190,8 @@ impl<R: Read> ChunkStream<R> {
             // Check if we're past min_size
             let chunk_len = i - self.buffer_pos + 1;
 
-            if chunk_len >= self.config.min_size {
-                // Simple threshold-based cut detection
-                // Check if bottom bits of hash are below threshold
-                let masked = hash & mask;
-                if masked < threshold {
-                    return Some(i + 1); // Cut after this byte
-                }
+            if chunk_len >= self.config.min_size && (hash & mask) < threshold {
+                return Some(i + 1); // Cut after this byte
             }
 
             // Force cut at max_size

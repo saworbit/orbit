@@ -380,17 +380,13 @@ impl LogLevel {
 /// Format for audit logs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum AuditFormat {
     /// JSON Lines format (one JSON object per line)
+    #[default]
     Json,
     /// CSV format with header
     Csv,
-}
-
-impl Default for AuditFormat {
-    fn default() -> Self {
-        Self::Json
-    }
 }
 
 // Default value functions for serde

@@ -57,9 +57,38 @@ impl LocalBackend {
     }
 
     /// Resolve a path relative to the root (if set)
+    ///
+    /// When a root is configured, this prevents path traversal attacks by
+    /// ensuring the resolved path stays within the root directory.
     fn resolve_path(&self, path: &Path) -> PathBuf {
         if let Some(root) = &self.root {
-            root.join(path.strip_prefix("/").unwrap_or(path))
+            // Strip leading slash and join with root
+            let relative = path.strip_prefix("/").unwrap_or(path);
+            let joined = root.join(relative);
+
+            // Normalize away ".." components to prevent path traversal.
+            // We can't use fs::canonicalize here because the path may not exist yet (e.g., write).
+            // Instead, manually resolve components.
+            let mut normalized = PathBuf::new();
+            for component in joined.components() {
+                match component {
+                    std::path::Component::ParentDir => {
+                        // Only pop if we're still within root
+                        if normalized.starts_with(root) && normalized != *root {
+                            normalized.pop();
+                        }
+                        // If popping would go above root, ignore the ".."
+                    }
+                    _ => normalized.push(component),
+                }
+            }
+
+            // Final safety check: ensure we're still inside the root
+            if !normalized.starts_with(root) {
+                return root.clone();
+            }
+
+            normalized
         } else {
             path.to_path_buf()
         }
@@ -520,6 +549,7 @@ impl Backend for LocalBackend {
                 | "set_timestamps"
                 | "get_xattrs"
                 | "set_xattrs"
+                | "set_ownership"
         )
     }
 

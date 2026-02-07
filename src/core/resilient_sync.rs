@@ -311,34 +311,40 @@ impl SyncExecutor {
             }
 
             task.status = TaskStatus::InProgress;
-            let result = self.execute_task(task);
 
-            match result {
-                Ok(()) => {
-                    task.status = TaskStatus::Completed;
-                    self.stats.completed_tasks.fetch_add(1, Ordering::Relaxed);
-                }
-                Err(e) => {
-                    task.error = Some(e.to_string());
+            // Inner retry loop for the current task
+            loop {
+                let result = self.execute_task(task);
 
-                    // Retry logic
-                    if task.attempts < self.config.retry_attempts as usize {
-                        task.attempts += 1;
-                        // Exponential backoff
-                        let delay = Duration::from_secs(
-                            self.config.retry_delay_secs * (1 << task.attempts.min(4)) as u64,
-                        );
-                        std::thread::sleep(delay);
-                        continue;
+                match result {
+                    Ok(()) => {
+                        task.status = TaskStatus::Completed;
+                        self.stats.completed_tasks.fetch_add(1, Ordering::Relaxed);
+                        break;
                     }
+                    Err(e) => {
+                        task.error = Some(e.to_string());
 
-                    task.status = TaskStatus::Failed;
-
-                    match self.config.error_mode {
-                        ErrorMode::Abort => return Err(e),
-                        ErrorMode::Skip | ErrorMode::Partial => {
-                            self.stats.files_failed.fetch_add(1, Ordering::Relaxed);
+                        // Retry if attempts remain
+                        if task.attempts < self.config.retry_attempts as usize {
+                            task.attempts += 1;
+                            // Exponential backoff
+                            let delay = Duration::from_secs(
+                                self.config.retry_delay_secs * (1 << task.attempts.min(4)) as u64,
+                            );
+                            std::thread::sleep(delay);
+                            continue; // Retry the same task
                         }
+
+                        task.status = TaskStatus::Failed;
+
+                        match self.config.error_mode {
+                            ErrorMode::Abort => return Err(e),
+                            ErrorMode::Skip | ErrorMode::Partial => {
+                                self.stats.files_failed.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                        break;
                     }
                 }
             }
@@ -388,8 +394,8 @@ impl SyncExecutor {
                     }
                 }
 
-                // Copy file using existing copy infrastructure
-                std::fs::copy(source, dest)?;
+                // Copy file using the full Orbit copy pipeline
+                let copy_stats = crate::core::copy_file(source, dest, &self.config)?;
 
                 let post_meta = std::fs::metadata(source)?;
                 let post_size = post_meta.len();
@@ -416,7 +422,7 @@ impl SyncExecutor {
                 self.stats.files_copied.fetch_add(1, Ordering::Relaxed);
                 self.stats
                     .bytes_copied
-                    .fetch_add(post_size, Ordering::Relaxed);
+                    .fetch_add(copy_stats.bytes_copied, Ordering::Relaxed);
             }
             SyncTask::Delete { path } => {
                 if path.is_dir() {
@@ -571,9 +577,12 @@ pub fn files_need_transfer(
 
             // If delta is applicable, check using delta algorithm
             if should_use_delta(source, dest, &delta_config)? {
-                // Full delta check would happen during transfer
-                // For now, assume transfer needed if sizes differ
-                Ok(src_meta.len() != dest_meta.len())
+                // Sizes are equal (early return above handles different sizes),
+                // but content may differ — fall back to checksum comparison
+                use crate::core::checksum::calculate_checksum;
+                let src_checksum = calculate_checksum(source)?;
+                let dest_checksum = calculate_checksum(dest)?;
+                Ok(src_checksum != dest_checksum)
             } else {
                 // Fall back to checksum for small files
                 use crate::core::checksum::calculate_checksum;

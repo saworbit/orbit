@@ -32,7 +32,7 @@ pub fn validate_disk_space(destination_path: &Path, required_size: u64) -> Resul
             });
         }
     } else {
-        eprintln!("Warning: Could not determine available disk space");
+        tracing::warn!("Could not determine available disk space");
     }
 
     Ok(())
@@ -64,11 +64,16 @@ pub fn should_copy_file(source_path: &Path, dest_path: &Path, mode: CopyMode) ->
 
     match mode {
         CopyMode::Copy => Ok(true),
-        CopyMode::Sync | CopyMode::Update => {
+        CopyMode::Update => {
+            // Update mode: only copy if source is newer
             let source_meta = std::fs::metadata(source_path)?;
             let dest_meta = std::fs::metadata(dest_path)?;
-
-            // Copy if source is newer or different size
+            Ok(source_meta.modified()? > dest_meta.modified()?)
+        }
+        CopyMode::Sync => {
+            // Sync mode: copy if source is newer OR different size
+            let source_meta = std::fs::metadata(source_path)?;
+            let dest_meta = std::fs::metadata(dest_path)?;
             Ok(source_meta.modified()? > dest_meta.modified()?
                 || source_meta.len() != dest_meta.len())
         }

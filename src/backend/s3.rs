@@ -147,26 +147,33 @@ impl S3Backend {
 
         // Upload parts in sequence (streaming from reader)
         loop {
-            // Read chunk from stream
-            let mut buffer = vec![0u8; chunk_size];
-            let mut chunk_data = Vec::new();
+            // Read chunk directly into a single buffer to avoid double allocation
+            let mut chunk_data = Vec::with_capacity(chunk_size);
+            chunk_data.resize(chunk_size, 0u8);
+            let mut filled = 0;
 
             // Read up to chunk_size bytes
             loop {
-                match reader.read(&mut buffer).await.map_err(BackendError::from)? {
+                match reader
+                    .read(&mut chunk_data[filled..])
+                    .await
+                    .map_err(BackendError::from)?
+                {
                     0 => break, // EOF
                     n => {
-                        chunk_data.extend_from_slice(&buffer[..n]);
-                        if chunk_data.len() >= chunk_size {
+                        filled += n;
+                        if filled >= chunk_size {
                             break;
                         }
                     }
                 }
             }
 
-            if chunk_data.is_empty() {
+            if filled == 0 {
                 break; // End of stream
             }
+
+            chunk_data.truncate(filled);
 
             // Upload this part
             let part_info = self
@@ -724,20 +731,24 @@ impl Backend for S3Backend {
 
         // Check if it's a "directory" (prefix)
         if recursive {
-            // List all objects with this prefix
+            // List all objects with this prefix and batch delete
             use futures::StreamExt;
             let mut stream = self.list(path, ListOptions::recursive()).await?;
 
-            // Delete all objects
+            // Collect keys for batch deletion
+            let mut keys_to_delete = Vec::new();
             while let Some(entry) = stream.next().await {
                 let entry = entry?;
-                let entry_key = self.path_to_key(&entry.full_path);
+                keys_to_delete.push(self.path_to_key(&entry.full_path));
+            }
+
+            if !keys_to_delete.is_empty() {
                 self.client
-                    .delete(&entry_key)
+                    .delete_batch(&keys_to_delete)
                     .await
                     .map_err(|e| BackendError::Other {
                         backend: "s3".to_string(),
-                        message: format!("Failed to delete object: {}", e),
+                        message: format!("Failed to batch delete objects: {}", e),
                     })?;
             }
         }

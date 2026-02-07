@@ -65,11 +65,13 @@ docs/
 - [S3 Integration](guides/S3_USER_GUIDE.md)
 
 ### Architecture
+- [V2 Architecture (CDC, Semantic, Universe)](architecture/ORBIT_V2_ARCHITECTURE.md)
 - [Guidance System](architecture/GUIDANCE_SYSTEM.md)
 - [Zero-Copy Transfers](architecture/ZERO_COPY.md)
 - [Resume System](architecture/RESUME_SYSTEM.md)
 - [Manifest System](architecture/MANIFEST_SYSTEM.md)
 - [Error Handling & Retries](architecture/ERROR_HANDLING_IMPLEMENTATION.md)
+- [Observability & Telemetry](architecture/OBSERVABILITY_IMPLEMENTATION.md)
 - [Scalability (Universe V3)](architecture/SCALABILITY_SPEC.md)
 
 ### Technical Specifications

@@ -300,6 +300,42 @@ impl S3Client {
             .map_err(S3Error::from)?;
         Ok(())
     }
+
+    /// Delete multiple objects from the bucket in a single batch request
+    ///
+    /// Uses the S3 DeleteObjects API to delete up to 1000 keys per request.
+    /// More efficient than calling `delete()` in a loop.
+    pub async fn delete_batch(&self, keys: &[String]) -> S3Result<()> {
+        use aws_sdk_s3::types::{Delete, ObjectIdentifier};
+
+        if keys.is_empty() {
+            return Ok(());
+        }
+
+        // S3 DeleteObjects API supports up to 1000 keys per request
+        for chunk in keys.chunks(1000) {
+            let objects: Vec<ObjectIdentifier> = chunk
+                .iter()
+                .map(|key| ObjectIdentifier::builder().key(key).build())
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|e| S3Error::Other(format!("Failed to build object identifier: {}", e)))?;
+
+            let delete = Delete::builder()
+                .set_objects(Some(objects))
+                .build()
+                .map_err(|e| S3Error::Other(format!("Failed to build delete request: {}", e)))?;
+
+            self.client
+                .delete_objects()
+                .bucket(&self.config.bucket)
+                .delete(delete)
+                .send()
+                .await
+                .map_err(S3Error::from)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

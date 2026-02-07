@@ -99,9 +99,10 @@ impl OrbitError {
             // Transient errors that often resolve on retry
             OrbitError::Io(io_err) => Self::is_io_transient(io_err),
             OrbitError::Protocol(_) => true,
-            OrbitError::Compression(_) => true,
-            OrbitError::Decompression(_) => true,
-            OrbitError::Resume(_) => true,
+            // Compression/decompression errors are typically permanent (corrupt data, bad format)
+            OrbitError::Compression(_) => false,
+            OrbitError::Decompression(_) => false,
+            OrbitError::Resume(_) => false,
             OrbitError::MetadataFailed(_) => true,
 
             // Not transient
@@ -323,7 +324,7 @@ impl From<io::Error> for OrbitError {
 
 impl From<serde_json::Error> for OrbitError {
     fn from(err: serde_json::Error) -> Self {
-        OrbitError::Resume(format!("JSON error: {}", err))
+        OrbitError::Config(format!("JSON parse error: {}", err))
     }
 }
 
@@ -388,9 +389,10 @@ mod tests {
     fn test_transient_errors() {
         // Transient errors
         assert!(OrbitError::Protocol("timeout".to_string()).is_transient());
-        assert!(OrbitError::Compression("temp failure".to_string()).is_transient());
-        assert!(OrbitError::Decompression("temp failure".to_string()).is_transient());
-        assert!(OrbitError::Resume("partial".to_string()).is_transient());
+        // Compression/decompression/resume errors are permanent (corrupt data, bad format)
+        assert!(!OrbitError::Compression("temp failure".to_string()).is_transient());
+        assert!(!OrbitError::Decompression("temp failure".to_string()).is_transient());
+        assert!(!OrbitError::Resume("partial".to_string()).is_transient());
         assert!(
             OrbitError::MetadataFailed("permission denied temporarily".to_string()).is_transient()
         );

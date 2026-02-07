@@ -215,10 +215,14 @@ pub fn copy_directory_impl(
             // Producer finished successfully
         }
         Ok(Err(e)) => {
-            eprintln!("Producer thread error: {}", e);
+            tracing::error!("Producer thread error: {}", e);
+            return Err(e);
         }
         Err(e) => {
-            eprintln!("Producer thread panicked: {:?}", e);
+            return Err(OrbitError::Parallel(format!(
+                "Producer thread panicked: {:?}",
+                e
+            )));
         }
     }
 
@@ -236,7 +240,7 @@ pub fn copy_directory_impl(
                 final_stats.files_failed += summary.failed as u64;
             }
             Err(e) => {
-                eprintln!("Failed to scan destination for deletions: {}", e);
+                tracing::error!("Failed to scan destination for deletions: {}", e);
                 final_stats.files_failed += 1;
             }
         }
@@ -331,7 +335,7 @@ fn produce_work_items(
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
-                eprintln!("Warning: Failed to read entry: {}", e);
+                tracing::warn!("Failed to read entry: {}", e);
                 continue;
             }
         };
@@ -339,10 +343,7 @@ fn produce_work_items(
         let relative_path = match entry.path().strip_prefix(source_dir) {
             Ok(p) => p,
             Err(_) => {
-                eprintln!(
-                    "Warning: Failed to compute relative path for {:?}",
-                    entry.path()
-                );
+                tracing::warn!("Failed to compute relative path for {:?}", entry.path());
                 continue;
             }
         };
@@ -450,7 +451,7 @@ fn collect_deletion_candidates(
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
-                eprintln!("Warning: Failed to read destination entry: {}", e);
+                tracing::warn!("Failed to read destination entry: {}", e);
                 continue;
             }
         };
@@ -462,8 +463,8 @@ fn collect_deletion_candidates(
         let relative_path = match entry.path().strip_prefix(dest_dir) {
             Ok(p) => p,
             Err(_) => {
-                eprintln!(
-                    "Warning: Failed to compute relative destination path for {:?}",
+                tracing::warn!(
+                    "Failed to compute relative destination path for {:?}",
                     entry.path()
                 );
                 continue;
@@ -531,7 +532,7 @@ fn apply_deletions(deletions: &[DeletionItem], config: &CopyConfig) -> DeletionS
                 summary.deleted += 1;
             }
             Err(e) => {
-                eprintln!("Failed to delete {:?}: {}", item.path, e);
+                tracing::error!("Failed to delete {:?}: {}", item.path, e);
                 summary.failed += 1;
             }
         }
@@ -549,9 +550,10 @@ fn flush_directory_batch(batch: &mut Vec<WorkItem>, config: &CopyConfig) -> Resu
 
         if config.preserve_metadata {
             if let Err(e) = preserve_metadata(&item.source_path, &item.dest_path) {
-                eprintln!(
-                    "Warning: Failed to preserve directory metadata for {:?}: {}",
-                    item.dest_path, e
+                tracing::warn!(
+                    "Failed to preserve directory metadata for {:?}: {}",
+                    item.dest_path,
+                    e
                 );
             }
         }
@@ -600,7 +602,7 @@ fn consume_work_items(
                     &total_stats,
                     concurrency_limiter,
                 ) {
-                    eprintln!("Error copying {:?}: {}", item.source_path, e);
+                    tracing::error!("Error copying {:?}: {}", item.source_path, e);
                     if let Ok(mut stats) = total_stats.lock() {
                         stats.files_failed += 1;
                     }
@@ -613,7 +615,7 @@ fn consume_work_items(
             if let Err(e) =
                 process_work_item(&item, source_dir, dest_dir, config, &total_stats, None)
             {
-                eprintln!("Error copying {:?}: {}", item.source_path, e);
+                tracing::error!("Error copying {:?}: {}", item.source_path, e);
                 if let Ok(mut stats) = total_stats.lock() {
                     stats.files_failed += 1;
                 }
@@ -678,6 +680,9 @@ fn process_work_item(
         total_stats.bytes_copied += stats.bytes_copied;
         total_stats.files_copied += stats.files_copied;
         total_stats.files_skipped += stats.files_skipped;
+        total_stats.files_failed += stats.files_failed;
+        total_stats.bytes_skipped += stats.bytes_skipped;
+        total_stats.chunks_resumed += stats.chunks_resumed;
     }
 
     Ok(())

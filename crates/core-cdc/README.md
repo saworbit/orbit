@@ -28,7 +28,7 @@ Result: 99.1% chunk preservation, only 1 chunk retransferred
 
 ## Features
 
-- **Gear Hash Rolling Hash**: Fast 64-bit rolling hash using a 256-entry lookup table
+- **Gear Hash Rolling Hash**: Fast 64-bit rolling hash using a BLAKE3-derived 256-entry lookup table
 - **Variable-Sized Chunks**: Configurable min/avg/max sizes (default: 8KB/64KB/256KB)
 - **BLAKE3 Content Hashing**: Cryptographically secure chunk identification
 - **Iterator-Based API**: Memory-efficient streaming with `ChunkStream<R: Read>`
