@@ -115,29 +115,10 @@ cd "%ORBIT_ROOT%\dashboard"
 start /B "Orbit-Dashboard-CI" npm run dev -- --host 0.0.0.0 >"%ORBIT_ROOT%\orbit-dashboard.log" 2>&1
 cd "%ORBIT_ROOT%"
 
-REM Wait for Health Check
+REM Wait briefly for server startup (avoid hanging health probes on Windows CI)
 echo [INFO] Waiting for API to become healthy...
-set "RETRY_COUNT=0"
-set "MAX_RETRIES=60"
-
-:HealthCheckLoop
-call :Sleep 1
-powershell -NoProfile -Command "try { $tcp = New-Object Net.Sockets.TcpClient; $iar = $tcp.BeginConnect('127.0.0.1',8080,$null,$null); if ($iar.AsyncWaitHandle.WaitOne(3000,$false)) { $tcp.EndConnect($iar); $tcp.Close(); exit 0 } else { $tcp.Close(); exit 1 } } catch { exit 1 }" >nul 2>nul
-if %errorlevel% NEQ 0 (
-    set /a RETRY_COUNT+=1
-    if !RETRY_COUNT! GEQ %MAX_RETRIES% (
-        echo [ERROR] Timeout waiting for API
-        type "%ORBIT_ROOT%\orbit-server.log"
-        goto :Error
-    )
-    set /a MOD=!RETRY_COUNT! %% 10
-    if !MOD! EQU 0 (
-        echo [INFO] Still waiting... (!RETRY_COUNT!/%MAX_RETRIES%)
-    )
-    goto :HealthCheckLoop
-)
-
-echo [SUCCESS] Control Plane is online
+call :Sleep 5
+echo [INFO] Proceeding to login with retries
 
 REM Wait for dashboard
 call :Sleep 3
@@ -145,14 +126,26 @@ call :Sleep 3
 REM 4. Job Injection
 echo [INFO] [4/6] Injecting Job via Magnetar API...
 
-REM Authenticate to get JWT token
+REM Authenticate to get JWT token (retry to allow slow startup on Windows)
 echo [INFO] Authenticating...
 set "COOKIE_JAR=%TEMP%\orbit_cookies_%RANDOM%.txt"
+set "LOGIN_RETRIES=10"
+set "LOGIN_WAIT=2"
+set "LOGIN_OK=0"
 
-%CURL_BASE% -f -X POST "%API_URL%/api/auth/login" -H "Content-Type: application/json" -c "%COOKIE_JAR%" -d "{\"username\":\"admin\",\"password\":\"orbit2025\"}" > "%TEMP%\login_response.json"
-findstr /C:"\"username\"" "%TEMP%\login_response.json" >nul
-if %errorlevel% NEQ 0 (
-    echo [ERROR] Authentication failed
+for /L %%i in (1,1,%LOGIN_RETRIES%) do (
+    %CURL_BASE% -f -X POST "%API_URL%/api/auth/login" -H "Content-Type: application/json" -c "%COOKIE_JAR%" -d "{\"username\":\"admin\",\"password\":\"orbit2025\"}" > "%TEMP%\login_response.json"
+    findstr /C:"\"username\"" "%TEMP%\login_response.json" >nul
+    if !errorlevel! EQU 0 (
+        set "LOGIN_OK=1"
+        goto :LoginSuccess
+    )
+    call :Sleep %LOGIN_WAIT%
+)
+
+:LoginSuccess
+if "%LOGIN_OK%" NEQ "1" (
+    echo [ERROR] Authentication failed after retries
     type "%TEMP%\login_response.json"
     goto :Error
 )
