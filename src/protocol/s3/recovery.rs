@@ -678,9 +678,7 @@ mod tests {
         assert!(!is_retryable_error(&S3Error::AccessDenied(
             "denied".to_string()
         )));
-        assert!(!is_retryable_error(&S3Error::InvalidKey(
-            "bad".to_string()
-        )));
+        assert!(!is_retryable_error(&S3Error::InvalidKey("bad".to_string())));
         assert!(!is_retryable_error(&S3Error::BucketNotFound(
             "gone".to_string()
         )));

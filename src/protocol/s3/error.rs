@@ -343,13 +343,11 @@ mod tests {
         assert!(S3Error::Io("io".to_string()).is_transient());
         assert!(!S3Error::Authentication("auth".to_string()).is_transient());
         assert!(!S3Error::Sdk("sdk".to_string()).is_transient());
-        assert!(
-            !S3Error::Service {
-                code: "InternalError".to_string(),
-                message: "err".to_string()
-            }
-            .is_transient()
-        );
+        assert!(!S3Error::Service {
+            code: "InternalError".to_string(),
+            message: "err".to_string()
+        }
+        .is_transient());
         assert!(!S3Error::InvalidBucketName("bad".to_string()).is_transient());
     }
 

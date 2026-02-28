@@ -22,7 +22,7 @@ use orbit::{
     },
     copy_directory, copy_file,
     core::guidance::Guidance,
-    error::{OrbitError, Result, EXIT_SUCCESS, EXIT_FATAL},
+    error::{OrbitError, Result, EXIT_FATAL, EXIT_SUCCESS},
     get_zero_copy_capabilities, is_zero_copy_available, logging,
     manifest_integration::ManifestGenerator,
     protocol::Protocol,
@@ -157,7 +157,6 @@ struct Cli {
     human_readable: bool,
 
     // === Phase 3: S3 Upload Enhancement Flags ===
-
     /// Content-Type header for S3 uploads
     #[arg(long, global = true)]
     content_type: Option<String>,
@@ -191,7 +190,6 @@ struct Cli {
     acl: Option<String>,
 
     // === Phase 4: S3 Client Configuration Flags ===
-
     /// Disable request signing for public S3 buckets
     #[arg(long, global = true)]
     no_sign_request: bool,
@@ -941,17 +939,28 @@ fn handle_subcommand(command: Commands) -> Result<()> {
         #[cfg(feature = "s3-native")]
         Commands::Presign { uri, expires } => handle_presign_command(&uri, expires),
         #[cfg(feature = "s3-native")]
-        Commands::Ls { uri, etag, storage_class, all_versions, show_fullpath } => {
-            handle_ls_command(&uri, etag, storage_class, all_versions, show_fullpath)
-        }
+        Commands::Ls {
+            uri,
+            etag,
+            storage_class,
+            all_versions,
+            show_fullpath,
+        } => handle_ls_command(&uri, etag, storage_class, all_versions, show_fullpath),
         #[cfg(feature = "s3-native")]
         Commands::Head { uri, version_id } => handle_head_command(&uri, version_id),
         #[cfg(feature = "s3-native")]
-        Commands::Du { uri, group, all_versions } => handle_du_command(&uri, group, all_versions),
+        Commands::Du {
+            uri,
+            group,
+            all_versions,
+        } => handle_du_command(&uri, group, all_versions),
         #[cfg(feature = "s3-native")]
-        Commands::Rm { uri, all_versions, version_id, dry_run } => {
-            handle_rm_command(&uri, all_versions, version_id, dry_run)
-        }
+        Commands::Rm {
+            uri,
+            all_versions,
+            version_id,
+            dry_run,
+        } => handle_rm_command(&uri, all_versions, version_id, dry_run),
         #[cfg(feature = "s3-native")]
         Commands::Mv { source, dest } => handle_mv_command(&source, &dest),
         #[cfg(feature = "s3-native")]
@@ -1744,7 +1753,11 @@ fn handle_run_command(file: Option<PathBuf>, workers: usize) -> Result<()> {
     // Read commands from file or stdin
     let lines: Vec<String> = if let Some(path) = file {
         let file = std::fs::File::open(&path).map_err(|e| {
-            OrbitError::Other(format!("Failed to open command file {}: {}", path.display(), e))
+            OrbitError::Other(format!(
+                "Failed to open command file {}: {}",
+                path.display(),
+                e
+            ))
         })?;
         std::io::BufReader::new(file)
             .lines()
@@ -1902,7 +1915,10 @@ fn handle_cat_command(uri: &str) -> Result<()> {
     use std::io::Write;
 
     let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let key = key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
 
     // Extract bucket from URI
     let bucket = match Protocol::from_uri(uri)? {
@@ -1928,12 +1944,12 @@ fn handle_cat_command(uri: &str) -> Result<()> {
             .await
             .map_err(|e| OrbitError::Other(format!("Failed to download: {}", e)))?;
 
-        std::io::stdout().write_all(&data).map_err(|e| {
-            OrbitError::Other(format!("Failed to write to stdout: {}", e))
-        })?;
-        std::io::stdout().flush().map_err(|e| {
-            OrbitError::Other(format!("Failed to flush stdout: {}", e))
-        })?;
+        std::io::stdout()
+            .write_all(&data)
+            .map_err(|e| OrbitError::Other(format!("Failed to write to stdout: {}", e)))?;
+        std::io::stdout()
+            .flush()
+            .map_err(|e| OrbitError::Other(format!("Failed to flush stdout: {}", e)))?;
 
         Ok(())
     })
@@ -1946,7 +1962,10 @@ fn handle_pipe_command(uri: &str) -> Result<()> {
     use std::io::Read;
 
     let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let key = key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
 
     let bucket = match Protocol::from_uri(uri)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
@@ -1959,9 +1978,9 @@ fn handle_pipe_command(uri: &str) -> Result<()> {
 
     // Read all stdin into memory
     let mut buffer = Vec::new();
-    std::io::stdin().read_to_end(&mut buffer).map_err(|e| {
-        OrbitError::Other(format!("Failed to read from stdin: {}", e))
-    })?;
+    std::io::stdin()
+        .read_to_end(&mut buffer)
+        .map_err(|e| OrbitError::Other(format!("Failed to read from stdin: {}", e)))?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -1987,7 +2006,10 @@ fn handle_presign_command(uri: &str, expires: u64) -> Result<()> {
     use orbit::protocol::s3::{S3Client, S3Config};
 
     let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let key = key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
 
     let bucket = match Protocol::from_uri(uri)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
@@ -2034,11 +2056,18 @@ fn handle_ls_command(
     };
 
     let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let key = key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
 
     let bucket = match Protocol::from_uri(uri)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => return Err(OrbitError::Config("ls command requires an S3 URI (s3://bucket/prefix)".to_string())),
+        _ => {
+            return Err(OrbitError::Config(
+                "ls command requires an S3 URI (s3://bucket/prefix)".to_string(),
+            ))
+        }
     };
 
     let runtime = tokio::runtime::Runtime::new()
@@ -2046,11 +2075,14 @@ fn handle_ls_command(
 
     runtime.block_on(async {
         let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config).await
+        let client = S3Client::new(config)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
 
         if all_versions {
-            let result = client.list_object_versions(&key).await
+            let result = client
+                .list_object_versions(&key)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to list versions: {}", e)))?;
 
             for version in &result.versions {
@@ -2063,7 +2095,10 @@ fn handle_ls_command(
                 };
                 let latest_marker = if version.is_latest { " [LATEST]" } else { "" };
 
-                print!("{}  {:>10}  {}  {}{}", date_str, size_str, version.version_id, key_display, latest_marker);
+                print!(
+                    "{}  {:>10}  {}  {}{}",
+                    date_str, size_str, version.version_id, key_display, latest_marker
+                );
                 if let Some(ref sc) = version.storage_class {
                     if show_storage_class {
                         print!("  {}", sc);
@@ -2079,11 +2114,18 @@ fn handle_ls_command(
                 } else {
                     dm.key.clone()
                 };
-                println!("{}  {:>10}  {}  {} [DELETE MARKER]", date_str, "(marker)", dm.version_id, key_display);
+                println!(
+                    "{}  {:>10}  {}  {} [DELETE MARKER]",
+                    date_str, "(marker)", dm.version_id, key_display
+                );
             }
 
             let total = result.versions.len() + result.delete_markers.len();
-            eprintln!("\n{} versions, {} delete markers", result.versions.len(), result.delete_markers.len());
+            eprintln!(
+                "\n{} versions, {} delete markers",
+                result.versions.len(),
+                result.delete_markers.len()
+            );
             if total == 0 {
                 eprintln!("No objects found.");
             }
@@ -2092,13 +2134,17 @@ fn handle_ls_command(
             let use_wildcard = has_wildcards(&key);
 
             if use_wildcard {
-                let result = client.list_objects_with_wildcard(&key).await
+                let result = client
+                    .list_objects_with_wildcard(&key)
+                    .await
                     .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
                 all_objects = result.objects;
             } else {
                 let mut continuation_token = None;
                 loop {
-                    let result = client.list_objects_paginated(&key, continuation_token, None).await
+                    let result = client
+                        .list_objects_paginated(&key, continuation_token, None)
+                        .await
                         .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
                     all_objects.extend(result.objects);
                     if result.is_truncated {
@@ -2110,7 +2156,8 @@ fn handle_ls_command(
             }
 
             for obj in &all_objects {
-                let date_str = obj.last_modified
+                let date_str = obj
+                    .last_modified
                     .map(format_system_time)
                     .unwrap_or_else(|| "                   ".to_string());
                 let size_str = format_bytes(obj.size);
@@ -2139,7 +2186,11 @@ fn handle_ls_command(
                 eprintln!("No objects found.");
             } else {
                 let total_size: u64 = all_objects.iter().map(|o| o.size).sum();
-                eprintln!("\n{} objects, {} total", all_objects.len(), format_bytes(total_size));
+                eprintln!(
+                    "\n{} objects, {} total",
+                    all_objects.len(),
+                    format_bytes(total_size)
+                );
             }
         }
 
@@ -2152,11 +2203,18 @@ fn handle_head_command(uri: &str, version_id: Option<String>) -> Result<()> {
     use orbit::protocol::s3::{S3Client, S3Config, VersioningOperations};
 
     let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let key = key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
 
     let bucket = match Protocol::from_uri(uri)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => return Err(OrbitError::Config("head command requires an S3 URI (s3://bucket/key)".to_string())),
+        _ => {
+            return Err(OrbitError::Config(
+                "head command requires an S3 URI (s3://bucket/key)".to_string(),
+            ))
+        }
     };
 
     let runtime = tokio::runtime::Runtime::new()
@@ -2164,59 +2222,154 @@ fn handle_head_command(uri: &str, version_id: Option<String>) -> Result<()> {
 
     runtime.block_on(async {
         let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config).await
+        let client = S3Client::new(config)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
 
         if let Some(ref vid) = version_id {
-            let version = client.get_version_metadata(&key, vid).await
+            let version = client
+                .get_version_metadata(&key, vid)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to get version metadata: {}", e)))?;
 
             section_header(&format!("{} S3 Object Version", Icons::FILE));
             println!();
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Key:"), Theme::value(&version.key));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Version ID:"), Theme::value(&version.version_id));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Size:"), Theme::value(format_bytes(version.size)));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Last Modified:"), Theme::value(format_system_time(version.last_modified)));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("ETag:"), Theme::value(&version.etag));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Is Latest:"), Theme::value(version.is_latest));
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Key:"),
+                Theme::value(&version.key)
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Version ID:"),
+                Theme::value(&version.version_id)
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Size:"),
+                Theme::value(format_bytes(version.size))
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Last Modified:"),
+                Theme::value(format_system_time(version.last_modified))
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("ETag:"),
+                Theme::value(&version.etag)
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Is Latest:"),
+                Theme::value(version.is_latest)
+            );
             if let Some(ref sc) = version.storage_class {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Storage Class:"), Theme::value(sc));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Storage Class:"),
+                    Theme::value(sc)
+                );
             }
             println!();
         } else {
-            let metadata = client.get_metadata(&key).await
+            let metadata = client
+                .get_metadata(&key)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to get metadata: {}", e)))?;
 
             section_header(&format!("{} S3 Object Metadata", Icons::FILE));
             println!();
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Key:"), Theme::value(&metadata.key));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Size:"), Theme::value(format_bytes(metadata.size)));
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Key:"),
+                Theme::value(&metadata.key)
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Size:"),
+                Theme::value(format_bytes(metadata.size))
+            );
             if let Some(ref lm) = metadata.last_modified {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Last Modified:"), Theme::value(format_system_time(*lm)));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Last Modified:"),
+                    Theme::value(format_system_time(*lm))
+                );
             }
             if let Some(ref etag) = metadata.etag {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("ETag:"), Theme::value(etag));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("ETag:"),
+                    Theme::value(etag)
+                );
             }
             if let Some(ref sc) = metadata.storage_class {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Storage Class:"), Theme::value(sc));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Storage Class:"),
+                    Theme::value(sc)
+                );
             }
             if let Some(ref ct) = metadata.content_type {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Content-Type:"), Theme::value(ct));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Content-Type:"),
+                    Theme::value(ct)
+                );
             }
             if let Some(ref ce) = metadata.content_encoding {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Content-Encoding:"), Theme::value(ce));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Content-Encoding:"),
+                    Theme::value(ce)
+                );
             }
             if let Some(ref cc) = metadata.cache_control {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Cache-Control:"), Theme::value(cc));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Cache-Control:"),
+                    Theme::value(cc)
+                );
             }
             if let Some(ref cd) = metadata.content_disposition {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Content-Disposition:"), Theme::value(cd));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Content-Disposition:"),
+                    Theme::value(cd)
+                );
             }
             if let Some(ref vid) = metadata.version_id {
-                println!("  {} {} {}", Icons::BULLET, Theme::muted("Version ID:"), Theme::value(vid));
+                println!(
+                    "  {} {} {}",
+                    Icons::BULLET,
+                    Theme::muted("Version ID:"),
+                    Theme::value(vid)
+                );
             }
             if let Some(ref sse) = metadata.server_side_encryption {
-                println!("  {} {} {:?}", Icons::BULLET, Theme::muted("Encryption:"), sse);
+                println!(
+                    "  {} {} {:?}",
+                    Icons::BULLET,
+                    Theme::muted("Encryption:"),
+                    sse
+                );
             }
             if !metadata.metadata.is_empty() {
                 println!("  {} {}", Icons::BULLET, Theme::muted("User Metadata:"));
@@ -2237,11 +2390,18 @@ fn handle_du_command(uri: &str, group: bool, all_versions: bool) -> Result<()> {
     use std::collections::HashMap;
 
     let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let key = key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
 
     let bucket = match Protocol::from_uri(uri)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => return Err(OrbitError::Config("du command requires an S3 URI (s3://bucket/prefix)".to_string())),
+        _ => {
+            return Err(OrbitError::Config(
+                "du command requires an S3 URI (s3://bucket/prefix)".to_string(),
+            ))
+        }
     };
 
     let runtime = tokio::runtime::Runtime::new()
@@ -2249,16 +2409,25 @@ fn handle_du_command(uri: &str, group: bool, all_versions: bool) -> Result<()> {
 
     runtime.block_on(async {
         let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config).await
+        let client = S3Client::new(config)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
 
         section_header(&format!("{} S3 Storage Usage", Icons::STATS));
         println!();
-        println!("  {} {} s3://{}/{}", Icons::BULLET, Theme::muted("Prefix:"), bucket, key);
+        println!(
+            "  {} {} s3://{}/{}",
+            Icons::BULLET,
+            Theme::muted("Prefix:"),
+            bucket,
+            key
+        );
         println!();
 
         if all_versions {
-            let result = client.list_object_versions(&key).await
+            let result = client
+                .list_object_versions(&key)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to list versions: {}", e)))?;
 
             let total_count = result.versions.len() as u64;
@@ -2267,25 +2436,51 @@ fn handle_du_command(uri: &str, group: bool, all_versions: bool) -> Result<()> {
             if group {
                 let mut groups: HashMap<String, (u64, u64)> = HashMap::new();
                 for version in &result.versions {
-                    let sc = version.storage_class.clone().unwrap_or_else(|| "STANDARD".to_string());
+                    let sc = version
+                        .storage_class
+                        .clone()
+                        .unwrap_or_else(|| "STANDARD".to_string());
                     let entry = groups.entry(sc).or_insert((0, 0));
                     entry.0 += 1;
                     entry.1 += version.size;
                 }
                 for (class, (count, size)) in &groups {
-                    println!("  {} {:>10}  {:>8} objects  {}", Icons::BULLET, format_bytes(*size), count, Theme::value(class));
+                    println!(
+                        "  {} {:>10}  {:>8} objects  {}",
+                        Icons::BULLET,
+                        format_bytes(*size),
+                        count,
+                        Theme::value(class)
+                    );
                 }
                 println!();
             }
 
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Total objects (all versions):"), Theme::value(total_count));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Total size:"), Theme::value(format_bytes(total_size)));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Delete markers:"), Theme::value(result.delete_markers.len()));
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Total objects (all versions):"),
+                Theme::value(total_count)
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Total size:"),
+                Theme::value(format_bytes(total_size))
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Delete markers:"),
+                Theme::value(result.delete_markers.len())
+            );
         } else {
             let mut all_objects = Vec::new();
             let mut continuation_token = None;
             loop {
-                let result = client.list_objects_paginated(&key, continuation_token, None).await
+                let result = client
+                    .list_objects_paginated(&key, continuation_token, None)
+                    .await
                     .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
                 all_objects.extend(result.objects);
                 if result.is_truncated {
@@ -2301,19 +2496,39 @@ fn handle_du_command(uri: &str, group: bool, all_versions: bool) -> Result<()> {
             if group {
                 let mut groups: HashMap<String, (u64, u64)> = HashMap::new();
                 for obj in &all_objects {
-                    let sc = obj.storage_class.as_ref().map(|s| s.to_string()).unwrap_or_else(|| "STANDARD".to_string());
+                    let sc = obj
+                        .storage_class
+                        .as_ref()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "STANDARD".to_string());
                     let entry = groups.entry(sc).or_insert((0, 0));
                     entry.0 += 1;
                     entry.1 += obj.size;
                 }
                 for (class, (count, size)) in &groups {
-                    println!("  {} {:>10}  {:>8} objects  {}", Icons::BULLET, format_bytes(*size), count, Theme::value(class));
+                    println!(
+                        "  {} {:>10}  {:>8} objects  {}",
+                        Icons::BULLET,
+                        format_bytes(*size),
+                        count,
+                        Theme::value(class)
+                    );
                 }
                 println!();
             }
 
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Total objects:"), Theme::value(total_count));
-            println!("  {} {} {}", Icons::BULLET, Theme::muted("Total size:"), Theme::value(format_bytes(total_size)));
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Total objects:"),
+                Theme::value(total_count)
+            );
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("Total size:"),
+                Theme::value(format_bytes(total_size))
+            );
         }
 
         println!();
@@ -2322,15 +2537,27 @@ fn handle_du_command(uri: &str, group: bool, all_versions: bool) -> Result<()> {
 }
 
 #[cfg(feature = "s3-native")]
-fn handle_rm_command(uri: &str, all_versions: bool, version_id: Option<String>, dry_run: bool) -> Result<()> {
+fn handle_rm_command(
+    uri: &str,
+    all_versions: bool,
+    version_id: Option<String>,
+    dry_run: bool,
+) -> Result<()> {
     use orbit::protocol::s3::{has_wildcards, S3Client, S3Config, VersioningOperations};
 
     let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let key = key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
 
     let bucket = match Protocol::from_uri(uri)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => return Err(OrbitError::Config("rm command requires an S3 URI (s3://bucket/key)".to_string())),
+        _ => {
+            return Err(OrbitError::Config(
+                "rm command requires an S3 URI (s3://bucket/key)".to_string(),
+            ))
+        }
     };
 
     let runtime = tokio::runtime::Runtime::new()
@@ -2338,22 +2565,30 @@ fn handle_rm_command(uri: &str, all_versions: bool, version_id: Option<String>, 
 
     runtime.block_on(async {
         let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config).await
+        let client = S3Client::new(config)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
 
         if let Some(ref vid) = version_id {
             if dry_run {
-                println!("(dry-run) Would delete: s3://{}/{} version {}", bucket, key, vid);
+                println!(
+                    "(dry-run) Would delete: s3://{}/{} version {}",
+                    bucket, key, vid
+                );
                 return Ok(());
             }
-            client.delete_object_version(&key, vid).await
+            client
+                .delete_object_version(&key, vid)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to delete version: {}", e)))?;
             print_info(&format!("Deleted s3://{}/{} version {}", bucket, key, vid));
             return Ok(());
         }
 
         if all_versions {
-            let result = client.list_object_versions(&key).await
+            let result = client
+                .list_object_versions(&key)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to list versions: {}", e)))?;
             let total = result.versions.len() + result.delete_markers.len();
             if total == 0 {
@@ -2362,28 +2597,58 @@ fn handle_rm_command(uri: &str, all_versions: bool, version_id: Option<String>, 
             }
             if dry_run {
                 for v in &result.versions {
-                    println!("(dry-run) Would delete: s3://{}/{} version {}", bucket, v.key, v.version_id);
+                    println!(
+                        "(dry-run) Would delete: s3://{}/{} version {}",
+                        bucket, v.key, v.version_id
+                    );
                 }
                 for dm in &result.delete_markers {
-                    println!("(dry-run) Would delete marker: s3://{}/{} version {}", bucket, dm.key, dm.version_id);
+                    println!(
+                        "(dry-run) Would delete marker: s3://{}/{} version {}",
+                        bucket, dm.key, dm.version_id
+                    );
                 }
-                println!("\n(dry-run) Would delete {} versions, {} delete markers", result.versions.len(), result.delete_markers.len());
+                println!(
+                    "\n(dry-run) Would delete {} versions, {} delete markers",
+                    result.versions.len(),
+                    result.delete_markers.len()
+                );
                 return Ok(());
             }
             for v in &result.versions {
-                client.delete_object_version(&v.key, &v.version_id).await
-                    .map_err(|e| OrbitError::Other(format!("Failed to delete version {} of {}: {}", v.version_id, v.key, e)))?;
+                client
+                    .delete_object_version(&v.key, &v.version_id)
+                    .await
+                    .map_err(|e| {
+                        OrbitError::Other(format!(
+                            "Failed to delete version {} of {}: {}",
+                            v.version_id, v.key, e
+                        ))
+                    })?;
             }
             for dm in &result.delete_markers {
-                client.delete_object_version(&dm.key, &dm.version_id).await
-                    .map_err(|e| OrbitError::Other(format!("Failed to delete marker {} of {}: {}", dm.version_id, dm.key, e)))?;
+                client
+                    .delete_object_version(&dm.key, &dm.version_id)
+                    .await
+                    .map_err(|e| {
+                        OrbitError::Other(format!(
+                            "Failed to delete marker {} of {}: {}",
+                            dm.version_id, dm.key, e
+                        ))
+                    })?;
             }
-            print_info(&format!("Deleted {} versions, {} delete markers", result.versions.len(), result.delete_markers.len()));
+            print_info(&format!(
+                "Deleted {} versions, {} delete markers",
+                result.versions.len(),
+                result.delete_markers.len()
+            ));
             return Ok(());
         }
 
         if has_wildcards(&key) {
-            let result = client.list_objects_with_wildcard(&key).await
+            let result = client
+                .list_objects_with_wildcard(&key)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
             if result.objects.is_empty() {
                 print_info("No objects matched the pattern.");
@@ -2397,7 +2662,9 @@ fn handle_rm_command(uri: &str, all_versions: bool, version_id: Option<String>, 
                 println!("\n(dry-run) Would delete {} objects", keys.len());
                 return Ok(());
             }
-            client.delete_batch(&keys).await
+            client
+                .delete_batch(&keys)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to batch delete: {}", e)))?;
             print_info(&format!("Deleted {} objects", keys.len()));
         } else {
@@ -2405,7 +2672,9 @@ fn handle_rm_command(uri: &str, all_versions: bool, version_id: Option<String>, 
                 println!("(dry-run) Would delete: s3://{}/{}", bucket, key);
                 return Ok(());
             }
-            client.delete(&key).await
+            client
+                .delete(&key)
+                .await
                 .map_err(|e| OrbitError::Other(format!("Failed to delete: {}", e)))?;
             print_info(&format!("Deleted s3://{}/{}", bucket, key));
         }
@@ -2419,21 +2688,37 @@ fn handle_mv_command(source: &str, dest: &str) -> Result<()> {
     use orbit::protocol::s3::{S3Client, S3Config, S3Operations};
 
     let (_src_protocol, src_key_path) = Protocol::from_uri(source)?;
-    let src_key = src_key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let src_key = src_key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
     let src_bucket = match Protocol::from_uri(source)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => return Err(OrbitError::Config("mv command requires S3 URIs (s3://bucket/key)".to_string())),
+        _ => {
+            return Err(OrbitError::Config(
+                "mv command requires S3 URIs (s3://bucket/key)".to_string(),
+            ))
+        }
     };
 
     let (_dst_protocol, dst_key_path) = Protocol::from_uri(dest)?;
-    let dst_key = dst_key_path.to_string_lossy().trim_start_matches('/').to_string();
+    let dst_key = dst_key_path
+        .to_string_lossy()
+        .trim_start_matches('/')
+        .to_string();
     let dst_bucket = match Protocol::from_uri(dest)? {
         (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => return Err(OrbitError::Config("mv command requires S3 URIs (s3://bucket/key)".to_string())),
+        _ => {
+            return Err(OrbitError::Config(
+                "mv command requires S3 URIs (s3://bucket/key)".to_string(),
+            ))
+        }
     };
 
     if src_bucket != dst_bucket {
-        return Err(OrbitError::Config("mv command currently only supports moves within the same bucket".to_string()));
+        return Err(OrbitError::Config(
+            "mv command currently only supports moves within the same bucket".to_string(),
+        ));
     }
 
     let runtime = tokio::runtime::Runtime::new()
@@ -2441,16 +2726,24 @@ fn handle_mv_command(source: &str, dest: &str) -> Result<()> {
 
     runtime.block_on(async {
         let config = S3Config::new(src_bucket.clone());
-        let client = S3Client::new(config).await
+        let client = S3Client::new(config)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
 
-        client.copy_object(&src_key, &dst_key).await
+        client
+            .copy_object(&src_key, &dst_key)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to copy object: {}", e)))?;
 
-        client.delete(&src_key).await
+        client
+            .delete(&src_key)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to delete source after copy: {}", e)))?;
 
-        print_info(&format!("Moved s3://{}/{} -> s3://{}/{}", src_bucket, src_key, dst_bucket, dst_key));
+        print_info(&format!(
+            "Moved s3://{}/{} -> s3://{}/{}",
+            src_bucket, src_key, dst_bucket, dst_key
+        ));
         Ok(())
     })
 }
@@ -2461,11 +2754,16 @@ fn handle_mb_command(bucket_uri: &str) -> Result<()> {
 
     let bucket_name = match Protocol::from_uri(bucket_uri) {
         Ok((Protocol::S3 { bucket, .. }, _)) => bucket,
-        _ => bucket_uri.trim_start_matches("s3://").trim_end_matches('/').to_string(),
+        _ => bucket_uri
+            .trim_start_matches("s3://")
+            .trim_end_matches('/')
+            .to_string(),
     };
 
     if bucket_name.is_empty() {
-        return Err(OrbitError::Config("mb command requires a bucket name (s3://bucket-name)".to_string()));
+        return Err(OrbitError::Config(
+            "mb command requires a bucket name (s3://bucket-name)".to_string(),
+        ));
     }
 
     let runtime = tokio::runtime::Runtime::new()
@@ -2473,10 +2771,13 @@ fn handle_mb_command(bucket_uri: &str) -> Result<()> {
 
     runtime.block_on(async {
         let config = S3Config::new(bucket_name.clone());
-        let client = S3Client::new(config).await
+        let client = S3Client::new(config)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
 
-        client.create_bucket(&bucket_name).await
+        client
+            .create_bucket(&bucket_name)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create bucket: {}", e)))?;
 
         print_info(&format!("Created bucket: s3://{}", bucket_name));
@@ -2490,11 +2791,16 @@ fn handle_rb_command(bucket_uri: &str) -> Result<()> {
 
     let bucket_name = match Protocol::from_uri(bucket_uri) {
         Ok((Protocol::S3 { bucket, .. }, _)) => bucket,
-        _ => bucket_uri.trim_start_matches("s3://").trim_end_matches('/').to_string(),
+        _ => bucket_uri
+            .trim_start_matches("s3://")
+            .trim_end_matches('/')
+            .to_string(),
     };
 
     if bucket_name.is_empty() {
-        return Err(OrbitError::Config("rb command requires a bucket name (s3://bucket-name)".to_string()));
+        return Err(OrbitError::Config(
+            "rb command requires a bucket name (s3://bucket-name)".to_string(),
+        ));
     }
 
     let runtime = tokio::runtime::Runtime::new()
@@ -2502,10 +2808,13 @@ fn handle_rb_command(bucket_uri: &str) -> Result<()> {
 
     runtime.block_on(async {
         let config = S3Config::new(bucket_name.clone());
-        let client = S3Client::new(config).await
+        let client = S3Client::new(config)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
 
-        client.delete_bucket(&bucket_name).await
+        client
+            .delete_bucket(&bucket_name)
+            .await
             .map_err(|e| OrbitError::Other(format!("Failed to delete bucket: {}", e)))?;
 
         print_info(&format!("Deleted bucket: s3://{}", bucket_name));
@@ -2516,7 +2825,9 @@ fn handle_rb_command(bucket_uri: &str) -> Result<()> {
 /// Format a SystemTime as a human-readable date string
 #[cfg(feature = "s3-native")]
 fn format_system_time(time: std::time::SystemTime) -> String {
-    let duration = time.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+    let duration = time
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
     let secs = duration.as_secs();
     let days = secs / 86400;
     let remaining = secs % 86400;
@@ -2524,7 +2835,10 @@ fn format_system_time(time: std::time::SystemTime) -> String {
     let minutes = (remaining % 3600) / 60;
     let seconds = remaining % 60;
     let (year, month, day) = days_to_ymd(days);
-    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", year, month, day, hours, minutes, seconds)
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        year, month, day, hours, minutes, seconds
+    )
 }
 
 /// Convert days since Unix epoch to (year, month, day)
@@ -2558,17 +2872,22 @@ mod tests {
 
     #[test]
     fn test_workers_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src.txt", "-d", "dst.txt", "--workers", "64",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt", "--workers", "64"])
+                .unwrap();
         assert_eq!(cli.workers, 64);
     }
 
     #[test]
     fn test_parallel_alias_for_workers() {
         let cli = Cli::try_parse_from([
-            "orbit", "-s", "src.txt", "-d", "dst.txt", "--parallel", "32",
+            "orbit",
+            "-s",
+            "src.txt",
+            "-d",
+            "dst.txt",
+            "--parallel",
+            "32",
         ])
         .unwrap();
         assert_eq!(cli.workers, 32);
@@ -2577,7 +2896,13 @@ mod tests {
     #[test]
     fn test_concurrency_flag() {
         let cli = Cli::try_parse_from([
-            "orbit", "-s", "src.txt", "-d", "dst.txt", "--concurrency", "10",
+            "orbit",
+            "-s",
+            "src.txt",
+            "-d",
+            "dst.txt",
+            "--concurrency",
+            "10",
         ])
         .unwrap();
         assert_eq!(cli.concurrency, 10);
@@ -2585,47 +2910,44 @@ mod tests {
 
     #[test]
     fn test_concurrency_default() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
         assert_eq!(cli.concurrency, 5);
     }
 
     #[test]
     fn test_workers_default_zero() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
         assert_eq!(cli.workers, 0);
     }
 
     #[test]
     fn test_stat_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src.txt", "-d", "dst.txt", "--stat",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt", "--stat"]).unwrap();
         assert!(cli.stat);
     }
 
     #[test]
     fn test_stat_default_false() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
         assert!(!cli.stat);
     }
 
     #[test]
     fn test_human_readable_short_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src.txt", "-d", "dst.txt", "-H",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt", "-H"]).unwrap();
         assert!(cli.human_readable);
     }
 
     #[test]
     fn test_human_readable_long_flag() {
         let cli = Cli::try_parse_from([
-            "orbit", "-s", "src.txt", "-d", "dst.txt", "--human-readable",
+            "orbit",
+            "-s",
+            "src.txt",
+            "-d",
+            "dst.txt",
+            "--human-readable",
         ])
         .unwrap();
         assert!(cli.human_readable);
@@ -2633,8 +2955,7 @@ mod tests {
 
     #[test]
     fn test_human_readable_default_false() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
         assert!(!cli.human_readable);
     }
 
@@ -2652,8 +2973,7 @@ mod tests {
 
     #[test]
     fn test_run_subcommand_with_file() {
-        let cli =
-            Cli::try_parse_from(["orbit", "run", "--file", "commands.txt"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "run", "--file", "commands.txt"]).unwrap();
         match cli.command {
             Some(Commands::Run { file, workers }) => {
                 assert_eq!(file, Some(PathBuf::from("commands.txt")));
@@ -2665,8 +2985,7 @@ mod tests {
 
     #[test]
     fn test_run_subcommand_with_workers() {
-        let cli =
-            Cli::try_parse_from(["orbit", "run", "--workers", "128"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "run", "--workers", "128"]).unwrap();
         match cli.command {
             Some(Commands::Run { file, workers }) => {
                 assert!(file.is_none());
@@ -2679,46 +2998,36 @@ mod tests {
     #[test]
     fn test_split_command_line_basic() {
         let args = split_command_line("cp /src /dst --recursive").unwrap();
-        assert_eq!(
-            args,
-            vec!["cp", "/src", "/dst", "--recursive"]
-        );
+        assert_eq!(args, vec!["cp", "/src", "/dst", "--recursive"]);
     }
 
     #[test]
     fn test_split_command_line_quotes() {
         let args = split_command_line(r#"cp "a b.txt" "c d.txt" --recursive"#).unwrap();
-        assert_eq!(
-            args,
-            vec!["cp", "a b.txt", "c d.txt", "--recursive"]
-        );
+        assert_eq!(args, vec!["cp", "a b.txt", "c d.txt", "--recursive"]);
     }
 
     #[test]
     fn test_split_command_line_windows_paths() {
         let args = split_command_line(r#"cp C:\data\file.txt D:\dest\file.txt"#).unwrap();
-        assert_eq!(
-            args,
-            vec!["cp", r"C:\data\file.txt", r"D:\dest\file.txt"]
-        );
+        assert_eq!(args, vec!["cp", r"C:\data\file.txt", r"D:\dest\file.txt"]);
     }
 
     #[test]
     fn test_normalize_batch_args_cp() {
         let args = normalize_batch_args(
             "cp /src /dst --recursive",
-            vec!["cp".to_string(), "/src".to_string(), "/dst".to_string(), "--recursive".to_string()],
+            vec![
+                "cp".to_string(),
+                "/src".to_string(),
+                "/dst".to_string(),
+                "--recursive".to_string(),
+            ],
         )
         .unwrap();
         assert_eq!(
             args,
-            vec![
-                "--source",
-                "/src",
-                "--dest",
-                "/dst",
-                "--recursive"
-            ]
+            vec!["--source", "/src", "--dest", "/dst", "--recursive"]
         );
     }
 
@@ -2735,10 +3044,7 @@ mod tests {
             ],
         )
         .unwrap();
-        assert_eq!(
-            args,
-            vec!["--source", "/src", "--dest", "/dst"]
-        );
+        assert_eq!(args, vec!["--source", "/src", "--dest", "/dst"]);
     }
 
     #[test]
@@ -2768,10 +3074,14 @@ mod tests {
     fn test_combined_flags() {
         let cli = Cli::try_parse_from([
             "orbit",
-            "-s", "src",
-            "-d", "dst",
-            "--workers", "128",
-            "--concurrency", "8",
+            "-s",
+            "src",
+            "-d",
+            "dst",
+            "--workers",
+            "128",
+            "--concurrency",
+            "8",
             "--stat",
             "-H",
             "--recursive",
@@ -2789,7 +3099,13 @@ mod tests {
     #[test]
     fn test_content_type_flag() {
         let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--content-type", "text/plain",
+            "orbit",
+            "-s",
+            "src",
+            "-d",
+            "dst",
+            "--content-type",
+            "text/plain",
         ])
         .unwrap();
         assert_eq!(cli.content_type, Some("text/plain".to_string()));
@@ -2798,7 +3114,13 @@ mod tests {
     #[test]
     fn test_content_encoding_flag() {
         let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--content-encoding", "gzip",
+            "orbit",
+            "-s",
+            "src",
+            "-d",
+            "dst",
+            "--content-encoding",
+            "gzip",
         ])
         .unwrap();
         assert_eq!(cli.content_encoding, Some("gzip".to_string()));
@@ -2849,10 +3171,7 @@ mod tests {
             "2026-12-31T23:59:59Z",
         ])
         .unwrap();
-        assert_eq!(
-            cli.expires_header,
-            Some("2026-12-31T23:59:59Z".to_string())
-        );
+        assert_eq!(cli.expires_header, Some("2026-12-31T23:59:59Z".to_string()));
     }
 
     #[test]
@@ -2889,26 +3208,21 @@ mod tests {
 
     #[test]
     fn test_acl_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--acl", "public-read",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--acl", "public-read"])
+            .unwrap();
         assert_eq!(cli.acl, Some("public-read".to_string()));
     }
 
     #[test]
     fn test_no_sign_request_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--no-sign-request",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-sign-request"]).unwrap();
         assert!(cli.no_sign_request);
     }
 
     #[test]
     fn test_no_sign_request_default_false() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
         assert!(!cli.no_sign_request);
     }
 
@@ -2929,60 +3243,48 @@ mod tests {
 
     #[test]
     fn test_aws_profile_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--aws-profile", "prod",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--aws-profile", "prod"])
+            .unwrap();
         assert_eq!(cli.aws_profile, Some("prod".to_string()));
     }
 
     #[test]
     fn test_use_acceleration_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--use-acceleration",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--use-acceleration"]).unwrap();
         assert!(cli.use_acceleration);
     }
 
     #[test]
     fn test_use_acceleration_default_false() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
         assert!(!cli.use_acceleration);
     }
 
     #[test]
     fn test_request_payer_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--request-payer",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--request-payer"]).unwrap();
         assert!(cli.request_payer);
     }
 
     #[test]
     fn test_no_verify_ssl_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--no-verify-ssl",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-verify-ssl"]).unwrap();
         assert!(cli.no_verify_ssl);
     }
 
     #[test]
     fn test_use_list_objects_v1_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit", "-s", "src", "-d", "dst", "--use-list-objects-v1",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--use-list-objects-v1"])
+            .unwrap();
         assert!(cli.use_list_objects_v1);
     }
 
     #[test]
     fn test_s3_flags_defaults() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
         assert!(cli.content_type.is_none());
         assert!(cli.content_encoding.is_none());
         assert!(cli.content_disposition.is_none());
@@ -3005,8 +3307,7 @@ mod tests {
     #[test]
     fn test_part_size_flag() {
         let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--part-size", "100"])
-                .unwrap();
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--part-size", "100"]).unwrap();
         assert_eq!(cli.part_size, Some(100));
     }
 
@@ -3018,9 +3319,15 @@ mod tests {
 
     #[test]
     fn test_glacier_flags() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--force-glacier-transfer"])
-                .unwrap();
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "-s",
+            "src",
+            "-d",
+            "dst",
+            "--force-glacier-transfer",
+        ])
+        .unwrap();
         assert!(cli.force_glacier_transfer);
     }
 
@@ -3046,38 +3353,33 @@ mod tests {
 
     #[test]
     fn test_no_clobber_long_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-clobber"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-clobber"]).unwrap();
         assert!(cli.no_clobber);
     }
 
     #[test]
     fn test_if_size_differ_flag() {
         let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--if-size-differ"])
-                .unwrap();
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--if-size-differ"]).unwrap();
         assert!(cli.if_size_differ);
     }
 
     #[test]
     fn test_if_source_newer_flag() {
         let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--if-source-newer"])
-                .unwrap();
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--if-source-newer"]).unwrap();
         assert!(cli.if_source_newer);
     }
 
     #[test]
     fn test_flatten_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--flatten"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--flatten"]).unwrap();
         assert!(cli.flatten);
     }
 
     #[test]
     fn test_raw_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--raw"]).unwrap();
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--raw"]).unwrap();
         assert!(cli.raw);
     }
 
@@ -3097,8 +3399,10 @@ mod tests {
     fn test_combined_phase5_6_flags() {
         let cli = Cli::try_parse_from([
             "orbit",
-            "-s", "src",
-            "-d", "dst",
+            "-s",
+            "src",
+            "-d",
+            "dst",
             "-n",
             "--if-size-differ",
             "--flatten",
@@ -3120,7 +3424,13 @@ mod tests {
     fn test_ls_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "ls", "s3://bucket/prefix"]).unwrap();
         match cli.command {
-            Some(Commands::Ls { uri, etag, storage_class, all_versions, show_fullpath }) => {
+            Some(Commands::Ls {
+                uri,
+                etag,
+                storage_class,
+                all_versions,
+                show_fullpath,
+            }) => {
                 assert_eq!(uri, "s3://bucket/prefix");
                 assert!(!etag);
                 assert!(!storage_class);
@@ -3135,10 +3445,23 @@ mod tests {
     #[cfg(feature = "s3-native")]
     fn test_ls_subcommand_with_flags() {
         let cli = Cli::try_parse_from([
-            "orbit", "ls", "s3://bucket/prefix", "-e", "-s", "--all-versions", "--show-fullpath",
-        ]).unwrap();
+            "orbit",
+            "ls",
+            "s3://bucket/prefix",
+            "-e",
+            "-s",
+            "--all-versions",
+            "--show-fullpath",
+        ])
+        .unwrap();
         match cli.command {
-            Some(Commands::Ls { uri, etag, storage_class, all_versions, show_fullpath }) => {
+            Some(Commands::Ls {
+                uri,
+                etag,
+                storage_class,
+                all_versions,
+                show_fullpath,
+            }) => {
                 assert_eq!(uri, "s3://bucket/prefix");
                 assert!(etag);
                 assert!(storage_class);
@@ -3166,8 +3489,13 @@ mod tests {
     #[cfg(feature = "s3-native")]
     fn test_head_subcommand_with_version() {
         let cli = Cli::try_parse_from([
-            "orbit", "head", "s3://bucket/key.txt", "--version-id", "abc123",
-        ]).unwrap();
+            "orbit",
+            "head",
+            "s3://bucket/key.txt",
+            "--version-id",
+            "abc123",
+        ])
+        .unwrap();
         match cli.command {
             Some(Commands::Head { uri, version_id }) => {
                 assert_eq!(uri, "s3://bucket/key.txt");
@@ -3182,7 +3510,11 @@ mod tests {
     fn test_du_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "du", "s3://bucket/prefix"]).unwrap();
         match cli.command {
-            Some(Commands::Du { uri, group, all_versions }) => {
+            Some(Commands::Du {
+                uri,
+                group,
+                all_versions,
+            }) => {
                 assert_eq!(uri, "s3://bucket/prefix");
                 assert!(!group);
                 assert!(!all_versions);
@@ -3196,7 +3528,11 @@ mod tests {
     fn test_du_subcommand_with_group() {
         let cli = Cli::try_parse_from(["orbit", "du", "s3://bucket/prefix", "--group"]).unwrap();
         match cli.command {
-            Some(Commands::Du { uri, group, all_versions }) => {
+            Some(Commands::Du {
+                uri,
+                group,
+                all_versions,
+            }) => {
                 assert_eq!(uri, "s3://bucket/prefix");
                 assert!(group);
                 assert!(!all_versions);
@@ -3210,7 +3546,12 @@ mod tests {
     fn test_rm_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "rm", "s3://bucket/key.txt"]).unwrap();
         match cli.command {
-            Some(Commands::Rm { uri, all_versions, version_id, dry_run }) => {
+            Some(Commands::Rm {
+                uri,
+                all_versions,
+                version_id,
+                dry_run,
+            }) => {
                 assert_eq!(uri, "s3://bucket/key.txt");
                 assert!(!all_versions);
                 assert!(version_id.is_none());
@@ -3223,11 +3564,15 @@ mod tests {
     #[test]
     #[cfg(feature = "s3-native")]
     fn test_rm_subcommand_with_dry_run() {
-        let cli = Cli::try_parse_from([
-            "orbit", "rm", "s3://bucket/prefix/*", "--dry-run",
-        ]).unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "rm", "s3://bucket/prefix/*", "--dry-run"]).unwrap();
         match cli.command {
-            Some(Commands::Rm { uri, all_versions, version_id, dry_run }) => {
+            Some(Commands::Rm {
+                uri,
+                all_versions,
+                version_id,
+                dry_run,
+            }) => {
                 assert_eq!(uri, "s3://bucket/prefix/*");
                 assert!(!all_versions);
                 assert!(version_id.is_none());
@@ -3240,9 +3585,9 @@ mod tests {
     #[test]
     #[cfg(feature = "s3-native")]
     fn test_mv_subcommand() {
-        let cli = Cli::try_parse_from([
-            "orbit", "mv", "s3://bucket/old.txt", "s3://bucket/new.txt",
-        ]).unwrap();
+        let cli =
+            Cli::try_parse_from(["orbit", "mv", "s3://bucket/old.txt", "s3://bucket/new.txt"])
+                .unwrap();
         match cli.command {
             Some(Commands::Mv { source, dest }) => {
                 assert_eq!(source, "s3://bucket/old.txt");

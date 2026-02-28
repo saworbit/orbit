@@ -33,7 +33,11 @@ pub struct OutputWriter {
 impl OutputWriter {
     pub fn new(json: bool) -> Self {
         Self {
-            mode: if json { OutputMode::Json } else { OutputMode::Human },
+            mode: if json {
+                OutputMode::Json
+            } else {
+                OutputMode::Human
+            },
         }
     }
 
@@ -52,10 +56,19 @@ impl OutputWriter {
             OutputMode::Human => {
                 if result.success {
                     if let (Some(src), Some(dst)) = (&result.source, &result.destination) {
-                        println!("  {} {} \u{2192} {}", crate::cli_style::Icons::SUCCESS, src, dst);
+                        println!(
+                            "  {} {} \u{2192} {}",
+                            crate::cli_style::Icons::SUCCESS,
+                            src,
+                            dst
+                        );
                     }
                 } else if let Some(err) = &result.error {
-                    eprintln!("  {} {}", crate::cli_style::Icons::ERROR, sanitize_error(err));
+                    eprintln!(
+                        "  {} {}",
+                        crate::cli_style::Icons::ERROR,
+                        sanitize_error(err)
+                    );
                 }
             }
         }
@@ -218,7 +231,10 @@ mod tests {
 
     #[test]
     fn test_sanitize_error_tabs() {
-        assert_eq!(sanitize_error("field1\tfield2\tfield3"), "field1 field2 field3");
+        assert_eq!(
+            sanitize_error("field1\tfield2\tfield3"),
+            "field1 field2 field3"
+        );
     }
 
     #[test]
@@ -384,15 +400,27 @@ mod tests {
 
     #[test]
     fn test_sanitize_error_unicode() {
-        assert_eq!(sanitize_error("error: fichier introuvable"), "error: fichier introuvable");
-        assert_eq!(sanitize_error("failed: \u{1F4C1} not found"), "failed: \u{1F4C1} not found");
-        assert_eq!(sanitize_error("\u{00E9}\u{00E0}\u{00FC}"), "\u{00E9}\u{00E0}\u{00FC}");
+        assert_eq!(
+            sanitize_error("error: fichier introuvable"),
+            "error: fichier introuvable"
+        );
+        assert_eq!(
+            sanitize_error("failed: \u{1F4C1} not found"),
+            "failed: \u{1F4C1} not found"
+        );
+        assert_eq!(
+            sanitize_error("\u{00E9}\u{00E0}\u{00FC}"),
+            "\u{00E9}\u{00E0}\u{00FC}"
+        );
         assert_eq!(
             sanitize_error("CJK: \u{4F60}\u{597D}\u{4E16}\u{754C}"),
             "CJK: \u{4F60}\u{597D}\u{4E16}\u{754C}"
         );
         // Unicode with surrounding whitespace should be preserved properly
-        assert_eq!(sanitize_error("  \u{00E9}rror  \n  d\u{00E9}tail  "), "\u{00E9}rror d\u{00E9}tail");
+        assert_eq!(
+            sanitize_error("  \u{00E9}rror  \n  d\u{00E9}tail  "),
+            "\u{00E9}rror d\u{00E9}tail"
+        );
     }
 
     #[test]

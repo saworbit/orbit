@@ -244,7 +244,6 @@ pub struct CopyConfig {
     pub json_output: bool,
 
     // === S3 Upload Enhancement Fields (Phase 3) ===
-
     /// Content-Type header for S3 uploads
     #[serde(default)]
     pub s3_content_type: Option<String>,
@@ -278,7 +277,6 @@ pub struct CopyConfig {
     pub s3_acl: Option<String>,
 
     // === S3 Client Configuration Fields (Phase 4) ===
-
     /// Disable request signing for public S3 buckets
     #[serde(default)]
     pub s3_no_sign_request: bool,
@@ -308,7 +306,6 @@ pub struct CopyConfig {
     pub s3_use_list_objects_v1: bool,
 
     // === Conditional Copy & Transfer Options (Phase 5/6) ===
-
     /// Do not overwrite existing files
     #[serde(default)]
     pub no_clobber: bool,
@@ -637,7 +634,6 @@ fn get_cpu_count() -> usize {
         .unwrap_or(4)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -775,8 +771,8 @@ recursive = false
 "#;
         let config: CopyConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.concurrency, 5); // default
-        assert!(!config.show_stats);       // default
-        assert!(!config.human_readable);   // default
+        assert!(!config.show_stats); // default
+        assert!(!config.human_readable); // default
     }
 
     #[test]
@@ -898,16 +894,28 @@ audit_log_path = "/var/log/orbit_audit.log"
         assert_eq!(restored.if_size_differ, true);
         assert_eq!(restored.if_source_newer, true);
         assert_eq!(restored.flatten, true);
-        assert_eq!(restored.s3_content_type, Some("application/octet-stream".to_string()));
+        assert_eq!(
+            restored.s3_content_type,
+            Some("application/octet-stream".to_string())
+        );
         assert_eq!(restored.s3_content_encoding, Some("gzip".to_string()));
-        assert_eq!(restored.s3_content_disposition, Some("attachment".to_string()));
+        assert_eq!(
+            restored.s3_content_disposition,
+            Some("attachment".to_string())
+        );
         assert_eq!(restored.s3_cache_control, Some("max-age=3600".to_string()));
-        assert_eq!(restored.s3_expires_header, Some("2030-01-01T00:00:00Z".to_string()));
+        assert_eq!(
+            restored.s3_expires_header,
+            Some("2030-01-01T00:00:00Z".to_string())
+        );
         assert_eq!(restored.s3_user_metadata, vec!["key1=val1", "key2=val2"]);
         assert_eq!(restored.s3_metadata_directive, Some("REPLACE".to_string()));
         assert_eq!(restored.s3_acl, Some("public-read".to_string()));
         assert_eq!(restored.s3_no_sign_request, true);
-        assert_eq!(restored.s3_credentials_file, Some(PathBuf::from("/home/user/.aws/credentials")));
+        assert_eq!(
+            restored.s3_credentials_file,
+            Some(PathBuf::from("/home/user/.aws/credentials"))
+        );
         assert_eq!(restored.s3_aws_profile, Some("production".to_string()));
         assert_eq!(restored.s3_use_acceleration, true);
         assert_eq!(restored.s3_request_payer, true);
@@ -955,12 +963,18 @@ s3_use_list_objects_v1 = true
         assert_eq!(config.s3_content_encoding, Some("br".to_string()));
         assert_eq!(config.s3_content_disposition, Some("inline".to_string()));
         assert_eq!(config.s3_cache_control, Some("no-cache".to_string()));
-        assert_eq!(config.s3_expires_header, Some("2025-12-31T23:59:59Z".to_string()));
+        assert_eq!(
+            config.s3_expires_header,
+            Some("2025-12-31T23:59:59Z".to_string())
+        );
         assert_eq!(config.s3_user_metadata, vec!["env=prod", "version=2"]);
         assert_eq!(config.s3_metadata_directive, Some("COPY".to_string()));
         assert_eq!(config.s3_acl, Some("private".to_string()));
         assert!(config.s3_no_sign_request);
-        assert_eq!(config.s3_credentials_file, Some(PathBuf::from("/etc/aws/creds")));
+        assert_eq!(
+            config.s3_credentials_file,
+            Some(PathBuf::from("/etc/aws/creds"))
+        );
         assert_eq!(config.s3_aws_profile, Some("staging".to_string()));
         assert!(config.s3_use_acceleration);
         assert!(config.s3_request_payer);

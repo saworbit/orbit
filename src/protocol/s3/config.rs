@@ -52,7 +52,6 @@ pub struct S3Config {
     pub verify_checksums: bool,
 
     // === Phase 3: Upload Enhancement Fields ===
-
     /// Content-Type for uploads
     pub content_type: Option<String>,
 
@@ -78,7 +77,6 @@ pub struct S3Config {
     pub acl: Option<String>,
 
     // === Phase 4: Client Configuration Fields ===
-
     /// Disable request signing for public S3 buckets
     pub no_sign_request: bool,
 
@@ -587,10 +585,7 @@ mod tests {
             Some("2026-12-31T00:00:00Z".to_string())
         );
         assert_eq!(config.user_metadata.len(), 1);
-        assert_eq!(
-            config.user_metadata.get("key1"),
-            Some(&"val1".to_string())
-        );
+        assert_eq!(config.user_metadata.get("key1"), Some(&"val1".to_string()));
         assert_eq!(config.metadata_directive, Some("REPLACE".to_string()));
         assert_eq!(config.acl, Some("public-read".to_string()));
     }

@@ -109,8 +109,8 @@ pub use types::{
 };
 
 // Re-export operations trait for extensibility
-pub use operations::S3Operations;
 pub use operations::has_wildcards;
+pub use operations::S3Operations;
 
 // Re-export new feature traits
 pub use batch::BatchOperations;

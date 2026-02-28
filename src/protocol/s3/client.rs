@@ -65,8 +65,7 @@ impl S3Client {
 
         // Phase 4A: Handle no-sign-request (anonymous credentials for public buckets)
         if config.no_sign_request {
-            let anonymous_credentials =
-                Credentials::new("", "", None, None, "anonymous");
+            let anonymous_credentials = Credentials::new("", "", None, None, "anonymous");
             aws_config_loader = aws_config_loader.credentials_provider(anonymous_credentials);
         } else if let (Some(access_key), Some(secret_key)) =
             (&config.access_key, &config.secret_key)
@@ -348,9 +347,8 @@ impl S3Client {
     pub async fn presign_get(&self, key: &str, expires_in: Duration) -> S3Result<String> {
         use aws_sdk_s3::presigning::PresigningConfig;
 
-        let presign_config = PresigningConfig::expires_in(expires_in).map_err(|e| {
-            S3Error::InvalidConfig(format!("Invalid presigning duration: {}", e))
-        })?;
+        let presign_config = PresigningConfig::expires_in(expires_in)
+            .map_err(|e| S3Error::InvalidConfig(format!("Invalid presigning duration: {}", e)))?;
 
         let presigned = self
             .client
@@ -368,17 +366,13 @@ impl S3Client {
     /// Useful for cross-region operations where the user didn't specify a region.
     pub async fn detect_bucket_region(bucket: &str) -> S3Result<Option<String>> {
         // Use a default client with no specific region to call HeadBucket
-        let aws_config = aws_config::defaults(BehaviorVersion::latest())
-            .load()
-            .await;
+        let aws_config = aws_config::defaults(BehaviorVersion::latest()).load().await;
         let client = AwsS3Client::new(&aws_config);
 
         match client.head_bucket().bucket(bucket).send().await {
             Ok(response) => {
                 // The region is in the x-amz-bucket-region header
-                let region = response
-                    .bucket_region()
-                    .map(|s| s.to_string());
+                let region = response.bucket_region().map(|s| s.to_string());
                 Ok(region)
             }
             Err(e) => {
@@ -492,9 +486,10 @@ impl S3Client {
             let sem = semaphore.clone();
 
             handles.push(tokio::spawn(async move {
-                let _permit = sem.acquire().await.map_err(|e| {
-                    S3Error::Sdk(format!("Semaphore error: {}", e))
-                })?;
+                let _permit = sem
+                    .acquire()
+                    .await
+                    .map_err(|e| S3Error::Sdk(format!("Semaphore error: {}", e)))?;
 
                 let objects: Vec<ObjectIdentifier> = chunk
                     .iter()
@@ -507,9 +502,7 @@ impl S3Client {
                 let delete = Delete::builder()
                     .set_objects(Some(objects))
                     .build()
-                    .map_err(|e| {
-                        S3Error::Sdk(format!("Failed to build delete request: {}", e))
-                    })?;
+                    .map_err(|e| S3Error::Sdk(format!("Failed to build delete request: {}", e)))?;
 
                 client
                     .delete_objects()

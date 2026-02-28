@@ -509,11 +509,17 @@ mod tests {
 
     #[test]
     fn test_extract_prefix_before_wildcard() {
-        assert_eq!(extract_prefix_before_wildcard("data/2024-*.parquet"), "data/2024-");
+        assert_eq!(
+            extract_prefix_before_wildcard("data/2024-*.parquet"),
+            "data/2024-"
+        );
         assert_eq!(extract_prefix_before_wildcard("logs/*/error.log"), "logs/");
         assert_eq!(extract_prefix_before_wildcard("*.txt"), "");
         assert_eq!(extract_prefix_before_wildcard("exact-key"), "exact-key");
-        assert_eq!(extract_prefix_before_wildcard("prefix/sub?file"), "prefix/sub");
+        assert_eq!(
+            extract_prefix_before_wildcard("prefix/sub?file"),
+            "prefix/sub"
+        );
     }
 
     #[test]

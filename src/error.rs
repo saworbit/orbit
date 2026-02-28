@@ -84,8 +84,7 @@ impl OrbitError {
             // Integrity errors: checksum mismatch
             OrbitError::ChecksumMismatch { .. } => EXIT_INTEGRITY,
             // Partial failures: retries exhausted, parallel errors
-            OrbitError::RetriesExhausted { .. }
-            | OrbitError::Parallel(_) => EXIT_PARTIAL,
+            OrbitError::RetriesExhausted { .. } | OrbitError::Parallel(_) => EXIT_PARTIAL,
             // Everything else: partial failure
             _ => EXIT_PARTIAL,
         }
@@ -529,12 +528,34 @@ mod tests {
 
     #[test]
     fn test_exit_codes() {
-        assert_eq!(OrbitError::SourceNotFound(PathBuf::from("/tmp")).exit_code(), EXIT_FATAL);
-        assert_eq!(OrbitError::Config("bad".to_string()).exit_code(), EXIT_FATAL);
-        assert_eq!(OrbitError::Authentication("denied".to_string()).exit_code(), EXIT_FATAL);
-        assert_eq!(OrbitError::ChecksumMismatch { expected: "a".to_string(), actual: "b".to_string() }.exit_code(), EXIT_INTEGRITY);
-        assert_eq!(OrbitError::RetriesExhausted { attempts: 3 }.exit_code(), EXIT_PARTIAL);
-        assert_eq!(OrbitError::Protocol("timeout".to_string()).exit_code(), EXIT_PARTIAL);
+        assert_eq!(
+            OrbitError::SourceNotFound(PathBuf::from("/tmp")).exit_code(),
+            EXIT_FATAL
+        );
+        assert_eq!(
+            OrbitError::Config("bad".to_string()).exit_code(),
+            EXIT_FATAL
+        );
+        assert_eq!(
+            OrbitError::Authentication("denied".to_string()).exit_code(),
+            EXIT_FATAL
+        );
+        assert_eq!(
+            OrbitError::ChecksumMismatch {
+                expected: "a".to_string(),
+                actual: "b".to_string()
+            }
+            .exit_code(),
+            EXIT_INTEGRITY
+        );
+        assert_eq!(
+            OrbitError::RetriesExhausted { attempts: 3 }.exit_code(),
+            EXIT_PARTIAL
+        );
+        assert_eq!(
+            OrbitError::Protocol("timeout".to_string()).exit_code(),
+            EXIT_PARTIAL
+        );
     }
 
     #[test]
@@ -773,7 +794,9 @@ mod tests {
         // SourceNotFound
         let err = OrbitError::SourceNotFound(PathBuf::from("/tmp/missing"));
         assert!(err.to_string().contains("Source not found"));
-        assert!(err.to_string().contains("/tmp/missing") || err.to_string().contains("\\tmp\\missing"));
+        assert!(
+            err.to_string().contains("/tmp/missing") || err.to_string().contains("\\tmp\\missing")
+        );
 
         // InvalidPath
         let err = OrbitError::InvalidPath(PathBuf::from("/bad/path"));

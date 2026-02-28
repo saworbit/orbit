@@ -1,7 +1,7 @@
 //! S3 client session cache for reusing clients across operations.
 
-use super::config::S3Config;
 use super::client::S3Client;
+use super::config::S3Config;
 use super::error::S3Result;
 use std::collections::HashMap;
 use std::sync::RwLock;

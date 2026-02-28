@@ -230,9 +230,21 @@ mod tests {
 
     #[test]
     fn test_sortable_entry_ordering() {
-        let a = SortableEntry { path: "a/file".to_string(), size: 100, mtime_secs: 0 };
-        let b = SortableEntry { path: "b/file".to_string(), size: 50, mtime_secs: 0 };
-        let c = SortableEntry { path: "a/file".to_string(), size: 200, mtime_secs: 0 };
+        let a = SortableEntry {
+            path: "a/file".to_string(),
+            size: 100,
+            mtime_secs: 0,
+        };
+        let b = SortableEntry {
+            path: "b/file".to_string(),
+            size: 50,
+            mtime_secs: 0,
+        };
+        let c = SortableEntry {
+            path: "a/file".to_string(),
+            size: 200,
+            mtime_secs: 0,
+        };
         assert!(a < b);
         assert_eq!(a.cmp(&c), Ordering::Equal);
     }
@@ -241,9 +253,21 @@ mod tests {
     fn test_in_memory_sort() {
         let sorter = ExternalSorter::new(1000);
         let entries = vec![
-            SortableEntry { path: "c".to_string(), size: 0, mtime_secs: 0 },
-            SortableEntry { path: "a".to_string(), size: 0, mtime_secs: 0 },
-            SortableEntry { path: "b".to_string(), size: 0, mtime_secs: 0 },
+            SortableEntry {
+                path: "c".to_string(),
+                size: 0,
+                mtime_secs: 0,
+            },
+            SortableEntry {
+                path: "a".to_string(),
+                size: 0,
+                mtime_secs: 0,
+            },
+            SortableEntry {
+                path: "b".to_string(),
+                size: 0,
+                mtime_secs: 0,
+            },
         ];
         let sorted = sorter.sort(entries.into_iter()).unwrap();
         assert_eq!(sorted[0].path, "a");
@@ -282,7 +306,11 @@ mod tests {
     #[test]
     fn test_single_entry() {
         let sorter = ExternalSorter::new(100);
-        let entries = vec![SortableEntry { path: "only".to_string(), size: 42, mtime_secs: 1 }];
+        let entries = vec![SortableEntry {
+            path: "only".to_string(),
+            size: 42,
+            mtime_secs: 1,
+        }];
         let sorted = sorter.sort(entries.into_iter()).unwrap();
         assert_eq!(sorted.len(), 1);
         assert_eq!(sorted[0].path, "only");

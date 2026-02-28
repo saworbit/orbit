@@ -346,7 +346,10 @@ mod tests {
             S3StorageClass::GlacierFlexibleRetrieval.to_string(),
             "GLACIER"
         );
-        assert_eq!(S3StorageClass::GlacierDeepArchive.to_string(), "DEEP_ARCHIVE");
+        assert_eq!(
+            S3StorageClass::GlacierDeepArchive.to_string(),
+            "DEEP_ARCHIVE"
+        );
     }
 
     #[test]
