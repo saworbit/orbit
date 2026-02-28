@@ -22,7 +22,8 @@ set "DEMO_SOURCE=%TEMP%\orbit_ci_source_%RANDOM%"
 set "DEMO_DEST=%TEMP%\orbit_ci_dest_%RANDOM%"
 set "API_URL=http://localhost:8080"
 set "METRICS_FILE=%ORBIT_ROOT%\e2e-metrics.json"
-set "CURL_BASE=curl -s --show-error --connect-timeout 2 --max-time 10"
+set "CURL_BIN=curl.exe"
+set "CURL_BASE=%CURL_BIN% -s --show-error --connect-timeout 2 --max-time 5 --retry 0"
 
 REM Start time (seconds since epoch approximation)
 set "START_TIME=%TIME%"
@@ -121,7 +122,7 @@ set "MAX_RETRIES=60"
 
 :HealthCheckLoop
 call :Sleep 1
-powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '%API_URL%/api/health' -UseBasicParsing -TimeoutSec 5 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
+%CURL_BASE% -f "%API_URL%/api/health" >nul 2>nul
 if %errorlevel% NEQ 0 (
     set /a RETRY_COUNT+=1
     if !RETRY_COUNT! GEQ %MAX_RETRIES% (
