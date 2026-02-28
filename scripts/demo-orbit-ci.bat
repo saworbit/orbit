@@ -20,7 +20,7 @@ REM ============================================================================
 set "ORBIT_ROOT=%CD%"
 set "DEMO_SOURCE=%TEMP%\orbit_ci_source_%RANDOM%"
 set "DEMO_DEST=%TEMP%\orbit_ci_dest_%RANDOM%"
-set "API_URL=http://localhost:8080"
+set "API_URL=http://127.0.0.1:8080"
 set "METRICS_FILE=%ORBIT_ROOT%\e2e-metrics.json"
 set "CURL_BIN=curl.exe"
 set "CURL_BASE=%CURL_BIN% -s --show-error --connect-timeout 2 --max-time 5 --retry 0"
