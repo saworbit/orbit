@@ -122,7 +122,7 @@ set "MAX_RETRIES=60"
 
 :HealthCheckLoop
 call :Sleep 1
-%CURL_BASE% -f "%API_URL%/api/health" >nul 2>nul
+powershell -NoProfile -Command "try { $tcp = New-Object Net.Sockets.TcpClient; $iar = $tcp.BeginConnect('127.0.0.1',8080,$null,$null); if ($iar.AsyncWaitHandle.WaitOne(3000,$false)) { $tcp.EndConnect($iar); $tcp.Close(); exit 0 } else { $tcp.Close(); exit 1 } } catch { exit 1 }" >nul 2>nul
 if %errorlevel% NEQ 0 (
     set /a RETRY_COUNT+=1
     if !RETRY_COUNT! GEQ %MAX_RETRIES% (
