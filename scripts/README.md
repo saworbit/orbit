@@ -12,6 +12,8 @@ This directory contains utility scripts for development, testing, and demonstrat
 ### CI/Automated Demos
 - **`demo-orbit-ci.sh`** / **`demo-orbit-ci.bat`** - Non-interactive demo for CI/CD pipelines
 
+**Windows CI note:** `demo-orbit-ci.bat` is tuned for Windows runners. It uses `http://127.0.0.1:8080`, `curl.exe` with timeouts, skips the health probe, and retries login to avoid CI hangs. If a Windows job stalls, pull latest `main` and check `orbit-server.log` and `orbit-dashboard.log`.
+
 ## Launch Scripts
 
 - **`launch-orbit.sh`** / **`launch-orbit.bat`** - Quick launch scripts for Orbit server and UI

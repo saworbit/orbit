@@ -963,6 +963,31 @@ If you can't update immediately:
   demo-orbit.bat < NUL
   ```
 
+#### Windows CI Headless Demo Hangs or Times Out
+
+**Symptoms:**
+- GitHub Actions Windows job times out after "Waiting for API to become healthy..." in `demo-orbit-ci.bat`
+- No login response or job creation never starts
+- `orbit-server.log` shows the server started, but the batch script stops making progress
+
+**Root Cause (Windows CI quirk):**
+Windows CI can hang on health probes or curl calls if the process waits on stdin, stalls on IPv6 `localhost`, or lacks timeouts. This is most visible in headless CI where `demo-orbit-ci.bat` drives everything.
+
+**Resolution Implemented (Current Version):**
+1. Uses `API_URL=http://127.0.0.1:8080` to avoid IPv6 `localhost` edge cases.
+2. Uses `curl.exe` with explicit timeouts: `--connect-timeout 2 --max-time 5 --retry 0`.
+3. Skips the health probe and proceeds to login with retries.
+4. Retries login up to 10 times with a short sleep between attempts.
+
+**If This Happens Again:**
+1. Pull latest changes and re-run `demo-orbit-ci.bat`.
+2. Check `orbit-server.log` and `orbit-dashboard.log` for startup errors.
+3. Run a manual health check with timeouts:
+   ```batch
+   curl.exe -s --show-error --connect-timeout 2 --max-time 5 http://127.0.0.1:8080/api/health
+   ```
+4. If login still fails, increase `LOGIN_RETRIES` or the initial sleep in `demo-orbit-ci.bat`.
+
 #### Character Encoding Issues (Windows)
 
 If you see garbled characters like `ÔòöÔòÉ` instead of `╔═══╗`:
