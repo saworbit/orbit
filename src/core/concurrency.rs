@@ -101,13 +101,25 @@ impl Drop for ConcurrencyPermit {
     }
 }
 
-/// Helper function to detect optimal concurrency level based on system
+/// Helper function to detect optimal concurrency level for local operations.
 pub fn detect_optimal_concurrency() -> usize {
     let cpu_count = num_cpus::get();
 
     // For I/O-bound operations, we can use more threads than CPUs
     // Use 2x CPU count, capped at 16
     (cpu_count * 2).min(16)
+}
+
+/// Default worker count for network-bound operations (S3, Azure, GCS, SSH).
+/// Network operations spend most time waiting for I/O, so we can run
+/// far more concurrent operations than CPU cores.
+pub const DEFAULT_NETWORK_WORKERS: usize = 256;
+
+/// Detect optimal concurrency for network operations.
+/// Returns a much higher value than local operations since network
+/// transfers are I/O-bound, not CPU-bound.
+pub fn detect_network_concurrency() -> usize {
+    DEFAULT_NETWORK_WORKERS
 }
 
 // Shim for num_cpus functionality (fallback to std if needed)
@@ -356,5 +368,40 @@ mod tests {
 
         // Permit should be released
         assert_eq!(limiter.available(), 1);
+    }
+
+    #[test]
+    fn test_default_network_workers_constant() {
+        assert_eq!(DEFAULT_NETWORK_WORKERS, 256);
+    }
+
+    #[test]
+    fn test_detect_network_concurrency() {
+        let concurrency = detect_network_concurrency();
+        assert_eq!(concurrency, 256);
+    }
+
+    #[test]
+    fn test_network_vs_local_concurrency() {
+        let local = detect_optimal_concurrency();
+        let network = detect_network_concurrency();
+        // Network concurrency should always be higher than local
+        assert!(
+            network > local,
+            "Network concurrency ({}) should exceed local ({})",
+            network,
+            local
+        );
+    }
+
+    #[test]
+    fn test_limiter_with_network_workers() {
+        // Verify the limiter works with the high network worker count
+        let limiter = ConcurrencyLimiter::new(DEFAULT_NETWORK_WORKERS);
+        assert_eq!(limiter.max_concurrent(), 256);
+        assert_eq!(limiter.available(), 256);
+
+        let _permit = limiter.acquire();
+        assert_eq!(limiter.available(), 255);
     }
 }

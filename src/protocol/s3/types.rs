@@ -127,6 +127,16 @@ impl S3StorageClass {
         }
     }
 
+    /// Check if this storage class is a Glacier tier
+    pub fn is_glacier(&self) -> bool {
+        matches!(
+            self,
+            S3StorageClass::GlacierInstantRetrieval
+                | S3StorageClass::GlacierFlexibleRetrieval
+                | S3StorageClass::GlacierDeepArchive
+        )
+    }
+
     /// Convert from AWS SDK storage class
     pub fn from_aws(sc: &aws_sdk_s3::types::StorageClass) -> Self {
         match sc {
@@ -284,6 +294,18 @@ mod tests {
     }
 
     #[test]
+    fn test_is_glacier() {
+        assert!(S3StorageClass::GlacierInstantRetrieval.is_glacier());
+        assert!(S3StorageClass::GlacierFlexibleRetrieval.is_glacier());
+        assert!(S3StorageClass::GlacierDeepArchive.is_glacier());
+        assert!(!S3StorageClass::Standard.is_glacier());
+        assert!(!S3StorageClass::StandardIa.is_glacier());
+        assert!(!S3StorageClass::OnezoneIa.is_glacier());
+        assert!(!S3StorageClass::IntelligentTiering.is_glacier());
+        assert!(!S3StorageClass::ReducedRedundancy.is_glacier());
+    }
+
+    #[test]
     fn test_resume_state_progress() {
         let mut state = ResumeState::new("upload123".to_string(), 10000, 5242880);
         assert!(!state.has_progress());
@@ -301,5 +323,164 @@ mod tests {
     fn test_server_side_encryption_default() {
         let sse: S3ServerSideEncryption = Default::default();
         assert_eq!(sse, S3ServerSideEncryption::None);
+    }
+
+    #[test]
+    fn test_storage_class_display_all() {
+        assert_eq!(S3StorageClass::Standard.to_string(), "STANDARD");
+        assert_eq!(
+            S3StorageClass::ReducedRedundancy.to_string(),
+            "REDUCED_REDUNDANCY"
+        );
+        assert_eq!(S3StorageClass::StandardIa.to_string(), "STANDARD_IA");
+        assert_eq!(S3StorageClass::OnezoneIa.to_string(), "ONEZONE_IA");
+        assert_eq!(
+            S3StorageClass::IntelligentTiering.to_string(),
+            "INTELLIGENT_TIERING"
+        );
+        assert_eq!(
+            S3StorageClass::GlacierInstantRetrieval.to_string(),
+            "GLACIER_IR"
+        );
+        assert_eq!(
+            S3StorageClass::GlacierFlexibleRetrieval.to_string(),
+            "GLACIER"
+        );
+        assert_eq!(S3StorageClass::GlacierDeepArchive.to_string(), "DEEP_ARCHIVE");
+    }
+
+    #[test]
+    fn test_storage_class_to_aws_all() {
+        assert_eq!(
+            S3StorageClass::Standard.to_aws(),
+            aws_sdk_s3::types::StorageClass::Standard
+        );
+        assert_eq!(
+            S3StorageClass::ReducedRedundancy.to_aws(),
+            aws_sdk_s3::types::StorageClass::ReducedRedundancy
+        );
+        assert_eq!(
+            S3StorageClass::StandardIa.to_aws(),
+            aws_sdk_s3::types::StorageClass::StandardIa
+        );
+        assert_eq!(
+            S3StorageClass::OnezoneIa.to_aws(),
+            aws_sdk_s3::types::StorageClass::OnezoneIa
+        );
+        assert_eq!(
+            S3StorageClass::IntelligentTiering.to_aws(),
+            aws_sdk_s3::types::StorageClass::IntelligentTiering
+        );
+        assert_eq!(
+            S3StorageClass::GlacierInstantRetrieval.to_aws(),
+            aws_sdk_s3::types::StorageClass::GlacierIr
+        );
+        assert_eq!(
+            S3StorageClass::GlacierFlexibleRetrieval.to_aws(),
+            aws_sdk_s3::types::StorageClass::Glacier
+        );
+        assert_eq!(
+            S3StorageClass::GlacierDeepArchive.to_aws(),
+            aws_sdk_s3::types::StorageClass::DeepArchive
+        );
+    }
+
+    #[test]
+    fn test_storage_class_from_aws_all() {
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::Standard),
+            S3StorageClass::Standard
+        );
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::ReducedRedundancy),
+            S3StorageClass::ReducedRedundancy
+        );
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::StandardIa),
+            S3StorageClass::StandardIa
+        );
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::OnezoneIa),
+            S3StorageClass::OnezoneIa
+        );
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::IntelligentTiering),
+            S3StorageClass::IntelligentTiering
+        );
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::GlacierIr),
+            S3StorageClass::GlacierInstantRetrieval
+        );
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::Glacier),
+            S3StorageClass::GlacierFlexibleRetrieval
+        );
+        assert_eq!(
+            S3StorageClass::from_aws(&aws_sdk_s3::types::StorageClass::DeepArchive),
+            S3StorageClass::GlacierDeepArchive
+        );
+    }
+
+    #[test]
+    fn test_storage_class_from_aws_unknown() {
+        // Use an unknown variant to test the default fallback
+        let unknown = aws_sdk_s3::types::StorageClass::from("SOME_UNKNOWN_CLASS");
+        assert_eq!(S3StorageClass::from_aws(&unknown), S3StorageClass::Standard);
+    }
+
+    #[test]
+    fn test_server_side_encryption_to_aws() {
+        assert_eq!(
+            S3ServerSideEncryption::Aes256.to_aws(),
+            Some(aws_sdk_s3::types::ServerSideEncryption::Aes256)
+        );
+        assert_eq!(
+            S3ServerSideEncryption::AwsKms {
+                key_id: Some("my-key".to_string())
+            }
+            .to_aws(),
+            Some(aws_sdk_s3::types::ServerSideEncryption::AwsKms)
+        );
+        assert_eq!(S3ServerSideEncryption::None.to_aws(), None);
+    }
+
+    #[test]
+    fn test_upload_part_info_new() {
+        let info = UploadPartInfo::new(3, "etag-abc".to_string(), 1024);
+        assert_eq!(info.part_number, 3);
+        assert_eq!(info.etag, "etag-abc");
+        assert_eq!(info.size, 1024);
+    }
+
+    #[test]
+    fn test_resume_state_new() {
+        let state = ResumeState::new("upload-xyz".to_string(), 50000, 5242880);
+        assert_eq!(state.upload_id, Some("upload-xyz".to_string()));
+        assert!(state.completed_parts.is_empty());
+        assert_eq!(state.total_size, 50000);
+        assert_eq!(state.chunk_size, 5242880);
+        assert_eq!(state.etag, None);
+    }
+
+    #[test]
+    fn test_s3_object_serialization() {
+        let obj = S3Object {
+            key: "test/file.txt".to_string(),
+            size: 12345,
+            last_modified: None,
+            etag: Some("abc123".to_string()),
+            storage_class: Some(S3StorageClass::Standard),
+            content_type: Some("text/plain".to_string()),
+        };
+
+        let json = serde_json::to_string(&obj).expect("Failed to serialize S3Object");
+        let deserialized: S3Object =
+            serde_json::from_str(&json).expect("Failed to deserialize S3Object");
+
+        assert_eq!(deserialized.key, "test/file.txt");
+        assert_eq!(deserialized.size, 12345);
+        assert_eq!(deserialized.etag, Some("abc123".to_string()));
+        assert_eq!(deserialized.storage_class, Some(S3StorageClass::Standard));
+        assert_eq!(deserialized.content_type, Some("text/plain".to_string()));
     }
 }

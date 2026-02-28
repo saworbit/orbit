@@ -4488,6 +4488,7 @@ dependencies = [
  "libc",
  "log",
  "lz4",
+ "mime_guess",
  "notify",
  "object_store 0.11.2",
  "once_cell",

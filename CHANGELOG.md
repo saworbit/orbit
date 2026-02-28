@@ -943,9 +943,9 @@ async fn process<S: OrbitSystem>(system: &S, path: &Path) {
   - **Testing**: Unit tests for router and executor functionality
   - **Usage**:
     ```bash
-    orbit copy --profile neutrino --recursive /source /dest
-    orbit copy --profile neutrino --neutrino-threshold 16 --recursive /source /dest
-    orbit copy --check smart --profile neutrino --recursive /source /dest
+    orbit --source /source --dest /dest --profile neutrino --recursive
+    orbit --source /source --dest /dest --profile neutrino --neutrino-threshold 16 --recursive
+    orbit --source /source --dest /dest --check checksum --profile neutrino --recursive
     ```
 
 - **🎨 Full UI Migration to Production Dashboard** - Complete Figma mockup integration with real API

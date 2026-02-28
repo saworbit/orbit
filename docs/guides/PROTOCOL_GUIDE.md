@@ -72,7 +72,7 @@ orbit --source ssh://user@server.com/data/backup.tar.gz --dest ./backup.tar.gz
 
 # Recursive directory sync over SSH
 orbit --source /local/photos --dest ssh://backup.server.com/photos/ \
-  --mode sync --recursive --compress zstd:5
+  --mode sync --recursive --compress zstd:3
 
 # Download with compression to reduce network transfer
 orbit --source ssh://server.com/large-file.iso --dest ./large-file.iso \
@@ -273,7 +273,7 @@ orbit --source s3://my-bucket/data/report.pdf --dest ./report.pdf
 
 # Sync directory to S3
 orbit --source /local/photos --dest s3://my-bucket/photos/ \
-  --mode sync --recursive --compress zstd:5
+  --mode sync --recursive --compress zstd:3
 
 # Use with MinIO or S3-compatible storage
 export S3_ENDPOINT=http://localhost:9000

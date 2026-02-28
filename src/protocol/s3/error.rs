@@ -114,9 +114,24 @@ impl S3Error {
     /// Check if error is retryable
     pub fn is_retryable(&self) -> bool {
         match self {
-            S3Error::Network(_) | S3Error::Timeout(_) | S3Error::RateLimitExceeded(_) => true,
-            S3Error::Service { code, .. } => is_retryable_code(code),
+            S3Error::Network(_) => true,
+            S3Error::Timeout(_) => true,
+            S3Error::RateLimitExceeded(_) => true,
             S3Error::Io(_) => true, // I/O errors are generally retryable
+            // Authentication errors are NOT retryable
+            S3Error::Authentication(_) => false,
+            // SDK errors: check for network-related strings
+            S3Error::Sdk(msg) => {
+                let lower = msg.to_lowercase();
+                lower.contains("connection reset")
+                    || lower.contains("connection timed out")
+                    || lower.contains("broken pipe")
+                    || lower.contains("connection refused")
+                    || lower.contains("temporarily unavailable")
+            }
+            S3Error::Service { code, .. } => is_retryable_code(code),
+            // Unwrap context to check inner error
+            S3Error::WithContext { source, .. } => source.is_retryable(),
             _ => false,
         }
     }
@@ -141,7 +156,7 @@ impl From<io::Error> for S3Error {
 }
 
 /// Check if an AWS error code is retryable
-fn is_retryable_code(code: &str) -> bool {
+pub(crate) fn is_retryable_code(code: &str) -> bool {
     matches!(
         code,
         "RequestTimeout"
@@ -214,6 +229,39 @@ mod tests {
     }
 
     #[test]
+    fn test_authentication_not_retryable() {
+        assert!(!S3Error::Authentication("bad credentials".to_string()).is_retryable());
+    }
+
+    #[test]
+    fn test_sdk_network_errors_retryable() {
+        assert!(S3Error::Sdk("connection reset by peer".to_string()).is_retryable());
+        assert!(S3Error::Sdk("Connection timed out".to_string()).is_retryable());
+        assert!(S3Error::Sdk("broken pipe".to_string()).is_retryable());
+        assert!(S3Error::Sdk("Connection refused".to_string()).is_retryable());
+        assert!(S3Error::Sdk("resource temporarily unavailable".to_string()).is_retryable());
+        // Non-network SDK errors should not be retryable
+        assert!(!S3Error::Sdk("invalid argument".to_string()).is_retryable());
+    }
+
+    #[test]
+    fn test_with_context_retryable_unwrap() {
+        let inner = S3Error::Network("connection lost".to_string());
+        let wrapped = S3Error::WithContext {
+            context: "during upload".to_string(),
+            source: Box::new(inner),
+        };
+        assert!(wrapped.is_retryable());
+
+        let inner_non_retryable = S3Error::InvalidKey("bad".to_string());
+        let wrapped_non_retryable = S3Error::WithContext {
+            context: "during upload".to_string(),
+            source: Box::new(inner_non_retryable),
+        };
+        assert!(!wrapped_non_retryable.is_retryable());
+    }
+
+    #[test]
     fn test_transient_errors() {
         assert!(S3Error::Network("network error".to_string()).is_transient());
         assert!(S3Error::Timeout("timeout".to_string()).is_transient());
@@ -228,5 +276,142 @@ mod tests {
         assert!(is_retryable_code("SlowDown"));
         assert!(!is_retryable_code("NoSuchKey"));
         assert!(!is_retryable_code("AccessDenied"));
+    }
+
+    #[test]
+    fn test_service_error_retryable() {
+        let err = S3Error::Service {
+            code: "RequestTimeout".to_string(),
+            message: "timed out".to_string(),
+        };
+        assert!(err.is_retryable());
+
+        let err = S3Error::Service {
+            code: "ServiceUnavailable".to_string(),
+            message: "503".to_string(),
+        };
+        assert!(err.is_retryable());
+
+        let err = S3Error::Service {
+            code: "InternalError".to_string(),
+            message: "500".to_string(),
+        };
+        assert!(err.is_retryable());
+
+        let err = S3Error::Service {
+            code: "SlowDown".to_string(),
+            message: "slow".to_string(),
+        };
+        assert!(err.is_retryable());
+
+        let err = S3Error::Service {
+            code: "RequestTimeTooSkewed".to_string(),
+            message: "skew".to_string(),
+        };
+        assert!(err.is_retryable());
+    }
+
+    #[test]
+    fn test_service_error_not_retryable() {
+        let err = S3Error::Service {
+            code: "NoSuchKey".to_string(),
+            message: "not found".to_string(),
+        };
+        assert!(!err.is_retryable());
+
+        let err = S3Error::Service {
+            code: "AccessDenied".to_string(),
+            message: "denied".to_string(),
+        };
+        assert!(!err.is_retryable());
+
+        let err = S3Error::Service {
+            code: "NoSuchBucket".to_string(),
+            message: "gone".to_string(),
+        };
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn test_io_error_retryable() {
+        assert!(S3Error::Io("disk error".to_string()).is_retryable());
+    }
+
+    #[test]
+    fn test_transient_all_types() {
+        assert!(S3Error::RateLimitExceeded("rate".to_string()).is_transient());
+        assert!(S3Error::Io("io".to_string()).is_transient());
+        assert!(!S3Error::Authentication("auth".to_string()).is_transient());
+        assert!(!S3Error::Sdk("sdk".to_string()).is_transient());
+        assert!(
+            !S3Error::Service {
+                code: "InternalError".to_string(),
+                message: "err".to_string()
+            }
+            .is_transient()
+        );
+        assert!(!S3Error::InvalidBucketName("bad".to_string()).is_transient());
+    }
+
+    #[test]
+    fn test_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "gone");
+        let s3_err: S3Error = io_err.into();
+        assert!(matches!(s3_err, S3Error::Io(_)));
+    }
+
+    #[test]
+    fn test_from_sdk_helper() {
+        let err = S3Error::from_sdk(std::io::Error::other("test"));
+        assert!(matches!(err, S3Error::Sdk(_)));
+    }
+
+    #[test]
+    fn test_error_display_formats() {
+        let err = S3Error::Network("connection lost".to_string());
+        assert_eq!(format!("{}", err), "Network error: connection lost");
+
+        let err = S3Error::Timeout("30s elapsed".to_string());
+        assert_eq!(format!("{}", err), "Operation timed out: 30s elapsed");
+
+        let err = S3Error::Service {
+            code: "SlowDown".to_string(),
+            message: "rate limited".to_string(),
+        };
+        assert_eq!(
+            format!("{}", err),
+            "S3 service error (SlowDown): rate limited"
+        );
+
+        let err = S3Error::NotFound {
+            bucket: "my-bucket".to_string(),
+            key: "my-key".to_string(),
+        };
+        assert_eq!(format!("{}", err), "Object not found: my-bucket/my-key");
+
+        let err = S3Error::Io("disk full".to_string());
+        assert_eq!(format!("{}", err), "I/O error: disk full");
+
+        let err = S3Error::AccessDenied("no perms".to_string());
+        assert_eq!(format!("{}", err), "Access denied: no perms");
+
+        let err = S3Error::InvalidBucketName("bad!name".to_string());
+        assert_eq!(format!("{}", err), "Invalid bucket name: bad!name");
+
+        let err = S3Error::Authentication("expired token".to_string());
+        assert_eq!(format!("{}", err), "Authentication error: expired token");
+
+        let err = S3Error::Sdk("some sdk error".to_string());
+        assert_eq!(format!("{}", err), "AWS SDK error: some sdk error");
+
+        let err = S3Error::ChecksumMismatch {
+            key: "obj".to_string(),
+            expected: "aaa".to_string(),
+            actual: "bbb".to_string(),
+        };
+        assert_eq!(
+            format!("{}", err),
+            "Checksum mismatch for obj: expected aaa, got bbb"
+        );
     }
 }

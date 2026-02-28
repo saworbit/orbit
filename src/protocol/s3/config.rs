@@ -3,6 +3,8 @@
 use super::error::{S3Error, S3Result};
 use super::types::{S3ServerSideEncryption, S3StorageClass};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// S3 client configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +50,55 @@ pub struct S3Config {
 
     /// Enable checksum verification
     pub verify_checksums: bool,
+
+    // === Phase 3: Upload Enhancement Fields ===
+
+    /// Content-Type for uploads
+    pub content_type: Option<String>,
+
+    /// Content-Encoding for uploads
+    pub content_encoding: Option<String>,
+
+    /// Content-Disposition for uploads
+    pub content_disposition: Option<String>,
+
+    /// Cache-Control for uploads
+    pub cache_control: Option<String>,
+
+    /// Expires header (RFC3339)
+    pub expires_header: Option<String>,
+
+    /// User-defined metadata key=value pairs
+    pub user_metadata: HashMap<String, String>,
+
+    /// Metadata directive for copy operations (COPY/REPLACE)
+    pub metadata_directive: Option<String>,
+
+    /// Canned ACL (e.g., private, public-read, bucket-owner-full-control)
+    pub acl: Option<String>,
+
+    // === Phase 4: Client Configuration Fields ===
+
+    /// Disable request signing for public S3 buckets
+    pub no_sign_request: bool,
+
+    /// Path to AWS credentials file
+    pub credentials_file: Option<PathBuf>,
+
+    /// AWS profile name to use
+    pub aws_profile: Option<String>,
+
+    /// Use S3 Transfer Acceleration
+    pub use_acceleration: bool,
+
+    /// Enable requester-pays for S3 bucket access
+    pub request_payer: bool,
+
+    /// Disable SSL certificate verification
+    pub no_verify_ssl: bool,
+
+    /// Use ListObjects API v1 instead of v2
+    pub use_list_objects_v1: bool,
 }
 
 impl S3Config {
@@ -68,6 +119,23 @@ impl S3Config {
             timeout_seconds: 300, // 5 minutes
             max_retries: 3,
             verify_checksums: true,
+            // Phase 3: Upload enhancements
+            content_type: None,
+            content_encoding: None,
+            content_disposition: None,
+            cache_control: None,
+            expires_header: None,
+            user_metadata: HashMap::new(),
+            metadata_directive: None,
+            acl: None,
+            // Phase 4: Client configuration
+            no_sign_request: false,
+            credentials_file: None,
+            aws_profile: None,
+            use_acceleration: false,
+            request_payer: false,
+            no_verify_ssl: false,
+            use_list_objects_v1: false,
         }
     }
 
@@ -233,6 +301,100 @@ impl S3ConfigBuilder {
         self
     }
 
+    // === Phase 3: Upload Enhancement Builder Methods ===
+
+    /// Set content type for uploads
+    pub fn content_type(mut self, content_type: String) -> Self {
+        self.config.content_type = Some(content_type);
+        self
+    }
+
+    /// Set content encoding for uploads
+    pub fn content_encoding(mut self, content_encoding: String) -> Self {
+        self.config.content_encoding = Some(content_encoding);
+        self
+    }
+
+    /// Set content disposition for uploads
+    pub fn content_disposition(mut self, content_disposition: String) -> Self {
+        self.config.content_disposition = Some(content_disposition);
+        self
+    }
+
+    /// Set cache control for uploads
+    pub fn cache_control(mut self, cache_control: String) -> Self {
+        self.config.cache_control = Some(cache_control);
+        self
+    }
+
+    /// Set expires header (RFC3339)
+    pub fn expires_header(mut self, expires_header: String) -> Self {
+        self.config.expires_header = Some(expires_header);
+        self
+    }
+
+    /// Set user-defined metadata
+    pub fn user_metadata(mut self, metadata: HashMap<String, String>) -> Self {
+        self.config.user_metadata = metadata;
+        self
+    }
+
+    /// Set metadata directive for copy operations (COPY/REPLACE)
+    pub fn metadata_directive(mut self, directive: String) -> Self {
+        self.config.metadata_directive = Some(directive);
+        self
+    }
+
+    /// Set canned ACL for uploads
+    pub fn acl(mut self, acl: String) -> Self {
+        self.config.acl = Some(acl);
+        self
+    }
+
+    // === Phase 4: Client Configuration Builder Methods ===
+
+    /// Disable request signing for public S3 buckets
+    pub fn no_sign_request(mut self, no_sign: bool) -> Self {
+        self.config.no_sign_request = no_sign;
+        self
+    }
+
+    /// Set path to AWS credentials file
+    pub fn credentials_file(mut self, path: PathBuf) -> Self {
+        self.config.credentials_file = Some(path);
+        self
+    }
+
+    /// Set AWS profile name
+    pub fn aws_profile(mut self, profile: String) -> Self {
+        self.config.aws_profile = Some(profile);
+        self
+    }
+
+    /// Enable S3 Transfer Acceleration
+    pub fn use_acceleration(mut self, accelerate: bool) -> Self {
+        self.config.use_acceleration = accelerate;
+        self
+    }
+
+    /// Enable requester-pays
+    pub fn request_payer(mut self, payer: bool) -> Self {
+        self.config.request_payer = payer;
+        self
+    }
+
+    /// Disable SSL certificate verification
+    pub fn no_verify_ssl(mut self, no_verify: bool) -> Self {
+        self.config.no_verify_ssl = no_verify;
+        self
+    }
+
+    /// Use ListObjects API v1
+    pub fn use_list_objects_v1(mut self, use_v1: bool) -> Self {
+        self.config.use_list_objects_v1 = use_v1;
+        self
+    }
+
     /// Build the configuration
     pub fn build(self) -> S3Result<S3Config> {
         self.config.validate()?;
@@ -378,5 +540,105 @@ mod tests {
         config.access_key = Some("key".to_string());
         config.secret_key = Some("secret".to_string());
         assert!(config.has_explicit_credentials());
+    }
+
+    #[test]
+    fn test_s3config_new_defaults() {
+        let config = S3Config::new("test".to_string());
+        // Phase 3 fields
+        assert_eq!(config.content_type, None);
+        assert_eq!(config.content_encoding, None);
+        assert_eq!(config.content_disposition, None);
+        assert_eq!(config.cache_control, None);
+        assert_eq!(config.expires_header, None);
+        assert!(config.user_metadata.is_empty());
+        assert_eq!(config.metadata_directive, None);
+        assert_eq!(config.acl, None);
+        // Phase 4 fields
+        assert_eq!(config.no_sign_request, false);
+        assert_eq!(config.credentials_file, None);
+        assert_eq!(config.aws_profile, None);
+        assert_eq!(config.use_acceleration, false);
+        assert_eq!(config.request_payer, false);
+        assert_eq!(config.no_verify_ssl, false);
+        assert_eq!(config.use_list_objects_v1, false);
+    }
+
+    #[test]
+    fn test_builder_phase3_methods() {
+        let config = S3ConfigBuilder::new("test-bucket".to_string())
+            .content_type("text/html".to_string())
+            .content_encoding("gzip".to_string())
+            .content_disposition("attachment".to_string())
+            .cache_control("max-age=3600".to_string())
+            .expires_header("2026-12-31T00:00:00Z".to_string())
+            .user_metadata(HashMap::from([("key1".to_string(), "val1".to_string())]))
+            .metadata_directive("REPLACE".to_string())
+            .acl("public-read".to_string())
+            .build()
+            .unwrap();
+
+        assert_eq!(config.content_type, Some("text/html".to_string()));
+        assert_eq!(config.content_encoding, Some("gzip".to_string()));
+        assert_eq!(config.content_disposition, Some("attachment".to_string()));
+        assert_eq!(config.cache_control, Some("max-age=3600".to_string()));
+        assert_eq!(
+            config.expires_header,
+            Some("2026-12-31T00:00:00Z".to_string())
+        );
+        assert_eq!(config.user_metadata.len(), 1);
+        assert_eq!(
+            config.user_metadata.get("key1"),
+            Some(&"val1".to_string())
+        );
+        assert_eq!(config.metadata_directive, Some("REPLACE".to_string()));
+        assert_eq!(config.acl, Some("public-read".to_string()));
+    }
+
+    #[test]
+    fn test_builder_phase4_methods() {
+        let config = S3ConfigBuilder::new("test-bucket".to_string())
+            .no_sign_request(true)
+            .credentials_file(PathBuf::from("/path/to/creds"))
+            .aws_profile("production".to_string())
+            .use_acceleration(true)
+            .request_payer(true)
+            .no_verify_ssl(true)
+            .use_list_objects_v1(true)
+            .build()
+            .unwrap();
+
+        assert_eq!(config.no_sign_request, true);
+        assert_eq!(
+            config.credentials_file,
+            Some(PathBuf::from("/path/to/creds"))
+        );
+        assert_eq!(config.aws_profile, Some("production".to_string()));
+        assert_eq!(config.use_acceleration, true);
+        assert_eq!(config.request_payer, true);
+        assert_eq!(config.no_verify_ssl, true);
+        assert_eq!(config.use_list_objects_v1, true);
+    }
+
+    #[test]
+    fn test_s3config_default() {
+        let config = S3Config::default();
+        assert_eq!(config.bucket, "");
+    }
+
+    #[test]
+    fn test_validation_max_chunk_size() {
+        let mut config = S3Config::new("test-bucket".to_string());
+        config.chunk_size = crate::protocol::s3::MAX_CHUNK_SIZE + 1;
+        let result = config.validate();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validation_max_parallel_operations() {
+        let mut config = S3Config::new("test-bucket".to_string());
+        config.parallel_operations = crate::protocol::s3::MAX_PARALLEL_OPERATIONS + 1;
+        let result = config.validate();
+        assert!(result.is_err());
     }
 }

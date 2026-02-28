@@ -15,7 +15,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.7.0 Core / v2.2.0-rc.1 Control Plane)
+## ⚠️ Project Status: Alpha (v0.8.0 Core / v2.2.0-rc.1 Control Plane)
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -27,7 +27,7 @@
 - APIs may change between versions
 - Some features are experimental and marked as such
 - The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v0.7.0**: Usability & Automation (Phases 3-5) - Interactive `orbit init` wizard, active environment probing, and intelligent auto-tuning
+- **NEW v0.8.0**: Usability & Automation (Phases 3-5) - Interactive `orbit init` wizard, active environment probing, and intelligent auto-tuning
 - **v0.6.0-alpha.5**: Phase 5 - Sentinel (Autonomous Resilience Engine) - OODA loop monitors Universe V3 and autonomously heals under-replicated chunks via Phase 4 P2P transfers
 - **v0.6.0-alpha.4**: Phase 4 - Data Plane (P2P Transfer) - Direct Star-to-Star data transfer eliminates Nucleus bandwidth bottleneck, enabling infinite horizontal scaling
 - **v0.6.0-alpha.3**: Phase 3 - Nucleus Client & RemoteSystem (Client-side connectivity for Nucleus-to-Star orchestration, 99.997% network reduction via compute offloading)
@@ -643,13 +643,13 @@ The **Neutrino Fast Lane** provides ~3x performance improvement for small-file w
 **Usage:**
 ```bash
 # Enable Neutrino fast lane
-orbit copy --profile neutrino --recursive /source /dest
+orbit --source /source --dest /dest --profile neutrino --recursive
 
 # Custom threshold (16KB)
-orbit copy --profile neutrino --neutrino-threshold 16 --recursive /source /dest
+orbit --source /source --dest /dest --profile neutrino --neutrino-threshold 16 --recursive
 
-# Combined with Smart Sync
-orbit copy --check smart --profile neutrino --recursive /source /dest
+# Combined with Checksum Sync
+orbit --source /source --dest /dest --check checksum --profile neutrino --recursive
 ```
 
 **Best For:**
@@ -1034,7 +1034,7 @@ orbit --source ./local-file.txt --dest sftp://example.com/upload/file.txt
 
 # Recursive directory sync with compression
 orbit --source /local/photos --dest ssh://backup.server.com/photos/ \
-  --mode sync --compress zstd:5 --recursive
+  --mode sync --compress zstd:3 --recursive
 
 # Download with resume support for unreliable connections
 orbit --source ssh://server.com/large-file.iso --dest ./large-file.iso \
@@ -1075,7 +1075,7 @@ orbit --source s3://my-bucket/data/report.pdf --dest ./report.pdf
 
 # Sync directory to S3 with compression
 orbit --source /local/photos --dest s3://my-bucket/photos/ \
-  --mode sync --compress zstd:5 --recursive
+  --mode sync --compress zstd:3 --recursive
 
 # Use with MinIO
 export S3_ENDPOINT=http://localhost:9000
@@ -1117,7 +1117,7 @@ orbit --source azure://mycontainer/data/report.pdf --dest ./report.pdf
 
 # Sync directory to Azure with compression
 orbit --source /local/photos --dest azblob://photos-container/backup/ \
-  --mode sync --compress zstd:5 --recursive
+  --mode sync --compress zstd:3 --recursive
 
 # Test with Azurite (Azure Storage Emulator)
 export AZURE_STORAGE_ACCOUNT="devstoreaccount1"
@@ -1219,7 +1219,7 @@ Orbit V3 provides **tamper-evident audit logs** using HMAC-SHA256 cryptographic 
 export ORBIT_AUDIT_SECRET=$(openssl rand -hex 32)
 
 # Enable audit logging with integrity protection
-orbit copy /source /dest --audit-log ./audit.jsonl
+orbit --source /source --dest /dest --audit-log ./audit.jsonl
 
 # Verify log integrity (detects any tampering)
 python3 scripts/verify_audit.py audit.jsonl
@@ -1249,7 +1249,7 @@ Orbit supports **W3C Trace Context** for distributed tracing across microservice
 **Enable OpenTelemetry Export:**
 ```bash
 # Export traces to Jaeger/Honeycomb/Datadog
-orbit copy /source /dest \
+orbit --source /source --dest /dest \
   --audit-log ./audit.jsonl \
   --otel-endpoint http://jaeger:4317
 ```
@@ -1270,14 +1270,14 @@ TEST_LOG=llm-debug RUST_LOG=debug \
 
 # Or for normal runs
 ORBIT_LOG_MODE=llm-debug RUST_LOG=debug \
-  orbit copy /source /dest
+  orbit --source /source --dest /dest
 ```
 
 #### 📊 Prometheus Metrics
 
 **Expose metrics for monitoring:**
 ```bash
-orbit copy /source /dest \
+orbit --source /source --dest /dest \
   --audit-log ./audit.jsonl \
   --metrics-port 9090
 
@@ -1446,13 +1446,17 @@ orbit --source source.txt --dest destination.txt
 orbit --source large-file.iso --dest /backup/large-file.iso --resume
 
 # Recursive directory copy with compression
-orbit --source /data/photos --dest /backup/photos --recursive --compress zstd:5
+orbit --source /data/photos --dest /backup/photos --recursive --compress zstd:3
 
-# Sync with parallel transfers
-orbit --source /source --dest /destination --mode sync --parallel 8 --recursive
+# Sync with parallel workers
+orbit --source /source --dest /destination --mode sync --workers 8 --recursive
 
-# Upload to S3
-orbit --source dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz
+# High-concurrency S3 upload (256 workers, 8 parts per file)
+orbit --source dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz \
+  --workers 256 --concurrency 8
+
+# Upload to S3 with execution statistics
+orbit --source dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz --stat -H
 
 # Preserve metadata with transformations
 orbit --source /data --dest /backup --recursive \
@@ -1488,11 +1492,26 @@ orbit --source /data --dest /backup --recursive --dry-run --verbose
 # Bandwidth-limited transfer with progress tracking
 orbit --source /large/dataset --dest /backup --recursive \
   --max-bandwidth 10 \
-  --parallel 4 \
+  --workers 4 \
   --show-progress
 
 # Create flight plan manifest
 orbit manifest plan --source /data --dest /backup --output ./manifests
+
+# Batch execution: run multiple operations in parallel
+orbit run --file commands.txt --workers 256
+
+# Stream S3 object to stdout (requires s3-native feature)
+orbit cat s3://bucket/data/report.csv | head -100
+
+# Upload stdin to S3
+tar czf - /data | orbit pipe s3://bucket/backups/data.tar.gz
+
+# Generate a pre-signed URL (expires in 1 hour)
+orbit presign s3://bucket/data/report.csv --expires 3600
+
+# S3 wildcard listing (optimized prefix scan)
+orbit --source "s3://bucket/data/2024-*.parquet" --dest /local --recursive
 ```
 
 ---
@@ -1512,8 +1531,10 @@ orbit manifest plan --source /data --dest /backup --output ./manifests
 ### S3 Transfer Performance
 
 - **Multipart Upload:** 500+ MB/s on high-bandwidth links
-- **Parallel Operations:** 4-16 concurrent chunks (configurable)
+- **Parallel Workers:** Up to 256 concurrent file operations (configurable via `--workers`)
+- **Per-File Concurrency:** 5 concurrent parts per multipart upload (configurable via `--concurrency`)
 - **Adaptive Chunking:** 5MB-2GB chunks based on file size
+- **Wildcard Optimization:** Prefix-scoped listing with in-memory glob filtering
 - **Resume Efficiency:** Chunk-level verification with intelligent restart decisions
 
 ### Compression Performance
@@ -1665,8 +1686,18 @@ exponential_backoff = true
 # Maximum bandwidth in bytes per second (0 = unlimited)
 max_bandwidth = 0
 
-# Number of parallel operations (0 = sequential)
-parallel = 4
+# Number of parallel file workers (0 = auto: 256 for network, CPU count for local)
+# Alias: --parallel on CLI
+parallel = 0
+
+# Per-operation concurrency for multipart transfers (parts per file)
+concurrency = 5
+
+# Show execution statistics at end of run
+show_stats = false
+
+# Human-readable output (e.g., "1.5 GiB" instead of raw bytes)
+human_readable = false
 
 # Symbolic link handling: "skip", "follow", or "preserve"
 symlink_mode = "skip"
@@ -2290,21 +2321,70 @@ For complete security audit results, dependency chain analysis, and mitigation d
 
 ## 📖 CLI Quick Reference
 
-**Current syntax (v0.4.1):**
+**Transfer operations:**
 ```bash
 orbit --source <PATH> --dest <PATH> [FLAGS]
-orbit manifest <plan|verify|diff|info> [OPTIONS]
-orbit <stats|presets|capabilities>
 ```
 
-**Planned syntax (v0.6.0+):**
+**Parallelism flags:**
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--workers N` | Parallel file workers (0 = auto) | 0 (auto: 256 network, CPU count local) |
+| `--parallel N` | Alias for `--workers` | 0 |
+| `--concurrency N` | Multipart parts per file | 5 |
+
+**Output flags:**
+| Flag | Description |
+|------|-------------|
+| `--stat` | Print execution statistics at end of run |
+| `-H` / `--human-readable` | Human-readable byte values (e.g., "1.5 GiB") |
+| `--json` | JSON Lines output for all operations (machine-parseable) |
+
+**S3 flags:**
+| Flag | Description |
+|------|-------------|
+| `--content-type TYPE` | Set Content-Type header on uploads |
+| `--cache-control VAL` | Set Cache-Control header on uploads |
+| `--acl ACL` | Canned ACL (e.g., `private`, `public-read`, `bucket-owner-full-control`) |
+| `--no-sign-request` | Anonymous access for public S3 buckets |
+| `--use-acceleration` | Enable S3 Transfer Acceleration |
+| `--request-payer` | Access requester-pays buckets |
+| `--aws-profile NAME` | Use a specific AWS credential profile |
+| `--credentials-file PATH` | Custom AWS credentials file path |
+| `--part-size N` | Multipart part size in MiB (default: 50) |
+| `--no-verify-ssl` | Skip SSL certificate verification |
+| `--use-list-objects-v1` | Use ListObjects v1 API for compatibility |
+
+**Conditional copy flags:**
+| Flag | Description |
+|------|-------------|
+| `-n` / `--no-clobber` | Do not overwrite existing files |
+| `--if-size-differ` | Only copy if source and destination sizes differ |
+| `--if-source-newer` | Only copy if source is newer than destination |
+| `--flatten` | Strip directory hierarchy during copy |
+| `--raw` | Disable wildcard expansion (treat patterns as literal keys) |
+| `--force-glacier-transfer` | Force transfer of Glacier-stored objects |
+| `--ignore-glacier-warnings` | Suppress Glacier object warnings |
+
+**Subcommands:**
 ```bash
-orbit cp <SOURCE> <DEST> [FLAGS]          # Friendly alias
-orbit sync <SOURCE> <DEST> [FLAGS]        # Sync mode alias
-orbit run --manifest <FILE>               # Execute from manifest (planned)
+orbit run [--file FILE] [--workers N]     # Batch execution from file/stdin
+orbit ls s3://bucket/prefix [-e] [-s]     # List S3 objects
+orbit head s3://bucket/key                # Show S3 object metadata
+orbit du s3://bucket/prefix [-g]          # Show storage usage
+orbit rm s3://bucket/pattern [--dry-run]  # Delete S3 objects
+orbit mv s3://src s3://dst                # Move/rename S3 objects
+orbit mb s3://bucket-name                 # Create S3 bucket
+orbit rb s3://bucket-name                 # Remove S3 bucket
+orbit cat s3://bucket/key                 # Stream S3 object to stdout
+orbit pipe s3://bucket/key                # Upload stdin to S3
+orbit presign s3://bucket/key [--expires] # Generate pre-signed URL
+orbit manifest <plan|verify|diff|info>    # Manifest operations
+orbit <init|stats|presets|capabilities>   # Configuration & info
+orbit serve [--addr HOST:PORT]            # Launch web GUI
 ```
 
-> **Note:** The current release uses flag-based syntax. User-friendly subcommands like `cp`, `sync`, and `run` are planned for v0.6.0.
+> **Note:** `cat`, `pipe`, and `presign` require the `s3-native` feature flag.
 
 ---
 

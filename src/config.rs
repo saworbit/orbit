@@ -93,9 +93,16 @@ pub struct CopyConfig {
     #[serde(default)]
     pub max_bandwidth: u64,
 
-    /// Number of parallel operations (0 = sequential)
+    /// Number of parallel file operations / workers (0 = auto-detect)
+    /// For network backends, auto = 256; for local, auto = CPU count
     #[serde(default)]
     pub parallel: usize,
+
+    /// Per-operation concurrency (e.g., multipart upload/download parts)
+    /// Default: 5. Controls how many parts of a single large file are
+    /// transferred simultaneously.
+    #[serde(default = "default_concurrency")]
+    pub concurrency: usize,
 
     /// Symbolic link handling mode
     #[serde(default)]
@@ -223,6 +230,100 @@ pub struct CopyConfig {
     /// Set to enable /metrics endpoint (e.g., 9090)
     #[serde(default)]
     pub metrics_port: Option<u16>,
+
+    /// Show execution statistics summary at end of run
+    #[serde(default)]
+    pub show_stats: bool,
+
+    /// Human-readable output (e.g., "1.5 GiB" instead of raw bytes)
+    #[serde(default)]
+    pub human_readable: bool,
+
+    /// Output results as JSON Lines instead of human-readable text
+    #[serde(default)]
+    pub json_output: bool,
+
+    // === S3 Upload Enhancement Fields (Phase 3) ===
+
+    /// Content-Type header for S3 uploads
+    #[serde(default)]
+    pub s3_content_type: Option<String>,
+
+    /// Content-Encoding header for S3 uploads
+    #[serde(default)]
+    pub s3_content_encoding: Option<String>,
+
+    /// Content-Disposition header for S3 uploads
+    #[serde(default)]
+    pub s3_content_disposition: Option<String>,
+
+    /// Cache-Control header for S3 uploads
+    #[serde(default)]
+    pub s3_cache_control: Option<String>,
+
+    /// Expiration date for S3 objects (RFC3339 format)
+    #[serde(default)]
+    pub s3_expires_header: Option<String>,
+
+    /// User-defined metadata key=value pairs for S3 uploads
+    #[serde(default)]
+    pub s3_user_metadata: Vec<String>,
+
+    /// Metadata directive for S3 copy operations (COPY or REPLACE)
+    #[serde(default)]
+    pub s3_metadata_directive: Option<String>,
+
+    /// Canned ACL for S3 uploads
+    #[serde(default)]
+    pub s3_acl: Option<String>,
+
+    // === S3 Client Configuration Fields (Phase 4) ===
+
+    /// Disable request signing for public S3 buckets
+    #[serde(default)]
+    pub s3_no_sign_request: bool,
+
+    /// Path to AWS credentials file
+    #[serde(default)]
+    pub s3_credentials_file: Option<std::path::PathBuf>,
+
+    /// AWS profile name to use
+    #[serde(default)]
+    pub s3_aws_profile: Option<String>,
+
+    /// Use S3 Transfer Acceleration
+    #[serde(default)]
+    pub s3_use_acceleration: bool,
+
+    /// Enable requester-pays for S3 bucket access
+    #[serde(default)]
+    pub s3_request_payer: bool,
+
+    /// Disable SSL certificate verification
+    #[serde(default)]
+    pub s3_no_verify_ssl: bool,
+
+    /// Use ListObjects API v1 (for older S3-compatible storage)
+    #[serde(default)]
+    pub s3_use_list_objects_v1: bool,
+
+    // === Conditional Copy & Transfer Options (Phase 5/6) ===
+
+    /// Do not overwrite existing files
+    #[serde(default)]
+    pub no_clobber: bool,
+
+    /// Only copy if sizes differ
+    #[serde(default)]
+    pub if_size_differ: bool,
+
+    /// Only copy if source is newer
+    #[serde(default)]
+    pub if_source_newer: bool,
+
+    /// Flatten directory hierarchy (strip path components)
+    #[serde(default)]
+    pub flatten: bool,
 }
 
 impl Default for CopyConfig {
@@ -245,6 +346,7 @@ impl Default for CopyConfig {
             exponential_backoff: false,
             max_bandwidth: 0,
             parallel: 0,
+            concurrency: default_concurrency(),
             symlink_mode: SymlinkMode::Skip,
             error_mode: ErrorMode::Abort,
             log_level: LogLevel::Info,
@@ -275,6 +377,31 @@ impl Default for CopyConfig {
             neutrino_threshold: default_neutrino_threshold(),
             otel_endpoint: None,
             metrics_port: None,
+            show_stats: false,
+            human_readable: false,
+            json_output: false,
+            // S3 upload enhancement fields (Phase 3)
+            s3_content_type: None,
+            s3_content_encoding: None,
+            s3_content_disposition: None,
+            s3_cache_control: None,
+            s3_expires_header: None,
+            s3_user_metadata: Vec::new(),
+            s3_metadata_directive: None,
+            s3_acl: None,
+            // S3 client configuration fields (Phase 4)
+            s3_no_sign_request: false,
+            s3_credentials_file: None,
+            s3_aws_profile: None,
+            s3_use_acceleration: false,
+            s3_request_payer: false,
+            s3_no_verify_ssl: false,
+            s3_use_list_objects_v1: false,
+            // Conditional copy & transfer options (Phase 5/6)
+            no_clobber: false,
+            if_size_differ: false,
+            if_source_newer: false,
+            flatten: false,
         }
     }
 }
@@ -414,6 +541,10 @@ fn default_neutrino_threshold() -> u64 {
     8 * 1024 // 8 KB
 }
 
+fn default_concurrency() -> usize {
+    5 // Per-operation concurrency (multipart parts in flight)
+}
+
 impl CopyConfig {
     /// Load configuration from a TOML file
     pub fn from_file(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
@@ -459,6 +590,19 @@ impl CopyConfig {
         }
     }
 
+    /// Resolve the effective worker count based on the backend type.
+    /// If `parallel` is 0 (auto), returns CPU count for local ops
+    /// or DEFAULT_NETWORK_WORKERS for network ops.
+    pub fn resolve_workers(&self, is_network: bool) -> usize {
+        if self.parallel > 0 {
+            self.parallel
+        } else if is_network {
+            DEFAULT_NETWORK_WORKERS
+        } else {
+            get_cpu_count()
+        }
+    }
+
     /// Create a configuration optimized for network transfers
     pub fn network_preset() -> Self {
         Self {
@@ -468,6 +612,8 @@ impl CopyConfig {
             retry_attempts: 10,
             exponential_backoff: true,
             use_zero_copy: false,
+            parallel: DEFAULT_NETWORK_WORKERS,
+            concurrency: 5,
             generate_manifest: false,
             manifest_output_dir: None,
             chunking_strategy: ChunkingStrategy::default(),
@@ -476,12 +622,21 @@ impl CopyConfig {
     }
 }
 
+/// Default worker count for network backends (S3, Azure, GCS, SSH, SMB)
+/// Network operations are I/O-bound, so we can have many more concurrent
+/// operations than CPU cores. Optimized for I/O-bound network operations (256 concurrent workers).
+pub const DEFAULT_NETWORK_WORKERS: usize = 256;
+
+/// Default worker count for local-to-local transfers (CPU-bound)
+pub const DEFAULT_LOCAL_WORKERS: usize = 0; // 0 = auto-detect CPU count
+
 /// Get the number of available CPU cores
 fn get_cpu_count() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -495,6 +650,9 @@ mod tests {
         assert!(config.use_zero_copy);
         assert!(!config.resume_enabled);
         assert!(!config.generate_manifest);
+        assert_eq!(config.concurrency, 5);
+        assert!(!config.show_stats);
+        assert!(!config.human_readable);
     }
 
     #[test]
@@ -521,6 +679,8 @@ mod tests {
         assert!(config.resume_enabled);
         assert!(matches!(config.compression, CompressionType::Zstd { .. }));
         assert!(!config.use_zero_copy);
+        assert_eq!(config.parallel, DEFAULT_NETWORK_WORKERS);
+        assert_eq!(config.concurrency, 5);
     }
 
     #[test]
@@ -550,6 +710,73 @@ mod tests {
     fn test_chunking_strategy_default() {
         let strategy = ChunkingStrategy::default();
         assert!(matches!(strategy, ChunkingStrategy::Cdc { .. }));
+    }
+
+    #[test]
+    fn test_concurrency_default() {
+        assert_eq!(default_concurrency(), 5);
+    }
+
+    #[test]
+    fn test_resolve_workers_explicit() {
+        let mut config = CopyConfig::default();
+        config.parallel = 32;
+        // Explicit value is always used regardless of backend type
+        assert_eq!(config.resolve_workers(false), 32);
+        assert_eq!(config.resolve_workers(true), 32);
+    }
+
+    #[test]
+    fn test_resolve_workers_auto_local() {
+        let config = CopyConfig::default(); // parallel = 0
+        let workers = config.resolve_workers(false);
+        // Should be CPU count, which is at least 1
+        assert!(workers >= 1);
+        assert!(workers <= 512); // sanity upper bound
+    }
+
+    #[test]
+    fn test_resolve_workers_auto_network() {
+        let config = CopyConfig::default(); // parallel = 0
+        let workers = config.resolve_workers(true);
+        assert_eq!(workers, DEFAULT_NETWORK_WORKERS);
+    }
+
+    #[test]
+    fn test_network_workers_constant() {
+        assert_eq!(DEFAULT_NETWORK_WORKERS, 256);
+    }
+
+    #[test]
+    fn test_local_workers_constant() {
+        assert_eq!(DEFAULT_LOCAL_WORKERS, 0);
+    }
+
+    #[test]
+    fn test_new_fields_serialization() {
+        let mut config = CopyConfig::default();
+        config.concurrency = 10;
+        config.show_stats = true;
+        config.human_readable = true;
+
+        let toml = toml::to_string(&config).unwrap();
+        let deserialized: CopyConfig = toml::from_str(&toml).unwrap();
+        assert_eq!(deserialized.concurrency, 10);
+        assert!(deserialized.show_stats);
+        assert!(deserialized.human_readable);
+    }
+
+    #[test]
+    fn test_new_fields_deserialization_with_defaults() {
+        // Old config files without new fields should still deserialize
+        let toml_str = r#"
+copy_mode = "copy"
+recursive = false
+"#;
+        let config: CopyConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.concurrency, 5); // default
+        assert!(!config.show_stats);       // default
+        assert!(!config.human_readable);   // default
     }
 
     #[test]
@@ -605,5 +832,139 @@ audit_log_path = "/var/log/orbit_audit.log"
             config.audit_log_path,
             Some(PathBuf::from("/var/log/orbit_audit.log"))
         );
+    }
+
+    #[test]
+    fn test_default_config_new_fields() {
+        let config = CopyConfig::default();
+        // Conditional copy & output fields
+        assert_eq!(config.json_output, false);
+        assert_eq!(config.no_clobber, false);
+        assert_eq!(config.if_size_differ, false);
+        assert_eq!(config.if_source_newer, false);
+        assert_eq!(config.flatten, false);
+        // S3 upload enhancement fields (Phase 3)
+        assert!(config.s3_content_type.is_none());
+        assert!(config.s3_content_encoding.is_none());
+        assert!(config.s3_content_disposition.is_none());
+        assert!(config.s3_cache_control.is_none());
+        assert!(config.s3_expires_header.is_none());
+        assert!(config.s3_user_metadata.is_empty());
+        assert!(config.s3_metadata_directive.is_none());
+        assert!(config.s3_acl.is_none());
+        // S3 client configuration fields (Phase 4)
+        assert_eq!(config.s3_no_sign_request, false);
+        assert!(config.s3_credentials_file.is_none());
+        assert!(config.s3_aws_profile.is_none());
+        assert_eq!(config.s3_use_acceleration, false);
+        assert_eq!(config.s3_request_payer, false);
+        assert_eq!(config.s3_no_verify_ssl, false);
+        assert_eq!(config.s3_use_list_objects_v1, false);
+    }
+
+    #[test]
+    fn test_new_fields_serialization_roundtrip() {
+        let mut config = CopyConfig::default();
+        // Set ALL new fields to non-default values
+        config.json_output = true;
+        config.no_clobber = true;
+        config.if_size_differ = true;
+        config.if_source_newer = true;
+        config.flatten = true;
+        config.s3_content_type = Some("application/octet-stream".to_string());
+        config.s3_content_encoding = Some("gzip".to_string());
+        config.s3_content_disposition = Some("attachment".to_string());
+        config.s3_cache_control = Some("max-age=3600".to_string());
+        config.s3_expires_header = Some("2030-01-01T00:00:00Z".to_string());
+        config.s3_user_metadata = vec!["key1=val1".to_string(), "key2=val2".to_string()];
+        config.s3_metadata_directive = Some("REPLACE".to_string());
+        config.s3_acl = Some("public-read".to_string());
+        config.s3_no_sign_request = true;
+        config.s3_credentials_file = Some(PathBuf::from("/home/user/.aws/credentials"));
+        config.s3_aws_profile = Some("production".to_string());
+        config.s3_use_acceleration = true;
+        config.s3_request_payer = true;
+        config.s3_no_verify_ssl = true;
+        config.s3_use_list_objects_v1 = true;
+
+        // Serialize to TOML
+        let toml_str = toml::to_string_pretty(&config).unwrap();
+        // Deserialize back
+        let restored: CopyConfig = toml::from_str(&toml_str).unwrap();
+
+        // Verify all fields match
+        assert_eq!(restored.json_output, true);
+        assert_eq!(restored.no_clobber, true);
+        assert_eq!(restored.if_size_differ, true);
+        assert_eq!(restored.if_source_newer, true);
+        assert_eq!(restored.flatten, true);
+        assert_eq!(restored.s3_content_type, Some("application/octet-stream".to_string()));
+        assert_eq!(restored.s3_content_encoding, Some("gzip".to_string()));
+        assert_eq!(restored.s3_content_disposition, Some("attachment".to_string()));
+        assert_eq!(restored.s3_cache_control, Some("max-age=3600".to_string()));
+        assert_eq!(restored.s3_expires_header, Some("2030-01-01T00:00:00Z".to_string()));
+        assert_eq!(restored.s3_user_metadata, vec!["key1=val1", "key2=val2"]);
+        assert_eq!(restored.s3_metadata_directive, Some("REPLACE".to_string()));
+        assert_eq!(restored.s3_acl, Some("public-read".to_string()));
+        assert_eq!(restored.s3_no_sign_request, true);
+        assert_eq!(restored.s3_credentials_file, Some(PathBuf::from("/home/user/.aws/credentials")));
+        assert_eq!(restored.s3_aws_profile, Some("production".to_string()));
+        assert_eq!(restored.s3_use_acceleration, true);
+        assert_eq!(restored.s3_request_payer, true);
+        assert_eq!(restored.s3_no_verify_ssl, true);
+        assert_eq!(restored.s3_use_list_objects_v1, true);
+    }
+
+    #[test]
+    fn test_log_level_to_tracing() {
+        assert_eq!(LogLevel::Error.to_tracing_level(), tracing::Level::ERROR);
+        assert_eq!(LogLevel::Warn.to_tracing_level(), tracing::Level::WARN);
+        assert_eq!(LogLevel::Info.to_tracing_level(), tracing::Level::INFO);
+        assert_eq!(LogLevel::Debug.to_tracing_level(), tracing::Level::DEBUG);
+        assert_eq!(LogLevel::Trace.to_tracing_level(), tracing::Level::TRACE);
+    }
+
+    #[test]
+    fn test_neutrino_threshold_default() {
+        assert_eq!(default_neutrino_threshold(), 8192);
+    }
+
+    #[test]
+    fn test_config_with_s3_fields_toml() {
+        let toml_str = r#"
+copy_mode = "copy"
+recursive = true
+s3_content_type = "text/html"
+s3_content_encoding = "br"
+s3_content_disposition = "inline"
+s3_cache_control = "no-cache"
+s3_expires_header = "2025-12-31T23:59:59Z"
+s3_user_metadata = ["env=prod", "version=2"]
+s3_metadata_directive = "COPY"
+s3_acl = "private"
+s3_no_sign_request = true
+s3_credentials_file = "/etc/aws/creds"
+s3_aws_profile = "staging"
+s3_use_acceleration = true
+s3_request_payer = true
+s3_no_verify_ssl = true
+s3_use_list_objects_v1 = true
+"#;
+        let config: CopyConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.s3_content_type, Some("text/html".to_string()));
+        assert_eq!(config.s3_content_encoding, Some("br".to_string()));
+        assert_eq!(config.s3_content_disposition, Some("inline".to_string()));
+        assert_eq!(config.s3_cache_control, Some("no-cache".to_string()));
+        assert_eq!(config.s3_expires_header, Some("2025-12-31T23:59:59Z".to_string()));
+        assert_eq!(config.s3_user_metadata, vec!["env=prod", "version=2"]);
+        assert_eq!(config.s3_metadata_directive, Some("COPY".to_string()));
+        assert_eq!(config.s3_acl, Some("private".to_string()));
+        assert!(config.s3_no_sign_request);
+        assert_eq!(config.s3_credentials_file, Some(PathBuf::from("/etc/aws/creds")));
+        assert_eq!(config.s3_aws_profile, Some("staging".to_string()));
+        assert!(config.s3_use_acceleration);
+        assert!(config.s3_request_payer);
+        assert!(config.s3_no_verify_ssl);
+        assert!(config.s3_use_list_objects_v1);
     }
 }

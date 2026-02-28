@@ -23,6 +23,7 @@ pub mod error;
 pub mod instrumentation;
 pub mod logging;
 pub mod manifest_integration;
+pub mod output;
 pub mod protocol;
 pub mod stats;
 #[cfg(feature = "orbit-system")]

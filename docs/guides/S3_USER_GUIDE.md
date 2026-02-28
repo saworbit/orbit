@@ -1,8 +1,8 @@
 # S3 Integration Guide
 
-**Version:** v0.5.0 - Streaming Optimized
+**Version:** v0.8.0 - Full-Featured S3 CLI
 **Status:** Production Ready
-**Last Updated:** November 27, 2025
+**Last Updated:** February 28, 2026
 
 ---
 
@@ -1045,6 +1045,141 @@ cargo test --release --features s3-native -- --ignored --test-threads=1
 
 ---
 
+## CLI Streaming Commands
+
+Orbit provides S3-specific CLI subcommands for streaming data without intermediate files.
+
+### `orbit cat` - Stream to stdout
+
+Download an S3 object and write it directly to stdout:
+
+```bash
+# Print an S3 object to terminal
+orbit cat s3://my-bucket/data/report.csv
+
+# Pipe to another command
+orbit cat s3://my-bucket/logs/app.log | grep ERROR
+
+# Save to a local file
+orbit cat s3://my-bucket/data/export.json > local-export.json
+```
+
+### `orbit pipe` - Upload from stdin
+
+Read from stdin and upload to an S3 object:
+
+```bash
+# Pipe a tar archive to S3
+tar czf - /data/project | orbit pipe s3://my-bucket/backups/project.tar.gz
+
+# Upload command output
+pg_dump mydb | orbit pipe s3://my-bucket/backups/mydb.sql
+
+# Upload a file via pipe
+cat report.csv | orbit pipe s3://my-bucket/data/report.csv
+```
+
+### `orbit presign` - Generate Pre-signed URLs
+
+Generate time-limited pre-signed URLs for sharing S3 objects:
+
+```bash
+# Default: 1 hour expiration
+orbit presign s3://my-bucket/data/report.pdf
+
+# Custom expiration (seconds)
+orbit presign s3://my-bucket/data/report.pdf --expires 86400  # 24 hours
+
+# Use in scripts
+URL=$(orbit presign s3://my-bucket/data/file.zip --expires 3600)
+curl -o file.zip "$URL"
+```
+
+---
+
+## Wildcard Pattern Matching
+
+S3 listing operations support glob-style wildcard patterns with automatic prefix optimization. When a pattern like `data/2024-*.parquet` is used, Orbit extracts the static prefix (`data/2024-`) and passes it to the S3 `ListObjectsV2` API, then filters results in-memory against the full pattern.
+
+**Supported wildcards:**
+- `*` - matches any sequence of characters
+- `?` - matches any single character
+
+```bash
+# List all Parquet files from 2024
+orbit --source "s3://bucket/data/2024-*.parquet" --dest /local --recursive
+
+# List all log files in any subdirectory
+orbit --source "s3://bucket/logs/*/error.log" --dest /local --recursive
+```
+
+This optimization significantly reduces API calls and data transfer when working with large buckets.
+
+---
+
+## Dual-Knob Parallelism
+
+Orbit separates file-level parallelism from per-file multipart concurrency:
+
+- **`--workers N`** (default: 256 for S3) - How many files to process simultaneously
+- **`--concurrency N`** (default: 5) - How many parts of a single multipart upload/download run in parallel
+
+```bash
+# High-throughput bulk upload: 256 files at once, 8 parts per file
+orbit --source /data --dest s3://bucket/backup --workers 256 --concurrency 8 --recursive
+
+# Conservative: fewer workers for shared environments
+orbit --source /data --dest s3://bucket/backup --workers 32 --concurrency 3 --recursive
+```
+
+The `--parallel` flag is a backward-compatible alias for `--workers`.
+
+---
+
+## Batch Execution
+
+Process multiple S3 operations in parallel using the `orbit run` command:
+
+```bash
+# commands.txt - one operation per line
+# Lines starting with '#' are comments
+cp /local/file1.txt s3://bucket/file1.txt
+cp /local/file2.txt s3://bucket/file2.txt
+cp /local/file3.txt s3://bucket/file3.txt
+```
+
+```bash
+# Execute all commands with 256 parallel workers
+orbit run --file commands.txt --workers 256
+
+# Read commands from stdin
+cat commands.txt | orbit run
+```
+
+---
+
+## Execution Statistics
+
+Use the `--stat` flag to display a summary table after any transfer operation:
+
+```bash
+orbit --source /data --dest s3://bucket/backup --recursive --stat -H
+```
+
+Output:
+```
+  Execution Statistics
+  - Operation: Copy
+  - Total files: 142
+  - Succeeded: 140
+  - Failed: 2
+  - Total size: 15.3 GiB
+  - Elapsed: 12.4s
+  - Throughput: 1.2 GiB/s
+```
+
+---
+
 ## Testing
 
 ### Unit Tests
@@ -1242,14 +1377,49 @@ for entry in WalkDir::new("/data/to/migrate") {
 - [x] Progress callbacks for UI integration - Real-time transfer tracking
 - [x] Advanced retry strategies - Circuit breaker and exponential backoff
 
-### Planned Features (v0.5.0+)
+### Completed in v0.7.0
+
+- [x] Dual-knob parallelism (`--workers` + `--concurrency`)
+- [x] S3 wildcard prefix optimization for listing
+- [x] Higher default concurrency (256 workers) for network backends
+- [x] CLI streaming commands (`cat`, `pipe`, `presign`)
+- [x] Batch command execution (`orbit run`)
+- [x] Execution statistics (`--stat` flag)
+- [x] Human-readable output (`-H` flag)
+- [x] External sort for large sync operations
+- [x] Cross-region auto-detection for S3 buckets
+
+### Completed in v0.8.0
+
+- [x] JSON structured output (`--json`) - Machine-parseable JSON Lines for all operations
+- [x] Structured exit codes - 0=success, 1=partial, 2=fatal, 3=integrity
+- [x] Error message sanitization - Clean whitespace in error messages
+- [x] S3 CLI commands: `ls`, `rm`, `head`, `du`, `mv`, `mb`, `rb`
+- [x] Content header flags: `--content-type`, `--cache-control`, `--content-encoding`, `--content-disposition`, `--acl`
+- [x] Auto MIME-type detection on upload via `mime_guess`
+- [x] Metadata directive for S3-to-S3 copies (`--metadata-directive`)
+- [x] Anonymous access for public buckets (`--no-sign-request`)
+- [x] AWS credential profiles (`--aws-profile`, `--credentials-file`)
+- [x] S3 Transfer Acceleration (`--use-acceleration`)
+- [x] Requester-pays bucket access (`--request-payer`)
+- [x] SSL verification bypass (`--no-verify-ssl`)
+- [x] ListObjects v1 compatibility (`--use-list-objects-v1`)
+- [x] S3 client session caching for performance
+- [x] Concurrent batch delete (10 parallel 1000-key chunks)
+- [x] Enhanced retry logic (10 retries, network string matching, auth non-retryable)
+- [x] Configurable multipart part size (`--part-size`, default 50 MiB)
+- [x] Glacier handling (`--force-glacier-transfer`, `--ignore-glacier-warnings`)
+- [x] Conditional copy flags (`--no-clobber`, `--if-size-differ`, `--if-source-newer`)
+- [x] Flatten directory hierarchy (`--flatten`)
+- [x] Disable wildcard expansion (`--raw`)
+- [x] Buffered output channel for concurrent workers
+
+### Planned Features (v0.9.0+)
 
 - [ ] S3 Select queries - Server-side filtering
 - [ ] Bandwidth throttling - Network rate limiting
 - [ ] CloudWatch metrics integration - Native AWS monitoring
-- [ ] S3 Transfer Acceleration support
-- [ ] Intelligent chunk size auto-tuning
-- [ ] Enhanced presigned URL support
+- [ ] S3-aware shell auto-completion
 
 ---
 

@@ -82,13 +82,13 @@ Enable Neutrino fast lane with the `--profile neutrino` flag:
 
 ```bash
 # Basic usage
-orbit copy --profile neutrino --recursive /source /dest
+orbit --source /source --dest /dest --profile neutrino --recursive
 
 # With custom threshold (16KB)
-orbit copy --profile neutrino --neutrino-threshold 16 --recursive /source /dest
+orbit --source /source --dest /dest --profile neutrino --neutrino-threshold 16 --recursive
 
-# Combined with smart sync for priority-based transfers
-orbit copy --check smart --profile neutrino --recursive /source /dest
+# Combined with checksum sync for priority-based transfers
+orbit --source /source --dest /dest --check checksum --profile neutrino --recursive
 ```
 
 ### Performance Characteristics

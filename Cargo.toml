@@ -128,6 +128,7 @@ zeroize = { version = "1", optional = true }
 aws-config = { version = "1.8", default-features = false, features = ["behavior-version-latest", "rustls"], optional = true }
 aws-sdk-s3 = { version = "1.116", default-features = false, features = ["rt-tokio", "rustls"], optional = true }
 url = { version = "2.5", optional = true }
+mime_guess = { version = "2", optional = true }
 
 # SSH backend dependencies (optional, feature-gated)
 ssh2 = { version = "0.9", optional = true }
@@ -223,7 +224,7 @@ protocols = []
 smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
 # Native S3 client (pure Rust, async) - OFF by default
-s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
+s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "dep:mime_guess", "backend-abstraction"]
 
 # SSH backend support - OFF by default
 ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]

@@ -58,8 +58,20 @@ impl S3Client {
         };
         aws_config_loader = aws_config_loader.region(region_provider);
 
-        // Set explicit credentials if provided
-        if let (Some(access_key), Some(secret_key)) = (&config.access_key, &config.secret_key) {
+        // Phase 4B: Set AWS profile if specified
+        if let Some(ref profile) = config.aws_profile {
+            aws_config_loader = aws_config_loader.profile_name(profile);
+        }
+
+        // Phase 4A: Handle no-sign-request (anonymous credentials for public buckets)
+        if config.no_sign_request {
+            let anonymous_credentials =
+                Credentials::new("", "", None, None, "anonymous");
+            aws_config_loader = aws_config_loader.credentials_provider(anonymous_credentials);
+        } else if let (Some(access_key), Some(secret_key)) =
+            (&config.access_key, &config.secret_key)
+        {
+            // Set explicit credentials if provided
             let credentials = if let Some(token) = &config.session_token {
                 Credentials::new(
                     access_key,
@@ -72,6 +84,15 @@ impl S3Client {
                 Credentials::new(access_key, secret_key, None, None, "orbit-s3-explicit")
             };
             aws_config_loader = aws_config_loader.credentials_provider(credentials);
+        }
+
+        // Phase 4B: credentials_file support
+        // Note: The AWS SDK credentials file path can be set via environment variable
+        // AWS_SHARED_CREDENTIALS_FILE. For programmatic support, profile_files
+        // configuration would be needed, which requires more complex setup.
+        // For now, we set the env var if credentials_file is specified.
+        if let Some(ref creds_path) = config.credentials_file {
+            std::env::set_var("AWS_SHARED_CREDENTIALS_FILE", creds_path);
         }
 
         // Load AWS config
@@ -88,6 +109,23 @@ impl S3Client {
         // Force path-style addressing if configured (required for MinIO, LocalStack)
         if config.force_path_style {
             s3_config_builder = s3_config_builder.force_path_style(true);
+        }
+
+        // Phase 4C: Enable S3 Transfer Acceleration
+        if config.use_acceleration {
+            s3_config_builder = s3_config_builder.accelerate(true);
+        }
+
+        // Phase 4E: SSL verification bypass warning
+        // Note: Disabling SSL certificate verification with rustls requires a custom
+        // TlsConnector configuration with dangerous_configuration feature enabled.
+        // This is intentionally complex to discourage casual use.
+        if config.no_verify_ssl {
+            eprintln!(
+                "WARNING: --no-verify-ssl is set. SSL certificate verification is NOT disabled \
+                 in this build. Rustls certificate bypass requires custom TlsConnector configuration. \
+                 Consider using a proper CA bundle or --endpoint with HTTP instead."
+            );
         }
 
         // Set timeout
@@ -301,10 +339,141 @@ impl S3Client {
         Ok(())
     }
 
-    /// Delete multiple objects from the bucket in a single batch request
+    /// Generate a pre-signed GET URL for an S3 object
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The object key
+    /// * `expires_in` - Duration until the URL expires
+    pub async fn presign_get(&self, key: &str, expires_in: Duration) -> S3Result<String> {
+        use aws_sdk_s3::presigning::PresigningConfig;
+
+        let presign_config = PresigningConfig::expires_in(expires_in).map_err(|e| {
+            S3Error::InvalidConfig(format!("Invalid presigning duration: {}", e))
+        })?;
+
+        let presigned = self
+            .client
+            .get_object()
+            .bucket(&self.config.bucket)
+            .key(key)
+            .presigned(presign_config)
+            .await
+            .map_err(|e| S3Error::Sdk(format!("Failed to presign URL: {}", e)))?;
+
+        Ok(presigned.uri().to_string())
+    }
+
+    /// Detect the region of an S3 bucket using HeadBucket.
+    /// Useful for cross-region operations where the user didn't specify a region.
+    pub async fn detect_bucket_region(bucket: &str) -> S3Result<Option<String>> {
+        // Use a default client with no specific region to call HeadBucket
+        let aws_config = aws_config::defaults(BehaviorVersion::latest())
+            .load()
+            .await;
+        let client = AwsS3Client::new(&aws_config);
+
+        match client.head_bucket().bucket(bucket).send().await {
+            Ok(response) => {
+                // The region is in the x-amz-bucket-region header
+                let region = response
+                    .bucket_region()
+                    .map(|s| s.to_string());
+                Ok(region)
+            }
+            Err(e) => {
+                // Check for redirect which also contains region info
+                let err_str = e.to_string();
+                if err_str.contains("PermanentRedirect") || err_str.contains("301") {
+                    // Parse region from error message if possible
+                    Ok(None)
+                } else {
+                    Err(S3Error::from(e))
+                }
+            }
+        }
+    }
+
+    /// Create an S3 bucket
+    ///
+    /// # Arguments
+    ///
+    /// * `bucket` - The bucket name to create
+    pub async fn create_bucket(&self, bucket: &str) -> S3Result<()> {
+        self.client
+            .create_bucket()
+            .bucket(bucket)
+            .send()
+            .await
+            .map_err(|e| {
+                let err_str = e.to_string();
+                if err_str.contains("BucketAlreadyOwnedByYou")
+                    || err_str.contains("BucketAlreadyExists")
+                {
+                    S3Error::Sdk(format!("Bucket already exists: {}", bucket))
+                } else if err_str.contains("AccessDenied") || err_str.contains("403") {
+                    S3Error::AccessDenied(format!("Cannot create bucket: {}", bucket))
+                } else {
+                    S3Error::from(e)
+                }
+            })?;
+        Ok(())
+    }
+
+    /// Delete an S3 bucket
+    ///
+    /// The bucket must be empty before it can be deleted.
+    ///
+    /// # Arguments
+    ///
+    /// * `bucket` - The bucket name to delete
+    pub async fn delete_bucket(&self, bucket: &str) -> S3Result<()> {
+        self.client
+            .delete_bucket()
+            .bucket(bucket)
+            .send()
+            .await
+            .map_err(|e| {
+                let err_str = e.to_string();
+                if err_str.contains("NoSuchBucket") || err_str.contains("404") {
+                    S3Error::BucketNotFound(bucket.to_string())
+                } else if err_str.contains("BucketNotEmpty") {
+                    S3Error::Sdk(format!(
+                        "Bucket is not empty: {}. Delete all objects first.",
+                        bucket
+                    ))
+                } else if err_str.contains("AccessDenied") || err_str.contains("403") {
+                    S3Error::AccessDenied(format!("Cannot delete bucket: {}", bucket))
+                } else {
+                    S3Error::from(e)
+                }
+            })?;
+        Ok(())
+    }
+
+    /// Delete a specific version of an object
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The object key
+    /// * `version_id` - The version ID to delete
+    pub async fn delete_object_version(&self, key: &str, version_id: &str) -> S3Result<()> {
+        self.client
+            .delete_object()
+            .bucket(&self.config.bucket)
+            .key(key)
+            .version_id(version_id)
+            .send()
+            .await
+            .map_err(S3Error::from)?;
+        Ok(())
+    }
+
+    /// Delete multiple objects from the bucket in concurrent batch requests
     ///
     /// Uses the S3 DeleteObjects API to delete up to 1000 keys per request.
-    /// More efficient than calling `delete()` in a loop.
+    /// Chunks are processed concurrently with a semaphore limiting to 10
+    /// in-flight requests. More efficient than calling `delete()` in a loop.
     pub async fn delete_batch(&self, keys: &[String]) -> S3Result<()> {
         use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 
@@ -312,26 +481,52 @@ impl S3Client {
             return Ok(());
         }
 
-        // S3 DeleteObjects API supports up to 1000 keys per request
-        for chunk in keys.chunks(1000) {
-            let objects: Vec<ObjectIdentifier> = chunk
-                .iter()
-                .map(|key| ObjectIdentifier::builder().key(key).build())
-                .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(|e| S3Error::Sdk(format!("Failed to build object identifier: {}", e)))?;
+        let chunks: Vec<Vec<String>> = keys.chunks(1000).map(|c| c.to_vec()).collect();
 
-            let delete = Delete::builder()
-                .set_objects(Some(objects))
-                .build()
-                .map_err(|e| S3Error::Sdk(format!("Failed to build delete request: {}", e)))?;
+        let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(10));
+        let mut handles = Vec::new();
 
-            self.client
-                .delete_objects()
-                .bucket(&self.config.bucket)
-                .delete(delete)
-                .send()
+        for chunk in chunks {
+            let client = self.client.clone();
+            let bucket = self.config.bucket.clone();
+            let sem = semaphore.clone();
+
+            handles.push(tokio::spawn(async move {
+                let _permit = sem.acquire().await.map_err(|e| {
+                    S3Error::Sdk(format!("Semaphore error: {}", e))
+                })?;
+
+                let objects: Vec<ObjectIdentifier> = chunk
+                    .iter()
+                    .map(|key| ObjectIdentifier::builder().key(key).build())
+                    .collect::<std::result::Result<Vec<_>, _>>()
+                    .map_err(|e| {
+                        S3Error::Sdk(format!("Failed to build object identifier: {}", e))
+                    })?;
+
+                let delete = Delete::builder()
+                    .set_objects(Some(objects))
+                    .build()
+                    .map_err(|e| {
+                        S3Error::Sdk(format!("Failed to build delete request: {}", e))
+                    })?;
+
+                client
+                    .delete_objects()
+                    .bucket(&bucket)
+                    .delete(delete)
+                    .send()
+                    .await
+                    .map_err(S3Error::from)?;
+
+                Ok::<(), S3Error>(())
+            }));
+        }
+
+        for handle in handles {
+            handle
                 .await
-                .map_err(S3Error::from)?;
+                .map_err(|e| S3Error::Sdk(format!("Task join error: {}", e)))??;
         }
 
         Ok(())

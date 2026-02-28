@@ -120,7 +120,7 @@ orbit -s /source -d /dest --max-bandwidth 10
 orbit -s /large/file.bin -d /dest/file.bin --max-bandwidth 10
 
 # Works with compression too
-orbit -s /data -d /backup --recursive --compress zstd:5 --max-bandwidth 10
+orbit -s /data -d /backup --recursive --compress zstd:3 --max-bandwidth 10
 ```
 
 ### 4. Concurrency Control (`src/core/concurrency.rs`)

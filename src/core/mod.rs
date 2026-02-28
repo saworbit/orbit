@@ -21,6 +21,7 @@ pub mod metadata_ops; // Metadata preservation orchestration
 pub mod neutrino; // Neutrino Fast Lane for small file optimization
 pub mod probe; // Phase 4: Active system probing for environment detection
 pub mod progress;
+pub mod external_sort; // External merge-sort for large file lists
 pub mod resilient_sync; // Crash-proof sync with Magnetar integration
 pub mod resume;
 pub mod retry;

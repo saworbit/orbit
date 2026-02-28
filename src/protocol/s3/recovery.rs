@@ -134,7 +134,7 @@ impl RetryPolicy {
     /// Create a policy for network-flaky scenarios
     pub fn network() -> Self {
         Self {
-            max_attempts: 7,
+            max_attempts: 10,
             initial_delay: Duration::from_millis(100),
             max_delay: Duration::from_secs(30),
             backoff: BackoffStrategy::ExponentialWithJitter,
@@ -561,5 +561,156 @@ mod tests {
         assert_eq!(ctx.attempts, 2);
         assert_eq!(ctx.total_delay, Duration::from_millis(300));
         assert_eq!(ctx.average_delay(), Duration::from_millis(150));
+    }
+
+    #[test]
+    fn test_retry_policy_network_defaults() {
+        let policy = RetryPolicy::network();
+        assert_eq!(policy.max_attempts, 10);
+        assert_eq!(policy.initial_delay, Duration::from_millis(100));
+        assert_eq!(policy.max_delay, Duration::from_secs(30));
+        assert_eq!(policy.backoff, BackoffStrategy::ExponentialWithJitter);
+        assert_eq!(policy.jitter_factor, 0.5);
+    }
+
+    #[test]
+    fn test_retry_policy_fast_defaults() {
+        let policy = RetryPolicy::fast();
+        assert_eq!(policy.max_attempts, 5);
+        assert_eq!(policy.initial_delay, Duration::from_millis(50));
+        assert_eq!(policy.max_delay, Duration::from_secs(5));
+        assert_eq!(policy.backoff, BackoffStrategy::Linear);
+    }
+
+    #[test]
+    fn test_retry_policy_slow_defaults() {
+        let policy = RetryPolicy::slow();
+        assert_eq!(policy.max_attempts, 3);
+        assert_eq!(policy.initial_delay, Duration::from_secs(1));
+        assert_eq!(policy.max_delay, Duration::from_secs(120));
+        assert_eq!(policy.backoff, BackoffStrategy::Exponential);
+    }
+
+    #[test]
+    fn test_retry_policy_default_values() {
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.max_attempts, 3);
+        assert_eq!(policy.initial_delay, Duration::from_millis(200));
+        assert_eq!(policy.max_delay, Duration::from_secs(60));
+        assert_eq!(policy.backoff, BackoffStrategy::ExponentialWithJitter);
+    }
+
+    #[test]
+    fn test_fixed_backoff() {
+        let policy = RetryPolicy {
+            initial_delay: Duration::from_millis(500),
+            backoff: BackoffStrategy::Fixed,
+            max_delay: Duration::from_secs(60),
+            jitter_factor: 0.0,
+            ..Default::default()
+        };
+        assert_eq!(policy.calculate_delay(1), Duration::from_millis(500));
+        assert_eq!(policy.calculate_delay(5), Duration::from_millis(500));
+        assert_eq!(policy.calculate_delay(10), Duration::from_millis(500));
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_non_retryable_fails_immediately() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        let policy = RetryPolicy {
+            max_attempts: 5,
+            use_circuit_breaker: false,
+            ..Default::default()
+        };
+        let attempts = AtomicU32::new(0);
+
+        let result = with_retry(policy, || {
+            attempts.fetch_add(1, Ordering::SeqCst);
+            async { Err::<(), _>(S3Error::InvalidKey("bad".to_string())) }
+        })
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_with_retry_exhausts_attempts() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        let policy = RetryPolicy {
+            max_attempts: 3,
+            initial_delay: Duration::from_millis(1),
+            use_circuit_breaker: false,
+            ..Default::default()
+        };
+        let attempts = AtomicU32::new(0);
+
+        let result = with_retry(policy, || {
+            attempts.fetch_add(1, Ordering::SeqCst);
+            async { Err::<(), _>(S3Error::Network("transient".to_string())) }
+        })
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(attempts.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn test_is_retryable_error_function() {
+        // Retryable errors
+        assert!(is_retryable_error(&S3Error::Network("net".to_string())));
+        assert!(is_retryable_error(&S3Error::Timeout("timeout".to_string())));
+        assert!(is_retryable_error(&S3Error::RateLimitExceeded(
+            "rate".to_string()
+        )));
+        assert!(is_retryable_error(&S3Error::Io("io".to_string())));
+
+        // Non-retryable errors
+        assert!(!is_retryable_error(&S3Error::InvalidConfig(
+            "bad".to_string()
+        )));
+        assert!(!is_retryable_error(&S3Error::NotFound {
+            bucket: "b".to_string(),
+            key: "k".to_string(),
+        }));
+        assert!(!is_retryable_error(&S3Error::AccessDenied(
+            "denied".to_string()
+        )));
+        assert!(!is_retryable_error(&S3Error::InvalidKey(
+            "bad".to_string()
+        )));
+        assert!(!is_retryable_error(&S3Error::BucketNotFound(
+            "gone".to_string()
+        )));
+
+        // Service with retryable code
+        assert!(is_retryable_error(&S3Error::Service {
+            code: "RequestTimeout".to_string(),
+            message: "timeout".to_string(),
+        }));
+
+        // Service with non-retryable code
+        assert!(!is_retryable_error(&S3Error::Service {
+            code: "AccessDenied".to_string(),
+            message: "denied".to_string(),
+        }));
+
+        // Sdk with retryable keyword
+        assert!(is_retryable_error(&S3Error::Sdk("timeout".to_string())));
+
+        // Sdk without retryable keyword
+        assert!(!is_retryable_error(&S3Error::Sdk("invalid".to_string())));
+    }
+
+    #[test]
+    fn test_retry_context_default() {
+        let ctx = RetryContext::default();
+        assert_eq!(ctx.attempts, 0);
+        assert_eq!(ctx.total_delay, Duration::ZERO);
+        assert!(!ctx.succeeded);
+        assert!(ctx.error.is_none());
+        assert_eq!(ctx.average_delay(), Duration::ZERO);
     }
 }

@@ -91,6 +91,7 @@ mod types;
 
 // New modules for v0.4.1
 pub mod batch;
+pub mod cache;
 pub mod progress;
 pub mod recovery;
 pub mod versioning;
@@ -109,13 +110,14 @@ pub use types::{
 
 // Re-export operations trait for extensibility
 pub use operations::S3Operations;
+pub use operations::has_wildcards;
 
 // Re-export new feature traits
 pub use batch::BatchOperations;
 pub use versioning::VersioningOperations;
 
-/// Default multipart chunk size (5 MB - minimum for S3)
-pub const DEFAULT_CHUNK_SIZE: usize = 5 * 1024 * 1024;
+/// Default multipart chunk size (50 MiB)
+pub const DEFAULT_CHUNK_SIZE: usize = 50 * 1024 * 1024;
 
 /// Maximum multipart chunk size (5 GB)
 pub const MAX_CHUNK_SIZE: usize = 5 * 1024 * 1024 * 1024;
@@ -128,3 +130,39 @@ pub const DEFAULT_PARALLEL_PARTS: usize = 4;
 
 /// Maximum number of parallel operations
 pub const MAX_PARALLEL_OPERATIONS: usize = 16;
+
+#[cfg(test)]
+mod constant_tests {
+    use super::*;
+
+    #[test]
+    fn test_default_chunk_size() {
+        assert_eq!(DEFAULT_CHUNK_SIZE, 50 * 1024 * 1024); // 50 MiB
+    }
+
+    #[test]
+    fn test_min_chunk_size() {
+        assert_eq!(MIN_CHUNK_SIZE, 5 * 1024 * 1024); // 5 MiB
+    }
+
+    #[test]
+    fn test_max_chunk_size() {
+        assert_eq!(MAX_CHUNK_SIZE, 5 * 1024 * 1024 * 1024); // 5 GiB
+    }
+
+    #[test]
+    fn test_default_parallel_parts() {
+        assert_eq!(DEFAULT_PARALLEL_PARTS, 4);
+    }
+
+    #[test]
+    fn test_max_parallel_operations() {
+        assert_eq!(MAX_PARALLEL_OPERATIONS, 16);
+    }
+
+    #[test]
+    fn test_chunk_size_constraints() {
+        assert!(MIN_CHUNK_SIZE < DEFAULT_CHUNK_SIZE);
+        assert!(DEFAULT_CHUNK_SIZE < MAX_CHUNK_SIZE);
+    }
+}
