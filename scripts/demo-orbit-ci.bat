@@ -119,7 +119,7 @@ set "RETRY_COUNT=0"
 set "MAX_RETRIES=60"
 
 :HealthCheckLoop
-timeout /t 1 /nobreak >nul
+call :Sleep 1
 curl -s -f "%API_URL%/api/health" >nul 2>nul
 if %errorlevel% NEQ 0 (
     set /a RETRY_COUNT+=1
@@ -138,7 +138,7 @@ if %errorlevel% NEQ 0 (
 echo [SUCCESS] Control Plane is online
 
 REM Wait for dashboard
-timeout /t 3 /nobreak >nul
+call :Sleep 3
 
 REM 4. Job Injection
 echo [INFO] [4/6] Injecting Job via Magnetar API...
@@ -181,7 +181,7 @@ set "ELAPSED=0"
 set "MAX_WAIT=120"
 
 :MonitorLoop
-timeout /t 2 /nobreak >nul
+call :Sleep 2
 set /a ELAPSED+=2
 
 REM Get job status (simplified - just check if destination has files)
@@ -237,7 +237,7 @@ REM Kill processes
 taskkill /FI "WINDOWTITLE eq Orbit-Server-CI*" /T /F >nul 2>nul
 taskkill /FI "WINDOWTITLE eq Orbit-Dashboard-CI*" /T /F >nul 2>nul
 
-timeout /t 1 /nobreak >nul
+call :Sleep 1
 taskkill /F /IM orbit-server.exe >nul 2>nul
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173"') do (
     taskkill /F /PID %%a >nul 2>nul
@@ -256,3 +256,11 @@ if defined EXIT_CODE (
 ) else (
     exit /b 0
 )
+
+:Sleep
+setlocal
+set "SECONDS=%~1"
+if "%SECONDS%"=="" set "SECONDS=1"
+powershell -NoProfile -Command "Start-Sleep -Seconds %SECONDS%" >nul 2>&1
+endlocal
+exit /b 0
