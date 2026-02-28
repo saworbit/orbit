@@ -121,7 +121,7 @@ set "MAX_RETRIES=60"
 
 :HealthCheckLoop
 call :Sleep 1
-%CURL_BASE% -f "%API_URL%/api/health" >nul 2>nul
+powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '%API_URL%/api/health' -UseBasicParsing -TimeoutSec 5 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
 if %errorlevel% NEQ 0 (
     set /a RETRY_COUNT+=1
     if !RETRY_COUNT! GEQ %MAX_RETRIES% (
