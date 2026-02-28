@@ -22,6 +22,7 @@ set "DEMO_SOURCE=%TEMP%\orbit_ci_source_%RANDOM%"
 set "DEMO_DEST=%TEMP%\orbit_ci_dest_%RANDOM%"
 set "API_URL=http://localhost:8080"
 set "METRICS_FILE=%ORBIT_ROOT%\e2e-metrics.json"
+set "CURL_BASE=curl -s --show-error --connect-timeout 2 --max-time 10"
 
 REM Start time (seconds since epoch approximation)
 set "START_TIME=%TIME%"
@@ -120,7 +121,7 @@ set "MAX_RETRIES=60"
 
 :HealthCheckLoop
 call :Sleep 1
-curl -s -f "%API_URL%/api/health" >nul 2>nul
+%CURL_BASE% -f "%API_URL%/api/health" >nul 2>nul
 if %errorlevel% NEQ 0 (
     set /a RETRY_COUNT+=1
     if !RETRY_COUNT! GEQ %MAX_RETRIES% (
@@ -147,7 +148,7 @@ REM Authenticate to get JWT token
 echo [INFO] Authenticating...
 set "COOKIE_JAR=%TEMP%\orbit_cookies_%RANDOM%.txt"
 
-curl -s -X POST "%API_URL%/api/auth/login" -H "Content-Type: application/json" -c "%COOKIE_JAR%" -d "{\"username\":\"admin\",\"password\":\"orbit2025\"}" > "%TEMP%\login_response.json"
+%CURL_BASE% -f -X POST "%API_URL%/api/auth/login" -H "Content-Type: application/json" -c "%COOKIE_JAR%" -d "{\"username\":\"admin\",\"password\":\"orbit2025\"}" > "%TEMP%\login_response.json"
 findstr /C:"\"username\"" "%TEMP%\login_response.json" >nul
 if %errorlevel% NEQ 0 (
     echo [ERROR] Authentication failed
@@ -160,14 +161,14 @@ set "JSON_SOURCE=%DEMO_SOURCE:\=\\%"
 set "JSON_DEST=%DEMO_DEST:\=\\%"
 
 echo [INFO] Creating job...
-for /f "delims=" %%i in ('curl -s -X POST "%API_URL%/api/create_job" -H "Content-Type: application/json" -b "%COOKIE_JAR%" -d "{\"source\": \"%JSON_SOURCE%\", \"destination\": \"%JSON_DEST%\", \"compress\": true, \"verify\": true, \"parallel_workers\": 4}"') do set "JOB_ID=%%i"
+for /f "delims=" %%i in ('%CURL_BASE% -f -X POST "%API_URL%/api/create_job" -H "Content-Type: application/json" -b "%COOKIE_JAR%" -d "{\"source\": \"%JSON_SOURCE%\", \"destination\": \"%JSON_DEST%\", \"compress\": true, \"verify\": true, \"parallel_workers\": 4}"') do set "JOB_ID=%%i"
 
 echo %JOB_ID%| findstr /R "^[0-9][0-9]*$" >nul
 if %errorlevel% EQU 0 (
     echo [SUCCESS] Job created: ID=%JOB_ID%
 
     echo [INFO] Starting job...
-    for /f "delims=" %%i in ('curl -s -X POST "%API_URL%/api/run_job" -H "Content-Type: application/json" -b "%COOKIE_JAR%" -d "{\"job_id\": %JOB_ID%}"') do set "RUN_RESPONSE=%%i"
+    for /f "delims=" %%i in ('%CURL_BASE% -f -X POST "%API_URL%/api/run_job" -H "Content-Type: application/json" -b "%COOKIE_JAR%" -d "{\"job_id\": %JOB_ID%}"') do set "RUN_RESPONSE=%%i"
     echo [SUCCESS] Job started: !RUN_RESPONSE!
 ) else (
     echo [ERROR] Failed to create job: %JOB_ID%
