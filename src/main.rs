@@ -21,6 +21,7 @@ use orbit::{
         SymlinkMode,
     },
     copy_directory, copy_file,
+    core::batch::TransferJournal,
     core::guidance::Guidance,
     error::{OrbitError, Result, EXIT_FATAL, EXIT_SUCCESS},
     get_zero_copy_capabilities, is_zero_copy_available, logging,
@@ -343,6 +344,51 @@ struct Cli {
     /// Disable wildcard expansion (treat patterns as literal keys)
     #[arg(long, global = true)]
     raw: bool,
+
+    // === In-place & Sparse File Optimization ===
+    /// Sparse file handling mode (auto, always, never)
+    /// Auto: detect and create holes for large zero-heavy files (≥64KB)
+    /// Always: always check for zero chunks and create sparse holes
+    /// Never: write all bytes including zeros
+    #[arg(long, value_enum, default_value = "auto", global = true)]
+    sparse: SparseModeArg,
+
+    /// Preserve hardlinks during directory transfers (-H)
+    /// Detects files sharing the same inode and recreates hardlinks at destination
+    #[arg(long = "preserve-hardlinks", global = true)]
+    preserve_hardlinks: bool,
+
+    /// Modify destination file in-place instead of temp+rename
+    /// Saves disk space for large files where only a small portion changed
+    #[arg(long, global = true)]
+    inplace: bool,
+
+    /// Safety level for in-place updates (reflink, journaled, unsafe)
+    /// Reflink: CoW snapshot (btrfs/XFS/APFS), Journaled: undo log, Unsafe: no safety
+    #[arg(long, value_enum, default_value = "reflink", global = true, requires = "inplace")]
+    inplace_safety: InplaceSafetyArg,
+
+    /// Detect renamed/moved files via content-chunk overlap
+    /// Uses the Star Map index to find destination files sharing chunks with source
+    #[arg(long, global = true)]
+    detect_renames: bool,
+
+    /// Minimum chunk overlap ratio to consider a rename (0.0–1.0, default: 0.8)
+    #[arg(long, default_value = "0.8", global = true, requires = "detect_renames")]
+    rename_threshold: f64,
+
+    /// Reference directory for incremental backup hardlinking (repeatable)
+    /// Unchanged files are hardlinked to the reference; partial matches use delta
+    #[arg(long = "link-dest", value_name = "DIR", global = true)]
+    link_dest: Vec<PathBuf>,
+
+    /// Record transfer operations to a batch file for replay
+    #[arg(long, value_name = "FILE", global = true)]
+    write_batch: Option<PathBuf>,
+
+    /// Replay a previously recorded batch file against a destination
+    #[arg(long, value_name = "FILE", global = true)]
+    read_batch: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -697,6 +743,40 @@ enum ProfileArg {
     Adaptive,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum SparseModeArg {
+    Auto,
+    Always,
+    Never,
+}
+
+impl From<SparseModeArg> for orbit::core::sparse::SparseMode {
+    fn from(arg: SparseModeArg) -> Self {
+        match arg {
+            SparseModeArg::Auto => orbit::core::sparse::SparseMode::Auto,
+            SparseModeArg::Always => orbit::core::sparse::SparseMode::Always,
+            SparseModeArg::Never => orbit::core::sparse::SparseMode::Never,
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum InplaceSafetyArg {
+    Reflink,
+    Journaled,
+    Unsafe,
+}
+
+impl From<InplaceSafetyArg> for orbit::config::InplaceSafety {
+    fn from(arg: InplaceSafetyArg) -> Self {
+        match arg {
+            InplaceSafetyArg::Reflink => orbit::config::InplaceSafety::Reflink,
+            InplaceSafetyArg::Journaled => orbit::config::InplaceSafety::Journaled,
+            InplaceSafetyArg::Unsafe => orbit::config::InplaceSafety::Unsafe,
+        }
+    }
+}
+
 fn main() {
     let code = match run() {
         Ok(()) => EXIT_SUCCESS,
@@ -751,18 +831,37 @@ fn run() -> Result<()> {
         return handle_subcommand(command);
     }
 
-    // Validate source and destination
-    let source = cli
-        .source
-        .ok_or_else(|| OrbitError::Config("Source path required".to_string()))?;
+    if cli.read_batch.is_some() && cli.write_batch.is_some() {
+        return Err(OrbitError::Config(
+            "Cannot use --read-batch and --write-batch together".to_string(),
+        ));
+    }
 
     let destination = cli
         .destination
         .ok_or_else(|| OrbitError::Config("Destination path required".to_string()))?;
 
+    let (_dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
+
+    if let Some(batch_path) = cli.read_batch.as_ref() {
+        let journal = TransferJournal::load(batch_path).map_err(OrbitError::Io)?;
+        let stats = journal.replay(&dest_path).map_err(OrbitError::Io)?;
+        println!("Batch replay complete:");
+        println!("  Files created: {}", stats.files_created);
+        println!("  Files updated: {}", stats.files_updated);
+        println!("  Files deleted: {}", stats.files_deleted);
+        println!("  Hardlinks created: {}", stats.hardlinks_created);
+        println!("  Bytes written: {}", stats.bytes_written);
+        return Ok(());
+    }
+
+    // Validate source
+    let source = cli
+        .source
+        .ok_or_else(|| OrbitError::Config("Source path required".to_string()))?;
+
     // Parse URIs
     let (_source_protocol, source_path) = Protocol::from_uri(&source)?;
-    let (_dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
 
     // Reuse the already-loaded config
     let mut config = base_config;
@@ -822,6 +921,17 @@ fn run() -> Result<()> {
     config.if_size_differ = cli.if_size_differ;
     config.if_source_newer = cli.if_source_newer;
     config.flatten = cli.flatten;
+
+    // In-place, sparse, and advanced transfer flags
+    config.sparse_mode = cli.sparse.into();
+    config.preserve_hardlinks = cli.preserve_hardlinks;
+    config.inplace = cli.inplace;
+    config.inplace_safety = cli.inplace_safety.into();
+    config.detect_renames = cli.detect_renames;
+    config.rename_threshold = cli.rename_threshold;
+    config.link_dest = cli.link_dest;
+    config.write_batch = cli.write_batch;
+    config.read_batch = cli.read_batch;
 
     // Handle compression
     if let Some(comp) = cli.compress {

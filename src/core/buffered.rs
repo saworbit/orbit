@@ -11,6 +11,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use super::bandwidth::BandwidthLimiter;
 use super::checksum::StreamingHasher;
+use super::inplace::InplaceWriter;
 use super::progress::ProgressPublisher;
 use super::resume::{
     cleanup_resume_info, decide_resume_strategy, load_resume_info, record_chunk_digest,
@@ -18,7 +19,7 @@ use super::resume::{
 };
 use super::CopyStats;
 use crate::config::CopyConfig;
-use crate::error::Result;
+use crate::error::{OrbitError, Result};
 use tracing::{debug, info};
 
 /// Buffered copy with streaming checksum (original implementation)
@@ -35,6 +36,18 @@ pub fn copy_buffered(
     publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
     let start_time = Instant::now();
+
+    if config.inplace && config.resume_enabled {
+        return Err(OrbitError::Config(
+            "In-place updates are incompatible with resume mode".to_string(),
+        ));
+    }
+
+    if config.inplace && matches!(config.sparse_mode, super::sparse::SparseMode::Always | super::sparse::SparseMode::Auto) {
+        return Err(OrbitError::Config(
+            "Sparse mode is not supported with in-place updates".to_string(),
+        ));
+    }
 
     // Setup bandwidth limiter with token bucket algorithm
     let bandwidth_limiter = BandwidthLimiter::new(config.max_bandwidth);
@@ -67,12 +80,27 @@ pub fn copy_buffered(
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|d| d.as_secs());
 
+    let use_inplace = config.inplace && dest_path.exists();
+    if config.inplace && !use_inplace {
+        info!(
+            "In-place requested but destination does not exist; falling back to normal copy"
+        );
+    }
+
+    let sparse_enabled = match config.sparse_mode {
+        super::sparse::SparseMode::Never => false,
+        super::sparse::SparseMode::Always => true,
+        super::sparse::SparseMode::Auto => source_size >= 64 * 1024,
+    };
+
     // Store source metadata in resume info for future validation
     resume_info.file_size = Some(source_size);
     resume_info.file_mtime = source_mtime;
 
     // Decide resume strategy
-    let resume_decision = if config.resume_enabled && resume_info.bytes_copied > 0 {
+    let resume_decision = if use_inplace {
+        ResumeDecision::StartFresh
+    } else if config.resume_enabled && resume_info.bytes_copied > 0 {
         decide_resume_strategy(dest_path, &resume_info)
     } else {
         ResumeDecision::StartFresh
@@ -116,32 +144,36 @@ pub fn copy_buffered(
     }
 
     // Determine start offset based on decision
-    let start_offset = match resume_decision {
-        ResumeDecision::Resume { from_offset, .. } => {
-            info!(
-                "Resuming from byte {} ({} chunks verified)",
-                from_offset,
-                resume_info.verified_chunks.len()
-            );
-            from_offset
-        }
-        ResumeDecision::Revalidate { ref reason } => {
-            info!("Revalidating file: {}", reason);
-            debug!("Re-hashing from beginning but preserving partial transfer");
-            resume_info.bytes_copied
-        }
-        ResumeDecision::Restart { ref reason } => {
-            info!("Restarting transfer: {}", reason);
-            if dest_path.exists() {
-                std::fs::remove_file(dest_path)?;
+    let start_offset = if use_inplace {
+        0
+    } else {
+        match resume_decision {
+            ResumeDecision::Resume { from_offset, .. } => {
+                info!(
+                    "Resuming from byte {} ({} chunks verified)",
+                    from_offset,
+                    resume_info.verified_chunks.len()
+                );
+                from_offset
             }
-            cleanup_resume_info(dest_path, false);
-            resume_info = ResumeInfo::default();
-            resume_info.file_size = Some(source_size);
-            resume_info.file_mtime = source_mtime;
-            0
+            ResumeDecision::Revalidate { ref reason } => {
+                info!("Revalidating file: {}", reason);
+                debug!("Re-hashing from beginning but preserving partial transfer");
+                resume_info.bytes_copied
+            }
+            ResumeDecision::Restart { ref reason } => {
+                info!("Restarting transfer: {}", reason);
+                if dest_path.exists() {
+                    std::fs::remove_file(dest_path)?;
+                }
+                cleanup_resume_info(dest_path, false);
+                resume_info = ResumeInfo::default();
+                resume_info.file_size = Some(source_size);
+                resume_info.file_mtime = source_mtime;
+                0
+            }
+            ResumeDecision::StartFresh => 0,
         }
-        ResumeDecision::StartFresh => 0,
     };
 
     // Open source file
@@ -150,15 +182,38 @@ pub fn copy_buffered(
         source_file.seek(SeekFrom::Start(start_offset))?;
     }
 
-    // Open destination file
-    let mut dest_file = BufWriter::new(
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .append(start_offset > 0)
-            .truncate(start_offset == 0)
-            .open(dest_path)?,
-    );
+    let mut inplace_writer = if use_inplace {
+        Some(InplaceWriter::open(dest_path, config.inplace_safety)?)
+    } else {
+        None
+    };
+
+    let mut sparse_file: Option<File> = None;
+    let mut buffered_writer: Option<BufWriter<File>> = None;
+
+    if inplace_writer.is_none() {
+        if sparse_enabled {
+            let mut file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .read(true)
+                .truncate(start_offset == 0)
+                .open(dest_path)?;
+            if start_offset > 0 {
+                file.seek(SeekFrom::Start(start_offset))?;
+            }
+            sparse_file = Some(file);
+        } else {
+            buffered_writer = Some(BufWriter::new(
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .append(start_offset > 0)
+                    .truncate(start_offset == 0)
+                    .open(dest_path)?,
+            ));
+        }
+    }
 
     // Setup progress bar
     let progress = if config.show_progress {
@@ -236,8 +291,18 @@ pub fn copy_buffered(
             h.update(&buffer[..n]);
         }
 
-        // Write to destination
-        dest_file.write_all(&buffer[..n])?;
+        if let Some(ref mut writer) = inplace_writer {
+            writer.write_at(bytes_copied, &buffer[..n])?;
+        } else if let Some(ref mut file) = sparse_file {
+            let is_zero = sparse_enabled && buffer[..n].iter().all(|&b| b == 0);
+            if is_zero {
+                file.seek(SeekFrom::Current(n as i64))?;
+            } else {
+                file.write_all(&buffer[..n])?;
+            }
+        } else if let Some(ref mut writer) = buffered_writer {
+            writer.write_all(&buffer[..n])?;
+        }
 
         // Record chunk digest if this is a complete chunk and resume is enabled
         if config.resume_enabled && n == config.chunk_size {
@@ -260,8 +325,12 @@ pub fn copy_buffered(
 
         // Checkpoint for resume - sync to disk for durability
         if config.resume_enabled && last_checkpoint.elapsed() > Duration::from_secs(5) {
-            dest_file.flush()?;
-            dest_file.get_ref().sync_data()?;
+            if let Some(ref mut writer) = buffered_writer {
+                writer.flush()?;
+                writer.get_ref().sync_data()?;
+            } else if let Some(ref mut file) = sparse_file {
+                file.sync_data()?;
+            }
             resume_info.bytes_copied = bytes_copied;
             save_resume_info_full(dest_path, &resume_info, false)?;
             last_checkpoint = Instant::now();
@@ -283,7 +352,14 @@ pub fn copy_buffered(
         }
     }
 
-    dest_file.flush()?;
+    if let Some(ref mut writer) = buffered_writer {
+        writer.flush()?;
+    } else if let Some(ref mut file) = sparse_file {
+        file.set_len(source_size)?;
+        file.sync_all()?;
+    } else if let Some(writer) = inplace_writer.take() {
+        writer.finalize(source_size)?;
+    }
 
     if let Some(pb) = progress {
         pb.finish_with_message("Complete");

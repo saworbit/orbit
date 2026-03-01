@@ -182,12 +182,14 @@ where
             // We use the 'offload_parallel_compute' from executor.rs
             // This spreads the BLAKE3 work across all available cores using Rayon
             let hashed_batch = offload_parallel_compute(batch, |raw| {
+                let is_zero = raw.data.iter().all(|&b| b == 0);
                 let hash = blake3::hash(&raw.data);
                 Ok(Chunk {
                     offset: raw.offset,
                     length: raw.data.len(),
                     hash: *hash.as_bytes(),
                     data: raw.data,
+                    is_zero,
                 })
             })
             .await

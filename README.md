@@ -138,6 +138,12 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Manifest System** | 🟡 Beta | File tracking and verification |
 | **Progress/Bandwidth Limiting** | 🟡 Beta | Recently integrated across all modes |
 | **Audit Logging** | 🟡 Beta | Structured telemetry, needs more use |
+| **Sparse File Handling** | 🟡 Beta | Zero-chunk detection during CDC, hole-aware writes |
+| **Hardlink Preservation** | 🟡 Beta | Inode tracking on Unix/Windows, `--preserve-hardlinks` flag |
+| **In-Place Updates** | 🟡 Beta | Reflink/journaled/unsafe safety tiers, `--inplace` |
+| **Rename Detection** | 🔴 Alpha | Content-aware via Star Map chunk overlap |
+| **Link-Dest++ (Incremental Backup)** | 🔴 Alpha | Chunk-level reference hardlinking, `--link-dest` |
+| **Transfer Journal (Batch Mode)** | 🔴 Alpha | Content-addressed operation journal, `--write-batch` / `--read-batch` |
 
 **Legend:**
 - 🟢 **Stable**: Production-ready with extensive testing
@@ -1308,6 +1314,45 @@ See [docs/observability-v3.md](docs/observability-v3.md) for complete documentat
 - Forensic validation procedures
 - Security best practices
 - Troubleshooting guide
+
+### 🔧 Advanced Transfer Optimizations
+
+Six rsync-inspired features, reimplemented to leverage Orbit's CDC + Star Map architecture:
+
+```bash
+# Sparse files — hole-aware writes for zero-heavy files (VMs, databases)
+orbit -s /data/vm.qcow2 -d /backup/ --sparse auto
+
+# Hardlink preservation — detect and recreate hardlink groups
+orbit -s /backups/daily/ -d /backups/offsite/ -R --preserve-hardlinks
+
+# In-place updates — modify destination directly (3 safety tiers)
+orbit -s /data/large.img -d /backup/large.img --inplace
+orbit -s /data/db.mdf -d /backup/db.mdf --inplace --inplace-safety journaled
+
+# Rename detection — find moved files by content, not name
+orbit -s /project/ -d /backup/ -R --detect-renames
+
+# Incremental backups — hardlink unchanged files to reference
+orbit -s /data/ -d /backups/today/ -R --link-dest /backups/yesterday/
+
+# Batch mode — record once, replay to many destinations
+orbit -s /release/ -d /server1/ -R --write-batch update.batch
+orbit --read-batch update.batch -d /server2/
+```
+
+| Feature | rsync Equivalent | Orbit Improvement |
+|---------|-----------------|-------------------|
+| `--sparse` | `--sparse` | Zero-cost detection during CDC; works with `--inplace` (rsync can't) |
+| `--preserve-hardlinks` | `-H` | Cross-platform (Unix + Windows FFI) |
+| `--inplace` | `--inplace` | Reflink/journaled/unsafe safety tiers (rsync has none) |
+| `--detect-renames` | `--fuzzy` | Content-aware chunk overlap vs filename similarity |
+| `--link-dest` | `--link-dest` | Chunk-level partial reuse vs all-or-nothing per file |
+| `--write-batch` | `--write-batch` | Content-addressed journal, portable across different destinations |
+
+**Current limitations:** `--sparse` and `--inplace` are mutually exclusive. `--detect-renames` and `--link-dest` currently hardlink **exact matches** only; partial-chunk delta basis is planned. `--write-batch` records full-file create entries (no delta ops yet) and requires `--mode copy`.
+
+See [Advanced Transfer Features](docs/architecture/ADVANCED_TRANSFER.md) for design details.
 
 ---
 

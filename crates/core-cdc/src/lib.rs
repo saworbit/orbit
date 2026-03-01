@@ -104,6 +104,10 @@ pub struct Chunk {
 
     /// The actual chunk data
     pub data: Vec<u8>,
+
+    /// Whether this chunk is entirely zero bytes (for sparse file optimization).
+    /// Detected during chunking at near-zero cost since we already read every byte.
+    pub is_zero: bool,
 }
 
 /// Iterator that produces chunks from a Read stream
@@ -254,6 +258,11 @@ impl<R: Read> ChunkStream<R> {
         let chunk_data = self.buffer[self.buffer_pos..cut_point].to_vec();
         let chunk_offset = self.stream_offset;
 
+        // Detect all-zero chunks for sparse file optimization.
+        // This auto-vectorizes to SIMD on modern CPUs, adding negligible cost
+        // since we already read every byte for hashing.
+        let is_zero = chunk_data.iter().all(|&b| b == 0);
+
         // Compute BLAKE3 hash
         let hash = blake3::hash(&chunk_data);
 
@@ -266,6 +275,7 @@ impl<R: Read> ChunkStream<R> {
             length: chunk_len,
             hash: *hash.as_bytes(),
             data: chunk_data,
+            is_zero,
         }))
     }
 }

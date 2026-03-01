@@ -171,6 +171,34 @@ impl UniverseMap {
         self.file_registry.get(&file_id).map(|s| s.as_str())
     }
 
+    /// Find all file IDs that contain a given chunk.
+    ///
+    /// This is the reverse index query needed for rename detection:
+    /// given a chunk hash, which files contain it?
+    pub fn files_containing_chunk(&self, content_id: &[u8; 32]) -> Vec<u64> {
+        match self.index.get(content_id) {
+            Some(locations) => {
+                let mut file_ids: Vec<u64> = locations.iter().map(|loc| loc.file_id).collect();
+                file_ids.sort_unstable();
+                file_ids.dedup();
+                file_ids
+            }
+            None => Vec::new(),
+        }
+    }
+
+    /// Get all chunk hashes associated with a given file ID.
+    ///
+    /// Iterates the entire index (O(N) in chunk count). For frequent use,
+    /// consider building a separate file_id → chunks map.
+    pub fn chunks_for_file(&self, file_id: u64) -> Vec<[u8; 32]> {
+        self.index
+            .iter()
+            .filter(|(_, locations)| locations.iter().any(|loc| loc.file_id == file_id))
+            .map(|(hash, _)| *hash)
+            .collect()
+    }
+
     /// Calculate deduplication statistics
     pub fn dedup_stats(&self) -> DedupStats {
         let mut total_refs = 0;

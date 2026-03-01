@@ -2,7 +2,7 @@
  * Directory copy operations with parallel processing support
  */
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -14,12 +14,15 @@ use tracing::info;
 use walkdir::WalkDir;
 
 use super::concurrency::ConcurrencyLimiter;
+use super::batch::{record_create_file, JournalEntry, TransferJournal};
 use super::disk_guardian::{self, GuardianConfig};
 use super::filter::FilterList;
+use super::hardlink::{create_hardlink, HardlinkTracker};
 use super::metadata::preserve_metadata;
 use super::progress::ProgressPublisher;
 use super::validation::matches_exclude_pattern;
 use super::CopyStats;
+use crate::core::checksum::calculate_checksum;
 use crate::audit::AuditLogger;
 use crate::config::{CopyConfig, CopyMode, SymlinkMode};
 use crate::error::{OrbitError, Result};
@@ -29,6 +32,7 @@ use crate::error::{OrbitError, Result};
 struct WorkItem {
     source_path: PathBuf,
     dest_path: PathBuf,
+    relative_path: PathBuf,
     entry_type: EntryType,
 }
 
@@ -37,6 +41,7 @@ enum EntryType {
     Directory,
     File,
     Symlink,
+    Hardlink { target: PathBuf },
 }
 
 /// Copy a directory recursively with streaming iteration to reduce memory usage
@@ -74,6 +79,19 @@ pub fn copy_directory_impl(
     if !config.recursive {
         return Err(OrbitError::Config(
             "Recursive flag not set for directory copy".to_string(),
+        ));
+    }
+
+    if config.read_batch.is_some() {
+        return Err(OrbitError::Config(
+            "Batch replay is not supported in directory copy; use --read-batch at the CLI"
+                .to_string(),
+        ));
+    }
+
+    if config.write_batch.is_some() && config.copy_mode != CopyMode::Copy {
+        return Err(OrbitError::Config(
+            "--write-batch is only supported with --mode copy".to_string(),
         ));
     }
 
@@ -147,6 +165,21 @@ pub fn copy_directory_impl(
         std::fs::create_dir_all(dest_dir)?;
     }
 
+    let rename_index = if config.detect_renames {
+        Some(Arc::new(build_hash_index(&dest_dir)?))
+    } else {
+        None
+    };
+
+    let batch_journal = if config.write_batch.is_some() {
+        Some(Arc::new(Mutex::new(TransferJournal::new(
+            source_dir.to_path_buf(),
+            dest_dir.to_path_buf(),
+        ))))
+    } else {
+        None
+    };
+
     // Build filter list from config
     let filter_list = match FilterList::from_config(
         &config.include_patterns,
@@ -161,6 +194,7 @@ pub fn copy_directory_impl(
             )));
         }
     };
+
 
     // Bounded channel prevents scanner from overwhelming copiers
     // Buffer size: use parallel threads as baseline, bounded between 16-1000
@@ -207,6 +241,8 @@ pub fn copy_directory_impl(
         rx,
         total_stats.clone(),
         concurrency_limiter.as_ref(),
+        rename_index.as_ref(),
+        batch_journal.as_ref(),
     )?;
 
     // Wait for producer to finish and check for errors
@@ -244,6 +280,13 @@ pub fn copy_directory_impl(
                 final_stats.files_failed += 1;
             }
         }
+    }
+
+    if let (Some(batch_path), Some(journal)) = (config.write_batch.as_ref(), batch_journal.as_ref()) {
+        let journal = journal.lock().unwrap();
+        journal
+            .save(batch_path)
+            .map_err(|e| OrbitError::Io(e))?;
     }
 
     final_stats.duration = start_time.elapsed();
@@ -330,6 +373,11 @@ fn produce_work_items(
     // Process in batches for better cache locality and reduced syscalls
     let mut dir_batch = Vec::with_capacity(100);
     let mut file_batch = Vec::with_capacity(100);
+    let mut hardlink_tracker = if config.preserve_hardlinks {
+        Some(HardlinkTracker::new())
+    } else {
+        None
+    };
 
     while let Some(entry) = walker.next() {
         let entry = match entry {
@@ -376,7 +424,7 @@ fn produce_work_items(
         let dest_path = dest_dir.join(relative_path);
         let source_path = entry.path().to_path_buf();
 
-        let entry_type = if entry.file_type().is_dir() {
+        let mut entry_type = if entry.file_type().is_dir() {
             EntryType::Directory
         } else if entry.file_type().is_symlink() {
             EntryType::Symlink
@@ -386,9 +434,25 @@ fn produce_work_items(
             continue; // Skip special files
         };
 
+        if matches!(entry_type, EntryType::File) {
+            if let Some(ref mut tracker) = hardlink_tracker {
+                if let Ok(metadata) = entry.metadata() {
+                    if let Some(original_path) = tracker.check(entry.path(), &metadata) {
+                        if let Ok(original_rel) = original_path.strip_prefix(source_dir) {
+                            let original_dest = dest_dir.join(original_rel);
+                            entry_type = EntryType::Hardlink {
+                                target: original_dest,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
         let work_item = WorkItem {
             source_path,
             dest_path,
+            relative_path: relative_path.to_path_buf(),
             entry_type: entry_type.clone(),
         };
 
@@ -404,7 +468,7 @@ fn produce_work_items(
                     flush_directory_batch(&mut dir_batch, config)?;
                 }
             }
-            EntryType::File | EntryType::Symlink => {
+            EntryType::File | EntryType::Symlink | EntryType::Hardlink { .. } => {
                 file_batch.push(work_item);
                 if file_batch.len() >= 100 {
                     flush_file_batch(&mut file_batch, &tx)?;
@@ -524,7 +588,9 @@ fn apply_deletions(deletions: &[DeletionItem], config: &CopyConfig) -> DeletionS
 
         let result = match item.entry_type {
             EntryType::Directory => std::fs::remove_dir_all(&item.path),
-            EntryType::File | EntryType::Symlink => std::fs::remove_file(&item.path),
+            EntryType::File | EntryType::Symlink | EntryType::Hardlink { .. } => {
+                std::fs::remove_file(&item.path)
+            }
         };
 
         match result {
@@ -539,6 +605,48 @@ fn apply_deletions(deletions: &[DeletionItem], config: &CopyConfig) -> DeletionS
     }
 
     summary
+}
+
+fn build_hash_index(dest_dir: &Path) -> Result<HashMap<String, PathBuf>> {
+    let mut index = HashMap::new();
+    let mut walker = WalkDir::new(dest_dir)
+        .follow_links(false)
+        .same_file_system(true)
+        .into_iter();
+
+    while let Some(entry) = walker.next() {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::warn!("Failed to read destination entry: {}", e);
+                continue;
+            }
+        };
+
+        if entry.depth() == 0 {
+            continue;
+        }
+
+        if entry.file_type().is_symlink() {
+            continue;
+        }
+
+        if entry.file_type().is_dir() {
+            continue;
+        }
+
+        let path = entry.path().to_path_buf();
+        match calculate_checksum(&path) {
+            Ok(hash) => {
+                index.entry(hash).or_insert(path);
+            }
+            Err(e) => {
+                tracing::warn!("Failed to hash {:?}: {}", path, e);
+            }
+        }
+    }
+
+    Ok(index)
 }
 
 /// Flush directory batch - create directories sequentially before files
@@ -584,6 +692,8 @@ fn consume_work_items(
     rx: crossbeam_channel::Receiver<WorkItem>,
     total_stats: Arc<Mutex<CopyStats>>,
     concurrency_limiter: Option<&Arc<ConcurrencyLimiter>>,
+    rename_index: Option<&Arc<HashMap<String, PathBuf>>>,
+    batch_journal: Option<&Arc<Mutex<TransferJournal>>>,
 ) -> Result<()> {
     if config.parallel > 0 {
         // Parallel processing with thread pool and concurrency control
@@ -601,6 +711,8 @@ fn consume_work_items(
                     config,
                     &total_stats,
                     concurrency_limiter,
+                    rename_index,
+                    batch_journal,
                 ) {
                     tracing::error!("Error copying {:?}: {}", item.source_path, e);
                     if let Ok(mut stats) = total_stats.lock() {
@@ -613,7 +725,7 @@ fn consume_work_items(
         // Sequential processing (no concurrency limiter needed)
         for item in rx {
             if let Err(e) =
-                process_work_item(&item, source_dir, dest_dir, config, &total_stats, None)
+                process_work_item(&item, source_dir, dest_dir, config, &total_stats, None, rename_index, batch_journal)
             {
                 tracing::error!("Error copying {:?}: {}", item.source_path, e);
                 if let Ok(mut stats) = total_stats.lock() {
@@ -630,16 +742,23 @@ fn consume_work_items(
 fn process_work_item(
     item: &WorkItem,
     _source_dir: &Path,
-    _dest_dir: &Path,
+    dest_dir: &Path,
     config: &CopyConfig,
     stats_mutex: &Arc<Mutex<CopyStats>>,
     concurrency_limiter: Option<&Arc<ConcurrencyLimiter>>,
+    rename_index: Option<&Arc<HashMap<String, PathBuf>>>,
+    batch_journal: Option<&Arc<Mutex<TransferJournal>>>,
 ) -> Result<()> {
     // Acquire concurrency permit if limiter is provided
     // Permit is automatically released when dropped (RAII pattern)
     let _permit = concurrency_limiter.map(|limiter| limiter.acquire());
+    let mut file_config = config.clone();
+    file_config.detect_renames = false;
+    file_config.link_dest.clear();
+    file_config.write_batch = None;
+    file_config.read_batch = None;
 
-    let stats = match item.entry_type {
+    let stats = match &item.entry_type {
         EntryType::Directory => {
             // Directories already handled in producer
             return Ok(());
@@ -649,7 +768,7 @@ fn process_work_item(
                 &item.source_path,
                 &item.dest_path,
                 config.symlink_mode,
-                config,
+                &file_config,
             )?;
             CopyStats {
                 bytes_copied: 0,
@@ -664,6 +783,63 @@ fn process_work_item(
                 bytes_skipped: 0,
             }
         }
+        EntryType::Hardlink { target } => {
+            if let Some(parent) = item.dest_path.parent() {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent)?;
+                }
+            }
+
+            let mut linked = false;
+            if target.exists() {
+                match create_hardlink(target, &item.dest_path) {
+                    Ok(()) => {
+                        linked = true;
+                        if let Some(journal) = batch_journal {
+                            let target_rel = target.strip_prefix(dest_dir).unwrap_or(target);
+                            let link_rel = item
+                                .dest_path
+                                .strip_prefix(dest_dir)
+                                .unwrap_or(&item.dest_path);
+                            journal.lock().unwrap().record(JournalEntry::CreateHardlink {
+                                target: target_rel.to_path_buf(),
+                                link: link_rel.to_path_buf(),
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to create hardlink {:?} -> {:?}: {}. Falling back to copy.",
+                            target,
+                            item.dest_path,
+                            e
+                        );
+                    }
+                }
+            }
+
+            if linked {
+                CopyStats {
+                    bytes_copied: 0,
+                    duration: Duration::ZERO,
+                    checksum: None,
+                    compression_ratio: None,
+                    files_copied: 1,
+                    files_skipped: 0,
+                    files_failed: 0,
+                    delta_stats: None,
+                    chunks_resumed: 0,
+                    bytes_skipped: 0,
+                }
+            } else {
+                let stats = super::copy_file(&item.source_path, &item.dest_path, &file_config)?;
+                if let Some(journal) = batch_journal {
+                    let mut journal = journal.lock().unwrap();
+                    record_create_file(&mut journal, &item.source_path, &item.relative_path)?;
+                }
+                stats
+            }
+        }
         EntryType::File => {
             // Ensure parent directory exists before copying file
             if let Some(parent) = item.dest_path.parent() {
@@ -671,7 +847,102 @@ fn process_work_item(
                     std::fs::create_dir_all(parent)?;
                 }
             }
-            super::copy_file(&item.source_path, &item.dest_path, config)?
+
+            let mut source_hash: Option<String> = None;
+            let mut hardlink_stats: Option<CopyStats> = None;
+
+            if !config.link_dest.is_empty() {
+                if let Ok(source_meta) = std::fs::metadata(&item.source_path) {
+                    for ref_dir in &config.link_dest {
+                        let ref_file = ref_dir.join(&item.relative_path);
+                        if let Ok(ref_meta) = std::fs::metadata(&ref_file) {
+                            if ref_meta.len() != source_meta.len() {
+                                continue;
+                            }
+                            if source_hash.is_none() {
+                                source_hash = Some(calculate_checksum(&item.source_path)?);
+                            }
+                            let ref_hash = calculate_checksum(&ref_file)?;
+                            if ref_hash == source_hash.as_ref().unwrap() {
+                                if create_hardlink(&ref_file, &item.dest_path).is_ok() {
+                                    if let Some(journal) = batch_journal {
+                                        let mut journal = journal.lock().unwrap();
+                                        record_create_file(
+                                            &mut journal,
+                                            &item.source_path,
+                                            &item.relative_path,
+                                        )?;
+                                    }
+                                    hardlink_stats = Some(CopyStats {
+                                        bytes_copied: 0,
+                                        duration: Duration::ZERO,
+                                        checksum: None,
+                                        compression_ratio: None,
+                                        files_copied: 1,
+                                        files_skipped: 0,
+                                        files_failed: 0,
+                                        delta_stats: None,
+                                        chunks_resumed: 0,
+                                        bytes_skipped: 0,
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                        if hardlink_stats.is_some() {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if hardlink_stats.is_none() {
+                if let Some(index) = rename_index {
+                    if !item.dest_path.exists() {
+                        if source_hash.is_none() {
+                            source_hash = Some(calculate_checksum(&item.source_path)?);
+                        }
+                        if let Some(basis_path) = index.get(source_hash.as_ref().unwrap()) {
+                            if basis_path != &item.dest_path && basis_path.exists() {
+                                if create_hardlink(basis_path, &item.dest_path).is_ok() {
+                                    if let Some(journal) = batch_journal {
+                                        let mut journal = journal.lock().unwrap();
+                                        record_create_file(
+                                            &mut journal,
+                                            &item.source_path,
+                                            &item.relative_path,
+                                        )?;
+                                    }
+                                    hardlink_stats = Some(CopyStats {
+                                        bytes_copied: 0,
+                                        duration: Duration::ZERO,
+                                        checksum: None,
+                                        compression_ratio: None,
+                                        files_copied: 1,
+                                        files_skipped: 0,
+                                        files_failed: 0,
+                                        delta_stats: None,
+                                        chunks_resumed: 0,
+                                        bytes_skipped: 0,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let stats = if let Some(stats) = hardlink_stats {
+                stats
+            } else {
+                let stats = super::copy_file(&item.source_path, &item.dest_path, &file_config)?;
+                if let Some(journal) = batch_journal {
+                    let mut journal = journal.lock().unwrap();
+                    record_create_file(&mut journal, &item.source_path, &item.relative_path)?;
+                }
+                stats
+            };
+            stats
         }
     };
 

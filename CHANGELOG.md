@@ -44,6 +44,16 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+#### Advanced Transfer Features (rsync-inspired, Orbit-enhanced)
+- **Sparse file handling** (`core/sparse.rs`): `--sparse {auto|always|never}` — hole-aware writes for zero-heavy files
+- **Hardlink preservation** (`core/hardlink.rs`): `-H` — inode tracking on Unix/Windows, recreates links at destination
+- **In-place updates** (`core/inplace.rs`): `--inplace` — reflink/journaled/unsafe safety tiers with crash recovery
+- **Rename detection** (`core/rename_detector.rs`): `--detect-renames` — content-aware via Star Map chunk overlap
+- **Link-dest++** (`core/link_dest.rs`): `--link-dest DIR` — chunk-level incremental backup hardlinking
+- **Batch mode** (`core/batch.rs`): `--write-batch` / `--read-batch` — content-addressed transfer journal
+- **CDC zero detection** (`core-cdc`): `is_zero` field on `Chunk`, set during chunking at near-zero cost
+- **Star Map reverse index** (`core-starmap`): `files_containing_chunk()` and `chunks_for_file()` queries
+
 #### Orbit GhostFS v0.2.0 - "The Tethering" (2025-01-04)
 - **Materialization Layer**: Database-backed metadata from Magnetar
   - MetadataOracle trait abstraction for metadata backends

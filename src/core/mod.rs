@@ -4,6 +4,7 @@
 
 // Submodules - organized by responsibility
 pub mod bandwidth;
+pub mod batch; // Transfer journal / batch mode for recording and replaying operations
 pub mod buffered;
 pub mod checksum;
 pub mod concurrency;
@@ -16,6 +17,9 @@ pub mod external_sort; // External merge-sort for large file lists
 pub mod file_metadata; // Comprehensive metadata preservation
 pub mod filter; // Include/exclude filter patterns
 pub mod guidance; // Guidance system ("Flight Computer")
+pub mod hardlink; // Hardlink detection and preservation
+pub mod inplace; // In-place file updates with safety levels
+pub mod link_dest; // Reference directory hardlinking for incremental backups
 pub mod metadata;
 pub mod metadata_ops; // Metadata preservation orchestration
 #[cfg(feature = "backend-abstraction")]
@@ -23,8 +27,10 @@ pub mod neutrino; // Neutrino Fast Lane for small file optimization
 pub mod probe; // Phase 4: Active system probing for environment detection
 pub mod progress;
 pub mod resilient_sync; // Crash-proof sync with Magnetar integration
+pub mod rename_detector; // Content-aware rename/move detection via Star Map
 pub mod resume;
 pub mod retry;
+pub mod sparse; // Sparse file detection and hole-aware writing
 pub mod terminology; // Phase 3: User-facing terminology abstraction
 pub mod transfer;
 pub mod transform; // Metadata and path transformation
@@ -32,13 +38,16 @@ pub mod v2_integration; // V2 Architecture integration (CDC + Semantic + Univers
 pub mod validation;
 pub mod zero_copy; // Concurrency control with semaphore
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::audit::AuditLogger;
 use crate::config::CopyConfig;
 use crate::error::{OrbitError, Result};
 use crate::instrumentation::OperationStats;
+use crate::core::batch::{record_create_file, TransferJournal};
+use crate::core::checksum::calculate_checksum;
+use crate::core::hardlink::create_hardlink;
 use validation::should_copy_file;
 
 /// Statistics about a copy operation
@@ -322,8 +331,51 @@ fn copy_file_impl_inner(
         return Ok(stats);
     }
 
+    if config.detect_renames {
+        return Err(OrbitError::Config(
+            "--detect-renames is only supported for directory copies".to_string(),
+        ));
+    }
+
+    if config.write_batch.is_some() && config.copy_mode != crate::config::CopyMode::Copy {
+        return Err(OrbitError::Config(
+            "--write-batch is only supported with --mode copy".to_string(),
+        ));
+    }
+
+    if let Some(stats) = try_link_dest_single(source_path, dest_path, config)? {
+        if let Some(batch_path) = config.write_batch.as_ref() {
+            write_batch_for_single_file(batch_path, source_path, dest_path)?;
+        }
+
+        if let Some(ref mut logger) = audit_logger {
+            let _ = logger.emit_from_stats(
+                &job_id,
+                source_path,
+                dest_path,
+                "local",
+                &stats,
+                config.compression,
+                0,
+                None,
+            );
+        }
+
+        return Ok(stats);
+    }
+
     // Validate disk space
-    if let Err(e) = validation::validate_disk_space(dest_path, source_size) {
+    let required_space = if config.inplace && dest_path.exists() {
+        match config.inplace_safety {
+            crate::config::InplaceSafety::Journaled => source_size,
+            crate::config::InplaceSafety::Reflink => 0,
+            crate::config::InplaceSafety::Unsafe => 0,
+        }
+    } else {
+        source_size
+    };
+
+    if let Err(e) = validation::validate_disk_space(dest_path, required_space) {
         if let Some(ref mut logger) = audit_logger {
             let _ = logger.emit_failure(
                 &job_id,
@@ -344,10 +396,18 @@ fn copy_file_impl_inner(
     let pub_ref = publisher.unwrap_or(&noop_publisher);
 
     // Perform copy with retry logic, metadata preservation, and statistics tracking
-    let result =
+    let mut result =
         retry::with_retry_and_metadata_stats(source_path, dest_path, config, Some(stats), || {
             transfer::perform_copy(source_path, dest_path, source_size, config, pub_ref)
         });
+
+    if let Ok(stats) = &result {
+        if let Some(batch_path) = config.write_batch.as_ref() {
+            if let Err(e) = write_batch_for_single_file(batch_path, source_path, dest_path) {
+                result = Err(e);
+            }
+        }
+    }
 
     // Emit completion audit event
     if let Some(ref mut logger) = audit_logger {
@@ -405,6 +465,80 @@ fn generate_job_id() -> String {
 
     // Simple but unique job ID combining timestamp and random component
     format!("orbit-{:x}-{:04x}", timestamp, rand::random::<u16>())
+}
+
+fn try_link_dest_single(
+    source_path: &Path,
+    dest_path: &Path,
+    config: &CopyConfig,
+) -> Result<Option<CopyStats>> {
+    if config.link_dest.is_empty() {
+        return Ok(None);
+    }
+
+    let dest_name = match dest_path.file_name() {
+        Some(name) => name,
+        None => return Ok(None),
+    };
+
+    let source_meta = std::fs::metadata(source_path)?;
+    let mut source_hash: Option<String> = None;
+
+    for ref_dir in &config.link_dest {
+        let ref_file = ref_dir.join(dest_name);
+        let ref_meta = match std::fs::metadata(&ref_file) {
+            Ok(meta) => meta,
+            Err(_) => continue,
+        };
+        if ref_meta.len() != source_meta.len() {
+            continue;
+        }
+        if source_hash.is_none() {
+            source_hash = Some(calculate_checksum(source_path)?);
+        }
+        let ref_hash = calculate_checksum(&ref_file)?;
+        if ref_hash == source_hash.as_ref().unwrap() {
+            create_hardlink(&ref_file, dest_path)?;
+            return Ok(Some(CopyStats {
+                bytes_copied: 0,
+                duration: Duration::ZERO,
+                checksum: None,
+                compression_ratio: None,
+                files_copied: 1,
+                files_skipped: 0,
+                files_failed: 0,
+                delta_stats: None,
+                chunks_resumed: 0,
+                bytes_skipped: 0,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+fn write_batch_for_single_file(
+    batch_path: &Path,
+    source_path: &Path,
+    dest_path: &Path,
+) -> Result<()> {
+    let source_root = source_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_path_buf();
+    let dest_root = dest_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_path_buf();
+    let relative = dest_path
+        .file_name()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| dest_path.to_path_buf());
+
+    let mut journal = TransferJournal::new(source_root, dest_root);
+    record_create_file(&mut journal, source_path, &relative).map_err(OrbitError::Io)?;
+    journal.save(batch_path).map_err(OrbitError::Io)?;
+    Ok(())
 }
 
 /// Copy a directory recursively with streaming iteration to reduce memory usage

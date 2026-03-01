@@ -30,6 +30,14 @@ pub fn perform_copy(
     config: &CopyConfig,
     publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
+    if (config.inplace || config.sparse_mode != crate::core::sparse::SparseMode::Never)
+        && config.compression != CompressionType::None
+    {
+        return Err(OrbitError::Config(
+            "Sparse or in-place modes are not supported with compression".to_string(),
+        ));
+    }
+
     match config.compression {
         CompressionType::None => {
             copy_direct(source_path, dest_path, source_size, config, publisher)
@@ -64,6 +72,9 @@ fn copy_direct(
     config: &CopyConfig,
     publisher: &ProgressPublisher,
 ) -> Result<CopyStats> {
+    if config.inplace || config.sparse_mode != crate::core::sparse::SparseMode::Never {
+        return buffered::copy_buffered(source_path, dest_path, source_size, config, publisher);
+    }
     // Check if delta transfer should be used
     if validation::should_use_delta_transfer(source_path, dest_path, config)? {
         // NOTE: Progress publisher is not forwarded to delta path.

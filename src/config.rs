@@ -321,6 +321,60 @@ pub struct CopyConfig {
     /// Flatten directory hierarchy (strip path components)
     #[serde(default)]
     pub flatten: bool,
+
+    // === rsync-Inspired Improvements ===
+
+    /// Sparse file handling mode.
+    /// Auto: detect zero-heavy chunks during CDC and write holes (skip for small files).
+    /// Always: always create sparse holes for zero chunks.
+    /// Never: write all bytes including zeros.
+    #[serde(default)]
+    pub sparse_mode: crate::core::sparse::SparseMode,
+
+    /// Preserve hardlinks: detect files sharing the same inode during
+    /// directory scan and recreate hardlink groups at the destination.
+    #[serde(default)]
+    pub preserve_hardlinks: bool,
+
+    /// In-place file updates: modify destination files directly instead of
+    /// writing to a temp file and renaming. Saves disk space for large files
+    /// where only a small portion changed.
+    #[serde(default)]
+    pub inplace: bool,
+
+    /// Safety level for in-place updates.
+    /// "reflink": CoW snapshot before modify (btrfs/XFS/APFS — zero cost)
+    /// "journaled": log original bytes to Magnetar before overwrite (any FS)
+    /// "unsafe": direct overwrite with no recovery (user opt-in only)
+    #[serde(default)]
+    pub inplace_safety: InplaceSafety,
+
+    /// Enable content-aware rename/move detection. Uses Star Map chunk
+    /// overlap to find destination files that share content with source
+    /// files, even if renamed or moved. Uses them as delta basis.
+    #[serde(default)]
+    pub detect_renames: bool,
+
+    /// Rename detection overlap threshold (0.0–1.0). Files sharing at least
+    /// this fraction of chunks are considered renames. Default: 0.8 (80%).
+    #[serde(default = "default_rename_threshold")]
+    pub rename_threshold: f64,
+
+    /// Reference directories for incremental backups. Unchanged files are
+    /// hardlinked to the reference instead of copied. Partial chunk matches
+    /// use the reference as delta basis. Like rsync --link-dest but with
+    /// chunk-level granularity.
+    #[serde(default)]
+    pub link_dest: Vec<PathBuf>,
+
+    /// Write a transfer journal (batch file) recording all operations.
+    /// Can be replayed against other destinations with --read-batch.
+    #[serde(default)]
+    pub write_batch: Option<PathBuf>,
+
+    /// Read and replay a previously recorded transfer journal.
+    #[serde(default)]
+    pub read_batch: Option<PathBuf>,
 }
 
 impl Default for CopyConfig {
@@ -399,6 +453,16 @@ impl Default for CopyConfig {
             if_size_differ: false,
             if_source_newer: false,
             flatten: false,
+            // rsync-inspired improvements
+            sparse_mode: crate::core::sparse::SparseMode::Auto,
+            preserve_hardlinks: false,
+            inplace: false,
+            inplace_safety: InplaceSafety::Reflink,
+            detect_renames: false,
+            rename_threshold: default_rename_threshold(),
+            link_dest: Vec::new(),
+            write_batch: None,
+            read_batch: None,
         }
     }
 }
@@ -501,6 +565,24 @@ impl LogLevel {
     }
 }
 
+/// Safety level for in-place file updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum InplaceSafety {
+    /// Use copy-on-write reflinks for zero-cost snapshots before modification.
+    /// Supported on btrfs, XFS (4.x+), APFS. Falls back to journaled if unavailable.
+    #[default]
+    Reflink,
+
+    /// Log original bytes to Magnetar state machine before each overwrite.
+    /// Works on any filesystem. Slightly slower but crash-recoverable.
+    Journaled,
+
+    /// Direct overwrite with no recovery mechanism. Only for users who
+    /// understand the risk of partial writes on crash.
+    Unsafe,
+}
+
 /// Format for audit logs
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -540,6 +622,10 @@ fn default_neutrino_threshold() -> u64 {
 
 fn default_concurrency() -> usize {
     5 // Per-operation concurrency (multipart parts in flight)
+}
+
+fn default_rename_threshold() -> f64 {
+    0.8 // 80% chunk overlap = likely rename
 }
 
 impl CopyConfig {

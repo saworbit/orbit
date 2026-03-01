@@ -38,7 +38,8 @@ docs/
 │   ├── smb_implementation.md
 │   ├── SMB_NATIVE_STATUS.md
 │   ├── WEB_GUI.md
-│   └── ZERO_COPY.md
+│   ├── ZERO_COPY.md
+│   └── ADVANCED_TRANSFER.md
 │
 ├── specs/            # Technical specifications
 │   └── RETRY_OPTIMIZATION_SPEC.md
@@ -73,6 +74,7 @@ docs/
 - [Error Handling & Retries](architecture/ERROR_HANDLING_IMPLEMENTATION.md)
 - [Observability & Telemetry](architecture/OBSERVABILITY_IMPLEMENTATION.md)
 - [Scalability (Universe V3)](architecture/SCALABILITY_SPEC.md)
+- [Advanced Transfer Features](architecture/ADVANCED_TRANSFER.md)
 
 ### Technical Specifications
 - [Retry Logic Optimization](specs/RETRY_OPTIMIZATION_SPEC.md)
