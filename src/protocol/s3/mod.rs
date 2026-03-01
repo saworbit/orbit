@@ -161,6 +161,7 @@ mod constant_tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_chunk_size_constraints() {
         assert!(MIN_CHUNK_SIZE < DEFAULT_CHUNK_SIZE);
         assert!(DEFAULT_CHUNK_SIZE < MAX_CHUNK_SIZE);

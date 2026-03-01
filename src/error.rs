@@ -614,7 +614,7 @@ mod tests {
             EXIT_PARTIAL
         );
         assert_eq!(
-            OrbitError::Io(io::Error::new(io::ErrorKind::Other, "disk read")).exit_code(),
+            OrbitError::Io(io::Error::other("disk read")).exit_code(),
             EXIT_PARTIAL
         );
         assert_eq!(
@@ -672,7 +672,7 @@ mod tests {
         assert!(OrbitError::RetriesExhausted { attempts: 10 }.is_fatal());
 
         // Non-fatal variants
-        assert!(!OrbitError::Io(io::Error::new(io::ErrorKind::Other, "oops")).is_fatal());
+        assert!(!OrbitError::Io(io::Error::other("oops")).is_fatal());
         assert!(!OrbitError::Compression("bad data".to_string()).is_fatal());
         assert!(!OrbitError::Decompression("bad frame".to_string()).is_fatal());
         assert!(!OrbitError::Resume("stale checkpoint".to_string()).is_fatal());
@@ -696,7 +696,7 @@ mod tests {
             ErrorCategory::Validation
         );
         assert_eq!(
-            OrbitError::Io(io::Error::new(io::ErrorKind::Other, "err")).category(),
+            OrbitError::Io(io::Error::other("err")).category(),
             ErrorCategory::IoError
         );
         assert_eq!(

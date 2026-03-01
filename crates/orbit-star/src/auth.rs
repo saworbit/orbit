@@ -157,6 +157,8 @@ impl AuthService {
     pub fn verify_transfer_token(&self, token: &str, requested_path: &str) -> Result<(), String> {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.set_issuer(&["orbit-nucleus"]);
+        validation.validate_exp = true;
+        validation.leeway = 0;
 
         let token_data =
             decode::<TransferClaims>(token, &DecodingKey::from_secret(&self.secret), &validation)
@@ -235,8 +237,8 @@ mod tests {
             .generate_transfer_token("/data/test.txt")
             .expect("Token generation failed");
 
-        // Wait a moment to ensure expiration
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        // Wait long enough to cross the second boundary used by exp
+        std::thread::sleep(std::time::Duration::from_secs(1));
 
         let result = auth.verify_transfer_token(&token, "/data/test.txt");
         assert!(result.is_err());

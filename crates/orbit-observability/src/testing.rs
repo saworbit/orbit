@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// assert_eq!(capture.event_count(), 1);
 /// let events = capture.events();
-/// assert_eq!(events[0].payload.to_string(), "custom");
+/// assert!(matches!(events[0].payload, EventPayload::Custom { .. }));
 /// ```
 pub struct EventCapture {
     events: Arc<Mutex<Vec<OrbitEvent>>>,

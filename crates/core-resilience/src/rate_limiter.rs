@@ -125,14 +125,14 @@ pub mod governor_impl {
     use governor::{
         clock::DefaultClock,
         state::{InMemoryState, NotKeyed},
-        Quota, RateLimiter as GovernorRateLimiter,
+        Quota, RateLimiter as GovernorCoreLimiter,
     };
     use std::num::NonZeroU32;
     use std::sync::Arc;
 
     /// Rate limiter wrapper using governor
     pub struct GovernorRateLimiter {
-        limiter: Arc<GovernorRateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
+        limiter: Arc<GovernorCoreLimiter<NotKeyed, InMemoryState, DefaultClock>>,
     }
 
     impl GovernorRateLimiter {
@@ -147,7 +147,7 @@ pub mod governor_impl {
                 .allow_burst(max_requests);
 
             Ok(Self {
-                limiter: Arc::new(GovernorRateLimiter::direct(quota)),
+                limiter: Arc::new(GovernorCoreLimiter::direct(quota)),
             })
         }
 

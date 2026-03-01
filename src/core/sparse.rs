@@ -91,8 +91,10 @@ where
     };
 
     let mut file = File::create(dest)?;
-    let mut stats = SparseWriteStats::default();
-    stats.logical_bytes = total_size;
+    let mut stats = SparseWriteStats {
+        logical_bytes: total_size,
+        ..Default::default()
+    };
 
     for chunk in chunks {
         if sparse_enabled && chunk.is_zero {

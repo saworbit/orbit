@@ -26,8 +26,8 @@ pub mod metadata_ops; // Metadata preservation orchestration
 pub mod neutrino; // Neutrino Fast Lane for small file optimization
 pub mod probe; // Phase 4: Active system probing for environment detection
 pub mod progress;
-pub mod resilient_sync; // Crash-proof sync with Magnetar integration
 pub mod rename_detector; // Content-aware rename/move detection via Star Map
+pub mod resilient_sync; // Crash-proof sync with Magnetar integration
 pub mod resume;
 pub mod retry;
 pub mod sparse; // Sparse file detection and hole-aware writing
@@ -43,11 +43,11 @@ use std::time::{Duration, Instant};
 
 use crate::audit::AuditLogger;
 use crate::config::CopyConfig;
-use crate::error::{OrbitError, Result};
-use crate::instrumentation::OperationStats;
 use crate::core::batch::{record_create_file, TransferJournal};
 use crate::core::checksum::calculate_checksum;
 use crate::core::hardlink::create_hardlink;
+use crate::error::{OrbitError, Result};
+use crate::instrumentation::OperationStats;
 use validation::should_copy_file;
 
 /// Statistics about a copy operation
@@ -401,7 +401,7 @@ fn copy_file_impl_inner(
             transfer::perform_copy(source_path, dest_path, source_size, config, pub_ref)
         });
 
-    if let Ok(stats) = &result {
+    if result.is_ok() {
         if let Some(batch_path) = config.write_batch.as_ref() {
             if let Err(e) = write_batch_for_single_file(batch_path, source_path, dest_path) {
                 result = Err(e);
@@ -497,7 +497,7 @@ fn try_link_dest_single(
             source_hash = Some(calculate_checksum(source_path)?);
         }
         let ref_hash = calculate_checksum(&ref_file)?;
-        if ref_hash == source_hash.as_ref().unwrap() {
+        if ref_hash == source_hash.as_deref().unwrap() {
             create_hardlink(&ref_file, dest_path)?;
             return Ok(Some(CopyStats {
                 bytes_copied: 0,

@@ -1,21 +1,38 @@
+#[cfg(unix)]
 mod adapter;
+#[cfg(unix)]
 mod config;
+#[cfg(unix)]
 mod entangler;
+#[cfg(unix)]
 mod error;
+#[cfg(unix)]
 mod fs;
+#[cfg(unix)]
 mod inode;
+#[cfg(unix)]
 mod oracle;
+#[cfg(unix)]
 mod translator;
 
+#[cfg(unix)]
 use adapter::MagnetarAdapter;
+#[cfg(unix)]
 use clap::Parser;
+#[cfg(unix)]
 use crossbeam_channel::unbounded;
+#[cfg(unix)]
 use entangler::{BlockRequest, Entangler};
+#[cfg(unix)]
 use fs::OrbitGhostFS;
+#[cfg(unix)]
 use std::sync::Arc;
+#[cfg(unix)]
 use std::thread;
+#[cfg(unix)]
 use translator::InodeTranslator;
 
+#[cfg(unix)]
 #[derive(Parser)]
 #[clap(
     name = "orbit-ghost",
@@ -39,6 +56,7 @@ struct Cli {
     cache_dir: String,
 }
 
+#[cfg(unix)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -122,4 +140,9 @@ async fn main() -> anyhow::Result<()> {
 
     fuser::mount2(fs, &args.mount_point, &options)?;
     Ok(())
+}
+
+#[cfg(not(unix))]
+fn main() -> anyhow::Result<()> {
+    anyhow::bail!("orbit-ghost is only supported on Unix-like platforms");
 }

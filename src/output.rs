@@ -137,9 +137,7 @@ struct StatsSummary {
 
 /// Sanitize error messages by collapsing whitespace
 pub fn sanitize_error(msg: &str) -> String {
-    msg.replace('\n', " ")
-        .replace('\t', " ")
-        .replace('\r', " ")
+    msg.replace(['\n', '\t', '\r'], " ")
         .split_whitespace()
         .collect::<Vec<&str>>()
         .join(" ")

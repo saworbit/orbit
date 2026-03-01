@@ -13,7 +13,7 @@
  */
 
 use crate::config::{CompressionType, CopyConfig, CopyMode};
-use crate::core::probe::Probe;
+use crate::core::{probe::Probe, sparse::SparseMode};
 use anyhow::Result;
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Select};
@@ -185,6 +185,7 @@ fn create_cloud_config() -> CopyConfig {
     CopyConfig {
         copy_mode: CopyMode::Copy,
         compression: CompressionType::Zstd { level: 3 },
+        sparse_mode: SparseMode::Never,
         verify_checksum: true,
         retry_attempts: 10,
         exponential_backoff: true,
@@ -199,6 +200,7 @@ fn create_network_config() -> CopyConfig {
     CopyConfig {
         copy_mode: CopyMode::Copy,
         compression: CompressionType::Zstd { level: 3 },
+        sparse_mode: SparseMode::Never,
         verify_checksum: true,
         resume_enabled: true,
         retry_attempts: 10,
@@ -224,6 +226,7 @@ fn apply_profile_optimizations(
         && matches!(config.compression, CompressionType::None)
     {
         config.compression = CompressionType::Lz4; // Fast compression
+        config.sparse_mode = SparseMode::Never;
     }
 
     // Adjust chunk size based on available memory

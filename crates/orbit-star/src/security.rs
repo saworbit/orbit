@@ -106,10 +106,42 @@ impl PathJail {
 
         let path = Path::new(requested);
 
-        // Canonicalize the requested path to resolve symlinks and normalize
-        let canonical = path
-            .canonicalize()
-            .with_context(|| format!("Failed to canonicalize path: {}", requested))?;
+        // Canonicalize the requested path to resolve symlinks and normalize.
+        // If the path doesn't exist yet (e.g., a new destination file),
+        // canonicalize the nearest existing ancestor and rebuild safely.
+        let canonical = match path.canonicalize() {
+            Ok(canonical) => canonical,
+            Err(_) => {
+                let mut ancestor = path;
+                let mut tail: Vec<std::ffi::OsString> = Vec::new();
+
+                loop {
+                    if let Ok(existing) = ancestor.canonicalize() {
+                        let mut rebuilt = existing;
+                        for component in tail.iter().rev() {
+                            if component == std::ffi::OsStr::new("..") {
+                                if !rebuilt.pop() {
+                                    bail!("Failed to canonicalize path: {}", requested);
+                                }
+                            } else if component != std::ffi::OsStr::new(".") {
+                                rebuilt.push(component);
+                            }
+                        }
+                        break rebuilt;
+                    }
+
+                    if let Some(file_name) = ancestor.file_name() {
+                        tail.push(file_name.to_os_string());
+                    } else {
+                        bail!("Failed to canonicalize path: {}", requested);
+                    }
+
+                    ancestor = ancestor
+                        .parent()
+                        .with_context(|| format!("Failed to canonicalize path: {}", requested))?;
+                }
+            }
+        };
 
         // Check if the canonical path starts with any allowed root
         for allowed_root in &self.allowed_roots {

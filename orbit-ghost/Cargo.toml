@@ -15,7 +15,6 @@ rust-version = "1.70"  # MSRV - Minimum Supported Rust Version
 publish = false  # Not ready for crates.io yet
 
 [dependencies]
-fuser = "0.16"             # Safe FUSE bindings
 libc = "0.2"               # syscall constants
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
@@ -26,6 +25,9 @@ env_logger = "0.10"
 dashmap = "5.5"            # Concurrent HashMap for Inode tracking
 crossbeam-channel = "0.5"  # High-perf channels for priority signaling
 parking_lot = "0.12"       # Low-latency mutexes
+
+[target.'cfg(unix)'.dependencies]
+fuser = "0.16"             # Safe FUSE bindings
 
 # Phase 2 dependencies - Materialization Layer
 sqlx = { version = "0.8.1", default-features = false, features = ["runtime-tokio", "sqlite"] }

@@ -323,7 +323,6 @@ pub struct CopyConfig {
     pub flatten: bool,
 
     // === rsync-Inspired Improvements ===
-
     /// Sparse file handling mode.
     /// Auto: detect zero-heavy chunks during CDC and write holes (skip for small files).
     /// Always: always create sparse holes for zero chunks.
@@ -692,6 +691,7 @@ impl CopyConfig {
             verify_checksum: true,
             resume_enabled: true,
             compression: CompressionType::Zstd { level: 3 },
+            sparse_mode: crate::core::sparse::SparseMode::Never,
             retry_attempts: 10,
             exponential_backoff: true,
             use_zero_copy: false,
@@ -801,8 +801,10 @@ mod tests {
 
     #[test]
     fn test_resolve_workers_explicit() {
-        let mut config = CopyConfig::default();
-        config.parallel = 32;
+        let config = CopyConfig {
+            parallel: 32,
+            ..Default::default()
+        };
         // Explicit value is always used regardless of backend type
         assert_eq!(config.resolve_workers(false), 32);
         assert_eq!(config.resolve_workers(true), 32);
@@ -836,10 +838,12 @@ mod tests {
 
     #[test]
     fn test_new_fields_serialization() {
-        let mut config = CopyConfig::default();
-        config.concurrency = 10;
-        config.show_stats = true;
-        config.human_readable = true;
+        let config = CopyConfig {
+            concurrency: 10,
+            show_stats: true,
+            human_readable: true,
+            ..Default::default()
+        };
 
         let toml = toml::to_string(&config).unwrap();
         let deserialized: CopyConfig = toml::from_str(&toml).unwrap();
@@ -920,11 +924,11 @@ audit_log_path = "/var/log/orbit_audit.log"
     fn test_default_config_new_fields() {
         let config = CopyConfig::default();
         // Conditional copy & output fields
-        assert_eq!(config.json_output, false);
-        assert_eq!(config.no_clobber, false);
-        assert_eq!(config.if_size_differ, false);
-        assert_eq!(config.if_source_newer, false);
-        assert_eq!(config.flatten, false);
+        assert!(!config.json_output);
+        assert!(!config.no_clobber);
+        assert!(!config.if_size_differ);
+        assert!(!config.if_source_newer);
+        assert!(!config.flatten);
         // S3 upload enhancement fields (Phase 3)
         assert!(config.s3_content_type.is_none());
         assert!(config.s3_content_encoding.is_none());
@@ -935,39 +939,41 @@ audit_log_path = "/var/log/orbit_audit.log"
         assert!(config.s3_metadata_directive.is_none());
         assert!(config.s3_acl.is_none());
         // S3 client configuration fields (Phase 4)
-        assert_eq!(config.s3_no_sign_request, false);
+        assert!(!config.s3_no_sign_request);
         assert!(config.s3_credentials_file.is_none());
         assert!(config.s3_aws_profile.is_none());
-        assert_eq!(config.s3_use_acceleration, false);
-        assert_eq!(config.s3_request_payer, false);
-        assert_eq!(config.s3_no_verify_ssl, false);
-        assert_eq!(config.s3_use_list_objects_v1, false);
+        assert!(!config.s3_use_acceleration);
+        assert!(!config.s3_request_payer);
+        assert!(!config.s3_no_verify_ssl);
+        assert!(!config.s3_use_list_objects_v1);
     }
 
     #[test]
     fn test_new_fields_serialization_roundtrip() {
-        let mut config = CopyConfig::default();
-        // Set ALL new fields to non-default values
-        config.json_output = true;
-        config.no_clobber = true;
-        config.if_size_differ = true;
-        config.if_source_newer = true;
-        config.flatten = true;
-        config.s3_content_type = Some("application/octet-stream".to_string());
-        config.s3_content_encoding = Some("gzip".to_string());
-        config.s3_content_disposition = Some("attachment".to_string());
-        config.s3_cache_control = Some("max-age=3600".to_string());
-        config.s3_expires_header = Some("2030-01-01T00:00:00Z".to_string());
-        config.s3_user_metadata = vec!["key1=val1".to_string(), "key2=val2".to_string()];
-        config.s3_metadata_directive = Some("REPLACE".to_string());
-        config.s3_acl = Some("public-read".to_string());
-        config.s3_no_sign_request = true;
-        config.s3_credentials_file = Some(PathBuf::from("/home/user/.aws/credentials"));
-        config.s3_aws_profile = Some("production".to_string());
-        config.s3_use_acceleration = true;
-        config.s3_request_payer = true;
-        config.s3_no_verify_ssl = true;
-        config.s3_use_list_objects_v1 = true;
+        let config = CopyConfig {
+            // Set ALL new fields to non-default values
+            json_output: true,
+            no_clobber: true,
+            if_size_differ: true,
+            if_source_newer: true,
+            flatten: true,
+            s3_content_type: Some("application/octet-stream".to_string()),
+            s3_content_encoding: Some("gzip".to_string()),
+            s3_content_disposition: Some("attachment".to_string()),
+            s3_cache_control: Some("max-age=3600".to_string()),
+            s3_expires_header: Some("2030-01-01T00:00:00Z".to_string()),
+            s3_user_metadata: vec!["key1=val1".to_string(), "key2=val2".to_string()],
+            s3_metadata_directive: Some("REPLACE".to_string()),
+            s3_acl: Some("public-read".to_string()),
+            s3_no_sign_request: true,
+            s3_credentials_file: Some(PathBuf::from("/home/user/.aws/credentials")),
+            s3_aws_profile: Some("production".to_string()),
+            s3_use_acceleration: true,
+            s3_request_payer: true,
+            s3_no_verify_ssl: true,
+            s3_use_list_objects_v1: true,
+            ..Default::default()
+        };
 
         // Serialize to TOML
         let toml_str = toml::to_string_pretty(&config).unwrap();
@@ -975,11 +981,11 @@ audit_log_path = "/var/log/orbit_audit.log"
         let restored: CopyConfig = toml::from_str(&toml_str).unwrap();
 
         // Verify all fields match
-        assert_eq!(restored.json_output, true);
-        assert_eq!(restored.no_clobber, true);
-        assert_eq!(restored.if_size_differ, true);
-        assert_eq!(restored.if_source_newer, true);
-        assert_eq!(restored.flatten, true);
+        assert!(restored.json_output);
+        assert!(restored.no_clobber);
+        assert!(restored.if_size_differ);
+        assert!(restored.if_source_newer);
+        assert!(restored.flatten);
         assert_eq!(
             restored.s3_content_type,
             Some("application/octet-stream".to_string())
@@ -997,16 +1003,16 @@ audit_log_path = "/var/log/orbit_audit.log"
         assert_eq!(restored.s3_user_metadata, vec!["key1=val1", "key2=val2"]);
         assert_eq!(restored.s3_metadata_directive, Some("REPLACE".to_string()));
         assert_eq!(restored.s3_acl, Some("public-read".to_string()));
-        assert_eq!(restored.s3_no_sign_request, true);
+        assert!(restored.s3_no_sign_request);
         assert_eq!(
             restored.s3_credentials_file,
             Some(PathBuf::from("/home/user/.aws/credentials"))
         );
         assert_eq!(restored.s3_aws_profile, Some("production".to_string()));
-        assert_eq!(restored.s3_use_acceleration, true);
-        assert_eq!(restored.s3_request_payer, true);
-        assert_eq!(restored.s3_no_verify_ssl, true);
-        assert_eq!(restored.s3_use_list_objects_v1, true);
+        assert!(restored.s3_use_acceleration);
+        assert!(restored.s3_request_payer);
+        assert!(restored.s3_no_verify_ssl);
+        assert!(restored.s3_use_list_objects_v1);
     }
 
     #[test]

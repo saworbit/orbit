@@ -1,6 +1,7 @@
 use orbit::{
     config::{CompressionType, CopyConfig},
     copy_directory, copy_file,
+    core::sparse::SparseMode,
     core::validation::matches_exclude_pattern,
     error::OrbitError,
     get_zero_copy_capabilities,
@@ -46,6 +47,7 @@ fn test_compression_lz4() {
 
     let config = CopyConfig {
         compression: CompressionType::Lz4,
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -311,6 +313,7 @@ fn test_zero_copy_disabled_by_compression() {
         use_zero_copy: true,
         compression: CompressionType::Lz4, // Should use compression path
         show_progress: false,
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 

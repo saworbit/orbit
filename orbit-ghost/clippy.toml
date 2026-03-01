@@ -28,7 +28,7 @@ doc-valid-idents = [
 ]
 
 # Allow certain abbreviations in names
-allowed-names-below-min-characters = ["i", "j", "k", "id", "fs", "io", "ok"]
+allowed-idents-below-min-chars = ["i", "j", "k", "id", "fs", "io", "ok"]
 
 # Warn on unwrap and expect in code (encourage proper error handling)
 # This is controlled via allow/warn/deny attributes in code

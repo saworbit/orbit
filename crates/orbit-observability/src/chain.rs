@@ -231,7 +231,7 @@ pub struct ValidationReport {
 impl ValidationReport {
     /// Check if the chain is valid (no failures)
     pub fn is_valid(&self) -> bool {
-        self.failures.is_empty()
+        self.failures.is_empty() && self.valid_events == self.total_events
     }
 
     /// Get failure rate as a percentage

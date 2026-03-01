@@ -143,7 +143,7 @@ impl ExternalSorter {
     }
 
     /// Sort a chunk in memory and write it to a temporary file
-    fn write_sorted_chunk(&self, chunk: &mut Vec<SortableEntry>) -> io::Result<PathBuf> {
+    fn write_sorted_chunk(&self, chunk: &mut [SortableEntry]) -> io::Result<PathBuf> {
         chunk.sort();
 
         std::fs::create_dir_all(&self.temp_dir)?;

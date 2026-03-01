@@ -47,7 +47,7 @@ pub trait S3Operations {
 /// then filter results in-memory against the full pattern.
 fn extract_prefix_before_wildcard(pattern: &str) -> &str {
     let first_wildcard = pattern
-        .find(|c: char| c == '*' || c == '?')
+        .find(|c: char| ['*', '?'].contains(&c))
         .unwrap_or(pattern.len());
     &pattern[..first_wildcard]
 }

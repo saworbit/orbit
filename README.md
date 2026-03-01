@@ -1350,7 +1350,7 @@ orbit --read-batch update.batch -d /server2/
 | `--link-dest` | `--link-dest` | Chunk-level partial reuse vs all-or-nothing per file |
 | `--write-batch` | `--write-batch` | Content-addressed journal, portable across different destinations |
 
-**Current limitations:** `--sparse` and `--inplace` are mutually exclusive. `--detect-renames` and `--link-dest` currently hardlink **exact matches** only; partial-chunk delta basis is planned. `--write-batch` records full-file create entries (no delta ops yet) and requires `--mode copy`.
+**Current limitations:** `--sparse` and `--inplace` are mutually exclusive. Compression is incompatible with `--sparse`/`--inplace` (use `--sparse never` and avoid `--inplace`). Delta transfer (`--check delta`) is disabled when `--sparse` or `--inplace` is enabled (Orbit falls back to a full buffered copy). `--detect-renames` and `--link-dest` currently hardlink **exact matches** only; partial-chunk delta basis is planned. `--write-batch` records full-file create entries (no delta ops yet) and requires `--mode copy`.
 
 See [Advanced Transfer Features](docs/architecture/ADVANCED_TRANSFER.md) for design details.
 

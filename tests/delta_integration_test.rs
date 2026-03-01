@@ -2,7 +2,11 @@
  * Integration tests for delta detection and efficient transfers
  */
 
-use orbit::{config::CopyConfig, copy_file, core::delta::CheckMode};
+use orbit::{
+    config::CopyConfig,
+    copy_file,
+    core::{delta::CheckMode, sparse::SparseMode},
+};
 use std::fs;
 use tempfile::tempdir;
 
@@ -20,6 +24,7 @@ fn test_delta_identical_files() {
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
         delta_block_size: 64 * 1024, // 64KB blocks
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -53,6 +58,7 @@ fn test_delta_completely_different_files() {
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
         delta_block_size: 32 * 1024, // 32KB blocks
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -92,6 +98,7 @@ fn test_delta_partial_modification() {
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
         delta_block_size: 25 * 1024, // 25KB blocks
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -126,6 +133,7 @@ fn test_delta_appended_data() {
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
         delta_block_size: 16 * 1024,
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -155,6 +163,7 @@ fn test_delta_no_destination() {
 
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -223,6 +232,7 @@ fn test_whole_file_flag() {
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
         whole_file: true, // Force full copy
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -245,6 +255,7 @@ fn test_small_file_threshold() {
 
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -268,6 +279,7 @@ fn test_different_block_sizes() {
         let config = CopyConfig {
             check_mode: CheckMode::Delta,
             delta_block_size: block_size_kb * 1024,
+            sparse_mode: SparseMode::Never,
             ..Default::default()
         };
 
@@ -306,6 +318,7 @@ fn test_delta_with_binary_data() {
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
         delta_block_size: 32 * 1024,
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 
@@ -340,6 +353,7 @@ fn test_delta_stats_reporting() {
     let config = CopyConfig {
         check_mode: CheckMode::Delta,
         delta_block_size: 50 * 1024,
+        sparse_mode: SparseMode::Never,
         ..Default::default()
     };
 

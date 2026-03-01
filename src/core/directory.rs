@@ -13,8 +13,8 @@ use rayon::prelude::*;
 use tracing::info;
 use walkdir::WalkDir;
 
-use super::concurrency::ConcurrencyLimiter;
 use super::batch::{record_create_file, JournalEntry, TransferJournal};
+use super::concurrency::ConcurrencyLimiter;
 use super::disk_guardian::{self, GuardianConfig};
 use super::filter::FilterList;
 use super::hardlink::{create_hardlink, HardlinkTracker};
@@ -22,9 +22,9 @@ use super::metadata::preserve_metadata;
 use super::progress::ProgressPublisher;
 use super::validation::matches_exclude_pattern;
 use super::CopyStats;
-use crate::core::checksum::calculate_checksum;
 use crate::audit::AuditLogger;
 use crate::config::{CopyConfig, CopyMode, SymlinkMode};
+use crate::core::checksum::calculate_checksum;
 use crate::error::{OrbitError, Result};
 
 /// Work item for parallel processing
@@ -166,7 +166,7 @@ pub fn copy_directory_impl(
     }
 
     let rename_index = if config.detect_renames {
-        Some(Arc::new(build_hash_index(&dest_dir)?))
+        Some(Arc::new(build_hash_index(dest_dir)?))
     } else {
         None
     };
@@ -194,7 +194,6 @@ pub fn copy_directory_impl(
             )));
         }
     };
-
 
     // Bounded channel prevents scanner from overwhelming copiers
     // Buffer size: use parallel threads as baseline, bounded between 16-1000
@@ -282,11 +281,10 @@ pub fn copy_directory_impl(
         }
     }
 
-    if let (Some(batch_path), Some(journal)) = (config.write_batch.as_ref(), batch_journal.as_ref()) {
+    if let (Some(batch_path), Some(journal)) = (config.write_batch.as_ref(), batch_journal.as_ref())
+    {
         let journal = journal.lock().unwrap();
-        journal
-            .save(batch_path)
-            .map_err(|e| OrbitError::Io(e))?;
+        journal.save(batch_path).map_err(OrbitError::Io)?;
     }
 
     final_stats.duration = start_time.elapsed();
@@ -357,6 +355,7 @@ pub fn copy_directory_impl(
 }
 
 /// Producer: walks directory tree and sends work items via bounded channel
+#[allow(clippy::while_let_on_iterator)]
 fn produce_work_items(
     source_dir: &Path,
     dest_dir: &Path,
@@ -497,6 +496,7 @@ struct DeletionSummary {
     failed: usize,
 }
 
+#[allow(clippy::while_let_on_iterator)]
 fn collect_deletion_candidates(
     dest_dir: &Path,
     expected_entries: &Arc<Mutex<HashSet<PathBuf>>>,
@@ -609,12 +609,12 @@ fn apply_deletions(deletions: &[DeletionItem], config: &CopyConfig) -> DeletionS
 
 fn build_hash_index(dest_dir: &Path) -> Result<HashMap<String, PathBuf>> {
     let mut index = HashMap::new();
-    let mut walker = WalkDir::new(dest_dir)
+    let walker = WalkDir::new(dest_dir)
         .follow_links(false)
         .same_file_system(true)
         .into_iter();
 
-    while let Some(entry) = walker.next() {
+    for entry in walker {
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
@@ -685,6 +685,7 @@ fn flush_file_batch(
 }
 
 /// Consumer: process work items in parallel or sequentially
+#[allow(clippy::too_many_arguments)]
 fn consume_work_items(
     source_dir: &Path,
     dest_dir: &Path,
@@ -724,9 +725,16 @@ fn consume_work_items(
     } else {
         // Sequential processing (no concurrency limiter needed)
         for item in rx {
-            if let Err(e) =
-                process_work_item(&item, source_dir, dest_dir, config, &total_stats, None, rename_index, batch_journal)
-            {
+            if let Err(e) = process_work_item(
+                &item,
+                source_dir,
+                dest_dir,
+                config,
+                &total_stats,
+                None,
+                rename_index,
+                batch_journal,
+            ) {
                 tracing::error!("Error copying {:?}: {}", item.source_path, e);
                 if let Ok(mut stats) = total_stats.lock() {
                     stats.files_failed += 1;
@@ -739,6 +747,7 @@ fn consume_work_items(
 }
 
 /// Process a single work item (file or symlink)
+#[allow(clippy::too_many_arguments)]
 fn process_work_item(
     item: &WorkItem,
     _source_dir: &Path,
@@ -801,10 +810,13 @@ fn process_work_item(
                                 .dest_path
                                 .strip_prefix(dest_dir)
                                 .unwrap_or(&item.dest_path);
-                            journal.lock().unwrap().record(JournalEntry::CreateHardlink {
-                                target: target_rel.to_path_buf(),
-                                link: link_rel.to_path_buf(),
-                            });
+                            journal
+                                .lock()
+                                .unwrap()
+                                .record(JournalEntry::CreateHardlink {
+                                    target: target_rel.to_path_buf(),
+                                    link: link_rel.to_path_buf(),
+                                });
                         }
                     }
                     Err(e) => {
@@ -863,30 +875,30 @@ fn process_work_item(
                                 source_hash = Some(calculate_checksum(&item.source_path)?);
                             }
                             let ref_hash = calculate_checksum(&ref_file)?;
-                            if ref_hash == source_hash.as_ref().unwrap() {
-                                if create_hardlink(&ref_file, &item.dest_path).is_ok() {
-                                    if let Some(journal) = batch_journal {
-                                        let mut journal = journal.lock().unwrap();
-                                        record_create_file(
-                                            &mut journal,
-                                            &item.source_path,
-                                            &item.relative_path,
-                                        )?;
-                                    }
-                                    hardlink_stats = Some(CopyStats {
-                                        bytes_copied: 0,
-                                        duration: Duration::ZERO,
-                                        checksum: None,
-                                        compression_ratio: None,
-                                        files_copied: 1,
-                                        files_skipped: 0,
-                                        files_failed: 0,
-                                        delta_stats: None,
-                                        chunks_resumed: 0,
-                                        bytes_skipped: 0,
-                                    });
-                                    break;
+                            if ref_hash == source_hash.as_deref().unwrap()
+                                && create_hardlink(&ref_file, &item.dest_path).is_ok()
+                            {
+                                if let Some(journal) = batch_journal {
+                                    let mut journal = journal.lock().unwrap();
+                                    record_create_file(
+                                        &mut journal,
+                                        &item.source_path,
+                                        &item.relative_path,
+                                    )?;
                                 }
+                                hardlink_stats = Some(CopyStats {
+                                    bytes_copied: 0,
+                                    duration: Duration::ZERO,
+                                    checksum: None,
+                                    compression_ratio: None,
+                                    files_copied: 1,
+                                    files_skipped: 0,
+                                    files_failed: 0,
+                                    delta_stats: None,
+                                    chunks_resumed: 0,
+                                    bytes_skipped: 0,
+                                });
+                                break;
                             }
                         }
                         if hardlink_stats.is_some() {
@@ -903,29 +915,30 @@ fn process_work_item(
                             source_hash = Some(calculate_checksum(&item.source_path)?);
                         }
                         if let Some(basis_path) = index.get(source_hash.as_ref().unwrap()) {
-                            if basis_path != &item.dest_path && basis_path.exists() {
-                                if create_hardlink(basis_path, &item.dest_path).is_ok() {
-                                    if let Some(journal) = batch_journal {
-                                        let mut journal = journal.lock().unwrap();
-                                        record_create_file(
-                                            &mut journal,
-                                            &item.source_path,
-                                            &item.relative_path,
-                                        )?;
-                                    }
-                                    hardlink_stats = Some(CopyStats {
-                                        bytes_copied: 0,
-                                        duration: Duration::ZERO,
-                                        checksum: None,
-                                        compression_ratio: None,
-                                        files_copied: 1,
-                                        files_skipped: 0,
-                                        files_failed: 0,
-                                        delta_stats: None,
-                                        chunks_resumed: 0,
-                                        bytes_skipped: 0,
-                                    });
+                            if basis_path != &item.dest_path
+                                && basis_path.exists()
+                                && create_hardlink(basis_path, &item.dest_path).is_ok()
+                            {
+                                if let Some(journal) = batch_journal {
+                                    let mut journal = journal.lock().unwrap();
+                                    record_create_file(
+                                        &mut journal,
+                                        &item.source_path,
+                                        &item.relative_path,
+                                    )?;
                                 }
+                                hardlink_stats = Some(CopyStats {
+                                    bytes_copied: 0,
+                                    duration: Duration::ZERO,
+                                    checksum: None,
+                                    compression_ratio: None,
+                                    files_copied: 1,
+                                    files_skipped: 0,
+                                    files_failed: 0,
+                                    delta_stats: None,
+                                    chunks_resumed: 0,
+                                    bytes_skipped: 0,
+                                });
                             }
                         }
                     }

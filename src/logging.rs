@@ -155,20 +155,23 @@ fn init_stdout_logging(
     #[cfg(feature = "opentelemetry")]
     {
         if let Some(ref endpoint) = _config.otel_endpoint {
-            use opentelemetry_otlp::WithExportConfig;
+            use opentelemetry::trace::TracerProvider as _;
+            use opentelemetry_otlp::{SpanExporter, WithExportConfig};
             use opentelemetry_sdk::runtime;
+            use opentelemetry_sdk::trace as sdktrace;
             use tracing_opentelemetry::OpenTelemetryLayer;
 
-            match opentelemetry_otlp::new_pipeline()
-                .tracing()
-                .with_exporter(
-                    opentelemetry_otlp::new_exporter()
-                        .tonic()
-                        .with_endpoint(endpoint),
-                )
-                .install_batch(runtime::Tokio)
-            {
-                Ok(tracer) => {
+            let exporter = SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint)
+                .build();
+
+            match exporter {
+                Ok(exporter) => {
+                    let provider = sdktrace::TracerProvider::builder()
+                        .with_batch_exporter(exporter, runtime::Tokio)
+                        .build();
+                    let tracer = provider.tracer("orbit");
                     tracing::info!("OpenTelemetry tracing enabled - exporting to {}", endpoint);
                     let otel_layer = OpenTelemetryLayer::new(tracer);
                     registry.with(Some(otel_layer)).init();
@@ -177,7 +180,7 @@ fn init_stdout_logging(
                 Err(e) => {
                     tracing::error!("Failed to initialize OpenTelemetry: {}", e);
                 }
-            }
+            };
         }
     }
 
@@ -216,20 +219,23 @@ fn init_file_logging(
     #[cfg(feature = "opentelemetry")]
     {
         if let Some(ref endpoint) = _config.otel_endpoint {
-            use opentelemetry_otlp::WithExportConfig;
+            use opentelemetry::trace::TracerProvider as _;
+            use opentelemetry_otlp::{SpanExporter, WithExportConfig};
             use opentelemetry_sdk::runtime;
+            use opentelemetry_sdk::trace as sdktrace;
             use tracing_opentelemetry::OpenTelemetryLayer;
 
-            match opentelemetry_otlp::new_pipeline()
-                .tracing()
-                .with_exporter(
-                    opentelemetry_otlp::new_exporter()
-                        .tonic()
-                        .with_endpoint(endpoint),
-                )
-                .install_batch(runtime::Tokio)
-            {
-                Ok(tracer) => {
+            let exporter = SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(endpoint)
+                .build();
+
+            match exporter {
+                Ok(exporter) => {
+                    let provider = sdktrace::TracerProvider::builder()
+                        .with_batch_exporter(exporter, runtime::Tokio)
+                        .build();
+                    let tracer = provider.tracer("orbit");
                     tracing::info!("OpenTelemetry tracing enabled - exporting to {}", endpoint);
                     let otel_layer = OpenTelemetryLayer::new(tracer);
                     registry.with(Some(otel_layer)).init();
@@ -238,7 +244,7 @@ fn init_file_logging(
                 Err(e) => {
                     tracing::error!("Failed to initialize OpenTelemetry: {}", e);
                 }
-            }
+            };
         }
     }
 

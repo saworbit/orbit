@@ -365,7 +365,13 @@ struct Cli {
 
     /// Safety level for in-place updates (reflink, journaled, unsafe)
     /// Reflink: CoW snapshot (btrfs/XFS/APFS), Journaled: undo log, Unsafe: no safety
-    #[arg(long, value_enum, default_value = "reflink", global = true, requires = "inplace")]
+    #[arg(
+        long,
+        value_enum,
+        default_value = "reflink",
+        global = true,
+        requires = "inplace"
+    )]
     inplace_safety: InplaceSafetyArg,
 
     /// Detect renamed/moved files via content-chunk overlap
@@ -374,7 +380,12 @@ struct Cli {
     detect_renames: bool,
 
     /// Minimum chunk overlap ratio to consider a rename (0.0–1.0, default: 0.8)
-    #[arg(long, default_value = "0.8", global = true, requires = "detect_renames")]
+    #[arg(
+        long,
+        default_value = "0.8",
+        global = true,
+        requires = "detect_renames"
+    )]
     rename_threshold: f64,
 
     /// Reference directory for incremental backup hardlinking (repeatable)
@@ -431,7 +442,7 @@ enum Commands {
     /// - orbit --source <src> --dest <dest> [options]
     /// - cp|copy <src> <dest> [options]
     /// - sync <src> <dest> [options]  (adds --mode sync)
-    /// Lines starting with '#' are comments. Empty lines are skipped.
+    ///   Lines starting with '#' are comments. Empty lines are skipped.
     Run {
         /// Input file with commands (default: read from stdin)
         #[arg(short, long)]
@@ -1809,7 +1820,7 @@ fn normalize_batch_args(line: &str, tokens: Vec<String>) -> Result<Vec<String>> 
 
     if first == "orbit" {
         let args = tokens[1..].to_vec();
-        if args.get(0).map(|s| s.as_str()) == Some("run") {
+        if args.first().map(|s| s.as_str()) == Some("run") {
             return Err(OrbitError::Config(
                 "Nested 'orbit run' is not supported in batch mode".to_string(),
             ));
@@ -1871,7 +1882,7 @@ fn handle_run_command(file: Option<PathBuf>, workers: usize) -> Result<()> {
         })?;
         std::io::BufReader::new(file)
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(|line| line.ok())
             .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
             .collect()
     } else {
@@ -1879,7 +1890,7 @@ fn handle_run_command(file: Option<PathBuf>, workers: usize) -> Result<()> {
         stdin
             .lock()
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(|line| line.ok())
             .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
             .collect()
     };
@@ -3177,7 +3188,7 @@ mod tests {
         // Test that zero-copy detection works
         let available = is_zero_copy_available();
         // On Windows, this should be true (CopyFileExW)
-        assert!(available || !available); // Just verify it doesn't panic
+        assert_eq!(available, is_zero_copy_available());
     }
 
     #[test]

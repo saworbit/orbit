@@ -300,7 +300,7 @@ impl Backend for LocalBackend {
             self.list_recursive(&resolved, &resolved, &options, 0, &mut entries)
                 .await?;
             // Filter to only direct children
-            entries.retain(|e| e.path.components().count() == 1 || e.path == PathBuf::from(""));
+            entries.retain(|e| e.path.components().count() == 1 || e.path.as_os_str().is_empty());
         }
 
         // Convert Vec to stream
@@ -535,22 +535,12 @@ impl Backend for LocalBackend {
     }
 
     fn supports(&self, operation: &str) -> bool {
-        matches!(
-            operation,
-            "stat"
-                | "list"
-                | "read"
-                | "write"
-                | "delete"
-                | "mkdir"
-                | "rename"
-                | "exists"
-                | "set_permissions"
-                | "set_timestamps"
-                | "get_xattrs"
-                | "set_xattrs"
-                | "set_ownership"
-        )
+        match operation {
+            "get_xattrs" | "set_xattrs" => cfg!(all(feature = "extended-metadata", unix)),
+            "stat" | "list" | "read" | "write" | "delete" | "mkdir" | "rename" | "exists"
+            | "set_permissions" | "set_timestamps" | "set_ownership" => true,
+            _ => false,
+        }
     }
 
     // Metadata operations implementation
@@ -668,7 +658,7 @@ impl Backend for LocalBackend {
         &self,
         path: &Path,
     ) -> BackendResult<std::collections::HashMap<String, Vec<u8>>> {
-        #[cfg(feature = "extended-metadata")]
+        #[cfg(all(feature = "extended-metadata", unix))]
         {
             let resolved = self.resolve_path(path);
             let path_clone = resolved.clone();
@@ -702,7 +692,7 @@ impl Backend for LocalBackend {
             .map_err(|e| BackendError::Io(std::io::Error::other(e)))?
         }
 
-        #[cfg(not(feature = "extended-metadata"))]
+        #[cfg(not(all(feature = "extended-metadata", unix)))]
         {
             let _ = path;
             Err(BackendError::Unsupported {
@@ -726,7 +716,7 @@ impl Backend for LocalBackend {
         path: &Path,
         attrs: &std::collections::HashMap<String, Vec<u8>>,
     ) -> BackendResult<()> {
-        #[cfg(feature = "extended-metadata")]
+        #[cfg(all(feature = "extended-metadata", unix))]
         {
             let resolved = self.resolve_path(path);
             let path_clone = resolved.clone();
@@ -745,7 +735,7 @@ impl Backend for LocalBackend {
             .map_err(|e| BackendError::Io(std::io::Error::other(e)))?
         }
 
-        #[cfg(not(feature = "extended-metadata"))]
+        #[cfg(not(all(feature = "extended-metadata", unix)))]
         {
             let _ = (path, attrs);
             Err(BackendError::Unsupported {

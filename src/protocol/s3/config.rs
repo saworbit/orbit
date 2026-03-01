@@ -553,13 +553,13 @@ mod tests {
         assert_eq!(config.metadata_directive, None);
         assert_eq!(config.acl, None);
         // Phase 4 fields
-        assert_eq!(config.no_sign_request, false);
+        assert!(!config.no_sign_request);
         assert_eq!(config.credentials_file, None);
         assert_eq!(config.aws_profile, None);
-        assert_eq!(config.use_acceleration, false);
-        assert_eq!(config.request_payer, false);
-        assert_eq!(config.no_verify_ssl, false);
-        assert_eq!(config.use_list_objects_v1, false);
+        assert!(!config.use_acceleration);
+        assert!(!config.request_payer);
+        assert!(!config.no_verify_ssl);
+        assert!(!config.use_list_objects_v1);
     }
 
     #[test]
@@ -603,16 +603,16 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(config.no_sign_request, true);
+        assert!(config.no_sign_request);
         assert_eq!(
             config.credentials_file,
             Some(PathBuf::from("/path/to/creds"))
         );
         assert_eq!(config.aws_profile, Some("production".to_string()));
-        assert_eq!(config.use_acceleration, true);
-        assert_eq!(config.request_payer, true);
-        assert_eq!(config.no_verify_ssl, true);
-        assert_eq!(config.use_list_objects_v1, true);
+        assert!(config.use_acceleration);
+        assert!(config.request_payer);
+        assert!(config.no_verify_ssl);
+        assert!(config.use_list_objects_v1);
     }
 
     #[test]

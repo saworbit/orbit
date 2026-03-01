@@ -43,7 +43,12 @@ pub fn copy_buffered(
         ));
     }
 
-    if config.inplace && matches!(config.sparse_mode, super::sparse::SparseMode::Always | super::sparse::SparseMode::Auto) {
+    if config.inplace
+        && matches!(
+            config.sparse_mode,
+            super::sparse::SparseMode::Always | super::sparse::SparseMode::Auto
+        )
+    {
         return Err(OrbitError::Config(
             "Sparse mode is not supported with in-place updates".to_string(),
         ));
@@ -82,9 +87,7 @@ pub fn copy_buffered(
 
     let use_inplace = config.inplace && dest_path.exists();
     if config.inplace && !use_inplace {
-        info!(
-            "In-place requested but destination does not exist; falling back to normal copy"
-        );
+        info!("In-place requested but destination does not exist; falling back to normal copy");
     }
 
     let sparse_enabled = match config.sparse_mode {

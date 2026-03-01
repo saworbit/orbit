@@ -86,15 +86,10 @@ pub enum JournalEntry {
     },
 
     /// Delete a file (for mirror/sync modes)
-    DeleteFile {
-        path: PathBuf,
-    },
+    DeleteFile { path: PathBuf },
 
     /// Create a directory
-    CreateDir {
-        path: PathBuf,
-        mode: Option<u32>,
-    },
+    CreateDir { path: PathBuf, mode: Option<u32> },
 
     /// Create a hardlink
     CreateHardlink {
@@ -116,15 +111,9 @@ pub enum JournalEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DeltaOp {
     /// Reuse an existing chunk by hash (destination already has it)
-    CopyChunk {
-        hash: [u8; 32],
-        length: u32,
-    },
+    CopyChunk { hash: [u8; 32], length: u32 },
     /// Write new chunk data (destination doesn't have this chunk)
-    WriteChunk {
-        hash: [u8; 32],
-        data: Vec<u8>,
-    },
+    WriteChunk { hash: [u8; 32], data: Vec<u8> },
 }
 
 /// Summary statistics for a journal
@@ -300,7 +289,8 @@ impl TransferJournal {
                 } => {
                     let dest = dest_root.join(path);
                     let dest_exists = dest.exists();
-                    let needs_existing = ops.iter().any(|op| matches!(op, DeltaOp::CopyChunk { .. }));
+                    let needs_existing =
+                        ops.iter().any(|op| matches!(op, DeltaOp::CopyChunk { .. }));
                     if !dest_exists && needs_existing {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
@@ -434,13 +424,13 @@ pub fn record_create_file(
 
     let file = File::open(source_path)?;
     let config = orbit_core_cdc::ChunkConfig::default_config();
-    let mut stream = orbit_core_cdc::ChunkStream::new(file, config);
+    let stream = orbit_core_cdc::ChunkStream::new(file, config);
 
     let mut chunk_hashes = Vec::new();
     let mut chunk_data = Vec::new();
 
-    while let Some(chunk) = stream.next() {
-        let chunk = chunk.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    for chunk in stream {
+        let chunk = chunk.map_err(io::Error::other)?;
         chunk_hashes.push(chunk.hash);
         chunk_data.push(chunk.data);
     }
@@ -479,10 +469,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let batch_path = dir.path().join("test.batch");
 
-        let mut journal = TransferJournal::new(
-            PathBuf::from("/source"),
-            PathBuf::from("/dest"),
-        );
+        let mut journal = TransferJournal::new(PathBuf::from("/source"), PathBuf::from("/dest"));
 
         journal.record(JournalEntry::CreateDir {
             path: PathBuf::from("subdir"),
@@ -515,10 +502,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let dest = dir.path().join("dest");
 
-        let mut journal = TransferJournal::new(
-            PathBuf::from("/source"),
-            dest.clone(),
-        );
+        let mut journal = TransferJournal::new(PathBuf::from("/source"), dest.clone());
 
         journal.record(JournalEntry::CreateDir {
             path: PathBuf::from("docs"),
@@ -595,21 +579,27 @@ mod tests {
         // Existing file at destination
         std::fs::write(dest.join("data.bin"), b"AAAA BBBB CCCC").unwrap();
 
+        let prefix = b"AAAA ";
+        let suffix = b" CCCC";
+        let prefix_hash = blake3::hash(prefix);
+        let suffix_hash = blake3::hash(suffix);
+        let write_data = b"XXXX".to_vec();
+
         let mut journal = TransferJournal::new(PathBuf::from("/src"), dest.clone());
         journal.record(JournalEntry::UpdateFile {
             path: PathBuf::from("data.bin"),
             ops: vec![
                 DeltaOp::CopyChunk {
-                    hash: [0x01; 32],
-                    length: 5,
+                    hash: *prefix_hash.as_bytes(),
+                    length: prefix.len() as u32,
                 },
                 DeltaOp::WriteChunk {
-                    hash: [0x02; 32],
-                    data: b"XXXX".to_vec(),
+                    hash: *blake3::hash(&write_data).as_bytes(),
+                    data: write_data,
                 },
                 DeltaOp::CopyChunk {
-                    hash: [0x03; 32],
-                    length: 5,
+                    hash: *suffix_hash.as_bytes(),
+                    length: suffix.len() as u32,
                 },
             ],
             new_size: 14,
@@ -640,10 +630,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let batch_path = dir.path().join("roundtrip.batch");
 
-        let mut journal = TransferJournal::new(
-            PathBuf::from("/a"),
-            PathBuf::from("/b"),
-        );
+        let mut journal = TransferJournal::new(PathBuf::from("/a"), PathBuf::from("/b"));
 
         // Record various operation types
         journal.record(JournalEntry::CreateDir {
@@ -714,8 +701,14 @@ mod tests {
         journal.record(JournalEntry::UpdateFile {
             path: PathBuf::from("c.txt"),
             ops: vec![
-                DeltaOp::CopyChunk { hash: [0x10; 32], length: 100 },
-                DeltaOp::WriteChunk { hash: [0x11; 32], data: vec![0xAA; 50] },
+                DeltaOp::CopyChunk {
+                    hash: [0x10; 32],
+                    length: 100,
+                },
+                DeltaOp::WriteChunk {
+                    hash: [0x11; 32],
+                    data: vec![0xAA; 50],
+                },
             ],
             new_size: 150,
         });
@@ -731,7 +724,7 @@ mod tests {
         assert_eq!(journal.stats.dirs_created, 1);
         assert_eq!(journal.stats.hardlinks_created, 1);
         assert_eq!(journal.stats.new_data_bytes, 4 + 4 + 50); // two creates + one write chunk
-        assert_eq!(journal.stats.total_bytes, 4 + 4 + 100); // two creates + one copy chunk
+        assert_eq!(journal.stats.total_bytes, 4 + 4 + 100 + 50); // two creates + copy + write chunks
         assert_eq!(journal.len(), 7);
         assert!(!journal.is_empty());
     }

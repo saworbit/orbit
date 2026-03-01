@@ -34,7 +34,7 @@
 //!
 //! // Insert a chunk location (O(log N) regardless of duplicate count)
 //! let hash = [0x42; 32];
-//! let loc = ChunkLocation::new(PathBuf::from("/data/file.bin"), 0, 4096);
+//! let loc = ChunkLocation::new("star-1".to_string(), PathBuf::from("/data/file.bin"), 0, 4096);
 //! universe.insert_chunk(hash, loc).unwrap();
 //!
 //! // Check existence (O(1))
@@ -156,7 +156,7 @@ impl Universe {
     /// # use std::path::PathBuf;
     /// let universe = Universe::open("db.redb").unwrap();
     /// let hash = [0xAA; 32];
-    /// let loc = ChunkLocation::new(PathBuf::from("file.bin"), 0, 4096);
+    /// let loc = ChunkLocation::new("star-1".to_string(), PathBuf::from("file.bin"), 0, 4096);
     /// universe.insert_chunk(hash, loc).unwrap();
     /// ```
     pub fn insert_chunk(&self, hash: [u8; 32], location: ChunkLocation) -> Result<()> {

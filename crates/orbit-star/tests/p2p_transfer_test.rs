@@ -87,8 +87,9 @@ async fn test_triangle_transfer() -> Result<(), Box<dyn std::error::Error>> {
     // ══════════════════════════════════════════════════════════
     // Simulate Nucleus: Generate Transfer Token
     // ══════════════════════════════════════════════════════════
+    let remote_path = test_file_path.to_string_lossy().to_string();
     let auth = AuthService::new(TEST_AUTH_SECRET);
-    let token = auth.generate_transfer_token("/payload.dat")?;
+    let token = auth.generate_transfer_token(&remote_path)?;
 
     println!("✓ Generated transfer token");
 
@@ -114,10 +115,12 @@ async fn test_triangle_transfer() -> Result<(), Box<dyn std::error::Error>> {
     // ══════════════════════════════════════════════════════════
     // Execute: Command Destination to Pull from Source
     // ══════════════════════════════════════════════════════════
+    let local_path = dest_dir.path().join("received").join("payload.dat");
+    let local_path_str = local_path.to_string_lossy().to_string();
     let request = tonic::Request::new(ReplicateRequest {
         source_star_url: "http://127.0.0.1:50051".to_string(),
-        remote_path: "/payload.dat".to_string(),
-        local_path: "/received/payload.dat".to_string(),
+        remote_path: remote_path.clone(),
+        local_path: local_path_str.clone(),
         transfer_token: token,
         expected_size: test_content.len() as u64,
         expected_checksum: vec![],
@@ -147,8 +150,7 @@ async fn test_triangle_transfer() -> Result<(), Box<dyn std::error::Error>> {
     // ══════════════════════════════════════════════════════════
     // Verify: File Content Matches
     // ══════════════════════════════════════════════════════════
-    let received_file = dest_dir.path().join("received/payload.dat");
-    let received_content = fs::read_to_string(&received_file).await?;
+    let received_content = fs::read_to_string(&local_path).await?;
 
     assert_eq!(received_content, test_content, "File content mismatch!");
 
@@ -180,7 +182,7 @@ async fn test_invalid_token_rejected() -> Result<(), Box<dyn std::error::Error>>
 
     let response = client
         .read_stream(ReadStreamRequest {
-            path: "/secret.txt".to_string(),
+            path: test_file.to_string_lossy().to_string(),
             transfer_token: "invalid-token".to_string(),
         })
         .await;
@@ -198,8 +200,10 @@ async fn test_invalid_token_rejected() -> Result<(), Box<dyn std::error::Error>>
 async fn test_token_wrong_file_rejected() -> Result<(), Box<dyn std::error::Error>> {
     // Setup
     let source_dir = tempdir()?;
-    fs::write(source_dir.path().join("allowed.txt"), "allowed").await?;
-    fs::write(source_dir.path().join("forbidden.txt"), "forbidden").await?;
+    let allowed_path = source_dir.path().join("allowed.txt");
+    let forbidden_path = source_dir.path().join("forbidden.txt");
+    fs::write(&allowed_path, "allowed").await?;
+    fs::write(&forbidden_path, "forbidden").await?;
 
     // Start Source Star
     let source_dir_clone = source_dir.path().to_path_buf();
@@ -213,14 +217,14 @@ async fn test_token_wrong_file_rejected() -> Result<(), Box<dyn std::error::Erro
 
     // Generate token for allowed.txt
     let auth = AuthService::new(TEST_AUTH_SECRET);
-    let token = auth.generate_transfer_token("/allowed.txt")?;
+    let token = auth.generate_transfer_token(allowed_path.to_string_lossy().as_ref())?;
 
     // Try to access forbidden.txt with the token
     let mut client = StarServiceClient::connect("http://127.0.0.1:50054").await?;
 
     let response = client
         .read_stream(ReadStreamRequest {
-            path: "/forbidden.txt".to_string(),
+            path: forbidden_path.to_string_lossy().to_string(),
             transfer_token: token,
         })
         .await;
@@ -253,15 +257,16 @@ async fn test_read_stream_direct() -> Result<(), Box<dyn std::error::Error>> {
     tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
 
     // Generate token
+    let request_path = test_file.to_string_lossy().to_string();
     let auth = AuthService::new(TEST_AUTH_SECRET);
-    let token = auth.generate_transfer_token("/data.txt")?;
+    let token = auth.generate_transfer_token(&request_path)?;
 
     // Connect and stream
     let mut client = StarServiceClient::connect("http://127.0.0.1:50055").await?;
 
     let mut stream = client
         .read_stream(ReadStreamRequest {
-            path: "/data.txt".to_string(),
+            path: request_path,
             transfer_token: token,
         })
         .await?

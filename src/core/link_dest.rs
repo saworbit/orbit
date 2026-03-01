@@ -28,10 +28,7 @@ pub enum LinkDecision {
 
     /// Partial chunk overlap — use reference as delta basis.
     /// Transfer only non-matching chunks. Path is the reference basis file.
-    DeltaBasis {
-        reference: PathBuf,
-        overlap: f64,
-    },
+    DeltaBasis { reference: PathBuf, overlap: f64 },
 
     /// No useful match in any reference directory — full transfer.
     FullTransfer,
@@ -128,7 +125,12 @@ impl LinkDestResolver {
     /// with the exact same size and modification time?
     ///
     /// This is a cheap pre-filter before the more expensive chunk comparison.
-    pub fn quick_match(&self, relative_path: &Path, source_size: u64, source_mtime: std::time::SystemTime) -> Option<PathBuf> {
+    pub fn quick_match(
+        &self,
+        relative_path: &Path,
+        source_size: u64,
+        source_mtime: std::time::SystemTime,
+    ) -> Option<PathBuf> {
         for ref_dir in &self.reference_dirs {
             let ref_file = ref_dir.join(relative_path);
             if let Ok(meta) = std::fs::metadata(&ref_file) {
@@ -162,11 +164,9 @@ mod tests {
 
         let resolver = LinkDestResolver::new(vec![ref_dir]);
 
-        let decision = resolver.resolve(
-            Path::new("file.txt"),
-            &chunks,
-            |_path| Some(ref_chunks.clone()),
-        );
+        let decision = resolver.resolve(Path::new("file.txt"), &chunks, |_path| {
+            Some(ref_chunks.clone())
+        });
 
         assert!(matches!(decision, LinkDecision::Hardlink(_)));
     }
@@ -184,11 +184,9 @@ mod tests {
 
         let resolver = LinkDestResolver::new(vec![ref_dir]);
 
-        let decision = resolver.resolve(
-            Path::new("file.txt"),
-            &source_chunks,
-            |_| Some(ref_chunks.clone()),
-        );
+        let decision = resolver.resolve(Path::new("file.txt"), &source_chunks, |_| {
+            Some(ref_chunks.clone())
+        });
 
         match decision {
             LinkDecision::DeltaBasis { overlap, .. } => {
@@ -210,11 +208,9 @@ mod tests {
 
         let resolver = LinkDestResolver::new(vec![ref_dir]);
 
-        let decision = resolver.resolve(
-            Path::new("file.txt"),
-            &source_chunks,
-            |_| Some(ref_chunks.clone()),
-        );
+        let decision = resolver.resolve(Path::new("file.txt"), &source_chunks, |_| {
+            Some(ref_chunks.clone())
+        });
 
         assert_eq!(decision, LinkDecision::FullTransfer);
     }
@@ -230,11 +226,7 @@ mod tests {
 
         let resolver = LinkDestResolver::new(vec![ref_dir]);
 
-        let decision = resolver.resolve(
-            Path::new("missing.txt"),
-            &source_chunks,
-            |_| None,
-        );
+        let decision = resolver.resolve(Path::new("missing.txt"), &source_chunks, |_| None);
 
         assert_eq!(decision, LinkDecision::FullTransfer);
     }
@@ -334,20 +326,16 @@ mod tests {
 
         // Default threshold (0.3) — 20% is below it
         let resolver = LinkDestResolver::new(vec![ref_dir.clone()]);
-        let decision = resolver.resolve(
-            Path::new("file.txt"),
-            &source_chunks,
-            |_| Some(ref_chunks.clone()),
-        );
+        let decision = resolver.resolve(Path::new("file.txt"), &source_chunks, |_| {
+            Some(ref_chunks.clone())
+        });
         assert_eq!(decision, LinkDecision::FullTransfer);
 
         // Custom threshold at 0.1 — 20% is above it
         let resolver = LinkDestResolver::new(vec![ref_dir]).with_delta_threshold(0.1);
-        let decision = resolver.resolve(
-            Path::new("file.txt"),
-            &source_chunks,
-            |_| Some(ref_chunks.clone()),
-        );
+        let decision = resolver.resolve(Path::new("file.txt"), &source_chunks, |_| {
+            Some(ref_chunks.clone())
+        });
         match decision {
             LinkDecision::DeltaBasis { overlap, .. } => {
                 assert!((overlap - 0.2).abs() < f64::EPSILON);
@@ -369,29 +357,26 @@ mod tests {
         std::fs::write(ref_dir.join("file.txt"), b"data").unwrap();
 
         let resolver = LinkDestResolver::new(vec![ref_dir]);
-        let decision = resolver.resolve(
-            Path::new("file.txt"),
-            &source_chunks,
-            |_| Some(ref_chunks.clone()),
-        );
+        let decision = resolver.resolve(Path::new("file.txt"), &source_chunks, |_| {
+            Some(ref_chunks.clone())
+        });
 
         // All source chunks match (100%) but different count, so DeltaBasis not Hardlink
         match decision {
             LinkDecision::DeltaBasis { overlap, .. } => {
                 assert!((overlap - 1.0).abs() < f64::EPSILON);
             }
-            other => panic!("Expected DeltaBasis (not Hardlink due to different chunk count), got {:?}", other),
+            other => panic!(
+                "Expected DeltaBasis (not Hardlink due to different chunk count), got {:?}",
+                other
+            ),
         }
     }
 
     #[test]
     fn test_empty_reference_dirs() {
         let resolver = LinkDestResolver::new(vec![]);
-        let decision = resolver.resolve(
-            Path::new("file.txt"),
-            &[[0x01; 32]],
-            |_| None,
-        );
+        let decision = resolver.resolve(Path::new("file.txt"), &[[0x01; 32]], |_| None);
         assert_eq!(decision, LinkDecision::FullTransfer);
     }
 }

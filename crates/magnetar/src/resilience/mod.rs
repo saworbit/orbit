@@ -195,7 +195,7 @@
 //!             .put_object()
 //!             .bucket(bucket)
 //!             .key(key)
-//!             .body(data.into())
+//!             .body(data.clone().into())
 //!             .send()
 //!             .await
 //!             .map_err(|e| ResilienceError::Transient(e.to_string()))?;

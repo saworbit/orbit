@@ -300,6 +300,7 @@ Delta transfer failed: I/O error, falling back to full copy
 1. **No savings with delta mode**
    - Files are completely different
    - Block size is too large/small
+   - `--sparse` or `--inplace` is enabled (delta is disabled and Orbit falls back to full copy)
    - Use `--check modtime` first to verify files should be synced
 
 2. **Slower than expected**

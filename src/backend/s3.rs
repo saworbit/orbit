@@ -148,8 +148,7 @@ impl S3Backend {
         // Upload parts in sequence (streaming from reader)
         loop {
             // Read chunk directly into a single buffer to avoid double allocation
-            let mut chunk_data = Vec::with_capacity(chunk_size);
-            chunk_data.resize(chunk_size, 0u8);
+            let mut chunk_data = vec![0u8; chunk_size];
             let mut filled = 0;
 
             // Read up to chunk_size bytes
@@ -643,8 +642,8 @@ impl Backend for S3Backend {
         let key = self.path_to_key(path);
         let size = size_hint.unwrap_or(0);
         let span = tracing::Span::current();
-        span.record("key", &tracing::field::display(&key));
-        span.record("size", &size);
+        span.record("key", tracing::field::display(&key));
+        span.record("size", size);
 
         // Check if exists
         if !options.overwrite && self.client.exists(&key).await.unwrap_or(false) {

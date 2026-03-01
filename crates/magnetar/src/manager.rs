@@ -258,7 +258,7 @@ async fn run_persistence_loop(
             }
 
             // Shutdown signal received
-            _ = &mut shutdown_rx => {
+            _ = &mut shutdown_rx, if !shutdown_requested => {
                 shutdown_requested = true;
                 info!(job_id, pending_updates = buffer.len(), "Disk Guardian shutdown signal received");
             }
@@ -420,6 +420,11 @@ mod tests {
                 done: 0,
                 failed: 0,
             })
+        }
+
+        #[cfg(feature = "analytics")]
+        async fn export_to_parquet(&self, _path: &str) -> anyhow::Result<()> {
+            Ok(())
         }
 
         async fn new_job(

@@ -167,7 +167,7 @@ impl SshConfig {
 pub struct SshBackend {
     #[allow(dead_code)]
     config: SshConfig,
-    session: Arc<Session>,
+    _session: Arc<Session>,
     sftp: Arc<Sftp>,
 }
 
@@ -305,7 +305,7 @@ impl SshBackend {
 
         Ok(Self {
             config,
-            session: Arc::new(session),
+            _session: Arc::new(session),
             sftp: Arc::new(sftp),
         })
     }

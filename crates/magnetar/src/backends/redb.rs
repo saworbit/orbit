@@ -357,11 +357,11 @@ impl JobStore for RedbStore {
         }
 
         let df = DataFrame::new(vec![
-            Series::new("job_id".into(), job_ids),
-            Series::new("chunk".into(), chunks),
-            Series::new("checksum".into(), checksums),
-            Series::new("status".into(), statuses),
-            Series::new("error".into(), errors),
+            Series::new("job_id".into(), job_ids).into(),
+            Series::new("chunk".into(), chunks).into(),
+            Series::new("checksum".into(), checksums).into(),
+            Series::new("status".into(), statuses).into(),
+            Series::new("error".into(), errors).into(),
         ])?;
 
         let mut file = std::fs::File::create(path)?;

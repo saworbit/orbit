@@ -20,7 +20,7 @@ use std::time::SystemTime;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
-#[cfg(feature = "extended-metadata")]
+#[cfg(all(feature = "extended-metadata", unix))]
 use xattr;
 
 /// Comprehensive file metadata structure
@@ -198,7 +198,7 @@ impl FileMetadata {
         }
 
         // Extended attributes (if feature enabled)
-        #[cfg(feature = "extended-metadata")]
+        #[cfg(all(feature = "extended-metadata", unix))]
         {
             file_meta.xattrs = Self::read_xattrs(path).ok();
         }
@@ -207,7 +207,7 @@ impl FileMetadata {
     }
 
     /// Read extended attributes from a file
-    #[cfg(feature = "extended-metadata")]
+    #[cfg(all(feature = "extended-metadata", unix))]
     fn read_xattrs(path: &Path) -> Result<HashMap<String, Vec<u8>>> {
         let mut xattrs = HashMap::new();
 
@@ -329,7 +329,7 @@ impl FileMetadata {
 
     /// Apply extended attributes to destination
     fn apply_xattrs(&self, _dest_path: &Path) -> Result<()> {
-        #[cfg(feature = "extended-metadata")]
+        #[cfg(all(feature = "extended-metadata", unix))]
         if let Some(xattrs) = &self.xattrs {
             let dest_path = _dest_path;
             for (name, value) in xattrs {

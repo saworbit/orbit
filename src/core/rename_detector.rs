@@ -24,7 +24,7 @@
  */
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use orbit_core_starmap::universe::UniverseMap;
 

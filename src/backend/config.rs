@@ -96,6 +96,7 @@ impl GcsConfig {
 
 /// Unified backend configuration
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum BackendConfig {
     /// Local filesystem backend
     Local {
