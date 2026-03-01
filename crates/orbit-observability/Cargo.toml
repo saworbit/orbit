@@ -18,7 +18,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json",
 tracing-opentelemetry = "0.28"
 opentelemetry = "0.27"
 opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry_sdk = { version = "0.31", features = ["rt-tokio"] }
 prometheus = "0.14"
 rand = "0.9"
 tokio = { version = "1", features = ["sync"] }
