@@ -269,7 +269,10 @@ mod tests {
     #[test]
     fn test_default_chain_names() {
         let p = ComposablePrioritizer::default();
-        assert_eq!(p.chain_names(), vec!["semantic", "smallest_first", "oldest_first"]);
+        assert_eq!(
+            p.chain_names(),
+            vec!["semantic", "smallest_first", "oldest_first"]
+        );
     }
 
     #[test]
@@ -345,9 +348,7 @@ mod tests {
 
     #[test]
     fn test_single_element_chain() {
-        let prioritizer = ComposablePrioritizer::new(vec![
-            Box::new(SmallestFirstPrioritizer),
-        ]);
+        let prioritizer = ComposablePrioritizer::new(vec![Box::new(SmallestFirstPrioritizer)]);
 
         let mut items = vec![
             TransferItem::new("big", Priority::Normal, 5000, now()),
@@ -412,9 +413,7 @@ mod tests {
     #[test]
     fn test_retry_count_in_chain() {
         let t = now();
-        let prioritizer = ComposablePrioritizer::new(vec![
-            Box::new(FewestRetriesPrioritizer),
-        ]);
+        let prioritizer = ComposablePrioritizer::new(vec![Box::new(FewestRetriesPrioritizer)]);
 
         let mut fresh = TransferItem::new("fresh", Priority::Normal, 100, t);
         fresh.retry_count = 0;

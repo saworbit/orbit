@@ -102,12 +102,7 @@ pub struct Bulletin {
 
 impl Bulletin {
     /// Create a new bulletin
-    pub fn new(
-        source: &str,
-        category: &str,
-        severity: Severity,
-        message: &str,
-    ) -> Self {
+    pub fn new(source: &str, category: &str, severity: Severity, message: &str) -> Self {
         Self {
             id: 0, // Assigned by BulletinBoard
             timestamp: SystemTime::now(),

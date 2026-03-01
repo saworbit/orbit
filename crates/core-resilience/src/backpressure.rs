@@ -383,10 +383,7 @@ mod tests {
 
         // object_count = max => should NOT accept
         guard.record_enqueue(1, 0);
-        assert!(
-            !guard.can_accept(),
-            "object_count at max should not accept"
-        );
+        assert!(!guard.can_accept(), "object_count at max should not accept");
     }
 
     #[test]
@@ -414,7 +411,10 @@ mod tests {
         );
 
         let state = guard.state();
-        assert_eq!(state.object_count, 4, "object count should be 4 after dequeue");
+        assert_eq!(
+            state.object_count, 4,
+            "object count should be 4 after dequeue"
+        );
         assert_eq!(state.byte_size, 200, "byte size unchanged");
         assert!(state.is_backpressured, "still backpressured due to bytes");
     }
@@ -426,15 +426,27 @@ mod tests {
         // Enqueue zero items and zero bytes — state should remain unchanged
         guard.record_enqueue(0, 0);
         let state = guard.state();
-        assert_eq!(state.object_count, 0, "enqueue(0,0) should be a no-op for count");
-        assert_eq!(state.byte_size, 0, "enqueue(0,0) should be a no-op for bytes");
+        assert_eq!(
+            state.object_count, 0,
+            "enqueue(0,0) should be a no-op for count"
+        );
+        assert_eq!(
+            state.byte_size, 0,
+            "enqueue(0,0) should be a no-op for bytes"
+        );
 
         // Add some items, then dequeue zero — state should remain the same
         guard.record_enqueue(3, 42);
         guard.record_dequeue(0, 0);
         let state = guard.state();
-        assert_eq!(state.object_count, 3, "dequeue(0,0) should be a no-op for count");
-        assert_eq!(state.byte_size, 42, "dequeue(0,0) should be a no-op for bytes");
+        assert_eq!(
+            state.object_count, 3,
+            "dequeue(0,0) should be a no-op for count"
+        );
+        assert_eq!(
+            state.byte_size, 42,
+            "dequeue(0,0) should be a no-op for bytes"
+        );
     }
 
     #[test]

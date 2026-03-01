@@ -152,10 +152,7 @@ impl DeadLetterQueue {
 
     /// Get entries for a specific job
     pub fn entries_for_job(&self, job_id: i64) -> Vec<&DeadLetterEntry> {
-        self.entries
-            .iter()
-            .filter(|e| e.job_id == job_id)
-            .collect()
+        self.entries.iter().filter(|e| e.job_id == job_id).collect()
     }
 
     /// Number of entries currently in the queue
@@ -276,7 +273,10 @@ mod tests {
     fn test_all_failure_reason_display() {
         assert_eq!(FailureReason::PermanentError.to_string(), "permanent error");
         assert_eq!(FailureReason::SourceMissing.to_string(), "source missing");
-        assert_eq!(FailureReason::DestinationError.to_string(), "destination error");
+        assert_eq!(
+            FailureReason::DestinationError.to_string(),
+            "destination error"
+        );
         assert_eq!(FailureReason::DataCorruption.to_string(), "data corruption");
     }
 

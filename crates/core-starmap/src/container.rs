@@ -586,7 +586,9 @@ mod tests {
         let mut writer = ContainerWriter::create_with_max_size(&path, max_size).unwrap();
 
         // Append a chunk that fills the container exactly to max_size
-        let chunk_ref = writer.append_chunk(&vec![0xAB; chunk_size as usize]).unwrap();
+        let chunk_ref = writer
+            .append_chunk(&vec![0xAB; chunk_size as usize])
+            .unwrap();
         writer.flush().unwrap();
 
         assert_eq!(chunk_ref.length, chunk_size as u32);

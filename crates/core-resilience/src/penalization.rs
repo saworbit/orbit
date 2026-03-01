@@ -106,12 +106,15 @@ impl PenaltyBox {
     /// (should be routed to dead-letter queue), `false` if it will be
     /// retried after the penalty period.
     pub fn penalize(&mut self, key: &str, error: &str) -> bool {
-        let record = self.records.entry(key.to_string()).or_insert(PenaltyRecord {
-            penalty_count: 0,
-            retry_after: Instant::now(),
-            last_error: String::new(),
-            current_delay: self.config.initial_delay,
-        });
+        let record = self
+            .records
+            .entry(key.to_string())
+            .or_insert(PenaltyRecord {
+                penalty_count: 0,
+                retry_after: Instant::now(),
+                last_error: String::new(),
+                current_delay: self.config.initial_delay,
+            });
 
         record.penalty_count += 1;
         record.last_error = error.to_string();
@@ -125,7 +128,10 @@ impl PenaltyBox {
         let delay = if record.penalty_count == 1 {
             self.config.initial_delay
         } else {
-            let factor = self.config.backoff_factor.powi(record.penalty_count as i32 - 1);
+            let factor = self
+                .config
+                .backoff_factor
+                .powi(record.penalty_count as i32 - 1);
             let delay_ms = (self.config.initial_delay.as_millis() as f64 * factor) as u64;
             Duration::from_millis(delay_ms).min(self.config.max_delay)
         };
@@ -459,10 +465,16 @@ mod tests {
         let mut box_ = PenaltyBox::new(config);
 
         box_.penalize("chunk-1", "first error");
-        assert_eq!(box_.get_record("chunk-1").unwrap().last_error, "first error");
+        assert_eq!(
+            box_.get_record("chunk-1").unwrap().last_error,
+            "first error"
+        );
 
         box_.penalize("chunk-1", "second error");
-        assert_eq!(box_.get_record("chunk-1").unwrap().last_error, "second error");
+        assert_eq!(
+            box_.get_record("chunk-1").unwrap().last_error,
+            "second error"
+        );
     }
 
     #[test]

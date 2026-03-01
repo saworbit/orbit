@@ -455,8 +455,7 @@ mod tests {
             .with_chunk_hash("hash2")
             .with_source("star-a", "/src/file.bin")
             .with_destination("star-b", "/dst/file.bin");
-        let e3 = ProvenanceEvent::new(ProvenanceType::JobCompleted, "job-1")
-            .with_duration_ms(500);
+        let e3 = ProvenanceEvent::new(ProvenanceType::JobCompleted, "job-1").with_duration_ms(500);
 
         logger.log(&e1).unwrap();
         logger.log(&e2).unwrap();
@@ -598,32 +597,19 @@ mod tests {
     #[test]
     fn test_file_events_are_neither_chunk_nor_job() {
         for t in &[ProvenanceType::FileRenamed, ProvenanceType::FileSkipped] {
-            assert!(
-                !t.is_chunk_event(),
-                "{:?} should not be a chunk event",
-                t
-            );
-            assert!(
-                !t.is_job_event(),
-                "{:?} should not be a job event",
-                t
-            );
+            assert!(!t.is_chunk_event(), "{:?} should not be a chunk event", t);
+            assert!(!t.is_job_event(), "{:?} should not be a job event", t);
         }
     }
 
     #[test]
     fn test_grid_events_are_neither_chunk_nor_job() {
-        for t in &[ProvenanceType::StarRegistered, ProvenanceType::StarDeregistered] {
-            assert!(
-                !t.is_chunk_event(),
-                "{:?} should not be a chunk event",
-                t
-            );
-            assert!(
-                !t.is_job_event(),
-                "{:?} should not be a job event",
-                t
-            );
+        for t in &[
+            ProvenanceType::StarRegistered,
+            ProvenanceType::StarDeregistered,
+        ] {
+            assert!(!t.is_chunk_event(), "{:?} should not be a chunk event", t);
+            assert!(!t.is_job_event(), "{:?} should not be a job event", t);
         }
     }
 
