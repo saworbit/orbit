@@ -8,6 +8,11 @@
 //! - **Circuit Breaker**: Prevents cascading failures by failing fast when a service is unhealthy
 //! - **Connection Pool**: Efficient connection reuse with health checking and lifecycle management
 //! - **Rate Limiter**: Token-based rate limiting to prevent overwhelming external services
+//! - **Backpressure**: Dual-threshold flow control (object count + byte size) per destination
+//! - **Penalization**: Exponential backoff deprioritization of failed transfer items
+//! - **Dead-Letter Queue**: Bounded quarantine for permanently failed items
+//! - **Reference-Counted GC**: WAL-gated garbage collection for shared chunks
+//! - **Health Monitor**: Continuous mid-transfer health checks with typed advisories
 //!
 //! # Key Principles
 //!
@@ -44,8 +49,32 @@
 //! └─────────────┬───────────────────────────┘
 //!               │
 //!               ▼
+//! ┌─────────────────────────────────────────┐
+//! │       Backpressure Guard                 │  ← Flow control
+//! │  (Dual-threshold: count + bytes)        │
+//! └─────────────┬───────────────────────────┘
+//!               │
+//!               ▼
 //!         External Service
 //!        (S3, SMB, Database)
+//!               │
+//!          On failure:
+//!               │
+//!               ▼
+//! ┌─────────────────────────────────────────┐
+//! │       Penalty Box                        │  ← Deprioritize failed items
+//! │  (Exponential backoff, max retries)     │
+//! └─────────────┬───────────────────────────┘
+//!               │ exhausted?
+//!               ▼
+//! ┌─────────────────────────────────────────┐
+//! │       Dead-Letter Queue                  │  ← Permanent failure quarantine
+//! │  (Bounded ring, flush to Magnetar)      │
+//! └─────────────────────────────────────────┘
+//!
+//!  Continuously running:
+//!   Health Monitor → Advisory (disk, throughput, errors)
+//!   Ref-Count GC  → WAL-gated chunk reclamation
 //! ```
 //!
 //! # Usage Example
@@ -112,16 +141,26 @@
 //! # }
 //! ```
 
+pub mod backpressure;
 pub mod circuit_breaker;
 pub mod connection_pool;
+pub mod dead_letter;
 pub mod error;
+pub mod health_monitor;
+pub mod penalization;
 pub mod rate_limiter;
+pub mod ref_count;
 
 // Re-export main types for convenience
+pub use backpressure::{BackpressureConfig, BackpressureGuard, BackpressureRegistry};
 pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitState};
 pub use connection_pool::{ConnectionFactory, ConnectionPool, PoolConfig, PoolStats};
+pub use dead_letter::{DeadLetterEntry, DeadLetterQueue, FailureReason};
 pub use error::ResilienceError;
+pub use health_monitor::{Advisory, HealthConfig, HealthMonitor, HealthSample};
+pub use penalization::{PenaltyBox, PenaltyConfig};
 pub use rate_limiter::RateLimiter;
+pub use ref_count::{GarbageCollector, RefCountMap};
 
 #[cfg(feature = "governor-impl")]
 pub use rate_limiter::governor_impl::GovernorRateLimiter;
@@ -133,8 +172,13 @@ pub use rate_limiter::governor_impl::GovernorRateLimiter;
 /// use orbit_core_resilience::prelude::*;
 /// ```
 pub mod prelude {
+    pub use super::backpressure::{BackpressureConfig, BackpressureGuard, BackpressureRegistry};
     pub use super::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
     pub use super::connection_pool::{ConnectionFactory, ConnectionPool, PoolConfig};
+    pub use super::dead_letter::{DeadLetterEntry, DeadLetterQueue, FailureReason};
     pub use super::error::ResilienceError;
+    pub use super::health_monitor::{Advisory, HealthConfig, HealthMonitor, HealthSample};
+    pub use super::penalization::{PenaltyBox, PenaltyConfig};
     pub use super::rate_limiter::RateLimiter;
+    pub use super::ref_count::{GarbageCollector, RefCountMap};
 }

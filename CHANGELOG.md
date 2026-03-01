@@ -44,6 +44,18 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+#### Data Flow Patterns (10 modules across 6 crates)
+- **Penalization** (`core-resilience/penalization.rs`): Exponential backoff deprioritization of failed transfer items. Configurable initial/max delay, backoff factor, and max penalties before dead-lettering. Items are cooperatively skipped by the scheduler while penalized.
+- **Dead-Letter Queue** (`core-resilience/dead_letter.rs`): Bounded in-memory queue for permanently failed items. 6 typed failure reasons (RetriesExhausted, PermanentError, ChecksumMismatch, SourceMissing, DestinationError, DataCorruption). Oldest-first eviction on overflow; flushable to Magnetar for persistence.
+- **Backpressure** (`core-resilience/backpressure.rs`): Dual-threshold flow control with independent object count and byte size limits per destination. Lock-free via `AtomicU64`. `BackpressureRegistry` manages guards for multiple Stars.
+- **Reference-Counted GC** (`core-resilience/ref_count.rs`): `RefCountMap` tracks chunk reference counts across jobs. `GarbageCollector` enforces WAL-sync gating — chunks only reclaimable after Magnetar WAL commit, preventing crash-induced dangling references.
+- **Health Monitor** (`core-resilience/health_monitor.rs`): Continuous mid-transfer health checks producing typed advisories (DiskCritical, DiskWarning, DiskExhaustionPredicted, ThroughputLow, ErrorRateHigh, Healthy). Linear regression for disk fill-rate prediction.
+- **Container Packing** (`core-starmap/container.rs`): Chunk packing into `.orbitpak` container files to reduce inode/handle pressure. `ContainerPool` auto-rotates files at configurable max size (default 4 GiB). Binary format with magic bytes + version header.
+- **Typed Provenance** (`core-audit/provenance.rs`): 20-type event taxonomy (ChunkCreated, ChunkDeduplicated, ChunkTransferred, ChunkVerified, ChunkHealed, ChunkPenalized, ChunkDeadLettered, ChunkPacked, FileRenamed, FileSkipped, FileStarted, FileCompleted, JobCreated, JobResumed, JobCompleted, JobFailed, StarRegistered, StarScheduled, StarDraining, StarDeregistered). `ProvenanceLogger` writes JSON Lines; builder pattern for event construction.
+- **Bulletin Board** (`orbit-connect/bulletin.rs`): Centralized error/warning aggregation from all Stars into a bounded ring buffer. `SharedBulletinBoard` provides thread-safe concurrent access via `Arc<RwLock<>>`. Filterable by severity, source, category, and job ID.
+- **Composable Prioritizers** (`core-semantic/prioritizer.rs`): Chainable sort criteria via `Prioritizer` trait. 6 built-in strategies: SemanticPrioritizer, SmallestFirstPrioritizer, LargestFirstPrioritizer, OldestFirstPrioritizer, NewestFirstPrioritizer, FewestRetriesPrioritizer. Default chain: semantic → smallest → oldest.
+- **Star Lifecycle Hooks** (`orbit-star/lifecycle.rs`): Formalized state machine (Registered → Scheduled → Draining → Shutdown). Prevents orphan jobs by tracking active tasks during drain. Invalid transitions return `None`. Full event history with timestamps for audit.
+
 #### Advanced Transfer Features (rsync-inspired, Orbit-enhanced)
 - **Sparse file handling** (`core/sparse.rs`): `--sparse {auto|always|never}` — hole-aware writes for zero-heavy files
 - **Hardlink preservation** (`core/hardlink.rs`): `-H` — inode tracking on Unix/Windows, recreates links at destination

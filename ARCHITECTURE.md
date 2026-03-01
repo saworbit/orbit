@@ -46,7 +46,8 @@ Orbit is a Rust-based file transfer system that scales from a simple CLI tool to
 │  Semantic Registry                │  Universe V3 Index                          │
 │  - File type classification       │  - Global deduplication (redb)              │
 │  - Priority assignment            │  - O(log N) inserts                         │
-│  - Sync strategy selection        │  - O(1) memory via streaming                │
+│  - Composable prioritizers        │  - O(1) memory via streaming                │
+│  - Sync strategy selection        │  - Container packing (.orbitpak)            │
 │                                   │                                             │
 │  CDC Engine (Gear Hash)           │  Guidance System                            │
 │  - Variable-size chunks           │  - Config validation                        │
@@ -63,9 +64,10 @@ Orbit is a Rust-based file transfer system that scales from a simple CLI tool to
 │                                   │  - mTLS encryption                          │
 │  Backend Registry                 │                                             │
 │  - Local filesystem               │  Resilience Primitives                      │
-│  - S3 / Azure / GCS               │  - Circuit breaker                          │
-│  - SSH/SFTP                       │  - Connection pooling                       │
-│  - SMB2/3 (native)                │  - Rate limiting                            │
+│  - S3 / Azure / GCS               │  - Circuit breaker, connection pool         │
+│  - SSH/SFTP                       │  - Rate limiting, backpressure              │
+│  - SMB2/3 (native)                │  - Penalization, dead-letter queue          │
+│                                   │  - Health monitor, ref-counted GC           │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                       │
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -95,16 +97,16 @@ Orbit is organized as a Rust workspace with 16 member crates:
 |-------|---------|
 | **orbit** | Main CLI binary and library - file copy, sync, verify operations |
 | **orbit-core-manifest** | Flight plan and cargo manifest data structures |
-| **orbit-core-audit** | Audit logging, structured JSON telemetry |
-| **orbit-core-starmap** | Binary indexing engine (Universe V1/V2/V3) |
-| **orbit-core-resilience** | Fault tolerance: circuit breaker, rate limiter, connection pool |
+| **orbit-core-audit** | Audit logging, structured JSON telemetry, typed provenance events |
+| **orbit-core-starmap** | Binary indexing engine (Universe V1/V2/V3), container packing |
+| **orbit-core-resilience** | Fault tolerance: circuit breaker, rate limiter, connection pool, backpressure, penalization, dead-letter queue, health monitor, ref-counted GC |
 
 ### V2 Content-Aware System
 
 | Crate | Purpose |
 |-------|---------|
 | **orbit-core-cdc** | Content-Defined Chunking with Gear Hash rolling hash |
-| **orbit-core-semantic** | Intent-based replication: file priority and sync strategy analysis |
+| **orbit-core-semantic** | Intent-based replication: file priority, sync strategy, composable prioritizers |
 | **orbit-core-interface** | OrbitSystem trait - universal I/O abstraction for local/remote |
 
 ### Grid Architecture (Distributed)
@@ -112,8 +114,8 @@ Orbit is organized as a Rust workspace with 16 member crates:
 | Crate | Purpose |
 |-------|---------|
 | **orbit-proto** | gRPC protocol definitions (tonic/prost) |
-| **orbit-star** | Stateless remote agent for distributed operations |
-| **orbit-connect** | Client-side gRPC connectivity (Nucleus → Star) |
+| **orbit-star** | Stateless remote agent with formalized lifecycle hooks |
+| **orbit-connect** | Client-side gRPC connectivity (Nucleus → Star), bulletin board |
 | **orbit-sentinel** | Autonomous resilience engine (OODA loop for chunk healing) |
 
 ### Control Plane & Observability
@@ -458,6 +460,21 @@ Result: Application reads 52MB into a 1TB file,
 | **Filter System** | ✅ Stable | Glob/regex include/exclude |
 | **Metadata Preservation** | ✅ Stable | Permissions, timestamps, xattrs |
 
+### Data Flow Patterns
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Penalization** | 🔴 Alpha | Exponential backoff deprioritization for failed items |
+| **Dead-Letter Queue** | 🔴 Alpha | Bounded quarantine for permanently failed items |
+| **Backpressure** | 🔴 Alpha | Dual-threshold flow control (object count + byte size) |
+| **Ref-Counted GC** | 🔴 Alpha | WAL-gated garbage collection for deduplicated chunks |
+| **Health Monitor** | 🔴 Alpha | Continuous mid-transfer disk/throughput/error advisories |
+| **Container Packing** | 🔴 Alpha | Chunk packing into .orbitpak files, pool rotation |
+| **Typed Provenance** | 🔴 Alpha | Structured event taxonomy (20 event types) |
+| **Bulletin Board** | 🔴 Alpha | Centralized error/warning aggregation from all Stars |
+| **Composable Prioritizers** | 🔴 Alpha | Chainable sort criteria (semantic, size, age, retry) |
+| **Star Lifecycle Hooks** | 🔴 Alpha | State machine: registered → scheduled → draining → shutdown |
+
 ---
 
 ## Deployment Modes
@@ -674,6 +691,7 @@ Event N+1 (prev_hmac: def456, HMAC: ...)
 - ✅ CDC + Semantic + Universe V3
 - ✅ Magnetar state machine
 - ✅ GhostFS on-demand filesystem
+- ✅ Data flow patterns (backpressure, penalization, dead-letter, health monitor, provenance, bulletin board, container packing, lifecycle hooks, composable prioritizers, ref-counted GC)
 - 🔄 Grid architecture (Stars, Nucleus)
 
 ### Near-term (v0.7.x)
@@ -733,6 +751,7 @@ cargo build --release --features full
 - [V2 Architecture](docs/architecture/ORBIT_V2_ARCHITECTURE.md) - CDC + Semantic
 - [Grid Specification](docs/specs/ORBIT_GRID_SPEC.md) - Distributed architecture
 - [GhostFS](orbit-ghost/ARCHITECTURE.md) - On-demand filesystem
+- [Data Flow Patterns](docs/architecture/DATA_FLOW_PATTERNS.md) - Backpressure, penalization, dead-letter, lifecycle hooks
 
 ---
 

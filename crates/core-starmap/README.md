@@ -31,6 +31,34 @@
 - **ACID Guarantees**: Full transaction support via redb
 - **High Cardinality**: Millions of duplicates per chunk supported
 
+### Container Packing 🆕
+
+Instead of storing each CDC chunk as a separate file (which creates inode and file handle pressure at scale), chunks are appended to `.orbitpak` container files:
+
+- **Sequential Append**: Chunks written contiguously; Universe index stores `(container_id, offset, length)` tuples
+- **Pool Rotation**: `ContainerPool` auto-rotates at configurable max size (default 4 GiB)
+- **Verified Format**: Magic bytes (`ORBITPAK\0`) + version header for integrity validation
+- **Append-Reopen**: Existing containers can be reopened for appending more chunks
+
+```
+┌─────────────────────────────────────┐
+│       .orbitpak Container           │
+├─────────────────────────────────────┤
+│ Magic: "ORBITPAK\0" (9 bytes)      │
+│ Version: u32 (4 bytes)             │
+│ Reserved (3 bytes)                  │
+├─────────────────────────────────────┤
+│ Chunk A data (raw bytes)            │
+│ Chunk B data (raw bytes)            │
+│ Chunk C data (raw bytes)            │
+│ ...                                 │
+└─────────────────────────────────────┘
+```
+
+**Key types**: `ContainerWriter`, `ContainerReader`, `ContainerPool`, `PackedChunkRef`
+
+**Status**: 🔴 Alpha — 16 tests passing
+
 ## Quick Start
 
 ### Star Map (V1)
@@ -173,6 +201,7 @@ See the complete [Universe V3 Migration Guide](../../docs/guides/UNIVERSE_V3_MIG
 - **reader**: Memory-mapped Star Map reader
 - **universe**: V2 in-memory global deduplication index
 - **universe_v3**: V3 persistent high-cardinality deduplication index ⭐
+- **container**: Chunk packing into `.orbitpak` container files 🆕
 - **migrate**: V1 → V2 migration utilities
 - **migrate_v3**: V2 → V3 migration utilities
 

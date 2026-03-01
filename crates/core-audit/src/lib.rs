@@ -51,11 +51,13 @@
 
 pub mod beacon;
 pub mod error;
+pub mod provenance;
 pub mod telemetry;
 
 // Re-export main types
 pub use beacon::{Beacon, BeaconBuilder};
 pub use error::{Error, Result};
+pub use provenance::{ProvenanceEvent, ProvenanceType};
 pub use telemetry::{EventType, TelemetryEvent, TelemetryLogger};
 
 #[cfg(test)]

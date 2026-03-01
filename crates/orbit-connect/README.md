@@ -16,6 +16,32 @@ Client-side gRPC connectivity for the Orbit Nucleus (Hub) to orchestrate operati
 - **Session Management**: Automatic handshake and session ID management
 - **Liskov Substitution**: Drop-in replacement for `LocalSystem` in magnetar
 
+### Bulletin Board 🆕
+
+Centralized error/warning aggregation from all Stars into a single feed:
+
+- **Bounded Ring Buffer**: In-memory `VecDeque` with oldest-first eviction at capacity
+- **Severity Levels**: `Info`, `Warning`, `Error` with ordered comparison for threshold filtering
+- **Multi-dimensional Filtering**: By severity, source Star, category, job ID, or time range
+- **Thread-safe**: `SharedBulletinBoard` wraps the board in `Arc<RwLock<>>` for concurrent access
+- **REST-ready**: Designed to serve `GET /api/bulletins` from the Control Plane
+- **Auto-incrementing IDs**: Each bulletin gets a unique monotonic ID for deduplication
+
+```rust
+use orbit_connect::bulletin::{BulletinBoard, Severity};
+
+let mut board = BulletinBoard::new(1000); // max 1000 entries
+board.post(Severity::Warning, "star-1", "transfer", Some(42), "Disk 85% full");
+board.post(Severity::Error, "star-2", "network", Some(42), "Connection refused");
+
+// Filter by severity
+let errors = board.by_severity(Severity::Error);
+```
+
+**Key types**: `BulletinBoard`, `SharedBulletinBoard`, `Bulletin`, `Severity`
+
+**Status**: 🔴 Alpha — 21 tests passing
+
 ## Architecture
 
 ```

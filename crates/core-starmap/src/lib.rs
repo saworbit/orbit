@@ -59,6 +59,7 @@ use serde::{Deserialize, Serialize};
 pub mod bitmap;
 pub mod bloom;
 pub mod builder;
+pub mod container; // Chunk packing into container files (.orbitpak)
 pub mod error;
 pub mod migrate; // V2: Migration utilities (V1 → V2)
 pub mod migrate_v3; // V3: Migration utilities (V2 → V3)

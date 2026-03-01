@@ -11,6 +11,39 @@ The Star agent is a lightweight, stateless gRPC server that exposes local filesy
 - **Remote Hashing**: Offload CPU-intensive BLAKE3 hashing to edge nodes
 - **Session-based Authentication**: Token-based handshake with session management
 
+### Lifecycle Hooks 🆕
+
+Formalized state machine for Star agent lifecycle transitions, preventing orphan jobs when a Star disappears mid-transfer:
+
+```
+         register()
+              │
+     ┌────────▼────────┐
+     │   Registered     │  Star is known but not receiving work
+     └────────┬─────────┘
+              │ schedule()
+     ┌────────▼────────┐
+     │   Scheduled      │  Actively receiving and processing work
+     └────────┬─────────┘
+              │ drain()
+     ┌────────▼────────┐
+     │   Draining       │  Finishing current work, no new assignments
+     └────────┬─────────┘
+              │ shutdown()
+     ┌────────▼────────┐
+     │   Shutdown        │  Clean exit
+     └──────────────────┘
+```
+
+- **Graceful Drain**: Tracks active tasks; `is_drained()` only returns true when task count reaches zero
+- **Force Shutdown**: Can skip directly from any state to Shutdown for emergencies
+- **Event History**: All transitions recorded with timestamps for audit and diagnostics
+- **Invalid Transition Safety**: Returns `None` instead of panicking on illegal state changes
+
+**Key types**: `StarLifecycle`, `LifecycleState`, `LifecycleEvent`
+
+**Status**: 🔴 Alpha — 20 tests passing
+
 ## Installation
 
 ### Prerequisites

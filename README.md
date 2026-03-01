@@ -61,6 +61,7 @@ See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-featu
   - [Inclusion/Exclusion Filters](#-inclusionexclusion-filters-selective-transfers)
   - [Protocol Support](#-protocol-support)
   - [Audit & Telemetry](#-audit-and-telemetry)
+  - [Data Flow Patterns](#-data-flow-patterns)
 - [Quick Start](#-quick-start)
 - [Web GUI](#️-web-gui-new-in-v050)
 - [Performance Benchmarks](#-performance-benchmarks)
@@ -144,6 +145,16 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Rename Detection** | 🔴 Alpha | Content-aware via Star Map chunk overlap |
 | **Link-Dest++ (Incremental Backup)** | 🔴 Alpha | Chunk-level reference hardlinking, `--link-dest` |
 | **Transfer Journal (Batch Mode)** | 🔴 Alpha | Content-addressed operation journal, `--write-batch` / `--read-batch` |
+| **Backpressure** | 🔴 Alpha | Dual-threshold flow control (object count + byte size) |
+| **Penalization** | 🔴 Alpha | Exponential backoff deprioritization of failed items |
+| **Dead-Letter Queue** | 🔴 Alpha | Bounded quarantine for permanently failed items |
+| **Health Monitor** | 🔴 Alpha | Continuous mid-transfer health checks with advisories |
+| **Ref-Counted GC** | 🔴 Alpha | WAL-gated garbage collection for shared chunks |
+| **Container Packing** | 🔴 Alpha | Chunk packing into `.orbitpak` files to reduce inode pressure |
+| **Typed Provenance** | 🔴 Alpha | Structured event taxonomy for audit lineage queries |
+| **Bulletin Board** | 🔴 Alpha | Centralized error/warning aggregation across Grid nodes |
+| **Composable Prioritizers** | 🔴 Alpha | Chainable sort criteria for transfer scheduling |
+| **Star Lifecycle Hooks** | 🔴 Alpha | Formalized state machine for Star agent lifecycle |
 
 **Legend:**
 - 🟢 **Stable**: Production-ready with extensive testing
@@ -510,6 +521,58 @@ breaker.execute(|| {
 - ✅ S3 and SMB integration examples
 
 📖 **Full Documentation:** See [`crates/magnetar/README.md`](crates/magnetar/README.md) and [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md)
+
+---
+
+### 🔄 Data Flow Patterns
+
+**10 production-grade modules** for reliable, observable data transfer pipelines — implemented across 6 crates with 180+ tests.
+
+```text
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│  Ingest      │────>│  Transfer    │────>│  Delivery   │
+│              │     │  Pipeline    │     │             │
+│ Prioritizer  │     │ Backpressure │     │ Container   │
+│ Provenance   │     │ Penalization │     │ Packing     │
+│ Lifecycle    │     │ Health Mon.  │     │ Bulletin    │
+└─────────────┘     │ Dead-Letter  │     │ Board       │
+                    │ Ref-Count GC │     └─────────────┘
+                    └──────────────┘
+```
+
+**Flow Control & Resilience** (`core-resilience`):
+- **Backpressure** — Dual-threshold guards (object count + byte size) with apply/release semantics
+- **Penalization** — Exponential backoff deprioritization with configurable cap and decay
+- **Dead-Letter Queue** — Bounded quarantine with reason tracking, retry, and drain support
+- **Health Monitor** — Continuous mid-transfer health checks emitting typed advisories
+- **Ref-Counted GC** — WAL-gated garbage collection preventing premature deletion of shared chunks
+
+**Scheduling & Intelligence** (`core-semantic`):
+- **Composable Prioritizers** — Chainable sort criteria (size, age, priority, name) with `then()` composition
+
+**Observability & Lifecycle**:
+- **Typed Provenance** (`core-audit`) — Structured event taxonomy for lineage queries
+- **Bulletin Board** (`orbit-connect`) — Lock-free ring buffer for error/warning aggregation across Grid nodes
+- **Star Lifecycle Hooks** (`orbit-star`) — Formalized state machine (Registered → Scheduled → Draining → Shutdown)
+- **Container Packing** (`core-starmap`) — Chunk packing into `.orbitpak` files to reduce inode pressure
+
+```rust
+use orbit_core_resilience::{Backpressure, BackpressureConfig};
+
+// Apply backpressure before sending chunks
+let bp = Backpressure::new(BackpressureConfig {
+    max_objects: 1000,
+    max_bytes: 64 * 1024 * 1024, // 64 MB
+    ..Default::default()
+});
+
+if bp.try_acquire(1, chunk_size).is_ok() {
+    send_chunk(chunk).await?;
+    bp.release(1, chunk_size);
+}
+```
+
+📖 **Full Documentation:** See [`docs/architecture/DATA_FLOW_PATTERNS.md`](docs/architecture/DATA_FLOW_PATTERNS.md)
 
 ---
 
@@ -1851,17 +1914,20 @@ Orbit is built from clean, reusable crates:
 |-------|---------|--------|
 | 🔌 `orbit-core-interface` | OrbitSystem I/O abstraction (Phase 1) | 🟢 Stable |
 | 🧩 `core-manifest` | Manifest parsing and job orchestration | 🟡 Beta |
-| 🌌 `core-starmap` | Job planner and dependency graph | 🟡 Beta |
+| 🌌 `core-starmap` | Job planner, dependency graph, container packing | 🟡 Beta |
 | 🌌 `core-starmap::universe` | Global deduplication index (V2) | 🔴 Alpha |
 | 🌌 `core-starmap::migrate` | V1→V2 migration utilities | 🔴 Alpha |
 | 🧬 `core-cdc` | FastCDC content-defined chunking (V2) | 🔴 Alpha |
-| 🧠 `core-semantic` | Intent-based replication (V2) | 🔴 Alpha |
-| 📊 `core-audit` | Structured logging and telemetry | 🟡 Beta |
+| 🧠 `core-semantic` | Intent-based replication, composable prioritizers (V2) | 🔴 Alpha |
+| 📊 `core-audit` | Structured logging, telemetry, typed provenance | 🟡 Beta |
 | ⚡ `core-zero-copy` | OS-level optimized I/O | 🟢 Stable |
 | 🗜️ `core-compress` | Compression and decompression | 🟢 Stable |
 | 🛡️ `disk-guardian` | Pre-flight space & integrity checks | 🟡 Beta |
 | 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | 🟡 Beta |
 | 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | 🟡 Beta |
+| 🛡️ `core-resilience` | Backpressure, penalization, dead-letter, health monitor, ref-counted GC | 🔴 Alpha |
+| ⭐ `orbit-star` | Star agent with formalized lifecycle hooks | 🔴 Alpha |
+| 📡 `orbit-connect` | Grid connectivity with bulletin board | 🔴 Alpha |
 | 🛡️ `orbit-sentinel` | Autonomous resilience engine (Phase 5 OODA loop) | 🔴 Alpha |
 | 🌐 `protocols` | Network protocol implementations | 🟡 S3/SSH Beta, 🔴 SMB Alpha |
 | 🌐 `orbit-server` | Headless Control Plane API (v2.2.0-alpha) | 🔴 Alpha |
@@ -2549,6 +2615,7 @@ cargo clippy
 - **Disk Guardian:** [`docs/architecture/DISK_GUARDIAN.md`](docs/architecture/DISK_GUARDIAN.md)
 - **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
 - **Resilience Module:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
+- **Data Flow Patterns:** [`docs/architecture/DATA_FLOW_PATTERNS.md`](docs/architecture/DATA_FLOW_PATTERNS.md) ⭐ **NEW!**
 - **Delta Detection:** [`docs/guides/DELTA_DETECTION_GUIDE.md`](docs/guides/DELTA_DETECTION_GUIDE.md) and [`docs/guides/DELTA_QUICKSTART.md`](docs/guides/DELTA_QUICKSTART.md) ⭐ **NEW!**
 - **Filter System:** [`docs/guides/FILTER_SYSTEM.md`](docs/guides/FILTER_SYSTEM.md) ⭐ **NEW!**
 - **Progress & Concurrency:** [`docs/architecture/PROGRESS_AND_CONCURRENCY.md`](docs/architecture/PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
@@ -2561,6 +2628,7 @@ cargo clippy
 - **Zero-Copy Guide:** [`docs/ZERO_COPY.md`](docs/ZERO_COPY.md)
 - **Magnetar Quick Start:** [`crates/magnetar/QUICKSTART.md`](crates/magnetar/QUICKSTART.md) ⭐ **NEW!**
 - **Resilience Patterns:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
+- **Data Flow Patterns:** [`docs/architecture/DATA_FLOW_PATTERNS.md`](docs/architecture/DATA_FLOW_PATTERNS.md) ⭐ **NEW!**
 - **API Reference:** Run `cargo doc --open`
 
 ### Examples

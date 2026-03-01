@@ -25,10 +25,12 @@
 //! }
 //! ```
 
+pub mod bulletin;
 pub mod error;
 pub mod manager;
 pub mod system;
 
+pub use bulletin::{Bulletin, BulletinBoard, Severity, SharedBulletinBoard};
 pub use error::ConnectError;
 pub use manager::{StarManager, StarRecord, StarStatus};
 pub use system::RemoteSystem;

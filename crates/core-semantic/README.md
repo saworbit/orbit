@@ -36,6 +36,38 @@ Files are analyzed by a chain of adapters, each identifying specific file types:
    - Everything else
    - Strategy: `ContentDefined`
 
+### Composable Prioritizers 🆕
+
+While the `SemanticRegistry` classifies files into priority tiers, the composable prioritizer system provides fine-grained sort control within and across those tiers:
+
+- **`Prioritizer` trait**: `compare(a, b) -> Ordering` with `name()` for introspection — requires `Send + Sync`
+- **`ComposablePrioritizer`**: Chains multiple criteria; first non-Equal result wins
+- **6 Built-in Strategies**:
+  - `SemanticPrioritizer` — Critical files before Low priority
+  - `SmallestFirstPrioritizer` — Small files transfer faster, unblock dependencies
+  - `LargestFirstPrioritizer` — Maximize throughput on high-bandwidth links
+  - `OldestFirstPrioritizer` — FIFO fairness tiebreaker
+  - `NewestFirstPrioritizer` — Freshest data first
+  - `FewestRetriesPrioritizer` — Deprioritize items that keep failing
+- **Default chain**: Semantic priority → Smallest first → Oldest first
+
+```rust
+use orbit_core_semantic::prioritizer::*;
+
+let prioritizer = ComposablePrioritizer::default_chain();
+
+// Or build a custom chain
+let custom = ComposablePrioritizer::new(vec![
+    Box::new(SemanticPrioritizer),
+    Box::new(LargestFirstPrioritizer),   // High-throughput link
+    Box::new(FewestRetriesPrioritizer),  // Avoid repeatedly failing items
+]);
+
+items.sort_by(|a, b| custom.compare(a, b));
+```
+
+**Status**: 🔴 Alpha — 17 tests passing
+
 ## Usage
 
 ```rust

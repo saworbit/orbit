@@ -4,5 +4,6 @@
 //! local filesystem and CPU resources to the Orbit Grid.
 
 pub mod auth;
+pub mod lifecycle;
 pub mod security;
 pub mod server;

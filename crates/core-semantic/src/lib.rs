@@ -37,6 +37,8 @@
 //! assert_eq!(intent.priority, Priority::Low);
 //! ```
 
+pub mod prioritizer;
+
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use thiserror::Error;
