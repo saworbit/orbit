@@ -28,7 +28,7 @@ orbit-star = { path = "../orbit-star", optional = true }
 orbit-connect = { path = "../orbit-connect", optional = true }
 
 # API & Web Server
-axum = { version = "0.7", features = ["ws", "multipart", "macros"] }
+axum = { version = "0.8", features = ["ws", "multipart", "macros"] }
 axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip"] }
