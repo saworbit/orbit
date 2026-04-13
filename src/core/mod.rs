@@ -2,41 +2,33 @@
  * Core file copy operations
  */
 
-// Submodules - organized by responsibility
+// Submodules
 pub mod bandwidth;
-pub mod batch; // Transfer journal / batch mode for recording and replaying operations
+pub mod batch;
 pub mod buffered;
 pub mod checksum;
 pub mod concurrency;
 pub mod delta;
 pub mod directory;
 pub mod disk_guardian;
-pub mod dry_run; // Dry-run simulation mode
-pub mod enhanced_progress; // Multi-transfer progress bars with indicatif
-pub mod external_sort; // External merge-sort for large file lists
-pub mod file_metadata; // Comprehensive metadata preservation
-pub mod filter; // Include/exclude filter patterns
-pub mod guidance; // Guidance system ("Flight Computer")
-pub mod hardlink; // Hardlink detection and preservation
-pub mod inplace; // In-place file updates with safety levels
-pub mod link_dest; // Reference directory hardlinking for incremental backups
+pub mod dry_run;
+pub mod file_metadata;
+pub mod filter;
+pub mod guidance;
+pub mod hardlink;
+pub mod inplace;
+pub mod link_dest;
 pub mod metadata;
-pub mod metadata_ops; // Metadata preservation orchestration
-#[cfg(feature = "backend-abstraction")]
-pub mod neutrino; // Neutrino Fast Lane for small file optimization
-pub mod probe; // Phase 4: Active system probing for environment detection
+pub mod metadata_ops;
+pub mod probe;
 pub mod progress;
-pub mod rename_detector; // Content-aware rename/move detection via Star Map
-pub mod resilient_sync; // Crash-proof sync with Magnetar integration
 pub mod resume;
 pub mod retry;
-pub mod sparse; // Sparse file detection and hole-aware writing
-pub mod terminology; // Phase 3: User-facing terminology abstraction
+pub mod sparse;
 pub mod transfer;
-pub mod transform; // Metadata and path transformation
-pub mod v2_integration; // V2 Architecture integration (CDC + Semantic + Universe Map)
+pub mod transform;
 pub mod validation;
-pub mod zero_copy; // Concurrency control with semaphore
+pub mod zero_copy;
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};

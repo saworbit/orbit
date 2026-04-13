@@ -12,7 +12,7 @@ The Orbit demo harness includes comprehensive logging to help diagnose issues wh
 |----------|----------|---------|--------------|
 | **Demo Run Log** | `demo-logs/demo-run-YYYYMMDD-HHMMSS.log` | Complete event timeline | Every demo run |
 | **Error Log** | `demo-logs/demo-errors-YYYYMMDD-HHMMSS.log` | Errors only | When errors occur |
-| **Server Log** | `orbit-server.log` | Rust backend output | When server starts |
+| **Server Log** | `orbit.log` | Rust backend output | When server starts |
 | **Dashboard Log** | `orbit-dashboard.log` | React frontend output | When dashboard starts |
 | **Metrics** | `e2e-metrics.json` | Performance metrics | CI mode only |
 
@@ -24,7 +24,7 @@ orbit/
 │   ├── demo-run-20251217-103045.log
 │   ├── demo-errors-20251217-103045.log
 │   └── ... (one per run)
-├── orbit-server.log              # Backend logs
+├── orbit.log              # Backend logs
 ├── orbit-dashboard.log           # Frontend logs
 └── e2e-metrics.json              # Metrics (CI mode)
 ```
@@ -120,7 +120,7 @@ Use the built-in log analyzer:
 Analyzing logs...
   Demo log:      demo-logs/demo-run-20251217-103045.log
   Error log:     demo-logs/demo-errors-20251217-103045.log
-  Server log:    orbit-server.log
+  Server log:    orbit.log
   Dashboard log: orbit-dashboard.log
 
 ═══════════════════════════════════════════
@@ -147,7 +147,7 @@ DIAGNOSTIC CHECKS
 ✓ No NPM errors
 ✗ API health check timeout
   Likely causes:
-    1. Server failed to start (check orbit-server.log)
+    1. Server failed to start (check orbit.log)
     2. Port 8080 blocked by firewall
     3. Database initialization failed
 ```
@@ -169,7 +169,7 @@ lsof -ti:8080  # Unix/Linux/macOS
 netstat -ano | findstr :8080  # Windows
 
 # View error in logs
-grep "Address already in use" orbit-server.log
+grep "Address already in use" orbit.log
 ```
 
 **Solution:**
@@ -186,14 +186,14 @@ export API_URL=http://localhost:9080
 
 **Symptoms:**
 ```
-[ERROR] Failed to compile orbit-server
+[ERROR] Failed to compile orbit
 error[E0425]: cannot find value...
 ```
 
 **Diagnosis:**
 ```bash
 # View compilation errors
-cat orbit-server.log | grep "error\["
+cat orbit.log | grep "error\["
 
 # Check Rust version
 cargo --version
@@ -206,7 +206,7 @@ rustup update stable
 
 # Clean and rebuild
 cargo clean
-cd crates/orbit-web && cargo build --bin orbit-server
+cargo build --release
 ```
 
 ### Issue 3: NPM Install Failure
@@ -275,10 +275,10 @@ export ORBIT_JWT_SECRET="demo-secret-key-must-be-32-chars-long"
 **Diagnosis:**
 ```bash
 # Check server log for panic
-tail -50 orbit-server.log
+tail -50 orbit.log
 
 # Look for specific errors
-grep "panic\|thread.*panicked" orbit-server.log
+grep "panic\|thread.*panicked" orbit.log
 ```
 
 **Solution:**
@@ -297,10 +297,10 @@ export RUST_BACKTRACE=full
 
 ```bash
 # Unix/Linux/macOS
-tail -f orbit-server.log
+tail -f orbit.log
 
 # Windows (PowerShell)
-Get-Content orbit-server.log -Wait
+Get-Content orbit.log -Wait
 ```
 
 ### Follow Dashboard Log
@@ -319,7 +319,7 @@ Get-Content orbit-dashboard.log -Wait
 # Unix/Linux/macOS (requires multitail or tmux)
 tmux new-session \; \
   split-window -h \; \
-  send-keys 'tail -f orbit-server.log' C-m \; \
+  send-keys 'tail -f orbit.log' C-m \; \
   split-window -v \; \
   send-keys 'tail -f orbit-dashboard.log' C-m \; \
   select-pane -t 0 \; \
@@ -372,7 +372,7 @@ rm -f demo-logs/*.log
     name: demo-logs
     path: |
       demo-logs/
-      orbit-server.log
+      orbit.log
       orbit-dashboard.log
       e2e-metrics.json
 ```
@@ -401,11 +401,11 @@ export RUST_LOG=debug
 ./demo-orbit.sh
 
 # Specific module
-export RUST_LOG=orbit_web=trace,orbit_core=debug
+export RUST_LOG=orbit=trace,orbit_core=debug
 ./demo-orbit.sh
 
 # Filter noise
-export RUST_LOG=orbit_web=debug,tower_http=warn
+export RUST_LOG=orbit=debug,tower_http=warn
 ```
 
 ### LLM-Native Debug Logging
@@ -436,10 +436,10 @@ tcpdump -i lo port 8080   # Linux
 
 ```bash
 # Watch processes
-watch -n 1 'ps aux | grep -E "orbit-server|npm run dev"'
+watch -n 1 'ps aux | grep -E "orbit|npm run dev"'
 
 # Monitor resource usage
-top -p $(pgrep orbit-server)
+top -p $(pgrep orbit)
 ```
 
 ## Getting Help
@@ -448,7 +448,7 @@ When reporting issues, include:
 
 1. **Demo log** - `demo-logs/demo-run-*.log`
 2. **Error log** - `demo-logs/demo-errors-*.log`
-3. **Server log excerpt** - Last 50 lines of `orbit-server.log`
+3. **Server log excerpt** - Last 50 lines of `orbit.log`
 4. **System info** - OS, Rust version, Node version
 5. **Command used** - Exact command that triggered the error
 
@@ -478,7 +478,7 @@ Demo fails with "API health check timeout"
 <summary>Server Log (last 20 lines)</summary>
 
 ```
-[tail of orbit-server.log]
+[tail of orbit.log]
 ```
 </details>
 ```

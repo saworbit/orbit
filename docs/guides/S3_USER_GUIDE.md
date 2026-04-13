@@ -1408,10 +1408,8 @@ for entry in WalkDir::new("/data/to/migrate") {
 - [x] Concurrent batch delete (10 parallel 1000-key chunks)
 - [x] Enhanced retry logic (10 retries, network string matching, auth non-retryable)
 - [x] Configurable multipart part size (`--part-size`, default 50 MiB)
-- [x] Glacier handling (`--force-glacier-transfer`, `--ignore-glacier-warnings`)
 - [x] Conditional copy flags (`--no-clobber`, `--if-size-differ`, `--if-source-newer`)
 - [x] Flatten directory hierarchy (`--flatten`)
-- [x] Disable wildcard expansion (`--raw`)
 - [x] Buffered output channel for concurrent workers
 
 ### Planned Features (v0.9.0+)

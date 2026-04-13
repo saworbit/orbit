@@ -4,18 +4,10 @@ members = [
     "crates/core-manifest",
     "crates/core-starmap",
     "crates/core-audit",
-    "crates/core-resilience",
     "crates/core-cdc",
     "crates/core-semantic",
-    "crates/orbit-core-interface",  # Phase 1: I/O Abstraction Layer
-    "crates/orbit-proto",           # Phase 2: gRPC Protocol Definitions
-    "crates/orbit-star",            # Phase 2: Star Agent Binary
-    "crates/orbit-connect",         # Phase 3: Nucleus Client & RemoteSystem
-    "crates/magnetar",              # Phase 4: Job Execution Engine
-    "crates/orbit-sentinel",        # Phase 5: Autonomous Resilience Engine
-    "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
-    "crates/orbit-observability",   # V3: Unified Observability & Immutable Audit Plane
-    "orbit-ghost",                  # Quantum Entanglement: FUSE-based on-demand filesystem
+    "crates/orbit-core-interface",
+    "crates/orbit-observability",
 ]
 
 [package]
@@ -90,9 +82,6 @@ opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"], optional = t
 opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true }
 tracing-opentelemetry = { version = "0.28", optional = true }
 
-# Control Plane API integration (optional) - V2.2.0: Renamed from orbit-web to orbit-server
-orbit-server = { path = "crates/orbit-web", optional = true, default-features = false }
-
 # Random for backoff jitter
 rand = "0.9"
 
@@ -150,7 +139,6 @@ rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "0.38", features = ["fs"] }
 libc = "0.2"
 
 # Extended attributes (Unix only)
@@ -196,21 +184,6 @@ strip = true
 [profile.bench]
 inherits = "release"
 
-[profile.wasm-release]
-inherits = "release"
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-
-[profile.release-min]
-inherits = "release"
-opt-level = "z"        # Optimize for size
-lto = true             # Enable link-time optimization
-codegen-units = 1      # Single codegen unit for better optimization
-strip = true           # Strip symbols
-panic = "abort"        # Smaller panic handler
-
 [features]
 # Minimal default: local file copy only, zero-copy optimizations
 # For network protocols or GUI, explicitly opt-in with --features
@@ -222,9 +195,6 @@ orbit-system = ["dep:tokio", "dep:async-trait"]
 
 # Zero-copy system calls for maximum performance
 zero-copy = []
-
-# Protocol support (experimental, deprecated - use specific protocol features)
-protocols = []
 
 # Native SMB2/3 client (pure Rust, async) - OFF by default
 smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
@@ -243,12 +213,6 @@ gcs-native = ["dep:object_store", "dep:tokio", "dep:async-trait", "dep:bytes", "
 
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
-
-# Control Plane API - OFF by default (use --features api to enable) - V2.2.0: Headless API server
-api = ["dep:orbit-server", "dep:tokio"]
-
-# GUI feature alias - maps to api for backward compatibility
-gui = ["api"]
 
 # Delta manifest persistence with SQLite - OFF by default
 delta-manifest = ["dep:rusqlite"]
@@ -271,11 +235,8 @@ opentelemetry = [
 # Convenience: All network protocols
 network = ["s3-native", "smb-native", "ssh-backend", "azure-native", "gcs-native"]
 
-# NEW: Aggregated feature for all network protocols
-network-all = ["s3-native", "smb-native", "ssh-backend", "azure-native", "gcs-native"]
-
 # Full feature set (for development and power users)
-full = ["zero-copy", "network", "backend-abstraction", "delta-manifest", "extended-metadata", "api", "unicode-normalization"]
+full = ["zero-copy", "network", "backend-abstraction", "extended-metadata", "unicode-normalization"]
 
 # --- CI & Local Development Optimization ---
 # This profile override fixes "signal 7 [Bus error]" and "No space left on device" errors on CI.

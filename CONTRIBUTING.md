@@ -31,15 +31,13 @@ Thanks for your interest in contributing to Orbit! We welcome community contribu
 - Follow naming conventions and doc-comment (`///`) where applicable
 - One logical change per PR
 - Use `tracing` macros (`info!`, `warn!`, `error!`, `debug!`) instead of `println!`/`eprintln!` for all output
-- Run `cargo fmt --all && cargo clippy --workspace --exclude orbit-ghost` before submitting
+- Run `cargo fmt --all && cargo clippy --workspace` before submitting
 
 ---
 
 ## 🏗️ Architecture: OrbitSystem Pattern
 
-### Phase 1: I/O Abstraction Layer
-
-As of v0.6.0, Orbit uses the **OrbitSystem trait** to abstract filesystem and compute operations. This enables both local (standalone) and distributed (Grid/Star) topologies with the same codebase.
+Orbit uses the **OrbitSystem trait** to abstract filesystem and compute operations.
 
 #### Key Components
 
@@ -97,7 +95,7 @@ async fn test_process_file() {
 }
 ```
 
-For more details, see [`docs/specs/PHASE_1_ABSTRACTION_SPEC.md`](docs/specs/PHASE_1_ABSTRACTION_SPEC.md).
+For more details, see the `orbit-core-interface` crate.
 
 ---
 
@@ -113,13 +111,19 @@ opt-level = 3
 debug = 0
 ```
 
-This configuration strips debug symbols from external dependencies (like AWS SDKs and Leptos) while keeping them for the Orbit codebase. This creates significantly smaller binaries, preventing "Bus Error" and "No space left on device" crashes on CI and saving disk space on your local machine.
+This configuration strips debug symbols from external dependencies while keeping them for the Orbit codebase. This creates significantly smaller binaries, preventing "Bus Error" and "No space left on device" crashes on CI and saving disk space on your local machine.
 
 ### Running Full Suite
-To run the full test suite exactly as the CI does (including S3, SMB, and GUI components):
+To run the full test suite:
 
 ```bash
-cargo test --features full
+cargo test --workspace
+```
+
+To include optional network backends (S3, SMB, SSH, etc.):
+
+```bash
+cargo test --features network
 ```
 
 ---

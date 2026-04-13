@@ -1,4 +1,4 @@
-# Active Guidance System - User Guide
+# Active Config Optimizer - User Guide
 
 **Version**: 0.7.0
 **Module**: `src/core/guidance.rs`, `src/core/probe.rs`
@@ -6,7 +6,7 @@
 
 ## Overview
 
-The Active Guidance System (Phase 4 enhancement) transforms Orbit's "Flight Computer" from a passive validator into an intelligent environment-aware optimizer. It actively probes your system hardware and destination to automatically tune settings for optimal performance.
+The Active Config Optimizer (Phase 4 enhancement) transforms Orbit's configuration layer from a passive validator into an intelligent environment-aware optimizer. It actively probes your system hardware and destination to automatically tune settings for optimal performance.
 
 ## What's New in v0.7.0
 
@@ -90,7 +90,7 @@ This measurement informs compression decisions.
 
 **Example:**
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Network: Detected SMB destination. Enabling resume for reliability.
 │ 🔧 Network: Increased retry attempts to 5 for network filesystem.
 └────────────────────────────────────────────────────┘
@@ -113,7 +113,7 @@ This measurement informs compression decisions.
 
 **Example:**
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Performance: Detected slow I/O (42.3 MB/s) with 16 cores.
 │                Enabling Zstd:3 to trade CPU for throughput.
 └────────────────────────────────────────────────────┘
@@ -140,7 +140,7 @@ This measurement informs compression decisions.
 
 **Example:**
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Memory: Low available memory (0 GB). Reduced parallel
 │            operations from 8 to 2.
 └────────────────────────────────────────────────────┘
@@ -162,7 +162,7 @@ This measurement informs compression decisions.
 
 **Example:**
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Cloud: Detected cloud storage destination.
 │           Enabling compression to reduce network transfer.
 │ 🔧 Cloud: Increased retry attempts to 10 for reliability.
@@ -192,7 +192,7 @@ Scanning system environment...
   16 GB RAM available
   I/O throughput: ~120 MB/s
 
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Network: Detected SMB destination. Enabling resume.
 │ 🔧 Network: Increased retry attempts to 5.
 └────────────────────────────────────────────────────┘
@@ -216,7 +216,7 @@ Scanning system environment...
   32 GB RAM available
   I/O throughput: ~35 MB/s
 
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Performance: Detected slow I/O (35.4 MB/s) with 16 cores.
 │                Enabling Zstd:3 compression to trade CPU for throughput.
 └────────────────────────────────────────────────────┘
@@ -240,7 +240,7 @@ Scanning system environment...
   8 GB RAM available
   I/O throughput: ~280 MB/s
 
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Cloud: Detected cloud storage destination.
 │           Enabling compression to reduce network transfer.
 │ 🔧 Cloud: Increased retry attempts to 10.
@@ -258,29 +258,29 @@ Starting upload to S3...
 
 ## Performance Impact
 
-The Active Guidance System adds **minimal overhead**:
+The Active Config Optimizer adds **minimal overhead**:
 
 | Operation | Time | Impact |
 |-----------|------|--------|
 | **System probe** | ~50-100ms | One-time per transfer |
 | **I/O benchmark** | ~200-300ms | One-time 10MB write |
-| **Guidance rules** | <1ms | Negligible |
+| **Optimization rules** | <1ms | Negligible |
 | **Total overhead** | ~250-400ms | 0.01% for 1GB+ files |
 
 For large transfers (GB-scale), this overhead is negligible compared to actual transfer time.
 
-## Interaction with Static Guidance
+## Interaction with Static Optimization
 
-Active Guidance works **alongside** the original Guidance rules:
+Active optimization works **alongside** the original optimization rules:
 
 ```
-Original Guidance Rules (v0.6.0):
+Original Optimization Rules (v0.6.0):
   ✓ Zero-copy vs Checksum conflicts
   ✓ Resume vs Compression safety
   ✓ Hardware capability checks
   (11 rules total)
 
-New Active Rules (v0.7.0):
+New Active Optimization Rules (v0.7.0):
   ✓ Network destination tuning
   ✓ CPU/IO optimization
   ✓ Memory protection
@@ -290,19 +290,19 @@ New Active Rules (v0.7.0):
 
 **Example with both:**
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🚀 Strategy: Disabling zero-copy for checksum verification
-│              (Original static rule)
+│              (Original static optimization rule)
 │ 🔧 Network: Detected SMB destination. Enabling resume.
-│             (New active rule)
+│             (New active optimization rule)
 │ 🔧 Cloud: Increased retry attempts to 10.
-│           (New active rule)
+│           (New active optimization rule)
 └────────────────────────────────────────────────────┘
 ```
 
-## Disabling Active Probing
+## Disabling Active Optimization
 
-If you prefer manual control, you can bypass active probing:
+If you prefer manual control, you can bypass active optimization:
 
 **Currently:** Active probing runs by default for all operations. Future versions may add:
 
@@ -374,7 +374,7 @@ $ orbit -s /data -d smb://server/share --recursive
 
 ## Integration with Init Wizard
 
-The Init Wizard (`orbit init`) and Active Guidance work together perfectly:
+The Init Wizard (`orbit init`) and the Active Config Optimizer work together perfectly:
 
 1. **Init Wizard** → Creates your **baseline configuration**
 2. **Active Guidance** → Provides **runtime optimization** per transfer
@@ -404,25 +404,25 @@ $ orbit -s /data -d smb://server/share --recursive
 
 ### 1. Trust the Auto-Tuning
 
-The Active Guidance System is designed to make optimal choices. Unless you have specific requirements, let it work:
+The Active Config Optimizer is designed to make optimal choices. Unless you have specific requirements, let it work:
 
 ```bash
-# ✅ Good: Let guidance optimize
+# ✅ Good: Let the optimizer tune settings
 orbit -s /data -d /backup --recursive
 
-# ❌ Over-specified: May conflict with guidance
+# ❌ Over-specified: May conflict with optimizer
 orbit -s /data -d /backup --recursive \
   --resume \
   --no-resume \  # Contradictory!
-  --parallel 32  # May exceed guidance limits
+  --parallel 32  # May exceed optimizer limits
 ```
 
-### 2. Review Guidance Messages
+### 2. Review Optimizer Messages
 
-Always read the guidance output to understand what's happening:
+Always read the optimizer output to understand what's happening:
 
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
 │ 🔧 Performance: Slow I/O detected. Enabling compression.
 └────────────────────────────────────────────────────┘
 ```
@@ -431,20 +431,20 @@ This teaches you about your system and optimal settings.
 
 ### 3. Use Init Wizard for Baseline
 
-Start with `orbit init` to set up your baseline, then let Active Guidance handle per-transfer optimizations.
+Start with `orbit init` to set up your baseline, then let the Active Config Optimizer handle per-transfer optimizations.
 
 ## FAQ
 
-### Q: Does Active Guidance slow down transfers?
+### Q: Does Active Config Optimization slow down transfers?
 
 **A:** No. The probe adds ~250-400ms one-time overhead, negligible for any real transfer. The optimizations it enables (compression, proper retries) often make transfers **faster** overall.
 
-### Q: What if I disagree with a guidance decision?
+### Q: What if I disagree with an optimization decision?
 
 **A:** You can manually override by explicitly setting flags:
 
 ```bash
-# Force disable compression even if guidance suggests it
+# Force disable compression even if the optimizer suggests it
 orbit -s /data -d /backup --compress none --recursive
 ```
 
@@ -458,10 +458,6 @@ Explicit flags always take precedence.
 # Future feature
 orbit -s /data -d /backup --guidance-only
 ```
-
-### Q: Does this work with the Web Dashboard?
-
-**A:** Yes! Active Guidance runs for all transfers, whether from CLI or Web Dashboard. The dashboard shows guidance notices in the job details.
 
 ## Technical Details
 
@@ -483,20 +479,20 @@ impl Probe {
 }
 ```
 
-### Guidance Integration
+### ConfigOptimizer Integration
 
 Location: `src/core/guidance.rs`
 
 ```rust
-impl Guidance {
-    pub fn plan_with_probe(
+impl ConfigOptimizer {
+    pub fn optimize_with_probe(
         config: CopyConfig,
         dest_path: Option<&Path>
-    ) -> Result<FlightPlan> {
+    ) -> Result<OptimizedConfig> {
         // 1. Run system probe if path provided
-        // 2. Apply static guidance rules
-        // 3. Apply active guidance rules
-        // Returns optimized FlightPlan with notices
+        // 2. Apply static optimization rules
+        // 3. Apply active optimization rules
+        // Returns OptimizedConfig with notices
     }
 }
 ```
@@ -504,9 +500,8 @@ impl Guidance {
 ## Related Documentation
 
 - **Init Wizard:** [`docs/guides/INIT_WIZARD_GUIDE.md`](INIT_WIZARD_GUIDE.md)
-- **Guidance Architecture:** [`docs/architecture/GUIDANCE_SYSTEM.md`](../architecture/GUIDANCE_SYSTEM.md)
+- **Config Optimizer Architecture:** [`docs/architecture/GUIDANCE_SYSTEM.md`](../architecture/GUIDANCE_SYSTEM.md)
 - **Implementation:** `src/core/probe.rs`, `src/core/guidance.rs`
-- **Terminology System:** `src/core/terminology.rs`
 
 ## Changelog
 
@@ -517,13 +512,13 @@ impl Guidance {
 - ✅ Integration with init wizard
 
 ### v0.6.0 and earlier
-- ✅ Static guidance rules only
+- ✅ Static optimization rules only
 - ❌ No environment awareness
 - ❌ Manual optimization required
 
 ## Feedback
 
-Active Guidance is new in v0.7.0. Please report:
+The Active Config Optimizer is new in v0.7.0. Please report:
 - Incorrect auto-tuning decisions
 - Performance issues from probing
 - Missing optimizations you'd like to see

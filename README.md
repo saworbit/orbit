@@ -15,7 +15,7 @@
 
 ---
 
-## ⚠️ Project Status: Alpha (v0.8.0 Core / v2.2.0-rc.1 Control Plane)
+## ⚠️ Project Status: Alpha
 
 **Orbit is currently in active development and should be considered alpha-quality software.**
 
@@ -26,17 +26,6 @@
 **What this means:**
 - APIs may change between versions
 - Some features are experimental and marked as such
-- The V2 architecture (content-defined chunking, semantic replication) is newly introduced
-- **NEW v0.8.0**: Usability & Automation (Phases 3-5) - Interactive `orbit init` wizard, active environment probing, and intelligent auto-tuning
-- **v0.6.0-alpha.5**: Phase 5 - Sentinel (Autonomous Resilience Engine) - OODA loop monitors Universe V3 and autonomously heals under-replicated chunks via Phase 4 P2P transfers
-- **v0.6.0-alpha.4**: Phase 4 - Data Plane (P2P Transfer) - Direct Star-to-Star data transfer eliminates Nucleus bandwidth bottleneck, enabling infinite horizontal scaling
-- **v0.6.0-alpha.3**: Phase 3 - Nucleus Client & RemoteSystem (Client-side connectivity for Nucleus-to-Star orchestration, 99.997% network reduction via compute offloading)
-- **v0.6.0-alpha.2**: Phase 2 - Star Protocol & Agent (gRPC remote execution server for distributed Orbit Grid)
-- **v0.6.0-alpha.1**: Phase 1 I/O Abstraction Layer - OrbitSystem trait enables future distributed topologies
-- **NEW v2.2.0-rc.1**: Full-stack CI/CD pipeline with dashboard-quality checks, professional file browser, and enhanced developer experience
-- **v2.2.0-beta.1**: Enterprise platform features - Intelligence API (Estimations), Administration (User Management), System Health monitoring
-- **v2.2.0-alpha.2**: React Dashboard implementation with Visual Pipeline Editor, File Browser, and Job Management UI
-- **v2.2.0-alpha.1**: Control Plane architecture with decoupled React dashboard ("The Separation")
 - Extensive testing in your specific environment is recommended before production use
 
 See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-feature stability status.
@@ -52,9 +41,8 @@ See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-featu
 - [Key Features](#-key-features)
   - [Error Handling & Retries](#-error-handling--retries-never-give-up)
   - [Disk Guardian](#️-disk-guardian-pre-flight-safety)
-  - [Guidance System](#️-guidance-system-the-flight-computer)
+  - [Config Optimizer](#️-config-optimizer)
   - [Manifest System + Starmap](#️-manifest-system--starmap-planner)
-  - [Magnetar State Machine](#-magnetar-persistent-job-state-machine)
   - [Metadata Preservation](#️-metadata-preservation--transformation)
   - [Delta Detection](#-delta-detection-efficient-transfers)
   - [Progress Reporting & Operational Controls](#-progress-reporting--operational-controls)
@@ -63,7 +51,6 @@ See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-featu
   - [Audit & Telemetry](#-audit-and-telemetry)
   - [Data Flow Patterns](#-data-flow-patterns)
 - [Quick Start](#-quick-start)
-- [Web GUI](#️-web-gui-new-in-v050)
 - [Performance Benchmarks](#-performance-benchmarks)
 - [Smart Strategy Selection](#-smart-strategy-selection)
 - [Use Cases](#-use-cases)
@@ -81,7 +68,7 @@ See the [Feature Maturity Matrix](#-feature-maturity-matrix) below for per-featu
 
 Orbit is a file transfer tool built in Rust that aims to combine reliability with performance. Whether you're backing up data, syncing files across locations, transferring to network shares, or moving data to the cloud, Orbit provides features designed to help.
 
-**Key Philosophy:** Intelligence, resilience, and speed. Currently in active development (v0.6.0 alpha).
+**Key Philosophy:** Intelligence, resilience, and speed. Currently in active development (alpha).
 
 ---
 
@@ -94,7 +81,6 @@ Orbit is a file transfer tool built in Rust that aims to combine reliability wit
 | 🧠 **Adaptive** | Adapts strategy based on environment (zero-copy, compression, buffered) |
 | 🛡️ **Safe** | Disk Guardian prevents mid-transfer failures with pre-flight checks |
 | 🌐 **Protocol Support** | Local, **SSH/SFTP**, SMB/CIFS (experimental), **S3**, **Azure Blob**, **GCS**, with unified backend API |
-| 🌐 **Web Dashboard** | Modern React dashboard with OpenAPI-documented Control Plane (v2.2.0-alpha) |
 | 📊 **Auditable** | Structured JSON telemetry for operations |
 | 🧩 **Modular** | Clean architecture with reusable crates |
 | 🌍 **Cross-Platform** | Linux, macOS, Windows with native optimizations |
@@ -109,7 +95,7 @@ Understanding feature stability helps you make informed decisions about what to 
 |---------|----------|-------|
 | **Core File Copy (Buffered)** | 🟢 Stable | Well-tested, safe for production use |
 | **Zero-Copy Optimization** | 🟢 Stable | Platform-specific (Linux, macOS, Windows) |
-| **OrbitSystem Abstraction (Phase 1)** | 🟢 Stable | I/O abstraction layer, foundation for Grid topology |
+| **OrbitSystem Abstraction** | 🟢 Stable | I/O abstraction layer |
 | **Resume/Checkpoint** | 🟡 Beta | Works well, needs more edge-case testing |
 | **Compression (LZ4, Zstd)** | 🟢 Stable | Reliable for most workloads |
 | **Checksum Verification** | 🟢 Stable | BLAKE3 (default), SHA-256 well-tested |
@@ -122,27 +108,19 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Delta Detection (V1)** | 🟡 Beta | rsync-style algorithm, tested but newer |
 | **V2 Architecture (CDC)** | 🔴 Alpha | Content-defined chunking, introduced in v0.5.0 |
 | **Semantic Replication** | 🔴 Alpha | Priority-based transfers, introduced in v0.5.0 |
-| **Neutrino Fast Lane** | 🔴 Alpha | Small file optimization (<8KB), introduced in v0.5.0 |
 | **Global Deduplication (V3)** | 🟡 Beta | High-cardinality Universe index, v2.1 scalability upgrade |
 | **Disk Guardian** | 🟡 Beta | Pre-flight checks, works well but newer |
-| **Magnetar State Machine** | 🟡 Beta | Job persistence, recently added |
-| **Resilience Patterns** | 🟡 Beta | Circuit breaker, rate limiting - new features |
-| **Sentinel Resilience Engine (Phase 5)** | 🔴 Alpha | Autonomous OODA loop for chunk redundancy healing |
 | **Filter System** | 🟡 Beta | Glob/regex filters, functional but newer |
 | **Metadata Preservation** | 🟡 Beta | Works well, extended attributes are platform-specific |
-| **Guidance System** | 🟡 Beta | Config validation with active probing (v0.7.0) |
+| **Config Optimizer** | 🟡 Beta | Config validation with active probing |
 | **Init Wizard** | 🟡 Beta | Interactive setup with `orbit init` (v0.7.0) |
 | **Active Environment Probing** | 🟡 Beta | Auto-tuning based on hardware/destination (v0.7.0) |
-| **Terminology Abstraction** | 🟢 Stable | User-friendly interface layer (v0.7.0) |
-| **Control Plane API** | 🔴 Alpha | v2.2.0-alpha - OpenAPI/Swagger documented REST API |
-| **React Dashboard** | 🔴 Alpha | v2.2.0-alpha - Modern SPA with React Flow pipelines |
 | **Manifest System** | 🟡 Beta | File tracking and verification |
 | **Progress/Bandwidth Limiting** | 🟡 Beta | Recently integrated across all modes |
 | **Audit Logging** | 🟡 Beta | Structured telemetry, needs more use |
 | **Sparse File Handling** | 🟡 Beta | Zero-chunk detection during CDC, hole-aware writes |
 | **Hardlink Preservation** | 🟡 Beta | Inode tracking on Unix/Windows, `--preserve-hardlinks` flag |
 | **In-Place Updates** | 🟡 Beta | Reflink/journaled/unsafe safety tiers, `--inplace` |
-| **Rename Detection** | 🔴 Alpha | Content-aware via Star Map chunk overlap |
 | **Link-Dest++ (Incremental Backup)** | 🔴 Alpha | Chunk-level reference hardlinking, `--link-dest` |
 | **Transfer Journal (Batch Mode)** | 🔴 Alpha | Content-addressed operation journal, `--write-batch` / `--read-batch` |
 | **Backpressure** | 🔴 Alpha | Dual-threshold flow control (object count + byte size) |
@@ -152,9 +130,7 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Ref-Counted GC** | 🔴 Alpha | WAL-gated garbage collection for shared chunks |
 | **Container Packing** | 🔴 Alpha | Chunk packing into `.orbitpak` files to reduce inode pressure |
 | **Typed Provenance** | 🔴 Alpha | Structured event taxonomy for audit lineage queries |
-| **Bulletin Board** | 🔴 Alpha | Centralized error/warning aggregation across Grid nodes |
 | **Composable Prioritizers** | 🔴 Alpha | Chainable sort criteria for transfer scheduling |
-| **Star Lifecycle Hooks** | 🔴 Alpha | Formalized state machine for Star agent lifecycle |
 
 **Legend:**
 - 🟢 **Stable**: Production-ready with extensive testing
@@ -295,14 +271,12 @@ cargo run --example disk_guardian_demo
 
 ---
 
-### 🛰️ Guidance System: The "Flight Computer"
+### 🛰️ Config Optimizer
 
-**NEW in v0.7.0!** Enhanced with active environment probing and intelligent auto-tuning.
-
-Automatic configuration validation and optimization that ensures safe, performant transfers, now with active hardware and destination detection.
+Automatic configuration validation and optimization that ensures safe, performant transfers, with active hardware and destination detection.
 
 **What It Does:**
-The Guidance System acts as an intelligent pre-processor, analyzing your configuration for logical conflicts and automatically resolving them before execution begins. **NEW**: It now actively probes your system environment (CPU, RAM, I/O speed, destination type) and auto-tunes settings for optimal performance.
+The Config Optimizer acts as an intelligent pre-processor, analyzing your configuration for logical conflicts and automatically resolving them before execution begins. It actively probes your system environment (CPU, RAM, I/O speed, destination type) and auto-tunes settings for optimal performance.
 
 **Key Benefits:**
 - 🔒 **Safety First** — Prevents data corruption from incompatible flag combinations
@@ -314,7 +288,7 @@ The Guidance System acts as an intelligent pre-processor, analyzing your configu
 
 **Example Output:**
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ──────────────────────┐
 │ 🚀 Strategy: Disabling zero-copy to allow streaming checksum verification
 │ 🛡️  Safety: Disabling resume capability to prevent compressed stream corruption
 │ 🔧 Network: Detected SMB destination. Enabling resume for reliability.
@@ -349,22 +323,22 @@ Rather than failing with cryptic errors, Orbit understands what you're trying to
 
 **Programmatic API:**
 ```rust
-use orbit::core::guidance::Guidance;
+use orbit::core::guidance::ConfigOptimizer;
 
 let mut config = CopyConfig::default();
 config.use_zero_copy = true;
 config.verify_checksum = true;
 
-// Run guidance pass
-let flight_plan = Guidance::plan(config)?;
+// Run optimization pass
+let optimized = ConfigOptimizer::optimize(config)?;
 
 // Display notices
-for notice in &flight_plan.notices {
+for notice in &optimized.notices {
     println!("{}", notice);
 }
 
 // Use optimized config
-copy_file(&source, &dest, &flight_plan.config)?;
+copy_file(&source, &dest, &optimized.final_config)?;
 ```
 
 📖 **Full Documentation:** See [`docs/architecture/GUIDANCE_SYSTEM.md`](docs/architecture/GUIDANCE_SYSTEM.md)
@@ -421,112 +395,11 @@ depends_on = ["source-sync"]  # Dependency ordering
 
 ---
 
-### 🧲 Magnetar: Persistent Job State Machine
-
-**NEW in v0.4.1!** A crash-proof, idempotent state machine for managing persistent jobs with dual backend support.
-
-**Prevents:**
-- ❌ Duplicate work after crashes
-- ❌ Lost progress on interruptions
-- ❌ Dependency conflicts in DAG-based workflows
-- ❌ Cascading failures from flaky external services
-
-**Features:**
-- **Atomic Claims** — Idempotent "pending → processing" transitions
-- **Crash Recovery** — Resume from any point with chunk-level verification
-- **DAG Dependencies** — Topological sorting for complex job graphs
-- **Dual Backends** — SQLite (default) or redb (pure Rust, WASM-ready)
-- **Zero-Downtime Migration** — Swap backends without stopping jobs
-- **Analytics Ready** — Export to Parquet for analysis
-- **Resilience Module** — Circuit breaker, connection pooling, and rate limiting for fault-tolerant data access ⭐ **NEW!**
-
-```rust
-use magnetar::JobStatus;
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let mut store = magnetar::open("jobs.db").await?;
-
-    // Load chunks from manifest
-    let manifest = toml::from_str(r#"
-        [[chunks]]
-        id = 1
-        checksum = "abc123"
-    "#)?;
-
-    store.init_from_manifest(42, &manifest).await?;
-
-    // Process with automatic deduplication
-    while let Some(chunk) = store.claim_pending(42).await? {
-        // Do work... (if crash happens, chunk auto-reverts to pending)
-        store.mark_status(42, chunk.chunk, JobStatus::Done, None).await?;
-    }
-
-    Ok(())
-}
-```
-
-**Try it:**
-```bash
-cd crates/magnetar
-cargo run --example basic_usage
-cargo run --example crash_recovery  # Simulates crash and resume
-cargo run --example resilience_demo --features resilience  # Circuit breaker demo
-```
-
-#### 🛡️ Resilience Module
-
-**NEW in v0.4.1!** Built-in resilience patterns for fault-tolerant access to flaky external services like S3, SMB, and databases.
-
-**Components:**
-- **Circuit Breaker** — Fail-fast protection with automatic recovery
-- **Connection Pool** — Efficient connection reuse with health checking
-- **Rate Limiter** — Token bucket rate limiting to prevent service overload
-
-```rust
-use magnetar::resilience::prelude::*;
-use std::sync::Arc;
-
-// Setup resilience stack
-let breaker = CircuitBreaker::new_default();
-let pool = Arc::new(ConnectionPool::new_default(factory));
-let limiter = RateLimiter::per_second(100);
-
-// Execute with full protection
-breaker.execute(|| {
-    let pool = pool.clone();
-    let limiter = limiter.clone();
-    async move {
-        limiter.execute(|| async {
-            let conn = pool.acquire().await?;
-            let result = perform_s3_operation(&conn).await;
-            pool.release(conn).await;
-            result
-        }).await
-    }
-}).await?;
-```
-
-**Resilience Features:**
-- ✅ Three-state circuit breaker (Closed → Open → HalfOpen)
-- ✅ Exponential backoff with configurable retries
-- ✅ Generic connection pool with health checks
-- ? Pending-creation tracking prevents idle over-provisioning under concurrency
-- ✅ Pool statistics and monitoring
-- ✅ Idle timeout and max lifetime management
-- ✅ Rate limiting with token bucket algorithm
-- ✅ Optional governor crate integration
-- ✅ Thread-safe async/await support
-- ✅ Transient vs permanent error classification
-- ✅ S3 and SMB integration examples
-
-📖 **Full Documentation:** See [`crates/magnetar/README.md`](crates/magnetar/README.md) and [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md)
-
 ---
 
 ### 🔄 Data Flow Patterns
 
-**10 production-grade modules** for reliable, observable data transfer pipelines — implemented across 6 crates with 180+ tests.
+Production-grade modules for reliable, observable data transfer pipelines.
 
 ```text
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
@@ -534,13 +407,13 @@ breaker.execute(|| {
 │              │     │  Pipeline    │     │             │
 │ Prioritizer  │     │ Backpressure │     │ Container   │
 │ Provenance   │     │ Penalization │     │ Packing     │
-│ Lifecycle    │     │ Health Mon.  │     │ Bulletin    │
-└─────────────┘     │ Dead-Letter  │     │ Board       │
-                    │ Ref-Count GC │     └─────────────┘
+└─────────────┘     │ Health Mon.  │     └─────────────┘
+                    │ Dead-Letter  │
+                    │ Ref-Count GC │
                     └──────────────┘
 ```
 
-**Flow Control & Resilience** (`core-resilience`):
+**Flow Control & Resilience**:
 - **Backpressure** — Dual-threshold guards (object count + byte size) with apply/release semantics
 - **Penalization** — Exponential backoff deprioritization with configurable cap and decay
 - **Dead-Letter Queue** — Bounded quarantine with reason tracking, retry, and drain support
@@ -552,27 +425,17 @@ breaker.execute(|| {
 
 **Observability & Lifecycle**:
 - **Typed Provenance** (`core-audit`) — Structured event taxonomy for lineage queries
-- **Bulletin Board** (`orbit-connect`) — Lock-free ring buffer for error/warning aggregation across Grid nodes
-- **Star Lifecycle Hooks** (`orbit-star`) — Formalized state machine (Registered → Scheduled → Draining → Shutdown)
 - **Container Packing** (`core-starmap`) — Chunk packing into `.orbitpak` files to reduce inode pressure
 
 ```rust
-use orbit_core_resilience::{Backpressure, BackpressureConfig};
+use orbit::manifests::{BeaconBuilder};
 
-// Apply backpressure before sending chunks
-let bp = Backpressure::new(BackpressureConfig {
-    max_objects: 1000,
-    max_bytes: 64 * 1024 * 1024, // 64 MB
-    ..Default::default()
-});
-
-if bp.try_acquire(1, chunk_size).is_ok() {
-    send_chunk(chunk).await?;
-    bp.release(1, chunk_size);
-}
+// Record structured audit beacon for a completed job
+let beacon = BeaconBuilder::new("job-123", "sha256:abc123")
+    .with_total_bytes(1_048_576)
+    .with_file_count(42)
+    .build();
 ```
-
-📖 **Full Documentation:** See [`docs/architecture/DATA_FLOW_PATTERNS.md`](docs/architecture/DATA_FLOW_PATTERNS.md)
 
 ---
 
@@ -692,44 +555,6 @@ orbit --source /critical --dest /backup \
   - Atomic chunk claims (`try_claim_chunk`) avoid duplicate transfers under concurrency
   - 4/4 persistence tests passing
 - **See:** [ORBIT_V2_ARCHITECTURE.md](ORBIT_V2_ARCHITECTURE.md) for complete details
-
-**Neutrino Fast Lane** ⚡
-
-The **Neutrino Fast Lane** provides ~3x performance improvement for small-file workloads by bypassing CDC/deduplication overhead:
-
-- **Smart Routing** — Files <8KB automatically routed to high-concurrency direct transfer
-- **High Concurrency** — 100-500 concurrent async tasks (vs standard 16)
-- **Zero Overhead** — Bypasses BLAKE3 hashing, CDC chunking, and starmap indexing
-- **Reduced CPU Load** — Direct I/O without rolling hash computation
-- **Configurable Threshold** — Adjustable size threshold (default: 8KB)
-- **Seamless Integration** — Works with Smart Sync priority-based transfers
-
-**Performance:**
-- 10,000 files (1-4KB): ~15s vs ~45s (standard) = **3x faster**
-- 60% lower CPU usage for small-file workloads
-- Minimal database bloat (no index entries for small files)
-
-**Usage:**
-```bash
-# Enable Neutrino fast lane
-orbit --source /source --dest /dest --profile neutrino --recursive
-
-# Custom threshold (16KB)
-orbit --source /source --dest /dest --profile neutrino --neutrino-threshold 16 --recursive
-
-# Combined with Checksum Sync
-orbit --source /source --dest /dest --check checksum --profile neutrino --recursive
-```
-
-**Best For:**
-- Source code repositories (`node_modules`, `.git` directories)
-- Configuration directories (`/etc`, `.config`)
-- Log files and small assets
-- npm/pip package directories
-
-**Requirements:** Requires `backend-abstraction` feature (included with network backends)
-
-**See:** [PERFORMANCE.md](docs/guides/PERFORMANCE.md#neutrino-fast-lane-v05) for detailed documentation
 
 **V2 CDC Features:**
 - **Gear Hash Rolling Hash** — 256-entry lookup table for fast boundary detection (~2GB/s per core)
@@ -1166,7 +991,7 @@ orbit --source file.txt --dest s3://my-bucket/file.txt
 - ✅ Full integration with manifest system
 - ✅ Object versioning and lifecycle management
 - ✅ Batch operations with rate limiting
-- ✅ **Resilience patterns** — Circuit breaker, connection pooling, and rate limiting via Magnetar ⭐
+- ✅ **Resilience patterns** — Circuit breaker and rate limiting
 
 📖 **Full Documentation:** See [`docs/guides/S3_USER_GUIDE.md`](docs/guides/S3_USER_GUIDE.md)
 📖 **Streaming Guide:** See [`docs/guides/BACKEND_STREAMING_GUIDE.md`](docs/guides/BACKEND_STREAMING_GUIDE.md) ⭐ **NEW!**
@@ -1326,7 +1151,6 @@ orbit --source /source --dest /dest \
 **Trace correlation features:**
 - **W3C-compliant** trace IDs (32-char hex) and span IDs (16-char hex)
 - **Hierarchical correlation** — trace_id → job_id → file_id → span_id
-- **Cross-service tracing** — Trace transfers across Nucleus, Star, and Sentinel components
 - **Backend instrumentation** — All 45 backend methods emit trace spans (S3, SMB, SSH, local)
 
 #### LLM-Native Debug Logging (Developer Mode)
@@ -1393,9 +1217,6 @@ orbit -s /backups/daily/ -d /backups/offsite/ -R --preserve-hardlinks
 orbit -s /data/large.img -d /backup/large.img --inplace
 orbit -s /data/db.mdf -d /backup/db.mdf --inplace --inplace-safety journaled
 
-# Rename detection — find moved files by content, not name
-orbit -s /project/ -d /backup/ -R --detect-renames
-
 # Incremental backups — hardlink unchanged files to reference
 orbit -s /data/ -d /backups/today/ -R --link-dest /backups/yesterday/
 
@@ -1409,11 +1230,10 @@ orbit --read-batch update.batch -d /server2/
 | `--sparse` | `--sparse` | Zero-cost detection during CDC; works with `--inplace` (rsync can't) |
 | `--preserve-hardlinks` | `-H` | Cross-platform (Unix + Windows FFI) |
 | `--inplace` | `--inplace` | Reflink/journaled/unsafe safety tiers (rsync has none) |
-| `--detect-renames` | `--fuzzy` | Content-aware chunk overlap vs filename similarity |
 | `--link-dest` | `--link-dest` | Chunk-level partial reuse vs all-or-nothing per file |
 | `--write-batch` | `--write-batch` | Content-addressed journal, portable across different destinations |
 
-**Current limitations:** `--sparse` and `--inplace` are mutually exclusive. Compression is incompatible with `--sparse`/`--inplace` (use `--sparse never` and avoid `--inplace`). Delta transfer (`--check delta`) is disabled when `--sparse` or `--inplace` is enabled (Orbit falls back to a full buffered copy). `--detect-renames` and `--link-dest` currently hardlink **exact matches** only; partial-chunk delta basis is planned. `--write-batch` records full-file create entries (no delta ops yet) and requires `--mode copy`.
+**Current limitations:** `--sparse` and `--inplace` are mutually exclusive. Compression is incompatible with `--sparse`/`--inplace` (use `--sparse never` and avoid `--inplace`). Delta transfer (`--check delta`) is disabled when `--sparse` or `--inplace` is enabled (Orbit falls back to a full buffered copy). `--link-dest` currently hardlinks **exact matches** only; partial-chunk delta basis is planned. `--write-batch` records full-file create entries (no delta ops yet) and requires `--mode copy`.
 
 See [Advanced Transfer Features](docs/architecture/ADVANCED_TRANSFER.md) for design details.
 
@@ -1436,29 +1256,22 @@ cargo build --release
 # With network protocols (S3, SMB, SSH)
 cargo build --release --features network
 
-# With Control Plane API
-cargo build --release --features api
-
-# Full build (everything)
-cargo build --release --features full
-
 # Install to system
 sudo cp target/release/orbit /usr/local/bin/
 
 # Or with cargo install
 cargo install --path .                    # Minimal
 cargo install --path . --features network  # With network
-cargo install --path . --features full    # Everything
 ```
 
-> **v0.5+:** Orbit defaults to a minimal build (just local copy with zero-copy optimizations) for fastest compile times and smallest binaries. Network protocols and GUI are opt-in via feature flags.
+> **v0.5+:** Orbit defaults to a minimal build (just local copy with zero-copy optimizations) for fastest compile times and smallest binaries. Network protocols are opt-in via feature flags.
 
 ### Feature Flags & Binary Sizes
 
 **v0.5-0.6 Performance Improvements:**
 - 🎯 **60% smaller default binary** — Minimal build is ~10MB (was ~50MB)
 - ⚡ **50% faster compilation** — Default build in ~60s (was ~120s)
-- 🔒 **Reduced attack surface** — No web server code in default CLI build
+- 🔒 **Reduced attack surface** — Minimal default build
 - 🚀 **2x Delta throughput** — Gear64 hash replaces Adler-32 for better collision resistance
 
 | Feature | Description | Binary Size | Default |
@@ -1470,10 +1283,8 @@ cargo install --path . --features full    # Everything
 | `ssh-backend` | SSH/SFTP remote access | +5MB | ❌ No |
 | `azure-native` | Microsoft Azure Blob Storage | +3MB | ❌ No |
 | `gcs-native` | Google Cloud Storage | +3MB | ❌ No |
-| `api` | Control Plane REST API (v2.2.0+) | +15MB | ❌ No |
 | `delta-manifest` | SQLite-backed delta persistence | +3MB | ❌ No |
 | `extended-metadata` | xattr + ownership (Unix/Linux/macOS only) | +500KB | ❌ No |
-| `full` | All features enabled | +50MB | ❌ No |
 
 ```bash
 # Minimal: Fast local copies only (~10MB)
@@ -1483,14 +1294,6 @@ cargo install orbit
 # Network: Add S3, SMB, SSH, Azure support (~38MB)
 cargo build --release --features network
 cargo install orbit --features network
-
-# GUI: Add web dashboard (~25MB)
-cargo build --release --features gui
-cargo install orbit --features gui
-
-# Full: Everything including network + GUI (~50MB+)
-cargo build --release --features full
-cargo install orbit --features full
 
 # Size-optimized: Maximum compression
 cargo build --profile release-min
@@ -1509,8 +1312,7 @@ orbit init
 1. 🔍 **Scans your system** — Detects CPU cores, RAM, and I/O speed
 2. 💬 **Asks about your use case** — Backup, Sync, Cloud, or Network
 3. ⚙️ **Generates optimal config** — Auto-tuned for your hardware
-4. 🔐 **Creates security secrets** — JWT secret for Web Dashboard (optional)
-5. 💾 **Saves to `~/.orbit/orbit.toml`** — Ready to use immediately
+4. 💾 **Saves to `~/.orbit/orbit.toml`** — Ready to use immediately
 
 **Example session:**
 ```
@@ -1869,9 +1671,9 @@ audit_log_path = "/var/log/orbit_audit.log"
 
 ## 🧩 Modular Architecture
 
-### Phase 1: OrbitSystem I/O Abstraction (v0.6.0-alpha.1)
+### OrbitSystem I/O Abstraction
 
-**NEW!** Orbit now features a universal I/O abstraction layer that decouples core logic from filesystem operations.
+Orbit features a universal I/O abstraction layer that decouples core logic from filesystem operations.
 
 **Key Components:**
 
@@ -1887,7 +1689,6 @@ audit_log_path = "/var/log/orbit_audit.log"
 
 - ✅ **Testability**: Unit tests without filesystem via `MockSystem`
 - ✅ **Flexibility**: Runtime switching between Local/Remote providers
-- ✅ **Future-Ready**: Foundation for distributed Grid/Star topology
 - ✅ **Performance**: Compute offloading enables efficient distributed CDC
 
 ```rust
@@ -1912,486 +1713,18 @@ Orbit is built from clean, reusable crates:
 
 | Crate | Purpose | Status |
 |-------|---------|--------|
-| 🔌 `orbit-core-interface` | OrbitSystem I/O abstraction (Phase 1) | 🟢 Stable |
+| 🔌 `orbit-core-interface` | OrbitSystem I/O abstraction | 🟢 Stable |
 | 🧩 `core-manifest` | Manifest parsing and job orchestration | 🟡 Beta |
 | 🌌 `core-starmap` | Job planner, dependency graph, container packing | 🟡 Beta |
-| 🌌 `core-starmap::universe` | Global deduplication index (V2) | 🔴 Alpha |
-| 🌌 `core-starmap::migrate` | V1→V2 migration utilities | 🔴 Alpha |
-| 🧬 `core-cdc` | FastCDC content-defined chunking (V2) | 🔴 Alpha |
-| 🧠 `core-semantic` | Intent-based replication, composable prioritizers (V2) | 🔴 Alpha |
+| 🧬 `core-cdc` | Content-defined chunking (Gear Hash CDC) | 🔴 Alpha |
+| 🧠 `core-semantic` | Intent-based replication, composable prioritizers | 🔴 Alpha |
 | 📊 `core-audit` | Structured logging, telemetry, typed provenance | 🟡 Beta |
-| ⚡ `core-zero-copy` | OS-level optimized I/O | 🟢 Stable |
-| 🗜️ `core-compress` | Compression and decompression | 🟢 Stable |
-| 🛡️ `disk-guardian` | Pre-flight space & integrity checks | 🟡 Beta |
-| 🧲 `magnetar` | Idempotent job state machine (SQLite + redb) | 🟡 Beta |
-| 🛡️ `magnetar::resilience` | Circuit breaker, connection pool, rate limiter | 🟡 Beta |
-| 🛡️ `core-resilience` | Backpressure, penalization, dead-letter, health monitor, ref-counted GC | 🔴 Alpha |
-| ⭐ `orbit-star` | Star agent with formalized lifecycle hooks | 🔴 Alpha |
-| 📡 `orbit-connect` | Grid connectivity with bulletin board | 🔴 Alpha |
-| 🛡️ `orbit-sentinel` | Autonomous resilience engine (Phase 5 OODA loop) | 🔴 Alpha |
-| 🌐 `protocols` | Network protocol implementations | 🟡 S3/SSH Beta, 🔴 SMB Alpha |
-| 🌐 `orbit-server` | Headless Control Plane API (v2.2.0-alpha) | 🔴 Alpha |
-| 🎨 `orbit-dashboard` | React dashboard (v2.2.0-alpha) | 🔴 Alpha |
-| 🕵️ `core-watcher` | Monitoring beacon | 🚧 Planned |
-| 🧪 `wormhole` | Forward-error correction | 🚧 Planned |
+| 📡 `orbit-observability` | Observability and monitoring | 🟡 Beta |
+| 🚀 `orbit` (root) | CLI, core engine, and transfer orchestration | 🟡 Beta |
 
 This structure ensures isolation, testability, and reusability.
 
 ---
-
-## 🖥️ Orbit Control Plane v2.2.0-alpha - "The Separation"
-
-**Breaking architectural change:** Orbit v2.2.0 separates the monolithic web application into a **headless Control Plane (Rust)** and a **modern Dashboard (React/TypeScript)**, enabling independent deployment, faster iteration, and better scalability.
-
-### Architecture Overview
-
-```
-┌─────────────────────┐
-│  Orbit Dashboard    │  React 18 + Vite + TypeScript
-│  (Port 5173)        │  TanStack Query + React Flow
-└──────────┬──────────┘
-           │ HTTP/WebSocket
-           │ (CORS enabled)
-           ▼
-┌─────────────────────┐
-│  Control Plane API  │  Axum + OpenAPI/Swagger
-│  (Port 8080)        │  JWT Auth + WebSocket
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Magnetar Database  │  SQLite + redb
-└─────────────────────┘
-```
-
-### Quick Start
-
-**Option 1: Use the launcher scripts** (Easiest)
-
-```bash
-# Unix/Linux/macOS
-./scripts/launch-orbit.sh
-
-# Windows
-scripts\launch-orbit.bat
-```
-
-**Option 2: Manual startup**
-
-```bash
-# Terminal 1: Start Control Plane
-cd crates/orbit-web
-cargo run --bin orbit-server
-
-# Terminal 2: Start Dashboard
-cd dashboard
-npm install  # First time only
-npm run dev
-```
-
-**Access Points:**
-- 🎨 **Dashboard**: http://localhost:5173
-- 🔌 **API**: http://localhost:8080/api
-- 📚 **Swagger UI**: http://localhost:8080/swagger-ui
-- 🔒 **Default credentials**: `admin` / `orbit2025` (⚠️ Change in production!)
-
-**What's Running:**
-- ☢️ **Reactor Engine**: Background job executor (starts automatically with orbit-server)
-- 🎨 **Dashboard Dev Server**: React app with hot reload (port 5173)
-- 🔌 **API Server**: RESTful API with WebSockets (port 8080)
-
-**Browser Safety**: Launch scripts open the dashboard in a **new browser tab** and will **NOT kill your other tabs** when you close the script. Safe to use with your existing browser session!
-
-### 🛰️ E2E Demo Harness - "Deep Space Telemetry Scenario"
-
-**NEW in v2.2.0!** Experience Orbit's full capabilities with an automated end-to-end demonstration that showcases real-time job management, visual chunk maps, and live telemetry tracking.
-
-**🛡️ Safety First (Recommended for First-Time Users):**
-
-Before running the demo, use the safety validator to verify your system is ready **without making any changes**:
-
-```bash
-# Unix/Linux/macOS
-./scripts/validate-demo-safety.sh
-
-# Windows (Git Bash)
-bash scripts/validate-demo-safety.sh
-```
-
-The validator checks system requirements, port availability, disk space, and shows exactly what the demo will do. See [docs/project-status/SAFETY_FIRST.md](docs/project-status/SAFETY_FIRST.md) for complete safety documentation.
-
-**Option 3: Run the E2E Demo** (Best for first-time users and demonstrations)
-
-```bash
-# Unix/Linux/macOS
-./scripts/demo-orbit.sh
-
-# Windows
-scripts\demo-orbit.bat
-```
-
-**Requirements:**
-- 💾 **Disk Space:** 4GB free (or 400MB if binaries already built) - [See details](DISK_SPACE_GUIDE.md)
-- ⏱️ **Duration:** ~5-10 minutes (includes build time)
-- 🌐 **Ports:** 8080 (API) and 5173 (Dashboard) must be available
-
-**What the demo does:**
-1. ✅ **Environment Validation** - Verifies Rust, Node.js, and port availability
-2. 📊 **Data Fabrication** - Generates ~170MB of synthetic telescope telemetry data
-3. 🚀 **System Ignition** - Launches both Control Plane and Dashboard
-4. 🎯 **Job Injection** - Programmatically creates and starts a transfer job via REST API
-5. 👁️ **Observation Phase** - Interactive pause to explore the dashboard's Visual Chunk Map and live telemetry graphs
-6. 🧹 **Cleanup** - Gracefully terminates services and removes temporary data
-
-**Features demonstrated:**
-- **Magnetar State Machine** - Job lifecycle management (`pending` → `running` → `completed`)
-- **Real-Time Dashboard** - Visual Chunk Map showing chunk-level transfer progress
-- **Live Telemetry** - Transfer speed graphs and statistics
-- **REST API** - Programmatic job creation and control
-- **Resilient Transfer** - Compression, verification, parallel workers (4 concurrent)
-
-**Perfect for:**
-- 🎬 **Sales Demonstrations** - Show Orbit's capabilities to stakeholders
-- 🧪 **Development Testing** - Validate full-stack functionality quickly
-- 📚 **Training** - Onboard new developers to the architecture
-- 🤖 **CI/CD Integration** - Automated E2E testing in pipelines
-
-📖 **Full Documentation:** See [`DEMO_GUIDE.md`](DEMO_GUIDE.md) for detailed usage, troubleshooting, and customization options.
-
-### Compilation Modes: Headless vs Full UI
-
-**NEW in v2.2.0!** The Control Plane now supports **compile-time modularity** via feature flags, allowing you to build either a lightweight headless API server or a full-featured server with embedded dashboard.
-
-#### Scenario A: Headless Mode (Default)
-Build a smaller, API-only binary without UI dependencies. Perfect for automation, CI/CD pipelines, or custom frontend integrations.
-
-```bash
-# Minimal binary - no UI, smaller attack surface
-cargo build --release -p orbit-server
-
-# Binary size: ~15MB (vs ~25MB with UI)
-# No static file serving, no dashboard embedded
-```
-
-**Use cases:**
-- Kubernetes/Docker deployments with separate UI CDN
-- API-only microservices
-- Custom dashboard integration
-- Embedded systems with limited storage
-
-#### Scenario B: Full UI Mode
-Build with embedded dashboard for all-in-one deployment.
-
-```bash
-# Full binary with embedded React dashboard
-cargo build --release -p orbit-server --features ui
-
-# Binary serves dashboard from dashboard/dist
-# Requires: npm run build in dashboard/ first
-```
-
-**Use cases:**
-- Single-binary desktop applications
-- Quick demos and development
-- End-user installations
-- Local workstation deployment
-
-#### Runtime Behavior
-
-**Headless Mode:**
-```
-⚙️ Headless Mode: Dashboard not included, API-only server
-Orbit Control Plane (Headless Mode) - API available at /api/*
-```
-
-**UI Mode:**
-```
-🎨 UI Feature Enabled: Serving embedded dashboard from dashboard/dist
-Dashboard available at http://localhost:8080/
-```
-
-### Control Plane Features (v2.2.0-alpha)
-
-#### ✅ OpenAPI-Documented REST API
-- **Swagger UI** at `/swagger-ui` for interactive API testing
-- **Type-safe endpoints** with utoipa schema generation
-- **Job Management**: Create, list, monitor, cancel, delete jobs
-- **Backend Configuration**: Manage S3, SMB, SSH, Local backends
-- **Authentication**: JWT-based auth with httpOnly cookies
-- **Real-time Updates**: WebSocket streams at `/ws/:job_id`
-
-#### ✅ Intelligent Scheduling (Planned)
-- **Duration Estimation**: Predict transfer times based on historical data
-- **Bottleneck Detection**: Proactive warnings for performance issues
-- **Confidence Scoring**: Reliability metrics for time estimates
-- **Priority Queues**: Smart job ordering for critical transfers
-
-#### ✅ Production Security
-- **JWT Authentication** with 24-hour expiration
-- **Argon2 Password Hashing** (OWASP recommended)
-- **Role-Based Access Control** (Admin/Operator/Viewer)
-- **CORS Configuration** for dashboard integration
-- **Environment-based secrets** via `ORBIT_JWT_SECRET`
-
-### Dashboard Features (v2.2.0-rc.1)
-
-#### ✅ Modern React Stack
-- **React 19** with TypeScript for type safety and strict ESLint compliance
-- **Vite 7** for instant hot module replacement (HMR)
-- **TanStack Query** for intelligent data fetching and caching
-- **Tailwind CSS 4** with tailwindcss-animate plugin for professional design and smooth animations
-- **Lucide Icons** for consistent iconography
-- **@xyflow/react 12** for visual pipeline editing
-- **Full-Screen Layout**: Edge-to-edge dashboard design with removed Vite scaffolding constraints
-
-#### ✅ Cockpit-Style App Shell (NEW in Unreleased)
-- **Sidebar Navigation**: Professional persistent sidebar replacing top navigation bar
-- **Live Status Indicator**: Animated pulsing green dot for "System Online" confirmation
-- **Pre-Alpha Warning**: Prominent warning banner across all views
-- **Mobile Drawer**: Smooth slide-in menu with backdrop overlay for mobile devices
-- **Responsive Design**: Fully optimized from 320px to 4K displays
-- **Theme Integration**: Dark/light mode toggle with consistent styling
-- **Operator Profile**: Gradient avatar with system status in sidebar
-
-#### ✅ Mission Control Dashboard (NEW in Unreleased - Embedded Visibility)
-- **Live Telemetry**: Real-time network throughput with SVG area charts
-- **Client-Side Buffering**: 30-point rolling history for smooth "live" feel
-- **Metric Cards**: Active Jobs, Throughput, System Load, Storage Health with trend indicators
-- **Animated Status**: Pulsing green dot for "Live Stream Active" confirmation
-- **Capacity Planning**: Donut chart visualization with used/available space breakdown
-- **Traffic Statistics**: Peak, Average, and Total Transferred metrics
-
-#### ✅ Deep-Dive Job Details (NEW in Unreleased - Embedded Visibility)
-- **Visual Chunk Map**: 100-cell grid showing completion progress with color coding
-- **Glowing Effects**: Green (completed) and red (failed) chunks with shadow effects
-- **Proportional Sampling**: Intelligent downsampling for jobs with >100 chunks
-- **Event Stream**: Real-time lifecycle events with timestamps and status icons
-- **Configuration Display**: Detailed source/destination, mode, compression, verification
-- **Performance Metrics**: Throughput, chunk statistics, and timing data
-- **Breadcrumb Navigation**: "Job List → Job #N" with back button
-
-#### ✅ Enhanced Job Management (NEW in Unreleased)
-- **Click-to-Expand**: Select any job to view detailed inspection view
-- **Real-time Search**: Filter jobs by ID, source path, or destination path
-- **Status Filtering**: Dropdown to filter by All/Running/Pending/Completed/Failed
-- **Manual Refresh**: Button for on-demand data refresh
-- **Compact Mode**: Shows 5 most recent jobs for dashboard integration
-- **Enhanced Empty States**: Helpful messaging with icons for better user guidance
-
-#### ✅ Professional File Browser (rc.1)
-- **Click-to-Select** files and folders with visual feedback
-- **Up Navigation** button to traverse parent directories
-- **Folder Selection** button for directory transfers
-- **Visual Indicators**: Selected items highlighted in blue with dark mode support
-- **Loading States**: Spinner and error handling for API calls
-- **RESTful API**: GET `/api/files/list?path={path}` endpoint
-
-#### ✅ Improved Quick Transfer (NEW in Unreleased)
-- **Visual Flow**: Source → destination with animated connector
-- **Color Coding**: Blue borders for source, orange for destination
-- **State Management**: Success/error feedback (no more browser alerts)
-- **Auto-reset**: Form clears automatically after successful transfer
-- **Validation**: Better input validation and loading states
-
-#### ✅ Visual Pipeline Builder
-- **React Flow v12** DAG editor for intuitive job configuration
-- **Drag-and-drop** source and destination nodes
-- **Theme-aware**: Uses design system colors for consistent styling
-- **Icon Toolbar**: Enhanced buttons with Database/Zap/Cloud icons
-- **Node Counter**: Displays current number of nodes and connections
-
-#### ✅ User Management (NEW in Unreleased)
-- **Statistics Dashboard**: Cards showing Total Users, Admins, and Operators
-- **Delete Functionality**: Remove users with confirmation dialogs
-- **Gradient Avatars**: Auto-generated avatars with user initials
-- **Role Badges**: Theme-aware badges for Admin/Operator/Viewer roles
-- **Enhanced Forms**: Better layout with clear field labeling
-
-#### ✅ Smart Data Fetching
-- **Adaptive Polling**: 2s for jobs and health, optimized for responsiveness
-- **Optimistic Updates**: Instant UI feedback on mutations
-- **Automatic Cache Invalidation**: Always shows fresh data
-- **Request Deduplication**: Efficient network usage
-
-#### ✅ Real-time Monitoring
-- **Live Job Status** with progress bars and percentages
-- **Transfer Speed Tracking** with chunk completion metrics
-- **Sparkline Trends**: Visual representation of metric history
-- **Auto-refresh**: Continuous updates for active monitoring
-
-#### ✅ CI/CD Pipeline (rc.1)
-- **Dashboard Quality Control**: Dedicated GitHub Actions job
-  - Prettier formatting checks
-  - ESLint linting (zero warnings)
-  - TypeScript strict type checking
-  - npm security audit (high severity)
-  - Vitest unit tests
-  - Production build verification
-- **Rust Security**: cargo-audit integrated into backend CI
-- **Local Validation**: `npm run ci:check` for pre-push checks
-
-### API Examples
-
-**Create a Job**
-```bash
-curl -X POST http://localhost:8080/api/jobs \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "/data/backup",
-    "destination": "s3://bucket/backup",
-    "compress": true,
-    "verify": true,
-    "parallel_workers": 4
-  }'
-```
-
-**Get Job Status**
-```bash
-curl http://localhost:8080/api/jobs/1
-```
-
-**WebSocket Monitoring**
-```javascript
-const ws = new WebSocket('ws://localhost:8080/ws/1');
-ws.onmessage = (event) => {
-  const update = JSON.parse(event.data);
-  console.log('Progress:', update.progress);
-};
-```
-
-### Development
-
-**Backend (Control Plane)**
-```bash
-cd crates/orbit-web
-cargo watch -x 'run --bin orbit-server'  # Auto-reload on changes
-cargo check  # Quick compilation check
-cargo audit  # Security vulnerability scan
-```
-
-**Frontend (Dashboard)**
-```bash
-cd dashboard
-npm install              # Install dependencies (first time)
-npm run dev              # Vite HMR enabled
-npm run ci:check         # Run all checks before pushing
-npm run format:fix       # Auto-fix code formatting
-npm run typecheck        # TypeScript validation
-npm test                 # Run unit tests
-```
-
-**API Documentation**
-```bash
-# Generate and open API docs
-cd crates/orbit-web
-cargo doc --open -p orbit-server
-```
-
-**Pre-Push Checklist**
-```bash
-# Backend
-cargo fmt --all --check
-cargo clippy --all
-cargo test
-cargo audit
-
-# Frontend
-cd dashboard
-npm run ci:check  # Runs: typecheck + lint + format:check + test
-```
-
-### Configuration
-
-**Environment Variables:**
-```bash
-# Control Plane
-export ORBIT_SERVER_HOST=0.0.0.0       # Bind address (default: 127.0.0.1)
-export ORBIT_SERVER_PORT=8080          # API port (default: 8080)
-export ORBIT_JWT_SECRET=$(openssl rand -base64 32)  # REQUIRED for production
-export ORBIT_MAGNETAR_DB=magnetar.db   # Job database path
-export ORBIT_USER_DB=users.db          # Auth database path
-
-# Dashboard
-# Edit dashboard/.env if needed
-VITE_API_URL=http://localhost:8080
-```
-
-### Migration from v1.0 (Nebula)
-
-The v2.2.0 architecture is a complete rewrite. Key changes:
-
-| v1.0 (Nebula) | v2.2.0 (Control Plane) |
-|---------------|------------------------|
-| Leptos SSR | Axum REST API + React SPA |
-| `orbit-web` binary | `orbit-server` + separate dashboard |
-| Monolithic | Decoupled microservices |
-| Server-side rendering | Client-side rendering |
-| `cargo leptos watch` | `cargo run` + `npm run dev` |
-| `/pkg` WASM assets | Static JSON API |
-
-**Breaking Changes:**
-- `orbit serve` now **only** starts the API (no UI bundled)
-- Dashboard must be hosted separately or via CDN
-- API endpoints remain compatible but are now OpenAPI-documented
-- Authentication flow unchanged (JWT cookies)
-
-### Deployment
-
-**Production Checklist:**
-- [ ] Set `ORBIT_JWT_SECRET` (minimum 32 characters)
-- [ ] Change default admin password
-- [ ] Configure CORS for your dashboard domain
-- [ ] Use HTTPS (reverse proxy recommended: nginx/Caddy)
-- [ ] Set up persistent volumes for databases
-- [ ] Configure firewall rules (allow 8080 for API, 5173 for dev dashboard)
-- [ ] Enable request logging (`RUST_LOG=info`)
-
-**Docker Compose Example** (Coming soon)
-
-### Roadmap
-
-- ✅ v2.2.0-alpha.1 - Basic separation, API refactoring, React scaffolding
-- 🚧 v2.2.0-alpha.2 - Interactive job creation UI, pipeline visual editor
-- 🚧 v2.2.0-beta.1 - Complete dashboard features, duration estimation API
-- 🚧 v2.2.0-rc.1 - Production hardening, performance optimization
-- 🚧 v2.2.0 - Stable release with full documentation
-
-### Troubleshooting
-
-**Control Plane won't start**
-```bash
-# Check if port is in use
-lsof -i :8080  # Unix
-netstat -ano | findstr :8080  # Windows
-
-# Check logs
-RUST_LOG=debug cargo run --bin orbit-server
-```
-
-**Dashboard can't connect to API**
-```bash
-# Verify Control Plane is running
-curl http://localhost:8080/api/health
-
-# Check CORS configuration in server.rs
-# Ensure dashboard origin is allowed
-```
-
-**JWT Authentication fails**
-```bash
-# Ensure JWT_SECRET is set
-echo $ORBIT_JWT_SECRET
-
-# Generate a new secret
-export ORBIT_JWT_SECRET=$(openssl rand -base64 32)
-```
-
-### Support & Documentation
-
-- 📖 **API Docs**: http://localhost:8080/swagger-ui (when running)
-- 📁 **Source**: [crates/orbit-web/](crates/orbit-web/) (Control Plane), [dashboard/](dashboard/) (React app)
-- 📝 **CHANGELOG**: [CHANGELOG.md](CHANGELOG.md#architecture-shift---orbit-control-plane-v220-alpha-breaking)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/saworbit/orbit/issues)
 
 ---
 
@@ -2413,9 +1746,8 @@ export ORBIT_JWT_SECRET=$(openssl rand -base64 32)
 | Build Configuration | Security Status | Use Case |
 |---------------------|----------------|----------|
 | `cargo build` (default) | ✅ **Zero vulnerabilities** | Production deployments |
-| `cargo build --features api` | ✅ **Zero vulnerabilities** | Web dashboard (SQLite only) |
+| `cargo build --features network` | ✅ **Zero vulnerabilities** | All network protocols |
 | `cargo build --features smb-native` | ⚠️ **Optional advisory** | SMB protocol (see note below) |
-| `cargo build --features full` | ⚠️ **Optional advisory** | Testing & development only |
 
 **Optional Feature Advisory:** When building with `--features smb-native`, a medium-severity timing side-channel advisory (RUSTSEC-2023-0071) is present in the SMB authentication stack. This requires active exploitation during SMB connections and does not affect other protocols or default builds.
 
@@ -2454,9 +1786,6 @@ orbit --source <PATH> --dest <PATH> [FLAGS]
 **S3 flags:**
 | Flag | Description |
 |------|-------------|
-| `--content-type TYPE` | Set Content-Type header on uploads |
-| `--cache-control VAL` | Set Cache-Control header on uploads |
-| `--acl ACL` | Canned ACL (e.g., `private`, `public-read`, `bucket-owner-full-control`) |
 | `--no-sign-request` | Anonymous access for public S3 buckets |
 | `--use-acceleration` | Enable S3 Transfer Acceleration |
 | `--request-payer` | Access requester-pays buckets |
@@ -2472,10 +1801,6 @@ orbit --source <PATH> --dest <PATH> [FLAGS]
 | `-n` / `--no-clobber` | Do not overwrite existing files |
 | `--if-size-differ` | Only copy if source and destination sizes differ |
 | `--if-source-newer` | Only copy if source is newer than destination |
-| `--flatten` | Strip directory hierarchy during copy |
-| `--raw` | Disable wildcard expansion (treat patterns as literal keys) |
-| `--force-glacier-transfer` | Force transfer of Glacier-stored objects |
-| `--ignore-glacier-warnings` | Suppress Glacier object warnings |
 
 **Subcommands:**
 ```bash
@@ -2492,7 +1817,6 @@ orbit pipe s3://bucket/key                # Upload stdin to S3
 orbit presign s3://bucket/key [--expires] # Generate pre-signed URL
 orbit manifest <plan|verify|diff|info>    # Manifest operations
 orbit <init|stats|presets|capabilities>   # Configuration & info
-orbit serve [--addr HOST:PORT]            # Launch web GUI
 ```
 
 > **Note:** `cat`, `pipe`, and `presign` require the `s3-native` feature flag.
@@ -2501,7 +1825,7 @@ orbit serve [--addr HOST:PORT]            # Launch web GUI
 
 ## 🧪 Roadmap
 
-### ✅ Core Features Implemented (v0.4.1 - v0.6.0)
+### ✅ Core Features Implemented
 
 **Stable/Well-Tested:**
 - Zero-copy system calls (Linux, macOS, Windows)
@@ -2515,37 +1839,28 @@ orbit serve [--addr HOST:PORT]            # Launch web GUI
 - SSH/SFTP backend
 - S3-compatible storage (MinIO, LocalStack)
 - Disk Guardian: Pre-flight space & integrity checks
-- Magnetar: Idempotent job state machine with SQLite + redb backends
-- Magnetar Resilience Module: Circuit breaker, connection pooling, rate limiting
 - Delta Detection: rsync-inspired efficient transfers with block-based diffing
 - Metadata Preservation & Transformation
 - Inclusion/Exclusion Filters: Glob, regex, and path patterns
 - Progress Reporting & Operational Controls: Bandwidth limiting, concurrency control
 - Manifest + Starmap + Audit integration
 - Structured telemetry with JSON Lines
+- Config Optimizer with active environment probing
 
 **Alpha/Experimental:**
 - V2 Architecture (CDC, semantic replication, global dedup)
 - SMB2/3 native implementation (awaiting upstream fix)
-- **Orbit Control Plane v2.2.0-alpha.2** with React Dashboard
-  - Visual Pipeline Editor (React Flow)
-  - Interactive File Browser with filesystem navigation
-  - Job Management UI with real-time progress tracking
-  - REST API with OpenAPI documentation
 
-### 🚧 In Progress (v0.6.0)
+### 🚧 In Progress
 
 - Stabilizing V2 architecture components (CDC, semantic replication)
 - Expanding test coverage for newer features
 - Real-world validation of S3 and SSH backends
-- Enhanced CLI with subcommands
-- Web GUI interactive dashboard (Nebula beta)
 
-### 🔮 Planned (v0.6.0+)
+### 🔮 Planned
 
 #### CLI Improvements
 - Friendly subcommands (`orbit cp`, `orbit sync`, `orbit run`) as aliases
-- Protocol-specific flags (`--smb-user`, `--region`, `--storage-class`)
 - File watching mode (`--watch`)
 - Interactive mode with prompts
 
@@ -2554,11 +1869,7 @@ orbit serve [--addr HOST:PORT]            # Launch web GUI
 
 #### Advanced Features
 - Wormhole FEC module for lossy networks
-- REST orchestration API
-- Job scheduler with cron-like syntax
 - Plugin framework for custom protocols
-- S3 Transfer Acceleration
-- CloudWatch metrics integration
 - Disk quota integration
 
 ---
@@ -2578,11 +1889,11 @@ cargo build
 # Run tests (includes S3 backend tests)
 cargo test
 
-# Run with all features (adds extended-metadata, delta-manifest)
-cargo build --features full
-cargo test --features full
+# Run with network features
+cargo build --features network
+cargo test --features network
 
-# Minimal build (no network backends or GUI)
+# Minimal build (no network backends)
 cargo build --no-default-features --features zero-copy
 
 # Format and lint
@@ -2603,22 +1914,13 @@ cargo clippy
 
 ### User Guides
 - **Quick Start:** This README
-- **🎨 Control Plane v2.2.0-alpha.2 Deployment:** [`DEPLOYMENT_GUIDE_V2.2.0-alpha.2.md`](DEPLOYMENT_GUIDE_V2.2.0-alpha.2.md) ⭐ **NEW!**
-- **Nebula MVP Summary:** [`crates/orbit-web/NEBULA_MVP_SUMMARY.md`](crates/orbit-web/NEBULA_MVP_SUMMARY.md) ⭐ **v1.0.0-alpha.2**
-- **Nebula Changelog:** [`crates/orbit-web/CHANGELOG.md`](crates/orbit-web/CHANGELOG.md) ⭐ **NEW!**
-- **Nebula README:** [`crates/orbit-web/README.md`](crates/orbit-web/README.md) ⭐ **v1.0.0-alpha.2**
-- **Web Dashboard (v2.2.0):** See Control Plane documentation
-- **GUI Integration:** [`docs/GUI_INTEGRATION.md`](docs/GUI_INTEGRATION.md)
-- **Testing & Validation Scripts:** [`docs/guides/TESTING_SCRIPTS_GUIDE.md`](docs/guides/TESTING_SCRIPTS_GUIDE.md) ⭐ **NEW!**
+- **Testing & Validation Scripts:** [`docs/guides/TESTING_SCRIPTS_GUIDE.md`](docs/guides/TESTING_SCRIPTS_GUIDE.md)
 - **S3 Guide:** [`docs/guides/S3_USER_GUIDE.md`](docs/guides/S3_USER_GUIDE.md)
 - **GCS Guide:** [`docs/guides/GCS_USER_GUIDE.md`](docs/guides/GCS_USER_GUIDE.md)
 - **Disk Guardian:** [`docs/architecture/DISK_GUARDIAN.md`](docs/architecture/DISK_GUARDIAN.md)
-- **Magnetar:** [`crates/magnetar/README.md`](crates/magnetar/README.md) ⭐ **NEW!**
-- **Resilience Module:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
-- **Data Flow Patterns:** [`docs/architecture/DATA_FLOW_PATTERNS.md`](docs/architecture/DATA_FLOW_PATTERNS.md) ⭐ **NEW!**
-- **Delta Detection:** [`docs/guides/DELTA_DETECTION_GUIDE.md`](docs/guides/DELTA_DETECTION_GUIDE.md) and [`docs/guides/DELTA_QUICKSTART.md`](docs/guides/DELTA_QUICKSTART.md) ⭐ **NEW!**
-- **Filter System:** [`docs/guides/FILTER_SYSTEM.md`](docs/guides/FILTER_SYSTEM.md) ⭐ **NEW!**
-- **Progress & Concurrency:** [`docs/architecture/PROGRESS_AND_CONCURRENCY.md`](docs/architecture/PROGRESS_AND_CONCURRENCY.md) ⭐ **NEW!**
+- **Delta Detection:** [`docs/guides/DELTA_DETECTION_GUIDE.md`](docs/guides/DELTA_DETECTION_GUIDE.md) and [`docs/guides/DELTA_QUICKSTART.md`](docs/guides/DELTA_QUICKSTART.md)
+- **Filter System:** [`docs/guides/FILTER_SYSTEM.md`](docs/guides/FILTER_SYSTEM.md)
+- **Progress & Concurrency:** [`docs/architecture/PROGRESS_AND_CONCURRENCY.md`](docs/architecture/PROGRESS_AND_CONCURRENCY.md)
 - **Resume System:** [`docs/architecture/RESUME_SYSTEM.md`](docs/architecture/RESUME_SYSTEM.md)
 - **Protocol Guide:** [`docs/guides/PROTOCOL_GUIDE.md`](docs/guides/PROTOCOL_GUIDE.md)
 
@@ -2626,18 +1928,13 @@ cargo clippy
 - **SMB Status:** [`docs/SMB_NATIVE_STATUS.md`](docs/SMB_NATIVE_STATUS.md)
 - **Manifest System:** [`docs/MANIFEST_SYSTEM.md`](docs/MANIFEST_SYSTEM.md)
 - **Zero-Copy Guide:** [`docs/ZERO_COPY.md`](docs/ZERO_COPY.md)
-- **Magnetar Quick Start:** [`crates/magnetar/QUICKSTART.md`](crates/magnetar/QUICKSTART.md) ⭐ **NEW!**
-- **Resilience Patterns:** [`crates/magnetar/src/resilience/README.md`](crates/magnetar/src/resilience/README.md) ⭐ **NEW!**
-- **Data Flow Patterns:** [`docs/architecture/DATA_FLOW_PATTERNS.md`](docs/architecture/DATA_FLOW_PATTERNS.md) ⭐ **NEW!**
 - **API Reference:** Run `cargo doc --open`
 
 ### Examples
 - **Basic Examples:** [`examples/`](examples/) directory
 - **S3 Examples:** [`examples/s3_*.rs`](examples/)
 - **Disk Guardian Demo:** [`examples/disk_guardian_demo.rs`](examples/disk_guardian_demo.rs)
-- **Magnetar Examples:** [`crates/magnetar/examples/`](crates/magnetar/examples/) ⭐ **NEW!**
-- **Resilience Demo:** [`crates/magnetar/examples/resilience_demo.rs`](crates/magnetar/examples/resilience_demo.rs) ⭐ **NEW!**
-- **Filter Example:** [`examples/filters/example.orbitfilter`](examples/filters/example.orbitfilter) ⭐ **NEW!**
+- **Filter Example:** [`examples/filters/example.orbitfilter`](examples/filters/example.orbitfilter)
 - **Progress Demo:** [`examples/progress_demo.rs`](examples/progress_demo.rs)
 
 ---

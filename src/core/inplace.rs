@@ -13,7 +13,7 @@
  *   file before modification. Zero-cost on btrfs/XFS/APFS. Falls back to
  *   journaled if the filesystem doesn't support reflinks.
  *
- * - **Journaled**: Records original bytes in a Magnetar-compatible undo journal
+ * - **Journaled**: Records original bytes in an undo journal
  *   before each overwrite. On crash, the journal can reconstruct the original.
  *
  * - **Unsafe**: Direct overwrite with no recovery. User opt-in only.

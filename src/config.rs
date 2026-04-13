@@ -210,16 +210,6 @@ pub struct CopyConfig {
     #[serde(default)]
     pub check_mode_str: Option<String>,
 
-    /// Transfer profile: "neutrino" for small-file optimization
-    /// Options: "standard", "neutrino", "adaptive"
-    #[serde(default)]
-    pub transfer_profile: Option<String>,
-
-    /// Neutrino threshold in bytes (default: 8192 = 8KB)
-    /// Files smaller than this use the fast lane
-    #[serde(default = "default_neutrino_threshold")]
-    pub neutrino_threshold: u64,
-
     // === V3 Observability Configuration ===
     /// OpenTelemetry OTLP endpoint for distributed tracing
     /// Example: "http://localhost:4317" (Jaeger, Honeycomb, Datadog)
@@ -423,8 +413,6 @@ impl Default for CopyConfig {
             check_mode_str: None,
             delta_resume_enabled: true,
             delta_chunk_size: default_delta_block_size(),
-            transfer_profile: None,
-            neutrino_threshold: default_neutrino_threshold(),
             otel_endpoint: None,
             metrics_port: None,
             show_stats: false,
@@ -573,7 +561,7 @@ pub enum InplaceSafety {
     #[default]
     Reflink,
 
-    /// Log original bytes to Magnetar state machine before each overwrite.
+    /// Log original bytes to an undo journal before each overwrite.
     /// Works on any filesystem. Slightly slower but crash-recoverable.
     Journaled,
 
@@ -613,10 +601,6 @@ fn default_retry_delay() -> u64 {
 
 fn default_delta_block_size() -> usize {
     1024 * 1024 // 1 MB
-}
-
-fn default_neutrino_threshold() -> u64 {
-    8 * 1024 // 8 KB
 }
 
 fn default_concurrency() -> usize {
@@ -1022,11 +1006,6 @@ audit_log_path = "/var/log/orbit_audit.log"
         assert_eq!(LogLevel::Info.to_tracing_level(), tracing::Level::INFO);
         assert_eq!(LogLevel::Debug.to_tracing_level(), tracing::Level::DEBUG);
         assert_eq!(LogLevel::Trace.to_tracing_level(), tracing::Level::TRACE);
-    }
-
-    #[test]
-    fn test_neutrino_threshold_default() {
-        assert_eq!(default_neutrino_threshold(), 8192);
     }
 
     #[test]

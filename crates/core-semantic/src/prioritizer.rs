@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn test_composable_chain() {
-        let mut items = vec![
+        let mut items = [
             TransferItem::new("big_critical", Priority::Critical, 1_000_000, now()),
             TransferItem::new("small_critical", Priority::Critical, 100, now()),
             TransferItem::new("normal", Priority::Normal, 500, now()),
@@ -282,7 +282,7 @@ mod tests {
             Box::new(NewestFirstPrioritizer),
         ]);
 
-        let mut items = vec![
+        let mut items = [
             TransferItem::new("small", Priority::Normal, 100, now()),
             TransferItem::new("large", Priority::Normal, 10000, now()),
         ];
@@ -350,7 +350,7 @@ mod tests {
     fn test_single_element_chain() {
         let prioritizer = ComposablePrioritizer::new(vec![Box::new(SmallestFirstPrioritizer)]);
 
-        let mut items = vec![
+        let mut items = [
             TransferItem::new("big", Priority::Normal, 5000, now()),
             TransferItem::new("tiny", Priority::Normal, 10, now()),
             TransferItem::new("mid", Priority::Normal, 500, now()),
@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn test_sort_stability() {
         let t = now();
-        let mut items = vec![
+        let mut items = [
             TransferItem::new("first", Priority::Normal, 100, t),
             TransferItem::new("second", Priority::Normal, 100, t),
         ];
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn test_same_priority_different_size() {
         let t = now();
-        let mut items = vec![
+        let mut items = [
             TransferItem::new("large_critical", Priority::Critical, 50_000, t),
             TransferItem::new("small_critical", Priority::Critical, 256, t),
         ];
@@ -397,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_same_priority_same_size_different_age() {
-        let mut items = vec![
+        let mut items = [
             TransferItem::new("newer", Priority::Normal, 1024, past(10)),
             TransferItem::new("older", Priority::Normal, 1024, past(60)),
         ];
@@ -424,7 +424,7 @@ mod tests {
         let mut heavy = TransferItem::new("heavy", Priority::Normal, 100, t);
         heavy.retry_count = 5;
 
-        let mut items = vec![heavy, fresh, moderate];
+        let mut items = [heavy, fresh, moderate];
         items.sort_by(|a, b| prioritizer.compare(a, b));
 
         assert_eq!(items[0].path, "fresh");

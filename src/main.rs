@@ -1,13 +1,4 @@
-/*!
- * Orbit CLI - Command Line Interface
- *
- * Version: 0.6.0
- * Author: Shane Wall <shaneawall@gmail.com>
- *
- * Phase 1 Note: The OrbitSystem abstraction (orbit-core-interface) is now available.
- * Future sync operations will use dependency injection with LocalSystem (standalone)
- * or RemoteSystem (Grid/Star topology). See docs/specs/PHASE_1_ABSTRACTION_SPEC.md
- */
+/*! Orbit CLI */
 
 use clap::{Parser, Subcommand, ValueEnum};
 use orbit::{
@@ -22,7 +13,7 @@ use orbit::{
     },
     copy_directory, copy_file,
     core::batch::TransferJournal,
-    core::guidance::Guidance,
+    core::guidance::ConfigOptimizer,
     error::{OrbitError, Result, EXIT_FATAL, EXIT_SUCCESS},
     get_zero_copy_capabilities, is_zero_copy_available, logging,
     manifest_integration::ManifestGenerator,
@@ -30,7 +21,6 @@ use orbit::{
     stats::TransferStats,
     CopyStats,
 };
-use std::net::SocketAddr;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -157,68 +147,6 @@ struct Cli {
     #[arg(short = 'H', long = "human-readable", global = true)]
     human_readable: bool,
 
-    // === Phase 3: S3 Upload Enhancement Flags ===
-    /// Content-Type header for S3 uploads
-    #[arg(long, global = true)]
-    content_type: Option<String>,
-
-    /// Content-Encoding header for S3 uploads
-    #[arg(long, global = true)]
-    content_encoding: Option<String>,
-
-    /// Content-Disposition header for S3 uploads
-    #[arg(long, global = true)]
-    content_disposition: Option<String>,
-
-    /// Cache-Control header for S3 uploads
-    #[arg(long, global = true)]
-    cache_control: Option<String>,
-
-    /// Expiration date for S3 objects (RFC3339 format)
-    #[arg(long = "expires-header", global = true)]
-    expires_header: Option<String>,
-
-    /// User-defined metadata key=value pairs for S3 uploads
-    #[arg(long = "metadata", global = true)]
-    user_metadata: Vec<String>,
-
-    /// Metadata directive for S3 copy operations (COPY or REPLACE)
-    #[arg(long, global = true)]
-    metadata_directive: Option<String>,
-
-    /// Canned ACL for S3 uploads (e.g., private, public-read, bucket-owner-full-control)
-    #[arg(long, global = true)]
-    acl: Option<String>,
-
-    // === Phase 4: S3 Client Configuration Flags ===
-    /// Disable request signing for public S3 buckets
-    #[arg(long, global = true)]
-    no_sign_request: bool,
-
-    /// Path to AWS credentials file
-    #[arg(long, global = true)]
-    credentials_file: Option<PathBuf>,
-
-    /// AWS profile name to use
-    #[arg(long = "aws-profile", global = true)]
-    aws_profile: Option<String>,
-
-    /// Use S3 Transfer Acceleration
-    #[arg(long, global = true)]
-    use_acceleration: bool,
-
-    /// Enable requester-pays for S3 bucket access
-    #[arg(long, global = true)]
-    request_payer: bool,
-
-    /// Disable SSL certificate verification (use with caution)
-    #[arg(long, global = true)]
-    no_verify_ssl: bool,
-
-    /// Use ListObjects API v1 (for older S3-compatible storage)
-    #[arg(long, global = true)]
-    use_list_objects_v1: bool,
-
     /// Audit log format
     #[arg(long, value_enum, default_value = "json", global = true)]
     audit_format: AuditFormatArg,
@@ -308,23 +236,69 @@ struct Cli {
     #[arg(long, global = true)]
     config: Option<PathBuf>,
 
-    /// Transfer profile for workload optimization (standard, neutrino, adaptive)
-    #[arg(long = "profile", value_enum, global = true)]
-    profile: Option<ProfileArg>,
-
-    /// Neutrino threshold in KB (default: 8)
-    /// Files smaller than this use the fast lane when --profile=neutrino
-    #[arg(long, default_value = "8", global = true)]
-    neutrino_threshold: u64,
-
-    /// Force transfer of Glacier-stored objects
+    // === S3 Upload Enhancement Flags ===
+    /// Content-Type header for S3 uploads
     #[arg(long, global = true)]
-    force_glacier_transfer: bool,
+    content_type: Option<String>,
 
-    /// Suppress warnings about Glacier-stored objects
+    /// Content-Encoding header for S3 uploads
     #[arg(long, global = true)]
-    ignore_glacier_warnings: bool,
+    content_encoding: Option<String>,
 
+    /// Content-Disposition header for S3 uploads
+    #[arg(long, global = true)]
+    content_disposition: Option<String>,
+
+    /// Cache-Control header for S3 uploads
+    #[arg(long, global = true)]
+    cache_control: Option<String>,
+
+    /// Expiration date for S3 objects (RFC3339 format)
+    #[arg(long = "expires-header", global = true)]
+    expires_header: Option<String>,
+
+    /// User-defined metadata key=value pairs for S3 uploads
+    #[arg(long = "metadata", global = true)]
+    user_metadata: Vec<String>,
+
+    /// Metadata directive for S3 copy operations (COPY or REPLACE)
+    #[arg(long, global = true)]
+    metadata_directive: Option<String>,
+
+    /// Canned ACL for S3 uploads (e.g., private, public-read, bucket-owner-full-control)
+    #[arg(long, global = true)]
+    acl: Option<String>,
+
+    // === S3 Client Configuration Flags ===
+    /// Disable request signing for public S3 buckets
+    #[arg(long, global = true)]
+    no_sign_request: bool,
+
+    /// Path to AWS credentials file
+    #[arg(long, global = true)]
+    credentials_file: Option<PathBuf>,
+
+    /// AWS profile name to use
+    #[arg(long = "aws-profile", global = true)]
+    aws_profile: Option<String>,
+
+    /// Use S3 Transfer Acceleration
+    #[arg(long, global = true)]
+    use_acceleration: bool,
+
+    /// Enable requester-pays for S3 bucket access
+    #[arg(long, global = true)]
+    request_payer: bool,
+
+    /// Disable SSL certificate verification (use with caution)
+    #[arg(long, global = true)]
+    no_verify_ssl: bool,
+
+    /// Use ListObjects API v1 (for older S3-compatible storage)
+    #[arg(long, global = true)]
+    use_list_objects_v1: bool,
+
+    // === Conditional copy flags ===
     /// Do not overwrite existing destination files
     #[arg(long, short = 'n', global = true)]
     no_clobber: bool,
@@ -340,10 +314,6 @@ struct Cli {
     /// Flatten directory hierarchy during copy (strip path components)
     #[arg(long, global = true)]
     flatten: bool,
-
-    /// Disable wildcard expansion (treat patterns as literal keys)
-    #[arg(long, global = true)]
-    raw: bool,
 
     // === In-place & Sparse File Optimization ===
     /// Sparse file handling mode (auto, always, never)
@@ -374,8 +344,7 @@ struct Cli {
     )]
     inplace_safety: InplaceSafetyArg,
 
-    /// Detect renamed/moved files via content-chunk overlap
-    /// Uses the Star Map index to find destination files sharing chunks with source
+    /// Detect renamed/moved files via content-hash overlap at destination
     #[arg(long, global = true)]
     detect_renames: bool,
 
@@ -418,13 +387,6 @@ enum Commands {
 
     /// Show platform capabilities
     Capabilities,
-
-    /// Launch the Orbit Web GUI server
-    Serve {
-        /// Bind address for the web server
-        #[arg(long, default_value = "127.0.0.1:8080")]
-        addr: SocketAddr,
-    },
 
     /// Generate shell completions
     Completions {
@@ -748,13 +710,6 @@ impl From<LogLevelArg> for LogLevel {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum ProfileArg {
-    Standard,
-    Neutrino,
-    Adaptive,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum SparseModeArg {
     Auto,
     Always,
@@ -908,7 +863,7 @@ fn run() -> Result<()> {
     config.verbose = cli.verbose;
     config.json_output = cli.json;
 
-    // S3 upload enhancement flags (Phase 3)
+    // S3 upload enhancement flags
     config.s3_content_type = cli.content_type;
     config.s3_content_encoding = cli.content_encoding;
     config.s3_content_disposition = cli.content_disposition;
@@ -918,7 +873,7 @@ fn run() -> Result<()> {
     config.s3_metadata_directive = cli.metadata_directive;
     config.s3_acl = cli.acl;
 
-    // S3 client configuration flags (Phase 4)
+    // S3 client configuration flags
     config.s3_no_sign_request = cli.no_sign_request;
     config.s3_credentials_file = cli.credentials_file;
     config.s3_aws_profile = cli.aws_profile;
@@ -927,7 +882,7 @@ fn run() -> Result<()> {
     config.s3_no_verify_ssl = cli.no_verify_ssl;
     config.s3_use_list_objects_v1 = cli.use_list_objects_v1;
 
-    // Conditional copy & transfer flags (Phase 5/6)
+    // Conditional copy flags
     config.no_clobber = cli.no_clobber;
     config.if_size_differ = cli.if_size_differ;
     config.if_source_newer = cli.if_source_newer;
@@ -989,24 +944,14 @@ fn run() -> Result<()> {
     config.ignore_existing = cli.ignore_existing;
     config.delta_manifest_path = cli.delta_manifest;
 
-    // Configure Neutrino fast lane
-    config.transfer_profile = cli.profile.map(|p| match p {
-        ProfileArg::Standard => "standard".to_string(),
-        ProfileArg::Neutrino => "neutrino".to_string(),
-        ProfileArg::Adaptive => "adaptive".to_string(),
-    });
-    config.neutrino_threshold = cli.neutrino_threshold.saturating_mul(1024); // Convert KB to bytes
+    // Optimize config based on system capabilities
+    let optimized = ConfigOptimizer::optimize_with_probe(config, Some(&dest_path))?;
 
-    // 🚀 GUIDANCE PASS: Sanitize and Optimize (with Active Probing)
-    let flight_plan = Guidance::plan_with_probe(config, Some(&dest_path))?;
-
-    // Display Intelligence to User
-    if !flight_plan.notices.is_empty() {
-        guidance_box(&flight_plan.notices);
+    if !optimized.notices.is_empty() {
+        guidance_box(&optimized.notices);
     }
 
-    // Use the optimized config from the flight plan
-    let config = flight_plan.final_config;
+    let config = optimized.final_config;
 
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {
@@ -1043,7 +988,6 @@ fn handle_subcommand(command: Commands) -> Result<()> {
             print_capabilities();
             Ok(())
         }
-        Commands::Serve { addr } => serve_gui(addr),
         Commands::Completions { shell } => {
             use clap::CommandFactory;
             use clap_complete::generate;
@@ -1089,40 +1033,6 @@ fn handle_subcommand(command: Commands) -> Result<()> {
         #[cfg(feature = "s3-native")]
         Commands::Rb { bucket } => handle_rb_command(&bucket),
     }
-}
-
-#[cfg(feature = "gui")]
-fn serve_gui(addr: SocketAddr) -> Result<()> {
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    // Create ServerConfig from environment variables or defaults
-    let config = orbit_server::ServerConfig {
-        host: addr.ip().to_string(),
-        port: addr.port(),
-        magnetar_db: std::env::var("ORBIT_MAGNETAR_DB")
-            .unwrap_or_else(|_| "magnetar.db".to_string()),
-        user_db: std::env::var("ORBIT_USER_DB")
-            .unwrap_or_else(|_| "orbit-server-users.db".to_string()),
-    };
-
-    println!(
-        "🚀 Starting Orbit Control Plane at http://{}:{}",
-        config.host, config.port
-    );
-
-    // Create reactor notify channel for background job processing
-    let reactor_notify = std::sync::Arc::new(tokio::sync::Notify::new());
-
-    runtime
-        .block_on(orbit_server::start_server(config, reactor_notify))
-        .map_err(|e| OrbitError::Other(format!("Failed to start GUI server: {}", e)))
-}
-
-#[cfg(not(feature = "gui"))]
-fn serve_gui(_addr: SocketAddr) -> Result<()> {
-    eprintln!("GUI feature not enabled. Rebuild with --features gui to use `orbit serve`.");
-    std::process::exit(EXIT_FATAL);
 }
 
 fn handle_manifest_command(command: ManifestCommands) -> Result<()> {
@@ -3215,10 +3125,41 @@ mod tests {
         assert!(cli.recursive);
     }
 
-    // === Phase 3 & 4: S3 flag tests ===
+    // === Restored flag parser tests ===
 
     #[test]
-    fn test_content_type_flag() {
+    fn test_flatten_flag() {
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--flatten"]).unwrap();
+        assert!(cli.flatten);
+    }
+
+    #[test]
+    fn test_detect_renames_flag() {
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--detect-renames"]).unwrap();
+        assert!(cli.detect_renames);
+        assert!((cli.rename_threshold - 0.8).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_detect_renames_with_threshold() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "-s",
+            "src",
+            "-d",
+            "dst",
+            "--detect-renames",
+            "--rename-threshold",
+            "0.5",
+        ])
+        .unwrap();
+        assert!(cli.detect_renames);
+        assert!((cli.rename_threshold - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_s3_content_type_flag() {
         let cli = Cli::try_parse_from([
             "orbit",
             "-s",
@@ -3233,174 +3174,24 @@ mod tests {
     }
 
     #[test]
-    fn test_content_encoding_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--content-encoding",
-            "gzip",
-        ])
-        .unwrap();
-        assert_eq!(cli.content_encoding, Some("gzip".to_string()));
-    }
-
-    #[test]
-    fn test_content_disposition_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--content-disposition",
-            "attachment; filename=\"file.txt\"",
-        ])
-        .unwrap();
-        assert_eq!(
-            cli.content_disposition,
-            Some("attachment; filename=\"file.txt\"".to_string())
-        );
-    }
-
-    #[test]
-    fn test_cache_control_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--cache-control",
-            "max-age=3600",
-        ])
-        .unwrap();
-        assert_eq!(cli.cache_control, Some("max-age=3600".to_string()));
-    }
-
-    #[test]
-    fn test_expires_header_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--expires-header",
-            "2026-12-31T23:59:59Z",
-        ])
-        .unwrap();
-        assert_eq!(cli.expires_header, Some("2026-12-31T23:59:59Z".to_string()));
-    }
-
-    #[test]
-    fn test_metadata_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--metadata",
-            "key1=val1",
-            "--metadata",
-            "key2=val2",
-        ])
-        .unwrap();
-        assert_eq!(cli.user_metadata, vec!["key1=val1", "key2=val2"]);
-    }
-
-    #[test]
-    fn test_metadata_directive_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--metadata-directive",
-            "REPLACE",
-        ])
-        .unwrap();
-        assert_eq!(cli.metadata_directive, Some("REPLACE".to_string()));
-    }
-
-    #[test]
-    fn test_acl_flag() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--acl", "public-read"])
-            .unwrap();
-        assert_eq!(cli.acl, Some("public-read".to_string()));
-    }
-
-    #[test]
-    fn test_no_sign_request_flag() {
+    fn test_s3_no_sign_request_flag() {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-sign-request"]).unwrap();
         assert!(cli.no_sign_request);
     }
 
     #[test]
-    fn test_no_sign_request_default_false() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
-        assert!(!cli.no_sign_request);
-    }
-
-    #[test]
-    fn test_credentials_file_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--credentials-file",
-            "/path/to/creds",
-        ])
-        .unwrap();
-        assert_eq!(cli.credentials_file, Some(PathBuf::from("/path/to/creds")));
-    }
-
-    #[test]
-    fn test_aws_profile_flag() {
+    fn test_s3_aws_profile_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--aws-profile", "prod"])
             .unwrap();
         assert_eq!(cli.aws_profile, Some("prod".to_string()));
     }
 
     #[test]
-    fn test_use_acceleration_flag() {
+    fn test_s3_use_acceleration_flag() {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--use-acceleration"]).unwrap();
         assert!(cli.use_acceleration);
-    }
-
-    #[test]
-    fn test_use_acceleration_default_false() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
-        assert!(!cli.use_acceleration);
-    }
-
-    #[test]
-    fn test_request_payer_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--request-payer"]).unwrap();
-        assert!(cli.request_payer);
-    }
-
-    #[test]
-    fn test_no_verify_ssl_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-verify-ssl"]).unwrap();
-        assert!(cli.no_verify_ssl);
-    }
-
-    #[test]
-    fn test_use_list_objects_v1_flag() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--use-list-objects-v1"])
-            .unwrap();
-        assert!(cli.use_list_objects_v1);
     }
 
     #[test]
@@ -3408,134 +3199,22 @@ mod tests {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
         assert!(cli.content_type.is_none());
         assert!(cli.content_encoding.is_none());
-        assert!(cli.content_disposition.is_none());
-        assert!(cli.cache_control.is_none());
-        assert!(cli.expires_header.is_none());
-        assert!(cli.user_metadata.is_empty());
-        assert!(cli.metadata_directive.is_none());
         assert!(cli.acl.is_none());
         assert!(!cli.no_sign_request);
-        assert!(cli.credentials_file.is_none());
         assert!(cli.aws_profile.is_none());
         assert!(!cli.use_acceleration);
         assert!(!cli.request_payer);
         assert!(!cli.no_verify_ssl);
-        assert!(!cli.use_list_objects_v1);
-    }
-
-    // === Phase 5 & 6: Operational improvements and conditional copy tests ===
-
-    #[test]
-    fn test_part_size_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--part-size", "100"]).unwrap();
-        assert_eq!(cli.part_size, Some(100));
+        assert!(!cli.flatten);
+        assert!(!cli.detect_renames);
     }
 
     #[test]
-    fn test_part_size_default_none() {
+    fn test_conditional_copy_defaults() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
-        assert_eq!(cli.part_size, None);
-    }
-
-    #[test]
-    fn test_glacier_flags() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--force-glacier-transfer",
-        ])
-        .unwrap();
-        assert!(cli.force_glacier_transfer);
-    }
-
-    #[test]
-    fn test_ignore_glacier_warnings_flag() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "--ignore-glacier-warnings",
-        ])
-        .unwrap();
-        assert!(cli.ignore_glacier_warnings);
-    }
-
-    #[test]
-    fn test_no_clobber_flag() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "-n"]).unwrap();
-        assert!(cli.no_clobber);
-    }
-
-    #[test]
-    fn test_no_clobber_long_flag() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-clobber"]).unwrap();
-        assert!(cli.no_clobber);
-    }
-
-    #[test]
-    fn test_if_size_differ_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--if-size-differ"]).unwrap();
-        assert!(cli.if_size_differ);
-    }
-
-    #[test]
-    fn test_if_source_newer_flag() {
-        let cli =
-            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--if-source-newer"]).unwrap();
-        assert!(cli.if_source_newer);
-    }
-
-    #[test]
-    fn test_flatten_flag() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--flatten"]).unwrap();
-        assert!(cli.flatten);
-    }
-
-    #[test]
-    fn test_raw_flag() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--raw"]).unwrap();
-        assert!(cli.raw);
-    }
-
-    #[test]
-    fn test_phase5_6_defaults() {
-        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
-        assert!(!cli.force_glacier_transfer);
-        assert!(!cli.ignore_glacier_warnings);
         assert!(!cli.no_clobber);
         assert!(!cli.if_size_differ);
         assert!(!cli.if_source_newer);
-        assert!(!cli.flatten);
-        assert!(!cli.raw);
-    }
-
-    #[test]
-    fn test_combined_phase5_6_flags() {
-        let cli = Cli::try_parse_from([
-            "orbit",
-            "-s",
-            "src",
-            "-d",
-            "dst",
-            "-n",
-            "--if-size-differ",
-            "--flatten",
-            "--raw",
-            "--force-glacier-transfer",
-        ])
-        .unwrap();
-        assert!(cli.no_clobber);
-        assert!(cli.if_size_differ);
-        assert!(cli.flatten);
-        assert!(cli.raw);
-        assert!(cli.force_glacier_transfer);
     }
 
     // === S3 subcommand parse tests ===

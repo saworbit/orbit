@@ -8,7 +8,7 @@
 use orbit::{
     config::{CompressionType, CopyConfig, CopyMode},
     copy_file,
-    core::guidance::Guidance,
+    core::guidance::ConfigOptimizer,
 };
 use tempfile::tempdir;
 
@@ -21,7 +21,7 @@ fn test_guidance_resume_vs_compression_safety() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Resume should be disabled
     assert!(
@@ -55,7 +55,7 @@ fn test_guidance_zerocopy_vs_checksum_optimization() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Zero-copy should be disabled to allow checksum
     assert!(
@@ -87,7 +87,7 @@ fn test_guidance_zerocopy_vs_resume_precision() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Zero-copy should be disabled for resume precision
     assert!(
@@ -117,7 +117,7 @@ fn test_guidance_sync_checksum_performance_info() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Config should remain unchanged (info only, no changes)
     assert_eq!(flight_plan.final_config.copy_mode, CopyMode::Sync);
@@ -143,7 +143,7 @@ fn test_guidance_multiple_rules_triggered() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Multiple notices should be generated
     assert!(
@@ -175,7 +175,7 @@ fn test_guidance_clean_config_no_notices() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: No notices should be generated
     assert!(
@@ -202,7 +202,7 @@ fn test_guidance_with_actual_copy_operation() {
     };
 
     // Apply guidance
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
     let optimized_config = flight_plan.final_config;
 
     // Verify: Guidance should have optimized the config
@@ -231,7 +231,7 @@ fn test_guidance_display_format() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: At least one notice should be generated
     assert!(!flight_plan.notices.is_empty());
@@ -260,7 +260,7 @@ fn test_guidance_preserves_other_config_options() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Unrelated options should be preserved
     assert_eq!(flight_plan.final_config.retry_attempts, 10);
@@ -297,8 +297,8 @@ fn test_guidance_cli_output() {
 
     // Verify the "Box" and the "Message" appear
     assert!(
-        stdout.contains("Orbit Guidance System"),
-        "Expected guidance system header in output"
+        stdout.contains("Orbit Notices"),
+        "Expected notices header in output"
     );
     assert!(
         stdout.contains("Safety") || stdout.contains("🛡️"),
@@ -321,7 +321,7 @@ fn test_guidance_manifest_vs_zerocopy() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Zero-copy should be disabled
     assert!(
@@ -352,7 +352,7 @@ fn test_guidance_delta_vs_zerocopy() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Zero-copy should be disabled
     assert!(
@@ -380,7 +380,7 @@ fn test_guidance_parallel_progress_ux() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Config should remain unchanged (info only)
     assert_eq!(flight_plan.final_config.parallel, 4);
@@ -405,7 +405,7 @@ fn test_guidance_resume_vs_checksum_integrity() {
         ..Default::default()
     };
 
-    let flight_plan = Guidance::plan(config).unwrap();
+    let flight_plan = ConfigOptimizer::optimize(config).unwrap();
 
     // Verify: Checksum should be disabled
     assert!(

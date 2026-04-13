@@ -1,18 +1,18 @@
-# Guidance System Architecture
+# Config Optimizer Architecture
 
 **Version**: 2.0 (Enhanced with Active Probing)
-**Modules**: `src/core/guidance.rs`, `src/core/probe.rs`, `src/core/terminology.rs`
+**Modules**: `src/core/guidance.rs`, `src/core/probe.rs`
 **Status**: Implemented
 
 ## Overview
 
-The Guidance System (internally called the "Flight Computer") is a configuration validation and optimization layer that sits between configuration loading and execution. It ensures that user-provided configurations are safe, logically consistent, and optimized for the specific hardware and use case.
+The Config Optimizer is a configuration validation and optimization layer that sits between configuration loading and execution. It ensures that user-provided configurations are safe, logically consistent, and optimized for the specific hardware and use case.
 
 **NEW in v0.7.0:** Enhanced with active environment probing and intelligent auto-tuning based on detected hardware, I/O performance, and destination type.
 
 ## Purpose
 
-The Guidance System serves five critical functions:
+The Config Optimizer serves five critical functions:
 
 1. **Sanitization**: Corrects invalid or dangerous combinations of flags
 2. **Optimization**: Downgrades aggressive settings when hardware or logic dictates
@@ -32,38 +32,37 @@ The Guidance System serves five critical functions:
 - ✅ **Active system probing** — CPU, RAM, I/O throughput
 - ✅ **Destination type detection** — Local, SMB, NFS, S3, Azure, GCS
 - ✅ **Environment-aware auto-tuning** — 4 new intelligent rules
-- ✅ **Terminology abstraction** — User-friendly status messages
 
 ## Design Pattern
 
-The Guidance System follows the **Interceptor / Pre-processor** pattern:
+The Config Optimizer follows the **Interceptor / Pre-processor** pattern:
 
 ```
-Config Load → CLI Overrides → 🚀 GUIDANCE → Optimized Config → Execution
+Config Load → CLI Overrides → 🚀 CONFIG OPTIMIZER → Optimized Config → Execution
 ```
 
 It acts as a gatekeeper, ensuring that no invalid configuration reaches the actual execution layer.
 
 ## Core Components
 
-### 1. Guidance Struct
+### 1. ConfigOptimizer Struct
 
-The main entry point for the guidance system. It provides a single static method:
+The main entry point for the config optimizer. It provides a single static method:
 
 ```rust
-pub struct Guidance;
+pub struct ConfigOptimizer;
 
-impl Guidance {
-    pub fn plan(config: CopyConfig) -> Result<FlightPlan>
+impl ConfigOptimizer {
+    pub fn optimize(config: CopyConfig) -> Result<OptimizedConfig>
 }
 ```
 
-### 2. FlightPlan Struct
+### 2. OptimizedConfig Struct
 
-The output of the guidance check, containing both the optimized configuration and any notices generated:
+The output of the optimization check, containing both the optimized configuration and any notices generated:
 
 ```rust
-pub struct FlightPlan {
+pub struct OptimizedConfig {
     pub config: CopyConfig,
     pub notices: Vec<Notice>,
 }
@@ -129,29 +128,11 @@ impl Probe {
 3. **I/O Throughput**: 10MB write benchmark to destination
 4. **Filesystem Type**: URI parsing + mount point analysis
 
-### 5. Terminology System
-
-**Location**: `src/core/terminology.rs`
-
-Maps internal architectural names to user-friendly terms for better UX:
-
-```rust
-pub enum Component {
-    Magnetar,     // → "Job Engine"
-    Starmap,      // → "Transfer Manifest"
-    Neutrino,     // → "Small File Optimization"
-    Universe,     // → "Global Index"
-    StarProtocol, // → "Grid Protocol"
-}
-```
-
-This provides **progressive disclosure** — friendly terms for users, technical names in debug logs.
-
 ## Implemented Rules
 
 ### Static Validation Rules (v1.0)
 
-The guidance system enforces the following rules, listed in order of evaluation:
+The config optimizer enforces the following rules, listed in order of evaluation:
 
 ### Rule 1: Hardware Reality (Zero-Copy Support)
 
@@ -371,12 +352,12 @@ When guidance rules are triggered, users see a formatted output:
 
 **v0.7.0 Example (with Active Probing):**
 ```
-┌── 🛰️  Orbit Guidance System ───────────────────────┐
+┌── 🛰️  Orbit Config Optimizer ─────────────────────────┐
 │ 🚀 Strategy: Disabling zero-copy to allow streaming checksum verification
 │ 🛡️  Safety: Disabling resume capability to prevent compressed stream corruption
 │ 🔧 Network: Detected SMB destination. Enabling resume for reliability.
 │ 🔧 Performance: Detected slow I/O (45.2 MB/s) with 16 cores. Enabling Zstd:3.
-└────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────┘
 ```
 
 **Notice Icons:**
@@ -396,7 +377,7 @@ This provides:
 
 ### Main Execution Flow
 
-In `src/main.rs`, guidance is called immediately after all CLI overrides:
+In `src/main.rs`, the config optimizer is called immediately after all CLI overrides:
 
 **v0.7.0 (with Active Probing):**
 ```rust
@@ -407,35 +388,35 @@ let mut config = CopyConfig::from_file(config_path)?;
 config.resume_enabled = cli.resume;
 // ... (other overrides)
 
-// 3. 🚀 GUIDANCE PASS: Sanitize and Optimize (with Active Probing)
-let flight_plan = Guidance::plan_with_probe(config, Some(&dest_path))?;
+// 3. 🚀 CONFIG OPTIMIZER PASS: Sanitize and Optimize (with Active Probing)
+let optimized = ConfigOptimizer::optimize_with_probe(config, Some(&dest_path))?;
 
 // 4. Display notices to user
-if !flight_plan.notices.is_empty() {
-    println!("┌── 🛰️  Orbit Guidance System ───────────────────────┐");
-    for notice in &flight_plan.notices {
+if !optimized.notices.is_empty() {
+    println!("┌── 🛰️  Orbit Config Optimizer ─────────────────────────┐");
+    for notice in &optimized.notices {
         println!("│ {}", notice);
     }
-    println!("└────────────────────────────────────────────────────┘");
+    println!("└────────────────────────────────────────────────────────┘");
 }
 
 // 5. Execute using optimized config
-let config = flight_plan.final_config;
+let config = optimized.final_config;
 copy_file(&source, &dest, &config)?;
 ```
 
 **Backward Compatibility:**
 ```rust
 // Old API still works (no probing, static rules only)
-let flight_plan = Guidance::plan(config)?;
+let optimized = ConfigOptimizer::optimize(config)?;
 
 // New API with active probing (recommended)
-let flight_plan = Guidance::plan_with_probe(config, Some(&dest_path))?;
+let optimized = ConfigOptimizer::optimize_with_probe(config, Some(&dest_path))?;
 ```
 
 ## Testing
 
-The guidance system includes comprehensive testing at two levels:
+The config optimizer includes comprehensive testing at two levels:
 
 ### Unit Tests (`src/core/guidance.rs`)
 
@@ -474,7 +455,7 @@ Tests the guidance system in real-world scenarios:
 
 To add a new guidance rule:
 
-1. **Add the check** in `Guidance::plan()`:
+1. **Add the check** in `ConfigOptimizer::optimize()`:
    ```rust
    if config.feature_a && config.feature_b {
        notices.push(Notice {
@@ -494,10 +475,10 @@ To add a new guidance rule:
        config.feature_a = true;
        config.feature_b = true;
 
-       let plan = Guidance::plan(config).unwrap();
+       let result = ConfigOptimizer::optimize(config).unwrap();
 
-       assert_eq!(plan.config.feature_a, false);
-       assert!(plan.notices.iter().any(|n| n.category == "Category"));
+       assert_eq!(result.config.feature_a, false);
+       assert!(result.notices.iter().any(|n| n.category == "Category"));
    }
    ```
 
@@ -507,7 +488,7 @@ To add a new guidance rule:
 
 ## Philosophy: User Intent vs Technical Reality
 
-The Guidance System embodies a key design principle of Orbit:
+The Config Optimizer embodies a key design principle of Orbit:
 
 > **Users express intent. The system ensures technical correctness.**
 
@@ -523,11 +504,11 @@ This approach:
 
 ## Error Handling
 
-The guidance system is designed to never fail. Even if individual capability detection fails, we fall back to safe defaults. The only error case is if the configuration is fundamentally invalid at the type level (which should be caught earlier).
+The config optimizer is designed to never fail. Even if individual capability detection fails, we fall back to safe defaults. The only error case is if the configuration is fundamentally invalid at the type level (which should be caught earlier).
 
 ## Performance Impact
 
-The guidance system adds minimal overhead:
+The config optimizer adds minimal overhead:
 - Single pass through configuration (~10-20 boolean checks)
 - No I/O operations (except one-time capability detection)
 - Negligible impact compared to actual file transfer time
@@ -561,9 +542,8 @@ Potential improvements for future versions:
 ## References
 
 ### Implementation
-- **Guidance Core**: [src/core/guidance.rs](../../src/core/guidance.rs)
+- **Config Optimizer Core**: [src/core/guidance.rs](../../src/core/guidance.rs)
 - **System Probe**: [src/core/probe.rs](../../src/core/probe.rs) ⭐ NEW v0.7.0
-- **Terminology**: [src/core/terminology.rs](../../src/core/terminology.rs) ⭐ NEW v0.7.0
 - **Init Wizard**: [src/commands/init.rs](../../src/commands/init.rs) ⭐ NEW v0.7.0
 - **Integration**: [src/main.rs](../../src/main.rs)
 
@@ -571,7 +551,6 @@ Potential improvements for future versions:
 - **Guidance Tests**: [tests/guidance_integration.rs](../../tests/guidance_integration.rs)
 - **Init Tests**: [tests/init_generation_test.rs](../../tests/init_generation_test.rs) ⭐ NEW v0.7.0
 - **Probe Tests**: In [src/core/probe.rs](../../src/core/probe.rs) (7 tests)
-- **Terminology Tests**: In [src/core/terminology.rs](../../src/core/terminology.rs) (7 tests)
 
 ### User Documentation
 - **Init Wizard Guide**: [docs/guides/INIT_WIZARD_GUIDE.md](../guides/INIT_WIZARD_GUIDE.md) ⭐ NEW v0.7.0

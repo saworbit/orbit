@@ -4,6 +4,46 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Removed — Simplification Pass
+
+Orbit was simplified back to its core: a fast, reliable file transfer tool. Speculative and unused components were removed to reduce complexity.
+
+#### Workspace Crates Removed (8 crates cut)
+- **magnetar** — Job execution engine (not integrated into core transfer flow)
+- **orbit-sentinel** — Autonomous resilience engine (Phase 5, speculative)
+- **orbit-ghost** — FUSE-based on-demand filesystem (speculative)
+- **orbit-connect** — Nucleus client / RemoteSystem (Grid topology, speculative)
+- **orbit-star** — Star Agent binary (Grid topology, speculative)
+- **orbit-proto** — gRPC protocol definitions (Grid topology, speculative)
+- **core-resilience** — Resilience patterns crate (not used by core binary)
+- **orbit-web** — Control Plane API / web server (optional, removed from workspace)
+
+#### Dead Modules Removed from `src/core/`
+- `terminology` — User-facing terminology abstraction (unused)
+- `resilient_sync` — Crash-proof sync with Magnetar integration (unused)
+- `enhanced_progress` — Multi-transfer progress bars (unused)
+- `external_sort` — External merge-sort for large file lists (unused)
+- `rename_detector` — Content-aware rename/move detection (unused)
+- `v2_integration` — V2 Architecture integration (unused)
+- `neutrino/` — Small file optimization "fast lane" (unused, feature-gated)
+
+#### CLI Changes
+- `--profile` / `--neutrino-threshold` — Removed (neutrino module removed)
+- `--raw` — Removed
+- `--force-glacier-transfer` / `--ignore-glacier-warnings` — Removed (were parse-only no-ops, never wired to backend)
+- `orbit serve` subcommand — Removed (control plane removed from workspace)
+
+#### Features Removed
+- `api` / `gui` — Control plane features (orbit-web removed)
+- `protocols` — Deprecated empty feature
+- `network-all` — Duplicate of `network`
+- `wasm-release` / `release-min` build profiles
+
+### Changed
+
+- **Guidance → ConfigOptimizer**: Renamed `Guidance` struct to `ConfigOptimizer`, `FlightPlan` (config result) to `OptimizedConfig`, `plan()` to `optimize()`
+- **Documentation**: 15 obsolete docs moved to `docs/archive/`, README and ARCHITECTURE.md updated to reflect simplified crate structure
+
 ### Fixed
 
 #### Correctness & Safety

@@ -1,8 +1,7 @@
 /*!
- * Guidance System ("Flight Computer")
+ * Config Optimizer
  *
- * Responsible for validating, sanitizing, and optimizing transfer configurations
- * before execution. It acts as the "Pre-flight Check" to ensure safety and performance.
+ * Validates, sanitizes, and optimizes transfer configurations before execution.
  */
 
 use crate::config::{CompressionType, CopyConfig, CopyMode};
@@ -14,11 +13,11 @@ use std::fmt;
 use std::path::Path;
 
 /// The Guidance system responsible for validating and optimizing transfer configurations.
-pub struct Guidance;
+pub struct ConfigOptimizer;
 
 /// The output of a guidance check, containing the optimized config and pilot notices.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlightPlan {
+pub struct OptimizedConfig {
     /// The sanitized and optimized configuration to be used for execution
     pub final_config: CopyConfig,
     /// Notices generated during the optimization pass
@@ -76,16 +75,19 @@ impl fmt::Display for Notice {
     }
 }
 
-impl Guidance {
+impl ConfigOptimizer {
     /// Runs pre-flight checks to sanitize and optimize the configuration.
     /// This version does not perform active environment probing.
-    pub fn plan(config: CopyConfig) -> Result<FlightPlan> {
-        Self::plan_with_probe(config, None)
+    pub fn optimize(config: CopyConfig) -> Result<OptimizedConfig> {
+        Self::optimize_with_probe(config, None)
     }
 
     /// Runs pre-flight checks with optional active environment probing.
     /// When dest_path is provided, the system will probe the environment and auto-tune settings.
-    pub fn plan_with_probe(mut config: CopyConfig, dest_path: Option<&Path>) -> Result<FlightPlan> {
+    pub fn optimize_with_probe(
+        mut config: CopyConfig,
+        dest_path: Option<&Path>,
+    ) -> Result<OptimizedConfig> {
         let mut notices = Vec::new();
         let sys_caps = ZeroCopyCapabilities::detect();
 
@@ -299,7 +301,7 @@ impl Guidance {
         }
         */
 
-        Ok(FlightPlan {
+        Ok(OptimizedConfig {
             final_config: config,
             notices,
         })
@@ -425,7 +427,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Resume must be disabled to prevent corruption
         assert!(!plan.final_config.resume_enabled);
@@ -440,7 +442,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Zero-copy must be disabled to allow streaming hash
         assert!(!plan.final_config.use_zero_copy);
@@ -455,7 +457,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Checksum verification must be disabled on resume
         assert!(!plan.final_config.verify_checksum);
@@ -471,7 +473,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(!plan.final_config.use_zero_copy);
         assert!(plan.notices.iter().any(|n| n.category == "Visibility"));
@@ -486,7 +488,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(!plan.final_config.use_zero_copy);
         assert!(plan.notices.iter().any(|n| n.category == "Logic"));
@@ -502,7 +504,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert_eq!(plan.final_config.use_zero_copy, false);
         assert!(plan
@@ -520,7 +522,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(plan.notices.iter().any(|n| n.category == "UX"));
     }
@@ -534,7 +536,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(plan.notices.iter().any(|n| n.category == "Performance"));
     }
@@ -547,7 +549,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Should have no notices for a clean, conflict-free config
         assert!(plan.notices.is_empty());
@@ -563,7 +565,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Multiple rules should have been triggered
         assert!(plan.notices.len() >= 2);
@@ -599,7 +601,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Zero-copy must be disabled because compression requires userspace buffering
         assert!(!plan.final_config.use_zero_copy);

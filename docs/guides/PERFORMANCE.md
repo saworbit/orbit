@@ -57,103 +57,6 @@ If you see this warning:
 - Verify syscall permissions
 - Consider manually setting `--concurrency` to an appropriate value for your environment
 
-## Neutrino Fast Lane (v0.5+)
-
-Orbit v0.5 introduces the **Neutrino Fast Lane**, an optimized pipeline for workloads with many small files (<8KB). This feature provides significant performance improvements for scenarios like:
-
-- Migrating source code repositories (`node_modules`, `.git` directories)
-- Backing up configuration directories (`/etc`, `.config`)
-- Transferring log files and small assets
-- Syncing documentation and web content
-
-### How It Works
-
-For small files, CDC chunking and deduplication overhead exceeds potential savings. The Neutrino Fast Lane:
-
-1. **Routes by size**: Files <8KB bypass CDC/starmap indexing
-2. **High concurrency**: Uses 100-500 concurrent async tasks (vs standard 16)
-3. **Direct I/O**: Simple buffered copy without hashing overhead
-4. **Reduced CPU load**: No BLAKE3 hashing or Adler-32 rolling hashes
-5. **Reduced DB bloat**: Avoids starmap index entries for non-deduplicable files
-
-### Usage
-
-Enable Neutrino fast lane with the `--profile neutrino` flag:
-
-```bash
-# Basic usage
-orbit --source /source --dest /dest --profile neutrino --recursive
-
-# With custom threshold (16KB)
-orbit --source /source --dest /dest --profile neutrino --neutrino-threshold 16 --recursive
-
-# Combined with checksum sync for priority-based transfers
-orbit --source /source --dest /dest --check checksum --profile neutrino --recursive
-```
-
-### Performance Characteristics
-
-**Benchmark Results** (10,000 files of 1-4KB each):
-
-| Mode | Time | CPU Usage | DB Size |
-|------|------|-----------|---------|
-| Standard | ~45s | High (BLAKE3 hashing) | 100MB index |
-| Neutrino | ~15s | Low (direct I/O) | Minimal index |
-
-**Performance Gain**: ~3x faster for small-file workloads
-
-### Configuration Options
-
-```bash
-# Transfer profile (standard, neutrino, adaptive)
---profile <PROFILE>
-
-# Neutrino threshold in KB (default: 8)
---neutrino-threshold <KB>
-
-# Concurrency override (default: 200 for Neutrino)
---parallel <N>
-```
-
-### When to Use Neutrino
-
-✅ **Best For:**
-- Source code trees (`.js`, `.py`, `.rs` files)
-- Configuration directories (`/etc`, `/usr/local/etc`)
-- Log files and small assets
-- npm/pip package directories
-
-❌ **Not Recommended For:**
-- Large media files (videos, disk images)
-- Database backups (deduplication beneficial)
-- Mixed workloads (use `adaptive` profile instead)
-
-### Adaptive Mode (Coming Soon)
-
-The `--profile adaptive` mode will automatically route files based on:
-- File size distribution analysis
-- Workload profiling
-- Historical deduplication effectiveness
-
-### Technical Details
-
-**Requirements:**
-- Requires `backend-abstraction` feature (included with network backends)
-- Uses tokio async runtime for I/O-bound concurrency
-- Compatible with all Smart Sync priority modes
-
-**Limitations:**
-- No deduplication for small files (by design)
-- No delta detection (full file transfer)
-- Metadata preservation still applies
-
-**Architecture:**
-- Router: Size-based routing ("The Sieve")
-- Executor: tokio::JoinSet with semaphore-based concurrency control
-- Integration: Phase 2a in Smart Sync pipeline (before standard lane)
-
-For more details, see [ORBIT_V2_ARCHITECTURE.md](../architecture/ORBIT_V2_ARCHITECTURE.md).
-
 ## The "Equilibrium" Standard Lane
 
 The **Equilibrium** profile is Orbit's default operating mode, optimized for the majority of your data: source code repositories, PDF documents, office files, and moderate binary assets (8KB to 1GB). In this zone, the CPU cost of deduplication is outweighed by the bandwidth savings.
@@ -293,14 +196,14 @@ orbit sync --compress /source /dest
 
 ### Comparing the Lanes
 
-| Feature | Neutrino (<8KB) | Equilibrium (8KB-1GB) | Gigantor (>1GB) |
-|---------|-----------------|----------------------|-----------------|
-| **Chunking** | None (direct copy) | CDC 64KB avg | Tiered CDC (1-4MB avg) |
-| **Deduplication** | None | Full (Universe Map) | Full (Universe Map) |
-| **Concurrency** | Very High (200+) | Auto (CPU count) | Parallel Hashing |
-| **Best For** | Config files, logs | Code, docs, media | VM images, videos, databases |
-| **CPU Usage** | Very Low | Moderate | High (multi-core) |
-| **Network Savings** | 0% (no dedup) | 30-70% typical | 20-60% typical |
+| Feature | Equilibrium (default) | Gigantor (>1GB) |
+|---------|----------------------|-----------------|
+| **Chunking** | CDC 64KB avg | Tiered CDC (1-4MB avg) |
+| **Deduplication** | Full (Universe Map) | Full (Universe Map) |
+| **Concurrency** | Auto (CPU count) | Parallel Hashing |
+| **Best For** | Code, docs, media | VM images, videos, databases |
+| **CPU Usage** | Moderate | High (multi-core) |
+| **Network Savings** | 30-70% typical | 20-60% typical |
 
 For more architectural details, see [ORBIT_V2_ARCHITECTURE.md](../architecture/ORBIT_V2_ARCHITECTURE.md).
 
@@ -436,7 +339,7 @@ orbit sync --verbose /large_dataset s3://bucket
 - Stable multi-hour transfers (no timeout issues)
 
 ❌ **Not Recommended For:**
-- Collections of small files (use Neutrino)
+- Collections of small files (standard Equilibrium mode is sufficient)
 - Files under 1GB (overhead not justified)
 
 ### Technical Details
