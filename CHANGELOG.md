@@ -10,6 +10,16 @@ All notable changes to Orbit will be documented in this file.
 - **Positional arguments**: `orbit /src /dest` now works as an alternative to `-s /src -d /dest`
 - **`--profile` preset flag**: Apply a named configuration preset (`fast`, `safe`, `backup`, `network`) from the command line. Each preset provides opinionated defaults tuned for its use case
 - **`orbit presets` subcommand**: Displays available profiles with a comparison table
+- **Transfer shorthand subcommands**: `orbit sync <SRC> <DST>`, `orbit backup <SRC> <DST>`, `orbit mirror <SRC> <DST>` — all global CLI flags (compression, retry, quiet, etc.) are fully supported alongside shorthands
+- **`orbit doctor` subcommand**: Validates configuration, probes hardware, lists compiled features, and checks environment variables — a one-stop diagnostic tool
+- **`--quiet` / `-q` flag**: Suppresses all non-essential output (progress, stats, guidance notices)
+- **`--raw` flag**: Disables human-readable formatting (outputs raw byte counts instead of "1.5 GiB")
+- **`--no-stat` flag**: Disables the end-of-run execution statistics summary
+- **`--no-preserve-metadata` flag**: Explicitly disables metadata preservation (overrides config default)
+- **`--no-auto-recursive` flag**: Prevents auto-detection of directory sources for recursive mode
+- **`--zstd` shorthand**: Equivalent to `--compress zstd:3` for quick Zstd compression
+- **`--lz4` shorthand**: Equivalent to `--compress lz4` for quick LZ4 compression
+- **Grouped `--help` output**: All CLI flags are organized under headings (Transfer, Reliability, Performance, Output, Filtering, etc.) for easier discovery
 
 #### Configuration Presets
 - **`CopyConfig::backup_preset()`**: Backup-specific preset with checksum verification, Zstd compression, resume, metadata preservation, and 5 retries — distinct from the `safe` preset
@@ -19,12 +29,31 @@ All notable changes to Orbit will be documented in this file.
 - **Actionable error messages**: All `OrbitError` variants now include a `suggestion()` method returning context-specific remediation hints (e.g., "Free up disk space or use --compress zstd:3 to reduce transfer size")
 - **Auto-tune summary**: Transfer completion output now displays any auto-tuned settings applied by the Config Optimizer (e.g., worker count adjustments, chunk size increases)
 - **Hardware probe caching**: CPU core count and total RAM are cached to `~/.orbit/probe_cache.json` (1-hour TTL) to avoid re-probing on every invocation. Available RAM is always probed fresh to reflect current memory pressure
+- **Auto-network detection**: When the destination is a remote URI (s3://, smb://, ssh://, etc.) and no `--profile` is specified, Orbit automatically enables resume, compression, exponential backoff, and higher retries — without clobbering any values the user customized in their config file
+- **First-run hint**: If no `~/.orbit/orbit.toml` exists, Orbit suggests running `orbit init` on first use
+- **Config file error reporting**: Invalid config files now produce a visible warning and fall back to defaults, instead of silently ignoring parse errors
 
 #### Config Optimizer (Guidance System)
 - **Rule 4 — Local-to-Local Worker Optimization**: Automatically sets workers to `cores/2` when more than 8 cores are available and `parallel == 0`
 - **Rule 5 — Fast I/O Chunk Size**: Increases chunk size to 4MB when I/O throughput exceeds 500 MB/s and the current chunk size is 1MB or less
 
 ### Changed
+
+#### Config Defaults (Breaking)
+- **`preserve_metadata` default changed to `true`**: Previously `false`. Metadata is now preserved by default; use `--no-preserve-metadata` to opt out
+- **`show_stats` default changed to `true`**: Execution statistics are now shown by default; use `--no-stat` to suppress
+- **`human_readable` default changed to `true`**: Output now shows "1.5 GiB" by default; use `--raw` for byte counts
+- **CLI args with hardcoded defaults changed to `Option<T>`**: `retry_attempts`, `retry_delay`, `chunk_size`, `workers`, `concurrency`, and `max_bandwidth` no longer have clap-level defaults, preventing profile/config presets from being silently overwritten by clap default values
+
+#### Output Mode Consistency
+- **JSON mode now suppresses all human output**: When `json_output = true` (from `--json` flag or config file), `human_readable`, `show_stats`, and `show_progress` are all forced to `false`. Progress bars, pre-transfer status prints (zero-copy, manifest), and guidance notices are all suppressed to keep stdout machine-readable
+- **`--quiet` suppresses progress and stats**: Progress bars and execution statistics are disabled in quiet mode
+
+#### Config Resolution Architecture
+- **Unified transfer path for shorthand subcommands**: `orbit sync`, `orbit backup`, and `orbit mirror` now fall through to the same config resolution and CLI override logic as bare `orbit`. Previously they used a separate code path that ignored most global flags
+- **Extracted `resolve_transfer_config()` helper**: Profile selection, auto-network merge, shorthand defaults, output-mode resolution, and all CLI overrides are now in a single testable function
+- **Extracted `apply_auto_network()` helper**: Auto-network merge logic compares each field against `CopyConfig::default()` to distinguish user-customized values from defaults
+- **Extracted `resolve_output_modes()` helper**: Output-mode resolution (json/quiet/raw → human_readable/show_stats) with correct config-file baseline preservation
 
 #### Codebase Restructuring
 - **main.rs reduced from 3,420 to 1,871 lines** (45% reduction): Extracted subcommand handlers into dedicated modules:
@@ -65,7 +94,7 @@ Orbit was simplified back to its core: a fast, reliable file transfer tool. Spec
 
 #### CLI Changes
 - `--profile` / `--neutrino-threshold` — Removed (neutrino module removed)
-- `--raw` — Removed
+- `--raw` — Removed, then re-added in UX overhaul (disables human-readable formatting)
 - `--force-glacier-transfer` / `--ignore-glacier-warnings` — Removed (were parse-only no-ops, never wired to backend)
 - `orbit serve` subcommand — Removed (control plane removed from workspace)
 

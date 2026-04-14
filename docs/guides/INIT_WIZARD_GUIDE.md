@@ -234,9 +234,20 @@ After running `orbit init`, all Orbit commands automatically use your configurat
 # No flags needed — uses your optimized config
 orbit /data /backup --recursive
 
+# Or use shorthand subcommands (also use your config)
+orbit sync /data /backup
+orbit backup /data /backup
+orbit mirror /data /replica
+
 # Override specific settings if needed
-orbit /data /backup --recursive --parallel 16
+orbit sync /data /backup --workers 16 --zstd
+
+# Suppress output for scripts
+orbit backup /data /backup --quiet
+orbit backup /data /backup --json    # Machine-readable JSON Lines
 ```
+
+**Auto-network detection:** When copying to a remote destination (`s3://`, `smb://`, etc.), Orbit automatically overlays network-friendly settings (resume, compression, retries, backoff) on top of your config — but only for fields you haven't customized. This means your `orbit init` config is the baseline, and auto-network upgrades the remaining defaults.
 
 ## CLI Profile Presets (--profile)
 

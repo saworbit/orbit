@@ -19,13 +19,15 @@ The Active Config Optimizer (Phase 4 enhancement) transforms Orbit's configurati
 ❌ Manual optimization required
 ```
 
-### After (v0.7.0):
+### After (v0.7.0+):
 ```
 ✅ Validated configuration conflicts
 ✅ Prevented incompatible flag combinations
 ✅ Detects CPU, RAM, I/O throughput
 ✅ Identifies destination type (SMB, S3, Local, etc.)
 ✅ Auto-tunes settings in real-time
+✅ Auto-network overlay for remote destinations (preserves user customizations)
+✅ JSON mode suppresses all human output (progress, stats, guidance)
 ```
 
 ## How It Works
@@ -442,19 +444,26 @@ $ orbit -s /data -d smb://server/share --recursive \
     --compress zstd:3             # Had to choose
 ```
 
-### After v0.7.0 (Auto-Tuning)
+### After v0.7.0+ (Auto-Tuning)
 
 ```bash
-# Just specify source and destination
-$ orbit -s /data -d smb://server/share --recursive
+# Just specify source and destination — or use a shorthand
+$ orbit sync /data smb://server/share
 
 # Orbit automatically:
-# ✅ Detects SMB destination
-# ✅ Enables resume
-# ✅ Increases retries
-# ✅ Enables backoff
-# ✅ (May enable compression if CPU/IO suggests it)
+# ✅ Detects SMB destination (auto-network overlay)
+# ✅ Enables resume (default was off → upgraded)
+# ✅ Increases retries (default 3 → 10)
+# ✅ Enables exponential backoff
+# ✅ Enables Zstd compression (default was none → upgraded)
+# ✅ Disables zero-copy (not effective over network)
+#
+# But preserves YOUR customizations:
+# If your config has retry_attempts = 2, it stays at 2
+# If your config has compression = lz4, it stays at LZ4
 ```
+
+**How auto-network merge works:** For each config field, Orbit compares your config value against `CopyConfig::default()`. Fields still at their default value are upgraded to network-friendly settings. Fields you customized are left alone. This means `orbit init` + auto-network gives you the best of both: your baseline preferences plus safe network defaults.
 
 ## Integration with Init Wizard
 
@@ -471,17 +480,25 @@ $ orbit init
   > Backup (Reliability First)
 ✅ Configuration saved
 
-# 2. Every transfer gets baseline + active tuning
-$ orbit -s /data -d smb://server/share --recursive
+# 2. Every transfer gets baseline + auto-network + active tuning
+$ orbit sync /data smb://server/share
 
-# Uses baseline (from init):
+# Layer 1 — Baseline (from orbit init):
 #   - Checksum verification
 #   - Resume enabled
 #   - 5 retry attempts
 
-# Plus active tuning:
+# Layer 2 — Auto-network (detects remote destination):
+#   - Retry attempts: 5 → kept (user customized, not default 3)
+#   - Compression: none → Zstd:3 (was still default)
+#   - Zero-copy: disabled (not effective over network)
+
+# Layer 3 — Active tuning (ConfigOptimizer):
 #   🔧 Network: Detected SMB, already has resume ✓
-#   🔧 Network: Retry attempts increased from 5 to 10
+#   🔧 Performance: I/O tuning based on live probe
+
+# Layer 4 — CLI flags (always win):
+#   --workers 16 would override everything above
 ```
 
 ## Best Practices
@@ -589,7 +606,16 @@ impl ConfigOptimizer {
 
 ## Changelog
 
-### v0.7.0 (Current)
+### Post-v0.7.0 (UX Overhaul)
+- ✅ Auto-network overlay for remote destinations (preserves user customizations)
+- ✅ JSON mode suppresses all human output (progress, stats, guidance notices)
+- ✅ `--quiet` mode suppresses progress and stats
+- ✅ Shorthand subcommands (`orbit sync`, `orbit backup`, `orbit mirror`) use unified config resolution
+- ✅ `orbit doctor` diagnostic subcommand
+- ✅ Config file errors surfaced with warnings (no longer silently ignored)
+- ✅ 4-layer config resolution: baseline → auto-network → active tuning → CLI flags
+
+### v0.7.0
 - ✅ Active system probing (CPU, RAM, I/O)
 - ✅ Filesystem type detection
 - ✅ 4 auto-tuning rules

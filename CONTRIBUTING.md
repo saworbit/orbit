@@ -32,6 +32,10 @@ Thanks for your interest in contributing to Orbit! We welcome community contribu
 - One logical change per PR
 - Use `tracing` macros (`info!`, `warn!`, `error!`, `debug!`) instead of `println!`/`eprintln!` for all output
 - Run `cargo fmt --all && cargo clippy --workspace` before submitting
+- **CLI args that have config-file counterparts must use `Option<T>`** (not hardcoded defaults) to avoid clobbering profile/config presets
+- **All human-visible output must be gated on `json_output` and `quiet`** — never write to stdout unconditionally in the transfer path
+- **New CLI flags should be `global = true`** and tagged with an appropriate `help_heading` for grouped help output
+- **Config resolution follows the 4-layer priority**: config file → auto-network overlay → active tuning → CLI flags. Extract testable helpers rather than adding inline logic to `run()`
 
 ---
 

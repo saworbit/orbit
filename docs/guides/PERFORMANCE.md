@@ -38,10 +38,12 @@ For I/O-bound operations like file transfers, Orbit uses `2 × CPU_count` concur
 
 ## Performance Tips
 
-1. **Network Transfers:** Higher concurrency helps saturate network bandwidth
-2. **Local Operations:** Lower concurrency may be better for disk-bound operations
+1. **Network Transfers:** Higher concurrency helps saturate network bandwidth. Orbit auto-detects remote destinations and applies network-friendly defaults (resume, compression, retries) — use `orbit sync` or `orbit backup` for the simplest invocation
+2. **Local Operations:** Lower concurrency may be better for disk-bound operations. Use `--profile fast` for maximum local speed (zero-copy, no checksums)
 3. **Resource-Constrained Environments:** Use `--concurrency 1` or `--concurrency 2` to minimize resource usage
 4. **High-Performance Servers:** Manually set higher concurrency if auto-detection caps too low
+5. **Compression Shorthands:** Use `--zstd` (Zstd level 3) or `--lz4` (fastest) instead of the verbose `--compress zstd:3` syntax
+6. **Quiet/JSON Mode:** Use `--quiet` or `--json` in scripts to suppress progress bars and human-readable output, reducing I/O overhead from terminal rendering
 
 ## Monitoring Performance
 

@@ -1,4 +1,4 @@
-# Orbit v0.4.1 - Quick Start Guide
+# Orbit - Quick Start Guide
 
 Get up and running with Orbit in 5 minutes!
 
@@ -17,8 +17,21 @@ cargo install --path .
 
 # Verify installation
 orbit --version
-# Should output: orbit 0.4.0
 ```
+
+---
+
+## 🔧 First-Time Setup (Recommended)
+
+```bash
+# Run the interactive setup wizard
+orbit init
+
+# Or check your system and config health
+orbit doctor
+```
+
+`orbit init` scans your hardware, asks about your use case, and generates an optimized `~/.orbit/orbit.toml`. All subsequent commands use these settings automatically.
 
 ---
 
@@ -26,29 +39,48 @@ orbit --version
 
 ### Copy a Single File
 ```bash
-orbit -s input.txt -d output.txt
+orbit input.txt output.txt
 ```
 
 ### Copy with Compression
 ```bash
-# Fast compression (LZ4)
-orbit -s large.dat -d backup.dat --compress lz4
+# Quick Zstd shorthand (level 3, balanced)
+orbit large.dat backup.dat --zstd
 
-# Better compression (Zstd level 3, balanced)
-orbit -s large.dat -d backup.dat --compress zstd:3
+# Quick LZ4 shorthand (fastest)
+orbit large.dat backup.dat --lz4
 
-# Maximum compression (Zstd level 19, slow but best)
-orbit -s large.dat -d backup.dat --compress zstd:19
+# Explicit level control
+orbit large.dat backup.dat --compress zstd:19
 ```
 
 ### Copy a Directory
 ```bash
-orbit -s ./source_dir -d ./backup_dir -R
+# Auto-detects directories and enables recursive mode
+orbit ./source_dir ./backup_dir
+```
+
+### Shorthand Subcommands
+```bash
+# Sync (only copy new/changed files)
+orbit sync /project /backup
+
+# Backup (checksums + Zstd + resume + metadata)
+orbit backup /data /backup
+
+# Mirror (exact replica, deletes extras at destination)
+orbit mirror /source /replica
+```
+
+All global flags work with shorthands:
+```bash
+orbit sync /data /backup --quiet --zstd --workers 8
+orbit backup /data s3://bucket/backup --retry-attempts 10
 ```
 
 ### Resume Interrupted Transfer
 ```bash
-orbit -s bigfile.iso -d /mnt/network/bigfile.iso --resume
+orbit bigfile.iso /mnt/network/bigfile.iso --resume
 # If interrupted, just run the same command again!
 ```
 
@@ -58,8 +90,11 @@ orbit -s bigfile.iso -d /mnt/network/bigfile.iso --resume
 
 ### 1. Network Backup (Slow/Unreliable Connection)
 ```bash
-orbit -s ./important_data -d /mnt/backup \
-  -R \
+# Orbit auto-detects remote destinations and enables resume + retries!
+orbit backup ./important_data smb://server/backup --max-bandwidth 5
+
+# Or with explicit control:
+orbit ./important_data /mnt/backup -R \
   --compress zstd:9 \
   --resume \
   --retry-attempts 10 \
@@ -68,44 +103,37 @@ orbit -s ./important_data -d /mnt/backup \
 ```
 
 **What this does:**
-- Recursively copies directory
-- Compresses with Zstd level 9 (good compression)
-- Resumes if interrupted
-- Retries up to 10 times with exponential backoff
+- `orbit backup` automatically enables checksums, Zstd compression, resume, and metadata preservation
+- Auto-network detection adds retries and backoff for remote destinations
 - Limits bandwidth to 5 MB/s
 
 ### 2. Fast Local Sync (Many Small Files)
 ```bash
-orbit -s ./project -d /backup/project \
-  -R \
-  --mode sync \
-  --parallel 8 \
+orbit sync ./project /backup/project \
+  --workers 8 \
   --exclude "node_modules/*" \
   --exclude "*.tmp"
 ```
 
 **What this does:**
-- Syncs directory (only copies new/changed files)
+- `orbit sync` sets sync mode and enables recursive + metadata preservation
 - Uses 8 parallel threads
 - Excludes node_modules and temp files
 
 ### 3. Large File Transfer with Verification
 ```bash
-orbit -s database_dump.sql -d /backup/database_dump.sql \
-  --compress zstd:3 \
-  --resume \
-  --preserve-metadata
+orbit database_dump.sql /backup/database_dump.sql --zstd --resume
 ```
 
 **What this does:**
-- Compresses the file
-- Verifies with SHA-256 checksum
-- Preserves timestamps and permissions
+- Compresses with Zstd (level 3)
+- Verifies with BLAKE3 checksum (enabled by default)
+- Preserves timestamps and permissions (enabled by default)
 - Can resume if interrupted
 
 ### 4. Preview Before Copying (Dry Run)
 ```bash
-orbit -s ./source -d ./dest -R --dry-run --verbose
+orbit ./source ./dest -R --dry-run --verbose
 ```
 
 **What this does:**
@@ -153,9 +181,9 @@ orbit -s /large/dataset -d /backup \
 
 ---
 
-## ⚙️ Configuration File (Optional)
+## ⚙️ Configuration File
 
-Create `~/.orbit/orbit.toml` for default settings:
+Run `orbit init` to generate one automatically, or create `~/.orbit/orbit.toml` manually:
 
 ```toml
 # Compression
@@ -167,8 +195,17 @@ chunk_size = 2048
 # Retry attempts
 retry_attempts = 5
 
-# Preserve metadata
+# Preserve metadata [default: true]
 preserve_metadata = true
+
+# Show execution statistics [default: true]
+show_stats = true
+
+# Human-readable output [default: true]
+human_readable = true
+
+# JSON Lines output (suppresses human output, stats, and progress)
+json_output = false
 
 # Parallel operations
 parallel = 4
@@ -187,7 +224,7 @@ audit_format = "json"
 audit_log_path = "~/.orbit/audit.log"
 ```
 
-Now all commands use these defaults automatically! Override with CLI flags.
+All commands use these defaults automatically. CLI flags override individual settings. Setting `json_output = true` in the config file suppresses all human-readable output, progress bars, and statistics for machine consumption.
 
 ---
 
@@ -240,18 +277,38 @@ TEST_LOG=llm-debug RUST_LOG=debug \
 
 | Flag | Short | Description | Example |
 |------|-------|-------------|---------|
-| `--source` | `-s` | Source path | `-s ./file.txt` |
-| `--destination` | `-d` | Destination path | `-d /backup/file.txt` |
-| `--recursive` | `-R` | Copy directories | `-R` |
+| `--source` | `-s` | Source path (or use positional) | `orbit src dst` |
+| `--dest` | `-d` | Destination path (or use positional) | `orbit src dst` |
+| `--recursive` | `-R` | Copy directories (auto-detected) | `-R` |
 | `--compress` | `-c` | Compression type | `--compress zstd:9` |
+| `--zstd` | | Shorthand for `--compress zstd:3` | `--zstd` |
+| `--lz4` | | Shorthand for `--compress lz4` | `--lz4` |
 | `--resume` | `-r` | Enable resume | `--resume` |
 | `--mode` | `-m` | Copy mode | `--mode sync` |
-| `--parallel` | | Parallel threads | `--parallel 8` |
+| `--profile` | | Configuration preset | `--profile backup` |
+| `--workers` | | Parallel threads | `--workers 8` |
 | `--exclude` | | Exclude pattern | `--exclude "*.tmp"` |
 | `--dry-run` | | Preview only | `--dry-run` |
-| `--preserve-metadata` | `-p` | Keep timestamps | `-p` |
+| `--preserve-metadata` | `-p` | Keep timestamps (default: on) | `-p` |
+| `--no-preserve-metadata` | | Disable metadata preservation | |
 | `--max-bandwidth` | | Limit speed (MB/s) | `--max-bandwidth 10` |
 | `--retry-attempts` | | Retry count | `--retry-attempts 5` |
+| `--quiet` | `-q` | Suppress non-essential output | `-q` |
+| `--json` | | Machine-readable JSON output | `--json` |
+| `--raw` | | Raw byte output (no formatting) | `--raw` |
+| `--no-stat` | | Disable end-of-run statistics | `--no-stat` |
+
+### Subcommands
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `orbit sync <SRC> <DST>` | Sync mode (recursive, metadata) | `orbit sync /data /backup` |
+| `orbit backup <SRC> <DST>` | Backup profile (checksums + Zstd) | `orbit backup /data /backup` |
+| `orbit mirror <SRC> <DST>` | Mirror mode (exact replica) | `orbit mirror /data /replica` |
+| `orbit doctor` | Validate config and probe system | `orbit doctor` |
+| `orbit init` | Interactive setup wizard | `orbit init` |
+| `orbit presets` | Show available profile presets | `orbit presets` |
+| `orbit run` | Batch execution from file | `orbit run --file cmds.txt` |
 
 ---
 
@@ -312,45 +369,41 @@ orbit -s file -d backup --resume
 
 ### Developer Workflow
 ```bash
-# Backup project excluding build artifacts
-orbit -s ~/projects/myapp -d /backup/myapp \
-  -R \
+# Sync project excluding build artifacts
+orbit sync ~/projects/myapp /backup/myapp \
   --exclude "target/*" \
   --exclude "node_modules/*" \
-  --exclude ".git/*" \
-  --mode sync
+  --exclude ".git/*"
 ```
 
 ### System Administrator
 ```bash
 # Nightly database backup with compression
-orbit -s /var/lib/postgresql/backup.sql -d /mnt/backup/db/backup.sql \
-  --compress zstd:9 \
-  --preserve-metadata \
+orbit backup /var/lib/postgresql/backup.sql /mnt/backup/db/backup.sql \
   --audit-format json \
   --audit-log /var/log/orbit/backup.log
 ```
 
 ### Data Migration
 ```bash
-# Transfer large dataset to new server
-orbit -s /data/warehouse -d /mnt/newserver/warehouse \
-  -R \
-  --compress zstd:3 \
-  --parallel 8 \
-  --resume \
-  --retry-attempts 10 \
+# Transfer large dataset to new server (auto-network enables resume + retries)
+orbit /data/warehouse smb://newserver/warehouse -R \
+  --zstd \
+  --workers 8 \
   --max-bandwidth 50
 ```
 
 ### Personal Backup
 ```bash
-# Backup documents to external drive
-orbit -s ~/Documents -d /mnt/external/Documents \
-  -R \
-  --mode mirror \
-  --exclude "*.tmp" \
-  --preserve-metadata
+# Mirror documents to external drive
+orbit mirror ~/Documents /mnt/external/Documents \
+  --exclude "*.tmp"
+```
+
+### CI/CD Pipeline (Machine-Readable Output)
+```bash
+# JSON output for automation — no progress bars, no stats, no human text
+orbit backup /artifacts s3://bucket/builds --json
 ```
 
 ---
@@ -361,9 +414,10 @@ Before your first real copy:
 
 - [ ] Install: `cargo install --path .`
 - [ ] Test: `orbit --version`
-- [ ] Try dry run: `orbit -s test -d backup --dry-run`
-- [ ] Create config: Copy `orbit.toml` to `~/.orbit/`
-- [ ] Read help: `orbit --help`
+- [ ] Setup: `orbit init` (interactive wizard)
+- [ ] Diagnose: `orbit doctor` (verify config + hardware)
+- [ ] Try dry run: `orbit /test /backup --dry-run`
+- [ ] Read help: `orbit --help` (grouped by category)
 - [ ] Run tests: `cargo test`
 
 ---

@@ -36,7 +36,7 @@ pub struct CopyConfig {
     pub recursive: bool,
 
     /// Preserve file metadata (timestamps, permissions)
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub preserve_metadata: bool,
 
     /// Detailed metadata preservation flags (overrides preserve_metadata if set)
@@ -222,11 +222,11 @@ pub struct CopyConfig {
     pub metrics_port: Option<u16>,
 
     /// Show execution statistics summary at end of run
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub show_stats: bool,
 
     /// Human-readable output (e.g., "1.5 GiB" instead of raw bytes)
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub human_readable: bool,
 
     /// Output results as JSON Lines instead of human-readable text
@@ -371,7 +371,7 @@ impl Default for CopyConfig {
         Self {
             copy_mode: CopyMode::Copy,
             recursive: false,
-            preserve_metadata: false,
+            preserve_metadata: true,
             preserve_flags: None,
             transform: None,
             strict_metadata: false,
@@ -415,8 +415,8 @@ impl Default for CopyConfig {
             delta_chunk_size: default_delta_block_size(),
             otel_endpoint: None,
             metrics_port: None,
-            show_stats: false,
-            human_readable: false,
+            show_stats: true,
+            human_readable: true,
             json_output: false,
             // S3 upload enhancement fields (Phase 3)
             s3_content_type: None,
@@ -735,8 +735,9 @@ mod tests {
         assert!(!config.resume_enabled);
         assert!(!config.generate_manifest);
         assert_eq!(config.concurrency, 5);
-        assert!(!config.show_stats);
-        assert!(!config.human_readable);
+        assert!(config.show_stats);
+        assert!(config.human_readable);
+        assert!(config.preserve_metadata);
     }
 
     #[test]
@@ -863,8 +864,8 @@ recursive = false
 "#;
         let config: CopyConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.concurrency, 5); // default
-        assert!(!config.show_stats); // default
-        assert!(!config.human_readable); // default
+        assert!(config.show_stats); // default (now true)
+        assert!(config.human_readable); // default (now true)
     }
 
     #[test]

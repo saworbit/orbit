@@ -114,6 +114,8 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Metadata Preservation** | 🟡 Beta | Works well, extended attributes are platform-specific |
 | **Config Optimizer** | 🟡 Beta | Config validation with active probing |
 | **Init Wizard** | 🟡 Beta | Interactive setup with `orbit init` (v0.7.0) |
+| **Transfer Shorthands** | 🟡 Beta | `orbit sync`, `orbit backup`, `orbit mirror` with full flag support |
+| **Auto-Network Detection** | 🟡 Beta | Automatic resume/compression/retries for remote destinations |
 | **Active Environment Probing** | 🟡 Beta | Auto-tuning based on hardware/destination (v0.7.0) |
 | **Manifest System** | 🟡 Beta | File tracking and verification |
 | **Progress/Bandwidth Limiting** | 🟡 Beta | Recently integrated across all modes |
@@ -1357,19 +1359,34 @@ orbit source.txt destination.txt
 # Or with named flags
 orbit --source source.txt --dest destination.txt
 
-# Use a preset profile for common scenarios
+# ── Shorthand subcommands (NEW) ───────────────────────
+# These set mode/profile automatically and support ALL global flags
+orbit sync /data /backup                         # Sync mode, recursive, metadata preserved
+orbit backup /data /backup                       # Backup profile (checksums + Zstd + resume)
+orbit mirror /data /backup                       # Mirror mode (exact replica)
+orbit sync /data /backup --zstd --workers 8      # Shorthands + global flags work together
+
+# ── Profiles ──────────────────────────────────────────
 orbit /data /backup -R --profile backup     # Reliable backup: checksums + compression + resume
 orbit /data /backup -R --profile fast       # Maximum speed: zero-copy, no checksums
 orbit /data /backup -R --profile network    # Network-optimized: compression + resume + retries
 
+# ── Output control ────────────────────────────────────
+orbit /data /backup -R --quiet              # Suppress all non-essential output
+orbit /data /backup -R --json               # Machine-readable JSON Lines output
+orbit /data /backup -R --raw --no-stat      # Raw bytes, no stats summary
+
+# ── Diagnostics ───────────────────────────────────────
+orbit doctor                                # Validate config, probe hardware, check env
+
 # Copy with resume and checksum verification
 orbit --source large-file.iso --dest /backup/large-file.iso --resume
 
-# Recursive directory copy with compression
-orbit --source /data/photos --dest /backup/photos --recursive --compress zstd:3
+# Recursive directory copy with compression (shorthand flags)
+orbit /data/photos /backup/photos -R --zstd
 
 # Sync with parallel workers
-orbit --source /source --dest /destination --mode sync --workers 8 --recursive
+orbit sync /source /destination --workers 8
 
 # High-concurrency S3 upload (256 workers, 8 parts per file)
 orbit --source dataset.tar.gz --dest s3://my-bucket/backups/dataset.tar.gz \
@@ -1613,11 +1630,14 @@ parallel = 0
 # Per-operation concurrency for multipart transfers (parts per file)
 concurrency = 5
 
-# Show execution statistics at end of run
-show_stats = false
+# Show execution statistics at end of run [default: true]
+show_stats = true
 
-# Human-readable output (e.g., "1.5 GiB" instead of raw bytes)
-human_readable = false
+# Human-readable output (e.g., "1.5 GiB" instead of raw bytes) [default: true]
+human_readable = true
+
+# JSON Lines output for machine-readable results (suppresses human output, stats, and progress)
+json_output = false
 
 # Symbolic link handling: "skip", "follow", or "preserve"
 symlink_mode = "skip"
@@ -1672,11 +1692,14 @@ audit_log_path = "/var/log/orbit_audit.log"
 
 ### Configuration Priority
 
-1. CLI arguments (highest)
-2. `--profile` preset (applied as base, then CLI flags override)
-3. `./orbit.toml` (project)
-4. `~/.orbit/orbit.toml` (user)
-5. Built-in defaults (lowest)
+1. CLI arguments (highest — only applied when explicitly provided)
+2. `--profile` preset or auto-network detection (applied as base for remote destinations)
+3. `~/.orbit/orbit.toml` (user config, loaded automatically if present)
+4. Built-in defaults (lowest)
+
+**Auto-network detection:** When the destination is a remote URI (`s3://`, `smb://`, `ssh://`, etc.) and no `--profile` is specified, Orbit overlays network-friendly defaults (resume, compression, retries, backoff) onto your config — but only for fields you haven't customized. Fields you changed in your config file are preserved.
+
+**JSON mode:** Setting `json_output = true` in your config file (or passing `--json`) suppresses all human-readable output: progress bars, execution statistics, guidance notices, and pre-transfer status messages. This ensures stdout is clean for machine consumption.
 
 ---
 
@@ -1873,6 +1896,9 @@ orbit <init|stats|presets|capabilities>   # Configuration & info
 
 ### ✅ Recently Completed
 
+- **UX overhaul**: Transfer shorthand subcommands (`orbit sync`, `orbit backup`, `orbit mirror`), `orbit doctor`, `--quiet`/`--raw`/`--no-stat` output control, `--zstd`/`--lz4` compression shorthands, grouped `--help` output
+- **Config resolution hardened**: Unified transfer path for shorthands, auto-network detection that preserves user-customized config values, JSON mode suppresses all human output including progress, config file errors surfaced with warnings
+- **Saner defaults**: `preserve_metadata`, `show_stats`, and `human_readable` now default to `true`; CLI args use `Option<T>` to avoid clobbering profiles
 - **Simplified CLI**: Positional arguments (`orbit /src /dest`), `--profile` presets, actionable error messages
 - **Codebase restructuring**: main.rs reduced by 45%, subcommand handlers extracted to dedicated modules
 - **Config Optimizer enhancements**: Hardware probe caching, auto-tune summary display, new worker/chunk rules
@@ -1887,7 +1913,6 @@ orbit <init|stats|presets|capabilities>   # Configuration & info
 ### 🔮 Planned
 
 #### CLI Improvements
-- Friendly subcommands (`orbit cp`, `orbit sync`, `orbit run`) as aliases
 - File watching mode (`--watch`)
 - Interactive mode with prompts
 

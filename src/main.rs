@@ -26,12 +26,23 @@ use std::path::PathBuf;
 #[command(name = "orbit")]
 #[command(version, about = "Intelligent file transfer with compression, resume, and zero-copy optimization", long_about = None)]
 struct Cli {
+    // ── Transfer ────────────────────────────────────────────────────
     /// Source path or URI (positional: orbit <SOURCE> <DEST>)
-    #[arg(short = 's', long = "source", value_name = "PATH")]
+    #[arg(
+        short = 's',
+        long = "source",
+        value_name = "PATH",
+        help_heading = "Transfer"
+    )]
     source: Option<String>,
 
     /// Destination path or URI (positional: orbit <SOURCE> <DEST>)
-    #[arg(short = 'd', long = "dest", value_name = "PATH")]
+    #[arg(
+        short = 'd',
+        long = "dest",
+        value_name = "PATH",
+        help_heading = "Transfer"
+    )]
     destination: Option<String>,
 
     /// Source path (positional alternative to -s/--source)
@@ -43,7 +54,7 @@ struct Cli {
     pos_dest: Option<String>,
 
     /// Configuration profile preset (fast, safe, backup, network)
-    #[arg(long, value_enum, global = true)]
+    #[arg(long, value_enum, global = true, help_heading = "Transfer")]
     profile: Option<ProfileArg>,
 
     /// Copy mode
@@ -51,334 +62,428 @@ struct Cli {
         short = 'm',
         long = "mode",
         value_enum,
-        default_value = "copy",
-        global = true
+        global = true,
+        help_heading = "Transfer"
     )]
-    mode: CopyModeArg,
+    mode: Option<CopyModeArg>,
 
-    /// Recursive copy
-    #[arg(short = 'R', long = "recursive", global = true)]
+    /// Recursive copy (auto-detected for directory sources)
+    #[arg(
+        short = 'R',
+        long = "recursive",
+        global = true,
+        help_heading = "Transfer"
+    )]
     recursive: bool,
 
-    /// Preserve metadata (timestamps, permissions)
-    #[arg(short = 'p', long = "preserve-metadata", global = true)]
+    /// Do not auto-detect recursive mode for directory sources
+    #[arg(long, global = true, help_heading = "Transfer")]
+    no_auto_recursive: bool,
+
+    /// Preserve metadata (timestamps, permissions) [default: true]
+    #[arg(
+        short = 'p',
+        long = "preserve-metadata",
+        global = true,
+        help_heading = "Transfer"
+    )]
     preserve_metadata: bool,
 
+    /// Disable metadata preservation
+    #[arg(long, global = true, help_heading = "Transfer")]
+    no_preserve_metadata: bool,
+
     /// Detailed preservation flags: times,perms,owners,xattrs (overrides -p)
-    #[arg(long = "preserve", value_name = "FLAGS", global = true)]
+    #[arg(
+        long = "preserve",
+        value_name = "FLAGS",
+        global = true,
+        help_heading = "Transfer"
+    )]
     preserve_flags: Option<String>,
 
     /// Metadata transformation: rename:pattern=replacement,case:lower,strip:xattrs
-    #[arg(long = "transform", value_name = "CONFIG", global = true)]
+    #[arg(
+        long = "transform",
+        value_name = "CONFIG",
+        global = true,
+        help_heading = "Transfer"
+    )]
     transform: Option<String>,
 
     /// Strict metadata mode (fail on any metadata error)
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Transfer")]
     strict_metadata: bool,
 
     /// Verify metadata after transfer
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Transfer")]
     verify_metadata: bool,
 
     /// Enable resume capability
-    #[arg(short = 'r', long = "resume", global = true)]
+    #[arg(
+        short = 'r',
+        long = "resume",
+        global = true,
+        help_heading = "Reliability"
+    )]
     resume: bool,
 
-    /// Compression type (none, lz4, zstd)
-    #[arg(short = 'c', long = "compress", global = true)]
+    /// Compression type (none, lz4, zstd, zstd:1, zstd:3, zstd:9, zstd:19)
+    #[arg(
+        short = 'c',
+        long = "compress",
+        global = true,
+        help_heading = "Performance"
+    )]
     compress: Option<CompressionArg>,
 
-    /// Show progress bar
-    #[arg(long = "show-progress", global = true)]
+    /// Shorthand for --compress lz4
+    #[arg(
+        long,
+        global = true,
+        conflicts_with = "compress",
+        help_heading = "Performance"
+    )]
+    lz4: bool,
+
+    /// Shorthand for --compress zstd:3
+    #[arg(long, global = true, conflicts_with_all = ["compress", "lz4"], help_heading = "Performance")]
+    zstd: bool,
+
+    /// Show progress bar (override config)
+    #[arg(long = "show-progress", global = true, help_heading = "Output")]
     show_progress: bool,
 
     /// Symbolic link mode
-    #[arg(long = "symlink", value_enum, default_value = "skip", global = true)]
-    symlink: SymlinkModeArg,
+    #[arg(long = "symlink", value_enum, global = true, help_heading = "Transfer")]
+    symlink: Option<SymlinkModeArg>,
 
+    // ── Reliability ────────────────────────────────────────────────
     /// Number of retry attempts
-    #[arg(long, default_value = "3", global = true)]
-    retry_attempts: u32,
+    #[arg(long, global = true, help_heading = "Reliability")]
+    retry_attempts: Option<u32>,
 
     /// Initial retry delay in seconds
-    #[arg(long, default_value = "5", global = true)]
-    retry_delay: u64,
+    #[arg(long, global = true, help_heading = "Reliability")]
+    retry_delay: Option<u64>,
 
     /// Use exponential backoff for retries
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Reliability")]
     exponential_backoff: bool,
 
+    /// Error handling mode (abort, skip, partial)
+    #[arg(long, value_enum, global = true, help_heading = "Reliability")]
+    error_mode: Option<ErrorModeArg>,
+
+    /// Skip checksum verification
+    #[arg(long, global = true, help_heading = "Reliability")]
+    no_verify: bool,
+
+    // ── Performance ────────────────────────────────────────────────
     /// Chunk size in KB
-    #[arg(long, default_value = "1024", global = true)]
-    chunk_size: usize,
+    #[arg(long, global = true, help_heading = "Performance")]
+    chunk_size: Option<usize>,
 
     /// Maximum bandwidth in MB/s (0 = unlimited)
-    #[arg(long, default_value = "0", global = true)]
-    max_bandwidth: u64,
+    #[arg(long, global = true, help_heading = "Performance")]
+    max_bandwidth: Option<u64>,
 
     /// Number of parallel file operations / workers (0 = auto)
     /// For network backends (S3, SMB, etc.) auto = 256; for local = CPU count.
     /// Alias: --parallel
-    #[arg(long, default_value = "0", global = true, alias = "parallel")]
-    workers: usize,
+    #[arg(long, global = true, alias = "parallel", help_heading = "Performance")]
+    workers: Option<usize>,
 
-    /// Per-operation concurrency for multipart transfers (default: 5)
+    /// Per-operation concurrency for multipart transfers
     /// Controls how many parts of a single large file transfer in parallel.
-    #[arg(long, default_value = "5", global = true)]
-    concurrency: usize,
+    #[arg(long, global = true, help_heading = "Performance")]
+    concurrency: Option<usize>,
 
-    /// Multipart upload part size in MiB (default: 50, min: 5, max: 5120)
-    #[arg(long, global = true)]
+    /// Multipart upload part size in MiB (min: 5, max: 5120)
+    #[arg(long, global = true, help_heading = "Performance")]
     part_size: Option<usize>,
 
+    /// Use zero-copy system calls for maximum performance
+    #[arg(
+        long,
+        global = true,
+        conflicts_with = "no_zero_copy",
+        help_heading = "Performance"
+    )]
+    zero_copy: bool,
+
+    /// Disable zero-copy optimization (use buffered copy)
+    #[arg(
+        long,
+        global = true,
+        conflicts_with = "zero_copy",
+        help_heading = "Performance"
+    )]
+    no_zero_copy: bool,
+
+    // ── Filtering ──────────────────────────────────────────────────
     /// Include patterns - glob, regex, or path (can be specified multiple times)
     /// Examples: --include="*.rs" --include="regex:^src/.*"
-    #[arg(long = "include", global = true)]
+    #[arg(long = "include", global = true, help_heading = "Filtering")]
     include_patterns: Vec<String>,
 
     /// Exclude patterns - glob, regex, or path (can be specified multiple times)
     /// Examples: --exclude="*.tmp" --exclude="target/**"
-    #[arg(long = "exclude", global = true)]
+    #[arg(long = "exclude", global = true, help_heading = "Filtering")]
     exclude_patterns: Vec<String>,
 
     /// Load filter rules from a file (one rule per line)
     /// File format: '+ pattern' (include) or '- pattern' (exclude)
-    #[arg(long = "filter-from", value_name = "FILE", global = true)]
+    #[arg(
+        long = "filter-from",
+        value_name = "FILE",
+        global = true,
+        help_heading = "Filtering"
+    )]
     filter_from: Option<PathBuf>,
 
-    /// Dry run - show what would be copied
-    #[arg(long, global = true)]
-    dry_run: bool,
-
-    /// Show execution statistics summary at end of run
-    #[arg(long, global = true)]
-    stat: bool,
-
-    /// Human-readable output (e.g., "1.5 GiB" instead of raw bytes)
-    #[arg(short = 'H', long = "human-readable", global = true)]
-    human_readable: bool,
-
-    /// Audit log format
-    #[arg(long, value_enum, default_value = "json", global = true)]
-    audit_format: AuditFormatArg,
-
-    /// Path to audit log file
-    #[arg(long, global = true)]
-    audit_log: Option<PathBuf>,
-
-    /// OpenTelemetry OTLP endpoint for distributed tracing (e.g., http://localhost:4317)
-    #[arg(long, global = true)]
-    otel_endpoint: Option<String>,
-
-    /// Prometheus metrics HTTP endpoint port
-    #[arg(long, global = true)]
-    metrics_port: Option<u16>,
-
-    /// Hide progress bar
-    #[arg(long, global = true)]
-    no_progress: bool,
-
-    /// Skip checksum verification
-    #[arg(long, global = true)]
-    no_verify: bool,
-
-    /// Use zero-copy system calls for maximum performance (default)
-    #[arg(long, global = true, conflicts_with = "no_zero_copy")]
-    zero_copy: bool,
-
-    /// Disable zero-copy optimization (use buffered copy)
-    #[arg(long, global = true, conflicts_with = "zero_copy")]
-    no_zero_copy: bool,
-
-    /// Generate manifests for transfer verification and audit
-    #[arg(long, global = true)]
-    generate_manifest: bool,
-
-    /// Output directory for manifests
-    #[arg(long, global = true, requires = "generate_manifest")]
-    manifest_dir: Option<PathBuf>,
-
-    // Delta detection options
-    /// Check mode for change detection (mod-time, size, checksum, delta)
-    #[arg(long, value_enum, default_value_t = CheckModeArg::ModTime, global = true)]
-    check: CheckModeArg,
-
-    /// Block size for delta algorithm (in KB)
-    #[arg(long, default_value = "1024", global = true)]
-    block_size: usize,
-
-    /// Force whole file copy, disable delta optimization
-    #[arg(long, global = true)]
-    whole_file: bool,
-
-    /// Update manifest database after transfer
-    #[arg(long, global = true)]
-    update_manifest: bool,
-
-    /// Skip files that already exist at destination
-    #[arg(long, global = true)]
-    ignore_existing: bool,
-
-    /// Path to delta manifest database
-    #[arg(long, global = true)]
-    delta_manifest: Option<PathBuf>,
-
-    /// Error handling mode (abort, skip, partial)
-    #[arg(long, value_enum, default_value = "abort", global = true)]
-    error_mode: ErrorModeArg,
-
-    /// Log level (error, warn, info, debug, trace)
-    #[arg(long, value_enum, default_value = "info", global = true)]
-    log_level: LogLevelArg,
-
-    /// Path to log file (default: stdout)
-    #[arg(long, value_name = "FILE", global = true)]
-    log: Option<PathBuf>,
-
-    /// Enable verbose logging (equivalent to --log-level=debug)
-    #[arg(short = 'v', long, global = true)]
-    verbose: bool,
-
-    /// Output results as JSON Lines (one JSON object per line)
-    #[arg(long, global = true)]
-    json: bool,
-
-    /// Path to config file (overrides default locations)
-    #[arg(long, global = true)]
-    config: Option<PathBuf>,
-
-    // === S3 Upload Enhancement Flags ===
-    /// Content-Type header for S3 uploads
-    #[arg(long, global = true)]
-    content_type: Option<String>,
-
-    /// Content-Encoding header for S3 uploads
-    #[arg(long, global = true)]
-    content_encoding: Option<String>,
-
-    /// Content-Disposition header for S3 uploads
-    #[arg(long, global = true)]
-    content_disposition: Option<String>,
-
-    /// Cache-Control header for S3 uploads
-    #[arg(long, global = true)]
-    cache_control: Option<String>,
-
-    /// Expiration date for S3 objects (RFC3339 format)
-    #[arg(long = "expires-header", global = true)]
-    expires_header: Option<String>,
-
-    /// User-defined metadata key=value pairs for S3 uploads
-    #[arg(long = "metadata", global = true)]
-    user_metadata: Vec<String>,
-
-    /// Metadata directive for S3 copy operations (COPY or REPLACE)
-    #[arg(long, global = true)]
-    metadata_directive: Option<String>,
-
-    /// Canned ACL for S3 uploads (e.g., private, public-read, bucket-owner-full-control)
-    #[arg(long, global = true)]
-    acl: Option<String>,
-
-    // === S3 Client Configuration Flags ===
-    /// Disable request signing for public S3 buckets
-    #[arg(long, global = true)]
-    no_sign_request: bool,
-
-    /// Path to AWS credentials file
-    #[arg(long, global = true)]
-    credentials_file: Option<PathBuf>,
-
-    /// AWS profile name to use
-    #[arg(long = "aws-profile", global = true)]
-    aws_profile: Option<String>,
-
-    /// Use S3 Transfer Acceleration
-    #[arg(long, global = true)]
-    use_acceleration: bool,
-
-    /// Enable requester-pays for S3 bucket access
-    #[arg(long, global = true)]
-    request_payer: bool,
-
-    /// Disable SSL certificate verification (use with caution)
-    #[arg(long, global = true)]
-    no_verify_ssl: bool,
-
-    /// Use ListObjects API v1 (for older S3-compatible storage)
-    #[arg(long, global = true)]
-    use_list_objects_v1: bool,
-
-    // === Conditional copy flags ===
+    // ── Conditional Copy ───────────────────────────────────────────
     /// Do not overwrite existing destination files
-    #[arg(long, short = 'n', global = true)]
+    #[arg(long, short = 'n', global = true, help_heading = "Conditional Copy")]
     no_clobber: bool,
 
     /// Only copy if source and destination sizes differ
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Conditional Copy")]
     if_size_differ: bool,
 
     /// Only copy if source is newer than destination
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Conditional Copy")]
     if_source_newer: bool,
 
+    /// Skip files that already exist at destination
+    #[arg(long, global = true, help_heading = "Conditional Copy")]
+    ignore_existing: bool,
+
     /// Flatten directory hierarchy during copy (strip path components)
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Conditional Copy")]
     flatten: bool,
 
-    // === In-place & Sparse File Optimization ===
+    // ── Output ─────────────────────────────────────────────────────
+    /// Dry run - show what would be copied
+    #[arg(long, global = true, help_heading = "Output")]
+    dry_run: bool,
+
+    /// Show execution statistics summary at end of run [default: true]
+    #[arg(long, global = true, help_heading = "Output")]
+    stat: bool,
+
+    /// Disable execution statistics summary
+    #[arg(long, global = true, help_heading = "Output")]
+    no_stat: bool,
+
+    /// Human-readable output (e.g., "1.5 GiB") [default: true]
+    #[arg(
+        short = 'H',
+        long = "human-readable",
+        global = true,
+        help_heading = "Output"
+    )]
+    human_readable: bool,
+
+    /// Raw byte output (disable human-readable formatting)
+    #[arg(long, global = true, help_heading = "Output")]
+    raw: bool,
+
+    /// Hide progress bar
+    #[arg(long, global = true, help_heading = "Output")]
+    no_progress: bool,
+
+    /// Suppress all non-essential output
+    #[arg(short = 'q', long, global = true, help_heading = "Output")]
+    quiet: bool,
+
+    /// Output results as JSON Lines (one JSON object per line)
+    #[arg(long, global = true, help_heading = "Output")]
+    json: bool,
+
+    // ── Observability ──────────────────────────────────────────────
+    /// Audit log format
+    #[arg(long, value_enum, global = true, help_heading = "Observability")]
+    audit_format: Option<AuditFormatArg>,
+
+    /// Path to audit log file
+    #[arg(long, global = true, help_heading = "Observability")]
+    audit_log: Option<PathBuf>,
+
+    /// OpenTelemetry OTLP endpoint for distributed tracing (e.g., http://localhost:4317)
+    #[arg(long, global = true, help_heading = "Observability")]
+    otel_endpoint: Option<String>,
+
+    /// Prometheus metrics HTTP endpoint port
+    #[arg(long, global = true, help_heading = "Observability")]
+    metrics_port: Option<u16>,
+
+    /// Log level (error, warn, info, debug, trace)
+    #[arg(long, value_enum, global = true, help_heading = "Observability")]
+    log_level: Option<LogLevelArg>,
+
+    /// Path to log file (default: stdout)
+    #[arg(
+        long,
+        value_name = "FILE",
+        global = true,
+        help_heading = "Observability"
+    )]
+    log: Option<PathBuf>,
+
+    /// Enable verbose logging (equivalent to --log-level=debug)
+    #[arg(short = 'v', long, global = true, help_heading = "Observability")]
+    verbose: bool,
+
+    /// Path to config file (overrides default locations)
+    #[arg(long, global = true, help_heading = "Observability")]
+    config: Option<PathBuf>,
+
+    // ── S3 Options ─────────────────────────────────────────────────
+    /// Content-Type header for S3 uploads
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    content_type: Option<String>,
+
+    /// Content-Encoding header for S3 uploads
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    content_encoding: Option<String>,
+
+    /// Content-Disposition header for S3 uploads
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    content_disposition: Option<String>,
+
+    /// Cache-Control header for S3 uploads
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    cache_control: Option<String>,
+
+    /// Expiration date for S3 objects (RFC3339 format)
+    #[arg(long = "expires-header", global = true, help_heading = "S3 Options")]
+    expires_header: Option<String>,
+
+    /// User-defined metadata key=value pairs for S3 uploads
+    #[arg(long = "metadata", global = true, help_heading = "S3 Options")]
+    user_metadata: Vec<String>,
+
+    /// Metadata directive for S3 copy operations (COPY or REPLACE)
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    metadata_directive: Option<String>,
+
+    /// Canned ACL for S3 uploads (e.g., private, public-read, bucket-owner-full-control)
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    acl: Option<String>,
+
+    /// Disable request signing for public S3 buckets
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    no_sign_request: bool,
+
+    /// Path to AWS credentials file
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    credentials_file: Option<PathBuf>,
+
+    /// AWS profile name to use
+    #[arg(long = "aws-profile", global = true, help_heading = "S3 Options")]
+    aws_profile: Option<String>,
+
+    /// Use S3 Transfer Acceleration
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    use_acceleration: bool,
+
+    /// Enable requester-pays for S3 bucket access
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    request_payer: bool,
+
+    /// Disable SSL certificate verification (use with caution)
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    no_verify_ssl: bool,
+
+    /// Use ListObjects API v1 (for older S3-compatible storage)
+    #[arg(long, global = true, help_heading = "S3 Options")]
+    use_list_objects_v1: bool,
+
+    // ── Advanced ───────────────────────────────────────────────────
+    /// Generate manifests for transfer verification and audit
+    #[arg(long, global = true, help_heading = "Advanced")]
+    generate_manifest: bool,
+
+    /// Output directory for manifests
+    #[arg(
+        long,
+        global = true,
+        requires = "generate_manifest",
+        help_heading = "Advanced"
+    )]
+    manifest_dir: Option<PathBuf>,
+
+    /// Check mode for change detection (mod-time, size, checksum, delta)
+    #[arg(long, value_enum, global = true, help_heading = "Advanced")]
+    check: Option<CheckModeArg>,
+
+    /// Block size for delta algorithm (in KB)
+    #[arg(long, global = true, help_heading = "Advanced")]
+    block_size: Option<usize>,
+
+    /// Force whole file copy, disable delta optimization
+    #[arg(long, global = true, help_heading = "Advanced")]
+    whole_file: bool,
+
+    /// Update manifest database after transfer
+    #[arg(long, global = true, help_heading = "Advanced")]
+    update_manifest: bool,
+
+    /// Path to delta manifest database
+    #[arg(long, global = true, help_heading = "Advanced")]
+    delta_manifest: Option<PathBuf>,
+
     /// Sparse file handling mode (auto, always, never)
-    /// Auto: detect and create holes for large zero-heavy files (≥64KB)
-    /// Always: always check for zero chunks and create sparse holes
-    /// Never: write all bytes including zeros
-    #[arg(long, value_enum, default_value = "auto", global = true)]
-    sparse: SparseModeArg,
+    #[arg(long, value_enum, global = true, help_heading = "Advanced")]
+    sparse: Option<SparseModeArg>,
 
     /// Preserve hardlinks during directory transfers (-H)
-    /// Detects files sharing the same inode and recreates hardlinks at destination
-    #[arg(long = "preserve-hardlinks", global = true)]
+    #[arg(long = "preserve-hardlinks", global = true, help_heading = "Advanced")]
     preserve_hardlinks: bool,
 
     /// Modify destination file in-place instead of temp+rename
-    /// Saves disk space for large files where only a small portion changed
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Advanced")]
     inplace: bool,
 
     /// Safety level for in-place updates (reflink, journaled, unsafe)
-    /// Reflink: CoW snapshot (btrfs/XFS/APFS), Journaled: undo log, Unsafe: no safety
     #[arg(
         long,
         value_enum,
-        default_value = "reflink",
         global = true,
-        requires = "inplace"
+        requires = "inplace",
+        help_heading = "Advanced"
     )]
-    inplace_safety: InplaceSafetyArg,
+    inplace_safety: Option<InplaceSafetyArg>,
 
     /// Detect renamed/moved files via content-hash overlap at destination
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "Advanced")]
     detect_renames: bool,
 
     /// Minimum chunk overlap ratio to consider a rename (0.0–1.0, default: 0.8)
     #[arg(
         long,
-        default_value = "0.8",
         global = true,
-        requires = "detect_renames"
+        requires = "detect_renames",
+        help_heading = "Advanced"
     )]
-    rename_threshold: f64,
+    rename_threshold: Option<f64>,
 
     /// Reference directory for incremental backup hardlinking (repeatable)
-    /// Unchanged files are hardlinked to the reference; partial matches use delta
-    #[arg(long = "link-dest", value_name = "DIR", global = true)]
+    #[arg(
+        long = "link-dest",
+        value_name = "DIR",
+        global = true,
+        help_heading = "Advanced"
+    )]
     link_dest: Vec<PathBuf>,
 
     /// Record transfer operations to a batch file for replay
-    #[arg(long, value_name = "FILE", global = true)]
+    #[arg(long, value_name = "FILE", global = true, help_heading = "Advanced")]
     write_batch: Option<PathBuf>,
 
     /// Replay a previously recorded batch file against a destination
-    #[arg(long, value_name = "FILE", global = true)]
+    #[arg(long, value_name = "FILE", global = true, help_heading = "Advanced")]
     read_batch: Option<PathBuf>,
 
     #[command(subcommand)]
@@ -398,6 +503,9 @@ enum Commands {
 
     /// Show platform capabilities
     Capabilities,
+
+    /// Diagnose common issues (config, permissions, connectivity)
+    Doctor,
 
     /// Generate shell completions
     Completions {
@@ -424,6 +532,31 @@ enum Commands {
         /// Number of parallel workers (default: 256)
         #[arg(long, default_value = "256")]
         workers: usize,
+    },
+
+    /// Sync files (shorthand for --mode sync -R -p)
+    Sync {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
+    },
+
+    /// Backup files (shorthand for --profile backup -R -p)
+    Backup {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
+    },
+
+    /// Mirror files (shorthand for --mode mirror -R -p, deletes extras at dest)
+    #[command(name = "mirror")]
+    MirrorCmd {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
     },
 
     /// Stream an S3 object to stdout
@@ -569,6 +702,8 @@ enum ProfileArg {
 enum CompressionArg {
     None,
     Lz4,
+    /// Zstd with default level 3
+    Zstd,
     #[value(name = "zstd:1")]
     Zstd1,
     #[value(name = "zstd:3")]
@@ -584,8 +719,8 @@ impl From<CompressionArg> for CompressionType {
         match comp {
             CompressionArg::None => CompressionType::None,
             CompressionArg::Lz4 => CompressionType::Lz4,
+            CompressionArg::Zstd | CompressionArg::Zstd3 => CompressionType::Zstd { level: 3 },
             CompressionArg::Zstd1 => CompressionType::Zstd { level: 1 },
-            CompressionArg::Zstd3 => CompressionType::Zstd { level: 3 },
             CompressionArg::Zstd9 => CompressionType::Zstd { level: 9 },
             CompressionArg::Zstd19 => CompressionType::Zstd { level: 19 },
         }
@@ -716,6 +851,270 @@ impl From<InplaceSafetyArg> for orbit::config::InplaceSafety {
     }
 }
 
+/// Apply auto-network overlay to a base config for remote destinations.
+///
+/// For each field, if the user's config still matches `CopyConfig::default()`,
+/// we upgrade it to the network-friendly value. Fields the user customized
+/// are left alone.
+fn apply_auto_network(base: &CopyConfig) -> CopyConfig {
+    let defaults = CopyConfig::default();
+    let mut cfg = base.clone();
+    let net = CopyConfig::network_preset();
+    if cfg.resume_enabled == defaults.resume_enabled {
+        cfg.resume_enabled = net.resume_enabled;
+    }
+    if cfg.exponential_backoff == defaults.exponential_backoff {
+        cfg.exponential_backoff = net.exponential_backoff;
+    }
+    if cfg.compression == defaults.compression {
+        cfg.compression = net.compression;
+    }
+    if cfg.retry_attempts == defaults.retry_attempts {
+        cfg.retry_attempts = net.retry_attempts;
+    }
+    if cfg.parallel == defaults.parallel {
+        cfg.parallel = net.parallel;
+    }
+    if cfg.sparse_mode == defaults.sparse_mode {
+        cfg.sparse_mode = net.sparse_mode;
+    }
+    cfg.use_zero_copy = false;
+    cfg
+}
+
+struct OutputModeInputs {
+    json_output: bool,
+    quiet: bool,
+    raw: bool,
+    cli_human_readable: bool,
+    cli_stat: bool,
+    cli_no_stat: bool,
+    config_human_readable: bool,
+    config_show_stats: bool,
+}
+
+/// Resolve output display modes from CLI flags and config.
+///
+/// Priority: explicit CLI flags > json/quiet/raw overrides > config file values.
+/// When no CLI flag or mode override applies, the config file value is preserved.
+fn resolve_output_modes(inputs: OutputModeInputs) -> (bool, bool) {
+    // Human-readable: --raw and json mode force off, --human-readable forces on,
+    // otherwise respect the config file value.
+    let human_readable = if inputs.raw || inputs.json_output {
+        false
+    } else if inputs.cli_human_readable {
+        true
+    } else {
+        inputs.config_human_readable
+    };
+
+    // Show stats: --no-stat / json / quiet force off, --stat forces on,
+    // otherwise respect the config file value.
+    let show_stats = if inputs.cli_no_stat || inputs.json_output || inputs.quiet {
+        false
+    } else if inputs.cli_stat {
+        true
+    } else {
+        inputs.config_show_stats
+    };
+
+    (human_readable, show_stats)
+}
+
+/// Build a resolved transfer config from base config + CLI flags.
+///
+/// This is the single place where profile selection, auto-network merge,
+/// shorthand defaults, output-mode resolution, and all CLI overrides are
+/// applied. Returns `(config, json_output, quiet)` so downstream code
+/// has a single source of truth for output suppression.
+///
+/// Fields NOT handled here (applied separately in `run()`):
+/// S3 upload/client options, audit/observability, delta detection,
+/// conditional copy, batch, manifest, hardlinks, renames, link-dest.
+fn resolve_transfer_config(
+    cli: &Cli,
+    base_config: CopyConfig,
+    is_shorthand: bool,
+    shorthand_mode: Option<CopyMode>,
+    effective_profile: Option<ProfileArg>,
+    dest_is_remote: bool,
+    source_is_dir: bool,
+) -> (CopyConfig, bool, bool) {
+    // ── Profile / auto-network base ──────────────────────────────
+    let mut config = match effective_profile {
+        Some(ProfileArg::Fast) => CopyConfig::fast_preset(),
+        Some(ProfileArg::Safe) => CopyConfig::safe_preset(),
+        Some(ProfileArg::Backup) => CopyConfig::backup_preset(),
+        Some(ProfileArg::Network) => CopyConfig::network_preset(),
+        None => {
+            if dest_is_remote {
+                apply_auto_network(&base_config)
+            } else {
+                base_config
+            }
+        }
+    };
+
+    // ── Shorthand defaults ───────────────────────────────────────
+    if is_shorthand {
+        config.recursive = true;
+        config.preserve_metadata = true;
+    }
+    if let Some(mode) = shorthand_mode {
+        config.copy_mode = mode;
+    }
+
+    // ── Output modes ─────────────────────────────────────────────
+    let json_output = cli.json || config.json_output;
+    let quiet = cli.quiet;
+
+    let (human_readable, show_stats) = resolve_output_modes(OutputModeInputs {
+        json_output,
+        quiet,
+        raw: cli.raw,
+        cli_human_readable: cli.human_readable,
+        cli_stat: cli.stat,
+        cli_no_stat: cli.no_stat,
+        config_human_readable: config.human_readable,
+        config_show_stats: config.show_stats,
+    });
+    config.human_readable = human_readable;
+    config.show_stats = show_stats;
+
+    // ── Metadata ─────────────────────────────────────────────────
+    if cli.no_preserve_metadata {
+        config.preserve_metadata = false;
+    } else if cli.preserve_metadata || cli.preserve_flags.is_some() {
+        config.preserve_metadata = true;
+    }
+    if cli.strict_metadata {
+        config.strict_metadata = true;
+    }
+    if cli.verify_metadata {
+        config.verify_metadata = true;
+    }
+
+    // ── Recursive ────────────────────────────────────────────────
+    if !cli.no_auto_recursive && source_is_dir {
+        config.recursive = true;
+    }
+    if cli.recursive {
+        config.recursive = true;
+    }
+
+    // ── Progress ─────────────────────────────────────────────────
+    // JSON mode suppresses progress to keep stdout machine-readable.
+    if cli.show_progress && !json_output {
+        config.show_progress = true;
+    } else if cli.no_progress || quiet || json_output {
+        config.show_progress = false;
+    }
+
+    // ── Core transfer overrides ──────────────────────────────────
+    if let Some(mode) = cli.mode {
+        config.copy_mode = mode.into();
+    }
+    if cli.resume {
+        config.resume_enabled = true;
+    }
+    if let Some(attempts) = cli.retry_attempts {
+        config.retry_attempts = attempts;
+    }
+    if let Some(delay) = cli.retry_delay {
+        config.retry_delay_secs = delay;
+    }
+    if cli.exponential_backoff {
+        config.exponential_backoff = true;
+    }
+    if let Some(size) = cli.chunk_size {
+        config.chunk_size = size.saturating_mul(1024);
+    }
+    if let Some(bw) = cli.max_bandwidth {
+        config.max_bandwidth = bw.saturating_mul(1024 * 1024);
+    }
+    if let Some(w) = cli.workers {
+        config.parallel = w;
+    }
+    if let Some(c) = cli.concurrency {
+        config.concurrency = c;
+    }
+    if cli.dry_run {
+        config.dry_run = true;
+    }
+    if let Some(level) = cli.log_level {
+        config.log_level = level.into();
+    }
+    if cli.verbose {
+        config.verbose = true;
+    }
+    if json_output {
+        config.json_output = true;
+    }
+    if cli.no_verify {
+        config.verify_checksum = false;
+    }
+
+    // ── Compression ──────────────────────────────────────────────
+    if cli.zstd {
+        config.compression = CompressionType::Zstd { level: 3 };
+    } else if cli.lz4 {
+        config.compression = CompressionType::Lz4;
+    } else if let Some(comp) = cli.compress {
+        config.compression = comp.into();
+    }
+
+    // ── Zero-copy ────────────────────────────────────────────────
+    if cli.zero_copy {
+        config.use_zero_copy = true;
+    } else if cli.no_zero_copy {
+        config.use_zero_copy = false;
+    }
+
+    (config, json_output, quiet)
+}
+
+/// Try to load config from the default location (~/.orbit/orbit.toml).
+/// Returns Ok(Some(config)) on success, Ok(None) if no file exists,
+/// or Err with warning message if file exists but is invalid.
+fn load_default_config() -> (Option<CopyConfig>, Option<String>) {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return (None, None),
+    };
+    let path = home.join(".orbit").join("orbit.toml");
+    if !path.exists() {
+        return (None, None);
+    }
+    match CopyConfig::from_file(&path) {
+        Ok(cfg) => (Some(cfg), None),
+        Err(e) => (
+            None,
+            Some(format!(
+                "Invalid config file {}: {}. Falling back to defaults.",
+                path.display(),
+                e
+            )),
+        ),
+    }
+}
+
+/// Check if default config file exists
+fn default_config_exists() -> bool {
+    dirs::home_dir()
+        .map(|h| h.join(".orbit").join("orbit.toml").exists())
+        .unwrap_or(false)
+}
+
+/// Detect if a URI refers to a remote/network protocol
+fn is_remote_uri(uri: &str) -> bool {
+    uri.starts_with("s3://")
+        || uri.starts_with("smb://")
+        || uri.starts_with("ssh://")
+        || uri.starts_with("azure://")
+        || uri.starts_with("gs://")
+        || uri.starts_with("\\\\") // UNC paths
+}
+
 fn main() {
     let code = match run() {
         Ok(()) => EXIT_SUCCESS,
@@ -730,14 +1129,18 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
 
-    // Load config file once and reuse for both logging init and transfer config
+    // Load config: explicit --config > ~/.orbit/orbit.toml > defaults
     let base_config = if let Some(ref config_path) = cli.config {
         CopyConfig::from_file(config_path).unwrap_or_else(|e| {
             cli_style::print_warning(&format!("Failed to load config file: {}", e));
             CopyConfig::default()
         })
     } else {
-        CopyConfig::default()
+        let (cfg, warning) = load_default_config();
+        if let Some(msg) = warning {
+            cli_style::print_warning(&msg);
+        }
+        cfg.unwrap_or_default()
     };
 
     // Check if we need to initialize logging for the command
@@ -752,7 +1155,9 @@ fn run() -> Result<()> {
         let mut log_config = base_config.clone();
 
         // Set logging config from CLI (including audit_log_path and otel_endpoint)
-        log_config.log_level = cli.log_level.into();
+        if let Some(level) = cli.log_level {
+            log_config.log_level = level.into();
+        }
         log_config.log_file = cli.log.clone();
         log_config.verbose = cli.verbose;
         log_config.audit_log_path = cli.audit_log.clone();
@@ -765,9 +1170,42 @@ fn run() -> Result<()> {
         }
     }
 
-    // Handle subcommands
-    if let Some(command) = cli.command {
-        return handle_subcommand(command);
+    // ── Route subcommands ──────────────────────────────────────────
+    // Transfer shorthands (sync, backup, mirror) extract source/dest and
+    // set mode/profile overrides, then fall through to the unified transfer
+    // path so ALL global CLI flags are applied. Non-transfer subcommands
+    // bail out early.
+    let mut shorthand_mode: Option<CopyMode> = None;
+    let mut shorthand_profile: Option<ProfileArg> = None;
+    let mut shorthand_source: Option<String> = None;
+    let mut shorthand_dest: Option<String> = None;
+
+    if let Some(ref command) = cli.command {
+        match command {
+            // Transfer shorthands: extract data, fall through
+            Commands::Sync { source, dest } => {
+                shorthand_source = Some(source.clone());
+                shorthand_dest = Some(dest.clone());
+                shorthand_mode = Some(CopyMode::Sync);
+            }
+            Commands::Backup { source, dest } => {
+                shorthand_source = Some(source.clone());
+                shorthand_dest = Some(dest.clone());
+                shorthand_profile = Some(ProfileArg::Backup);
+            }
+            Commands::MirrorCmd { source, dest } => {
+                shorthand_source = Some(source.clone());
+                shorthand_dest = Some(dest.clone());
+                shorthand_mode = Some(CopyMode::Mirror);
+            }
+            // Non-transfer subcommands: handle and return
+            _ => {
+                // We need to move the command out for handle_subcommand.
+                // Safe because we checked it's not a shorthand above.
+                let command = cli.command.unwrap();
+                return handle_subcommand(command);
+            }
+        }
     }
 
     if cli.read_batch.is_some() && cli.write_batch.is_some() {
@@ -776,10 +1214,14 @@ fn run() -> Result<()> {
         ));
     }
 
-    // Resolve positional args: positional takes precedence if --source/--dest not given
-    let destination = cli
-        .destination
-        .or(cli.pos_dest)
+    // ── Resolve source & dest ──────────────────────────────────────
+    // Shorthand subcommands provide source/dest directly; otherwise
+    // resolve from positional args or -s/-d flags.
+    let is_shorthand = shorthand_source.is_some();
+
+    let destination = shorthand_dest
+        .or(cli.destination.clone())
+        .or(cli.pos_dest.clone())
         .ok_or_else(|| OrbitError::Config("Destination path required. Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>".to_string()))?;
 
     let (_dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
@@ -796,104 +1238,144 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    // Resolve source: positional takes precedence if --source not given
-    let source = cli.source.or(cli.pos_source).ok_or_else(|| {
-        OrbitError::Config(
-            "Source path required. Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>"
-                .to_string(),
-        )
-    })?;
+    let source = shorthand_source
+        .or(cli.source.clone())
+        .or(cli.pos_source.clone())
+        .ok_or_else(|| {
+            OrbitError::Config(
+                "Source path required. Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>"
+                    .to_string(),
+            )
+        })?;
 
-    // Parse URIs
     let (_source_protocol, source_path) = Protocol::from_uri(&source)?;
 
-    // Apply profile preset as base, then layer file config, then CLI overrides
-    let mut config = match cli.profile {
-        Some(ProfileArg::Fast) => CopyConfig::fast_preset(),
-        Some(ProfileArg::Safe) => CopyConfig::safe_preset(),
-        Some(ProfileArg::Backup) => CopyConfig::backup_preset(),
-        Some(ProfileArg::Network) => CopyConfig::network_preset(),
-        None => base_config,
-    };
+    // ── Resolve config: profile → auto-network → shorthand → output modes → CLI overrides
+    let effective_profile = cli.profile.or(shorthand_profile);
+    let dest_is_remote = is_remote_uri(&destination);
 
-    // Override config with CLI arguments
-    config.copy_mode = cli.mode.into();
-    config.recursive = cli.recursive;
-    config.preserve_metadata = cli.preserve_metadata;
-    config.preserve_flags = cli.preserve_flags;
-    config.transform = cli.transform;
-    config.strict_metadata = cli.strict_metadata;
-    config.verify_metadata = cli.verify_metadata;
-    config.resume_enabled = cli.resume;
-    config.verify_checksum = !cli.no_verify;
-    config.show_progress = cli.show_progress || !cli.no_progress;
-    config.symlink_mode = cli.symlink.into();
-    config.retry_attempts = cli.retry_attempts;
-    config.retry_delay_secs = cli.retry_delay;
-    config.exponential_backoff = cli.exponential_backoff;
-    config.chunk_size = cli.chunk_size.saturating_mul(1024);
-    config.max_bandwidth = cli.max_bandwidth.saturating_mul(1024 * 1024);
-    config.parallel = cli.workers;
-    config.concurrency = cli.concurrency;
-    config.include_patterns = cli.include_patterns;
-    config.exclude_patterns = cli.exclude_patterns;
-    config.filter_from = cli.filter_from;
-    config.dry_run = cli.dry_run;
-    config.show_stats = cli.stat;
-    config.human_readable = cli.human_readable;
-    config.error_mode = cli.error_mode.into();
-    config.log_level = cli.log_level.into();
-    config.log_file = cli.log;
-    config.verbose = cli.verbose;
-    config.json_output = cli.json;
+    let (mut config, json_output, quiet) = resolve_transfer_config(
+        &cli,
+        base_config.clone(),
+        is_shorthand,
+        shorthand_mode,
+        effective_profile,
+        dest_is_remote,
+        source_path.is_dir(),
+    );
+
+    // ── Remaining CLI overrides that move owned values out of Cli ──
+    // These are not in resolve_transfer_config because it takes &Cli.
+    if let Some(flags) = cli.preserve_flags {
+        config.preserve_flags = Some(flags);
+    }
+    config.transform = cli.transform.or(config.transform);
+    if let Some(symlink) = cli.symlink {
+        config.symlink_mode = symlink.into();
+    }
+    if let Some(err_mode) = cli.error_mode {
+        config.error_mode = err_mode.into();
+    }
+    if cli.log.is_some() {
+        config.log_file = cli.log;
+    }
+    if !cli.include_patterns.is_empty() {
+        config.include_patterns = cli.include_patterns;
+    }
+    if !cli.exclude_patterns.is_empty() {
+        config.exclude_patterns = cli.exclude_patterns;
+    }
+    if cli.filter_from.is_some() {
+        config.filter_from = cli.filter_from;
+    }
 
     // S3 upload enhancement flags
-    config.s3_content_type = cli.content_type;
-    config.s3_content_encoding = cli.content_encoding;
-    config.s3_content_disposition = cli.content_disposition;
-    config.s3_cache_control = cli.cache_control;
-    config.s3_expires_header = cli.expires_header;
-    config.s3_user_metadata = cli.user_metadata;
-    config.s3_metadata_directive = cli.metadata_directive;
-    config.s3_acl = cli.acl;
+    if cli.content_type.is_some() {
+        config.s3_content_type = cli.content_type;
+    }
+    if cli.content_encoding.is_some() {
+        config.s3_content_encoding = cli.content_encoding;
+    }
+    if cli.content_disposition.is_some() {
+        config.s3_content_disposition = cli.content_disposition;
+    }
+    if cli.cache_control.is_some() {
+        config.s3_cache_control = cli.cache_control;
+    }
+    if cli.expires_header.is_some() {
+        config.s3_expires_header = cli.expires_header;
+    }
+    if !cli.user_metadata.is_empty() {
+        config.s3_user_metadata = cli.user_metadata;
+    }
+    if cli.metadata_directive.is_some() {
+        config.s3_metadata_directive = cli.metadata_directive;
+    }
+    if cli.acl.is_some() {
+        config.s3_acl = cli.acl;
+    }
 
     // S3 client configuration flags
-    config.s3_no_sign_request = cli.no_sign_request;
-    config.s3_credentials_file = cli.credentials_file;
-    config.s3_aws_profile = cli.aws_profile;
-    config.s3_use_acceleration = cli.use_acceleration;
-    config.s3_request_payer = cli.request_payer;
-    config.s3_no_verify_ssl = cli.no_verify_ssl;
-    config.s3_use_list_objects_v1 = cli.use_list_objects_v1;
+    if cli.no_sign_request {
+        config.s3_no_sign_request = true;
+    }
+    if cli.credentials_file.is_some() {
+        config.s3_credentials_file = cli.credentials_file;
+    }
+    if cli.aws_profile.is_some() {
+        config.s3_aws_profile = cli.aws_profile;
+    }
+    if cli.use_acceleration {
+        config.s3_use_acceleration = true;
+    }
+    if cli.request_payer {
+        config.s3_request_payer = true;
+    }
+    if cli.no_verify_ssl {
+        config.s3_no_verify_ssl = true;
+    }
+    if cli.use_list_objects_v1 {
+        config.s3_use_list_objects_v1 = true;
+    }
 
     // Conditional copy flags
-    config.no_clobber = cli.no_clobber;
-    config.if_size_differ = cli.if_size_differ;
-    config.if_source_newer = cli.if_source_newer;
-    config.flatten = cli.flatten;
+    if cli.no_clobber {
+        config.no_clobber = true;
+    }
+    if cli.if_size_differ {
+        config.if_size_differ = true;
+    }
+    if cli.if_source_newer {
+        config.if_source_newer = true;
+    }
+    if cli.flatten {
+        config.flatten = true;
+    }
 
     // In-place, sparse, and advanced transfer flags
-    config.sparse_mode = cli.sparse.into();
-    config.preserve_hardlinks = cli.preserve_hardlinks;
-    config.inplace = cli.inplace;
-    config.inplace_safety = cli.inplace_safety.into();
-    config.detect_renames = cli.detect_renames;
-    config.rename_threshold = cli.rename_threshold;
-    config.link_dest = cli.link_dest;
-    config.write_batch = cli.write_batch;
-    config.read_batch = cli.read_batch;
-
-    // Handle compression
-    if let Some(comp) = cli.compress {
-        config.compression = comp.into();
+    if let Some(sparse) = cli.sparse {
+        config.sparse_mode = sparse.into();
     }
-
-    // Handle zero-copy flag
-    if cli.zero_copy {
-        config.use_zero_copy = true;
-    } else if cli.no_zero_copy {
-        config.use_zero_copy = false;
+    if cli.preserve_hardlinks {
+        config.preserve_hardlinks = true;
     }
+    if cli.inplace {
+        config.inplace = true;
+    }
+    if let Some(safety) = cli.inplace_safety {
+        config.inplace_safety = safety.into();
+    }
+    if cli.detect_renames {
+        config.detect_renames = true;
+    }
+    if let Some(threshold) = cli.rename_threshold {
+        config.rename_threshold = threshold;
+    }
+    if !cli.link_dest.is_empty() {
+        config.link_dest = cli.link_dest;
+    }
+    config.write_batch = cli.write_batch.or(config.write_batch);
+    config.read_batch = cli.read_batch.or(config.read_batch);
 
     // Handle manifest generation
     if cli.generate_manifest {
@@ -901,37 +1383,69 @@ fn run() -> Result<()> {
         config.manifest_output_dir = cli.manifest_dir;
     }
 
-    // Show zero-copy status if enabled
-    if config.use_zero_copy && config.show_progress && is_zero_copy_available() {
+    // Show zero-copy status if enabled (suppressed in json/quiet mode)
+    if config.use_zero_copy
+        && config.show_progress
+        && !json_output
+        && !quiet
+        && is_zero_copy_available()
+    {
         let caps = get_zero_copy_capabilities();
         println!("⚡ Zero-copy enabled ({})", caps.method);
     }
 
-    // Show manifest status if enabled
-    if config.generate_manifest && config.show_progress {
+    // Show manifest status if enabled (suppressed in json/quiet mode)
+    if config.generate_manifest && config.show_progress && !json_output && !quiet {
         if let Some(ref dir) = config.manifest_output_dir {
             println!("📋 Manifest generation enabled: {}", dir.display());
         }
     }
 
     // Configure audit logging and observability
-    config.audit_format = cli.audit_format.into();
-    config.audit_log_path = cli.audit_log;
-    config.otel_endpoint = cli.otel_endpoint;
-    config.metrics_port = cli.metrics_port;
+    if let Some(fmt) = cli.audit_format {
+        config.audit_format = fmt.into();
+    }
+    if cli.audit_log.is_some() {
+        config.audit_log_path = cli.audit_log;
+    }
+    if cli.otel_endpoint.is_some() {
+        config.otel_endpoint = cli.otel_endpoint;
+    }
+    config.metrics_port = cli.metrics_port.or(config.metrics_port);
 
     // Configure delta detection
-    config.check_mode = cli.check.into();
-    config.delta_block_size = cli.block_size.saturating_mul(1024); // Convert KB to bytes
-    config.whole_file = cli.whole_file;
-    config.update_manifest = cli.update_manifest;
-    config.ignore_existing = cli.ignore_existing;
-    config.delta_manifest_path = cli.delta_manifest;
+    if let Some(check) = cli.check {
+        config.check_mode = check.into();
+    }
+    if let Some(bs) = cli.block_size {
+        config.delta_block_size = bs.saturating_mul(1024);
+    }
+    if cli.whole_file {
+        config.whole_file = true;
+    }
+    if cli.update_manifest {
+        config.update_manifest = true;
+    }
+    if cli.ignore_existing {
+        config.ignore_existing = true;
+    }
+    if cli.delta_manifest.is_some() {
+        config.delta_manifest_path = cli.delta_manifest;
+    }
+
+    // First-run hint: suggest `orbit init` if no config file exists
+    if !default_config_exists() && !quiet && !json_output {
+        eprintln!(
+            "{} Run '{}' to optimize for your hardware and use case.",
+            Theme::muted("Tip:"),
+            Theme::primary("orbit init")
+        );
+    }
 
     // Optimize config based on system capabilities
     let optimized = ConfigOptimizer::optimize_with_probe(config, Some(&dest_path))?;
 
-    if !optimized.notices.is_empty() {
+    if !optimized.notices.is_empty() && !quiet && !json_output {
         guidance_box(&optimized.notices);
     }
 
@@ -952,17 +1466,21 @@ fn run() -> Result<()> {
         copy_file(&source_path, &dest_path, &config)?
     };
 
-    // Print summary
-    print_summary(&stats, &auto_tune_notices);
+    // Print summary (unless quiet or json mode)
+    if !quiet && !json_output {
+        print_summary(&stats, &auto_tune_notices);
+    }
 
-    // Print execution statistics if --stat was requested
-    if config.show_stats {
+    // Print execution statistics if enabled (default: true now)
+    if config.show_stats && !quiet && !json_output {
         print_exec_stats(&stats);
     }
 
     Ok(())
 }
 
+/// Handle non-transfer subcommands. Transfer shorthands (sync, backup, mirror)
+/// are handled in run() by falling through to the unified transfer path.
 fn handle_subcommand(command: Commands) -> Result<()> {
     match command {
         Commands::Init => orbit::commands::init::run_init_wizard(),
@@ -977,6 +1495,10 @@ fn handle_subcommand(command: Commands) -> Result<()> {
         }
         Commands::Capabilities => {
             print_capabilities();
+            Ok(())
+        }
+        Commands::Doctor => {
+            run_doctor();
             Ok(())
         }
         Commands::Completions { shell } => {
@@ -1037,7 +1559,173 @@ fn handle_subcommand(command: Commands) -> Result<()> {
         Commands::Mb { bucket } => orbit::commands::s3::handle_mb_command(&bucket),
         #[cfg(feature = "s3-native")]
         Commands::Rb { bucket } => orbit::commands::s3::handle_rb_command(&bucket),
+        // Transfer shorthands are handled in run() — this arm is unreachable
+        // because run() extracts them before calling handle_subcommand().
+        Commands::Sync { .. } | Commands::Backup { .. } | Commands::MirrorCmd { .. } => {
+            unreachable!("transfer shorthands handled in run()")
+        }
     }
+}
+
+fn run_doctor() {
+    cli_style::print_banner();
+    section_header(&format!("{} Orbit Doctor", Icons::WRENCH));
+    println!();
+
+    // 1. Config file
+    let config_exists = default_config_exists();
+    if config_exists {
+        let home = dirs::home_dir().unwrap();
+        let path = home.join(".orbit").join("orbit.toml");
+        println!(
+            "  {} {} {}",
+            Icons::SUCCESS,
+            Theme::muted("Config file:"),
+            Theme::success(path.display())
+        );
+        // Try to parse it
+        match CopyConfig::from_file(&path) {
+            Ok(_) => println!(
+                "  {} {}",
+                Icons::SUCCESS,
+                Theme::success("Config file is valid TOML")
+            ),
+            Err(e) => println!(
+                "  {} {} {}",
+                Icons::ERROR,
+                Theme::error("Config parse error:"),
+                e
+            ),
+        }
+    } else {
+        println!(
+            "  {} {} {}",
+            Icons::WARNING,
+            Theme::warning("No config file found."),
+            Theme::muted("Run 'orbit init' to create one.")
+        );
+    }
+    println!();
+
+    // 2. Platform capabilities
+    section_header(&format!("{} Platform", Icons::GEAR));
+    println!(
+        "  {} {} {} / {}",
+        Icons::BULLET,
+        Theme::muted("OS:"),
+        Theme::value(std::env::consts::OS),
+        Theme::muted(std::env::consts::ARCH)
+    );
+
+    let caps = get_zero_copy_capabilities();
+    println!(
+        "  {} {} {}",
+        if caps.available {
+            Icons::SUCCESS
+        } else {
+            Icons::WARNING
+        },
+        Theme::muted("Zero-copy:"),
+        if caps.available {
+            Theme::success(caps.method)
+        } else {
+            Theme::warning("unavailable")
+        }
+    );
+    println!();
+
+    // 3. System probe
+    section_header(&format!("{} Hardware", Icons::LIGHTNING));
+    match orbit::core::probe::Probe::scan(&std::env::current_dir().unwrap_or_default()) {
+        Ok(profile) => {
+            println!(
+                "  {} {} {}",
+                Icons::BULLET,
+                Theme::muted("CPU cores:"),
+                Theme::value(profile.logical_cores)
+            );
+            println!(
+                "  {} {} {} GB",
+                Icons::BULLET,
+                Theme::muted("RAM:"),
+                Theme::value(profile.available_ram_gb)
+            );
+            println!(
+                "  {} {} ~{:.0} MB/s",
+                Icons::BULLET,
+                Theme::muted("I/O throughput:"),
+                profile.estimated_io_throughput
+            );
+        }
+        Err(e) => {
+            println!(
+                "  {} {} {}",
+                Icons::WARNING,
+                Theme::warning("Probe failed:"),
+                e
+            );
+        }
+    }
+    println!();
+
+    // 4. Feature flags
+    section_header(&format!("{} Compiled Features", Icons::GEAR));
+    let features: Vec<(&str, bool)> = vec![
+        ("s3-native", cfg!(feature = "s3-native")),
+        ("smb-native", cfg!(feature = "smb-native")),
+        ("ssh-backend", cfg!(feature = "ssh-backend")),
+        ("azure-native", cfg!(feature = "azure-native")),
+        ("gcs-native", cfg!(feature = "gcs-native")),
+    ];
+    for (name, enabled) in &features {
+        println!(
+            "  {} {}",
+            if *enabled {
+                Icons::SUCCESS
+            } else {
+                Icons::BULLET
+            },
+            if *enabled {
+                Theme::success(*name).to_string()
+            } else {
+                Theme::muted(*name).to_string()
+            }
+        );
+    }
+    println!();
+
+    // 5. Environment
+    section_header(&format!("{} Environment", Icons::GLOBE));
+    let jwt_set = std::env::var("ORBIT_JWT_SECRET").is_ok();
+    println!(
+        "  {} {} {}",
+        if jwt_set {
+            Icons::SUCCESS
+        } else {
+            Icons::BULLET
+        },
+        Theme::muted("ORBIT_JWT_SECRET:"),
+        if jwt_set {
+            Theme::success("set")
+        } else {
+            Theme::muted("not set (dashboard auth disabled)")
+        }
+    );
+
+    let stats_env = std::env::var("ORBIT_STATS").unwrap_or_else(|_| "on".to_string());
+    println!(
+        "  {} {} {}",
+        Icons::BULLET,
+        Theme::muted("ORBIT_STATS:"),
+        Theme::value(&stats_env)
+    );
+    println!();
+
+    println!(
+        "  {}",
+        Theme::success("Doctor check complete. No critical issues found.")
+    );
+    println!();
 }
 
 fn print_presets() {
@@ -1097,17 +1785,27 @@ fn print_presets() {
     println!(
         "  {} {}",
         Theme::muted("Fast local copy:"),
-        Theme::primary("orbit -s /data -d /backup -R --profile fast")
+        Theme::primary("orbit /data /backup --profile fast")
     );
     println!(
         "  {} {}",
-        Theme::muted("Safe with verify:"),
-        Theme::primary("orbit -s /data -d /backup -R --profile safe --check checksum")
+        Theme::muted("Sync two dirs:"),
+        Theme::primary("orbit sync /data /backup")
+    );
+    println!(
+        "  {} {}",
+        Theme::muted("Backup with zstd:"),
+        Theme::primary("orbit backup /data /nas/backup")
     );
     println!(
         "  {} {}",
         Theme::muted("Network transfer:"),
-        Theme::primary("orbit -s /data -d smb://server/share -R --profile network")
+        Theme::primary("orbit /data s3://bucket/data")
+    );
+    println!(
+        "  {} {}",
+        Theme::muted("Mirror (delete extras):"),
+        Theme::primary("orbit mirror /src /dst")
     );
     println!();
 }
@@ -1361,7 +2059,7 @@ mod tests {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt", "--workers", "64"])
                 .unwrap();
-        assert_eq!(cli.workers, 64);
+        assert_eq!(cli.workers, Some(64));
     }
 
     #[test]
@@ -1376,7 +2074,7 @@ mod tests {
             "32",
         ])
         .unwrap();
-        assert_eq!(cli.workers, 32);
+        assert_eq!(cli.workers, Some(32));
     }
 
     #[test]
@@ -1391,19 +2089,19 @@ mod tests {
             "10",
         ])
         .unwrap();
-        assert_eq!(cli.concurrency, 10);
+        assert_eq!(cli.concurrency, Some(10));
     }
 
     #[test]
-    fn test_concurrency_default() {
+    fn test_concurrency_default_none() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
-        assert_eq!(cli.concurrency, 5);
+        assert_eq!(cli.concurrency, None);
     }
 
     #[test]
-    fn test_workers_default_zero() {
+    fn test_workers_default_none() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
-        assert_eq!(cli.workers, 0);
+        assert_eq!(cli.workers, None);
     }
 
     #[test]
@@ -1441,6 +2139,7 @@ mod tests {
 
     #[test]
     fn test_human_readable_default_false() {
+        // The CLI flag defaults to false; the *config* defaults to true now
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
         assert!(!cli.human_readable);
     }
@@ -1573,14 +2272,14 @@ mod tests {
             "--recursive",
         ])
         .unwrap();
-        assert_eq!(cli.workers, 128);
-        assert_eq!(cli.concurrency, 8);
+        assert_eq!(cli.workers, Some(128));
+        assert_eq!(cli.concurrency, Some(8));
         assert!(cli.stat);
         assert!(cli.human_readable);
         assert!(cli.recursive);
     }
 
-    // === Restored flag parser tests ===
+    // === Flag parser tests ===
 
     #[test]
     fn test_flatten_flag() {
@@ -1593,7 +2292,7 @@ mod tests {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--detect-renames"]).unwrap();
         assert!(cli.detect_renames);
-        assert!((cli.rename_threshold - 0.8).abs() < f64::EPSILON);
+        assert_eq!(cli.rename_threshold, None);
     }
 
     #[test]
@@ -1610,7 +2309,7 @@ mod tests {
         ])
         .unwrap();
         assert!(cli.detect_renames);
-        assert!((cli.rename_threshold - 0.5).abs() < f64::EPSILON);
+        assert!((cli.rename_threshold.unwrap() - 0.5).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1670,6 +2369,130 @@ mod tests {
         assert!(!cli.no_clobber);
         assert!(!cli.if_size_differ);
         assert!(!cli.if_source_newer);
+    }
+
+    #[test]
+    fn test_compression_shorthand_zstd() {
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--zstd"]).unwrap();
+        assert!(cli.zstd);
+        assert!(!cli.lz4);
+        assert!(cli.compress.is_none());
+    }
+
+    #[test]
+    fn test_compression_shorthand_lz4() {
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--lz4"]).unwrap();
+        assert!(cli.lz4);
+        assert!(!cli.zstd);
+    }
+
+    #[test]
+    fn test_compress_bare_zstd() {
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--compress", "zstd"]).unwrap();
+        let comp: CompressionType = cli.compress.unwrap().into();
+        assert!(matches!(comp, CompressionType::Zstd { level: 3 }));
+    }
+
+    #[test]
+    fn test_quiet_flag() {
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "-q"]).unwrap();
+        assert!(cli.quiet);
+    }
+
+    #[test]
+    fn test_raw_flag() {
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--raw"]).unwrap();
+        assert!(cli.raw);
+    }
+
+    #[test]
+    fn test_no_stat_flag() {
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-stat"]).unwrap();
+        assert!(cli.no_stat);
+    }
+
+    #[test]
+    fn test_no_preserve_metadata_flag() {
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-preserve-metadata"])
+                .unwrap();
+        assert!(cli.no_preserve_metadata);
+    }
+
+    #[test]
+    fn test_no_auto_recursive_flag() {
+        let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-auto-recursive"])
+            .unwrap();
+        assert!(cli.no_auto_recursive);
+    }
+
+    #[test]
+    fn test_sync_subcommand() {
+        let cli = Cli::try_parse_from(["orbit", "sync", "/src", "/dst"]).unwrap();
+        match cli.command {
+            Some(Commands::Sync { source, dest }) => {
+                assert_eq!(source, "/src");
+                assert_eq!(dest, "/dst");
+            }
+            _ => panic!("Expected Sync subcommand"),
+        }
+    }
+
+    #[test]
+    fn test_backup_subcommand() {
+        let cli = Cli::try_parse_from(["orbit", "backup", "/src", "/dst"]).unwrap();
+        match cli.command {
+            Some(Commands::Backup { source, dest }) => {
+                assert_eq!(source, "/src");
+                assert_eq!(dest, "/dst");
+            }
+            _ => panic!("Expected Backup subcommand"),
+        }
+    }
+
+    #[test]
+    fn test_mirror_subcommand() {
+        let cli = Cli::try_parse_from(["orbit", "mirror", "/src", "/dst"]).unwrap();
+        match cli.command {
+            Some(Commands::MirrorCmd { source, dest }) => {
+                assert_eq!(source, "/src");
+                assert_eq!(dest, "/dst");
+            }
+            _ => panic!("Expected Mirror subcommand"),
+        }
+    }
+
+    #[test]
+    fn test_doctor_subcommand() {
+        let cli = Cli::try_parse_from(["orbit", "doctor"]).unwrap();
+        assert!(matches!(cli.command, Some(Commands::Doctor)));
+    }
+
+    #[test]
+    fn test_profile_not_clobbered_by_defaults() {
+        // When --profile safe is used without --retry-attempts,
+        // retry_attempts should be None (not a default that overwrites the profile)
+        let cli =
+            Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--profile", "safe"]).unwrap();
+        assert_eq!(cli.retry_attempts, None);
+        assert_eq!(cli.retry_delay, None);
+        assert_eq!(cli.chunk_size, None);
+        assert_eq!(cli.workers, None);
+        assert_eq!(cli.concurrency, None);
+    }
+
+    #[test]
+    fn test_is_remote_uri() {
+        assert!(is_remote_uri("s3://bucket/key"));
+        assert!(is_remote_uri("smb://server/share"));
+        assert!(is_remote_uri("ssh://host/path"));
+        assert!(is_remote_uri("azure://container/blob"));
+        assert!(is_remote_uri("gs://bucket/key"));
+        assert!(is_remote_uri("\\\\server\\share"));
+        assert!(!is_remote_uri("/local/path"));
+        assert!(!is_remote_uri("./relative"));
+        assert!(!is_remote_uri("C:\\Windows\\path"));
     }
 
     // === S3 subcommand parse tests ===
@@ -1874,5 +2697,566 @@ mod tests {
             }
             _ => panic!("Expected Rb subcommand"),
         }
+    }
+
+    // === Output mode resolution tests ===
+
+    #[test]
+    fn test_resolve_output_modes_defaults() {
+        // No flags, config defaults (true, true): both stay true
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: false,
+            quiet: false,
+            raw: false,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: false,
+            config_human_readable: true,
+            config_show_stats: true,
+        });
+        assert!(hr, "human_readable should default to true");
+        assert!(stats, "show_stats should default to true");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_json_suppresses_both() {
+        // json_output=true (from config or --json): both should be false
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: true,
+            quiet: false,
+            raw: false,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: false,
+            config_human_readable: true,
+            config_show_stats: true,
+        });
+        assert!(!hr, "json mode should disable human_readable");
+        assert!(!stats, "json mode should disable show_stats");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_quiet_suppresses_stats() {
+        // --quiet: stats off, human_readable still on
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: false,
+            quiet: true,
+            raw: false,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: false,
+            config_human_readable: true,
+            config_show_stats: true,
+        });
+        assert!(hr, "quiet should not affect human_readable");
+        assert!(!stats, "quiet should disable show_stats");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_raw_disables_human() {
+        // --raw: human_readable off, stats still on
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: false,
+            quiet: false,
+            raw: true,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: false,
+            config_human_readable: true,
+            config_show_stats: true,
+        });
+        assert!(!hr, "raw should disable human_readable");
+        assert!(stats, "raw should not affect show_stats");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_no_stat_flag() {
+        // --no-stat: stats off, human_readable on
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: false,
+            quiet: false,
+            raw: false,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: true,
+            config_human_readable: true,
+            config_show_stats: true,
+        });
+        assert!(hr);
+        assert!(!stats, "--no-stat should disable show_stats");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_json_from_config_suppresses_output() {
+        // Simulates CopyConfig.json_output=true being merged with cli.json=false
+        // The resolved json_output would be true, so:
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: true,
+            quiet: false,
+            raw: false,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: false,
+            config_human_readable: true,
+            config_show_stats: true,
+        });
+        assert!(!hr, "config json_output should suppress human_readable");
+        assert!(!stats, "config json_output should suppress show_stats");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_config_show_stats_false_preserved() {
+        // Config file sets show_stats=false, no CLI override → stays false
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: false,
+            quiet: false,
+            raw: false,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: false,
+            config_human_readable: true,
+            config_show_stats: false,
+        });
+        assert!(hr, "human_readable should follow config (true)");
+        assert!(!stats, "config show_stats=false should be preserved");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_config_human_readable_false_preserved() {
+        // Config file sets human_readable=false, no CLI override → stays false
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: false,
+            quiet: false,
+            raw: false,
+            cli_human_readable: false,
+            cli_stat: false,
+            cli_no_stat: false,
+            config_human_readable: false,
+            config_show_stats: true,
+        });
+        assert!(!hr, "config human_readable=false should be preserved");
+        assert!(stats, "show_stats should follow config (true)");
+    }
+
+    #[test]
+    fn test_resolve_output_modes_cli_overrides_config_false() {
+        // Config file sets both false, but --human-readable and --stat override
+        let (hr, stats) = resolve_output_modes(OutputModeInputs {
+            json_output: false,
+            quiet: false,
+            raw: false,
+            cli_human_readable: true,
+            cli_stat: true,
+            cli_no_stat: false,
+            config_human_readable: false,
+            config_show_stats: false,
+        });
+        assert!(hr, "--human-readable should override config false");
+        assert!(stats, "--stat should override config false");
+    }
+
+    #[test]
+    fn test_json_mode_suppresses_progress() {
+        // --json should suppress progress even when --show-progress is passed
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "-s",
+            "/src",
+            "-d",
+            "/dst",
+            "--json",
+            "--show-progress",
+        ])
+        .unwrap();
+
+        let base = CopyConfig::default();
+        let (config, json_output, _quiet) =
+            resolve_transfer_config(&cli, base, false, None, None, false, false);
+
+        assert!(json_output);
+        assert!(
+            !config.show_progress,
+            "--json should suppress progress even with --show-progress"
+        );
+    }
+
+    #[test]
+    fn test_config_json_output_suppresses_progress() {
+        // Config json_output=true (no CLI flag) should also suppress progress
+        let cli = Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst"]).unwrap();
+
+        let base = CopyConfig {
+            json_output: true,
+            show_progress: true, // Explicitly on in config
+            ..CopyConfig::default()
+        };
+
+        let (config, json_output, _quiet) =
+            resolve_transfer_config(&cli, base, false, None, None, false, false);
+
+        assert!(json_output);
+        assert!(
+            !config.show_progress,
+            "config json_output should suppress progress"
+        );
+    }
+
+    // === Auto-network merge tests ===
+
+    #[test]
+    fn test_auto_network_upgrades_defaults() {
+        // A default config should be fully upgraded to network settings
+        let base = CopyConfig::default();
+        let merged = apply_auto_network(&base);
+        let net = CopyConfig::network_preset();
+
+        assert!(merged.resume_enabled, "should enable resume for remote");
+        assert!(
+            merged.exponential_backoff,
+            "should enable backoff for remote"
+        );
+        assert_eq!(merged.retry_attempts, net.retry_attempts);
+        assert_eq!(merged.parallel, net.parallel);
+        assert!(!merged.use_zero_copy, "should disable zero-copy for remote");
+        assert!(matches!(merged.compression, CompressionType::Zstd { .. }));
+    }
+
+    #[test]
+    fn test_auto_network_preserves_custom_retry() {
+        // User set retry_attempts=2 in config — should NOT be clobbered
+        let base = CopyConfig {
+            retry_attempts: 2,
+            ..CopyConfig::default()
+        };
+        let merged = apply_auto_network(&base);
+        assert_eq!(
+            merged.retry_attempts, 2,
+            "custom retry_attempts should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_auto_network_preserves_custom_compression() {
+        // User set compression=Lz4 in config — should NOT be clobbered to Zstd
+        let base = CopyConfig {
+            compression: CompressionType::Lz4,
+            ..CopyConfig::default()
+        };
+        let merged = apply_auto_network(&base);
+        assert!(
+            matches!(merged.compression, CompressionType::Lz4),
+            "custom compression should be preserved"
+        );
+    }
+
+    #[test]
+    fn test_auto_network_upgrades_default_retry() {
+        // retry_attempts=3 (the default) should be upgraded to 10 (network)
+        let base = CopyConfig::default();
+        assert_eq!(base.retry_attempts, 3, "precondition: default is 3");
+        let merged = apply_auto_network(&base);
+        assert_eq!(
+            merged.retry_attempts, 10,
+            "default retry should be upgraded to network value"
+        );
+    }
+
+    // === Shorthand subcommand CLI flag passthrough tests ===
+
+    #[test]
+    fn test_sync_with_global_flags() {
+        // Global flags should parse alongside shorthand subcommands
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "sync",
+            "/src",
+            "/dst",
+            "--quiet",
+            "--zstd",
+            "--retry-attempts",
+            "7",
+            "--workers",
+            "16",
+        ])
+        .unwrap();
+
+        // Shorthand data is present
+        match &cli.command {
+            Some(Commands::Sync { source, dest }) => {
+                assert_eq!(source, "/src");
+                assert_eq!(dest, "/dst");
+            }
+            _ => panic!("Expected Sync subcommand"),
+        }
+
+        // Global flags are accessible
+        assert!(cli.quiet, "--quiet should be parsed for sync");
+        assert!(cli.zstd, "--zstd should be parsed for sync");
+        assert_eq!(
+            cli.retry_attempts,
+            Some(7),
+            "--retry-attempts should be parsed for sync"
+        );
+        assert_eq!(cli.workers, Some(16), "--workers should be parsed for sync");
+    }
+
+    #[test]
+    fn test_backup_with_global_flags() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "backup",
+            "/src",
+            "/dst",
+            "--json",
+            "--lz4",
+            "--no-verify",
+        ])
+        .unwrap();
+
+        match &cli.command {
+            Some(Commands::Backup { .. }) => {}
+            _ => panic!("Expected Backup subcommand"),
+        }
+
+        assert!(cli.json, "--json should be parsed for backup");
+        assert!(cli.lz4, "--lz4 should be parsed for backup");
+        assert!(cli.no_verify, "--no-verify should be parsed for backup");
+    }
+
+    #[test]
+    fn test_mirror_with_global_flags() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "mirror",
+            "/src",
+            "/dst",
+            "--raw",
+            "--no-stat",
+            "--resume",
+        ])
+        .unwrap();
+
+        match &cli.command {
+            Some(Commands::MirrorCmd { .. }) => {}
+            _ => panic!("Expected Mirror subcommand"),
+        }
+
+        assert!(cli.raw, "--raw should be parsed for mirror");
+        assert!(cli.no_stat, "--no-stat should be parsed for mirror");
+        assert!(cli.resume, "--resume should be parsed for mirror");
+    }
+
+    // === Config resolution integration tests ===
+    // These exercise the full resolve_transfer_config pipeline:
+    // parsed Cli + base CopyConfig → resolved CopyConfig, proving that
+    // shorthand subcommands with global flags produce the correct runtime config.
+
+    #[test]
+    fn test_sync_resolved_config_with_flags() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "sync",
+            "/src",
+            "/dst",
+            "--quiet",
+            "--zstd",
+            "--retry-attempts",
+            "7",
+            "--workers",
+            "16",
+        ])
+        .unwrap();
+
+        let base = CopyConfig::default();
+        let (config, json_output, quiet) = resolve_transfer_config(
+            &cli,
+            base,
+            true,                 // is_shorthand
+            Some(CopyMode::Sync), // shorthand_mode
+            None,                 // no explicit profile
+            false,                // local dest
+            false,                // source is not a dir
+        );
+
+        assert!(!json_output);
+        assert!(quiet, "quiet should be true");
+        assert_eq!(
+            config.copy_mode,
+            CopyMode::Sync,
+            "shorthand should set Sync mode"
+        );
+        assert!(
+            matches!(config.compression, CompressionType::Zstd { level: 3 }),
+            "--zstd should set Zstd compression"
+        );
+        assert_eq!(config.retry_attempts, 7, "--retry-attempts should override");
+        assert_eq!(config.parallel, 16, "--workers should set parallel");
+        assert!(config.recursive, "shorthand should enable recursive");
+        assert!(
+            config.preserve_metadata,
+            "shorthand should enable preserve_metadata"
+        );
+        assert!(!config.show_stats, "quiet should suppress show_stats");
+    }
+
+    #[test]
+    fn test_backup_resolved_config_with_json() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "backup",
+            "/src",
+            "/dst",
+            "--json",
+            "--lz4",
+            "--no-verify",
+        ])
+        .unwrap();
+
+        let base = CopyConfig::default();
+        let (config, json_output, quiet) = resolve_transfer_config(
+            &cli,
+            base,
+            true,                     // is_shorthand
+            None,                     // backup uses profile, not mode
+            Some(ProfileArg::Backup), // backup profile
+            false,                    // local dest
+            false,
+        );
+
+        assert!(json_output, "--json should set json_output");
+        assert!(!quiet);
+        assert!(
+            !config.human_readable,
+            "json mode should disable human_readable"
+        );
+        assert!(!config.show_stats, "json mode should disable show_stats");
+        assert!(
+            !config.show_progress,
+            "json mode should disable show_progress"
+        );
+        assert!(config.json_output, "config.json_output should be true");
+        assert!(
+            matches!(config.compression, CompressionType::Lz4),
+            "--lz4 should set Lz4 compression"
+        );
+        assert!(
+            !config.verify_checksum,
+            "--no-verify should disable checksum"
+        );
+    }
+
+    #[test]
+    fn test_mirror_resolved_config_with_raw() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "mirror",
+            "/src",
+            "/dst",
+            "--raw",
+            "--no-stat",
+            "--resume",
+        ])
+        .unwrap();
+
+        let base = CopyConfig::default();
+        let (config, json_output, _quiet) = resolve_transfer_config(
+            &cli,
+            base,
+            true,                   // is_shorthand
+            Some(CopyMode::Mirror), // shorthand_mode
+            None,
+            false,
+            false,
+        );
+
+        assert!(!json_output);
+        assert_eq!(config.copy_mode, CopyMode::Mirror);
+        assert!(
+            !config.human_readable,
+            "--raw should disable human_readable"
+        );
+        assert!(!config.show_stats, "--no-stat should disable show_stats");
+        assert!(config.resume_enabled, "--resume should enable resume");
+        assert!(config.recursive, "shorthand should enable recursive");
+    }
+
+    #[test]
+    fn test_config_json_output_suppresses_human_output_e2e() {
+        // Config file has json_output=true; no CLI --json flag.
+        // The resolved config should suppress human_readable and show_stats.
+        let cli = Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst"]).unwrap();
+
+        let base = CopyConfig {
+            json_output: true,
+            ..CopyConfig::default()
+        };
+
+        let (config, json_output, _quiet) = resolve_transfer_config(
+            &cli, base, false, // not shorthand
+            None, None, false, false,
+        );
+
+        assert!(json_output, "config json_output should propagate");
+        assert!(
+            !config.human_readable,
+            "json mode should suppress human_readable"
+        );
+        assert!(!config.show_stats, "json mode should suppress show_stats");
+        assert!(
+            !config.show_progress,
+            "json mode should suppress show_progress"
+        );
+    }
+
+    #[test]
+    fn test_config_show_stats_false_survives_resolution() {
+        // Config file has show_stats=false, human_readable=false. No CLI overrides.
+        let cli = Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst"]).unwrap();
+
+        let base = CopyConfig {
+            show_stats: false,
+            human_readable: false,
+            ..CopyConfig::default()
+        };
+
+        let (config, _json_output, _quiet) =
+            resolve_transfer_config(&cli, base, false, None, None, false, false);
+
+        assert!(!config.show_stats, "config show_stats=false should survive");
+        assert!(
+            !config.human_readable,
+            "config human_readable=false should survive"
+        );
+    }
+
+    #[test]
+    fn test_auto_network_merge_through_resolve() {
+        // When dest is remote and no profile, auto-network should apply
+        let cli = Cli::try_parse_from(["orbit", "-s", "/src", "-d", "s3://bucket/key"]).unwrap();
+
+        let mut base = CopyConfig {
+            retry_attempts: 2,
+            ..CopyConfig::default()
+        };
+        base.retry_attempts = 2; // Custom value — should survive
+
+        let (config, _json_output, _quiet) = resolve_transfer_config(
+            &cli, base, false, None, None, true, // dest is remote
+            false,
+        );
+
+        assert_eq!(
+            config.retry_attempts, 2,
+            "custom retry should survive auto-network"
+        );
+        assert!(config.resume_enabled, "auto-network should enable resume");
+        assert!(
+            config.exponential_backoff,
+            "auto-network should enable backoff"
+        );
+        assert!(
+            !config.use_zero_copy,
+            "auto-network should disable zero-copy"
+        );
     }
 }
