@@ -9,6 +9,42 @@ use crate::cli_style::{format_bytes, print_info, section_header, Icons, Theme};
 use crate::error::{OrbitError, Result};
 use crate::protocol::Protocol;
 
+fn parse_s3_uri(uri: &str, command: &str, usage: &str) -> Result<(String, String)> {
+    let (protocol, key_path) = Protocol::from_uri(uri)?;
+    match protocol {
+        Protocol::S3 { bucket, .. } => Ok((
+            bucket,
+            key_path
+                .to_string_lossy()
+                .trim_start_matches('/')
+                .to_string(),
+        )),
+        _ => Err(OrbitError::Config(format!(
+            "{} command requires an S3 URI ({})",
+            command, usage
+        ))),
+    }
+}
+
+fn parse_bucket_name(bucket_uri: &str, command: &str) -> Result<String> {
+    let bucket_name = match Protocol::from_uri(bucket_uri) {
+        Ok((Protocol::S3 { bucket, .. }, _)) => bucket,
+        _ => bucket_uri
+            .trim_start_matches("s3://")
+            .trim_end_matches('/')
+            .to_string(),
+    };
+
+    if bucket_name.is_empty() {
+        return Err(OrbitError::Config(format!(
+            "{} command requires a bucket name (s3://bucket-name)",
+            command
+        )));
+    }
+
+    Ok(bucket_name)
+}
+
 // ============================================================================
 // S3 Streaming Commands (cat, pipe, presign)
 // ============================================================================
@@ -17,21 +53,7 @@ pub fn handle_cat_command(uri: &str) -> Result<()> {
     use crate::protocol::s3::{S3Client, S3Config, S3Operations};
     use std::io::Write;
 
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    // Extract bucket from URI
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "cat command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
+    let (bucket, key) = parse_s3_uri(uri, "cat", "s3://bucket/key")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -63,20 +85,7 @@ pub fn handle_pipe_command(uri: &str) -> Result<()> {
     use bytes::Bytes;
     use std::io::Read;
 
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "pipe command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
+    let (bucket, key) = parse_s3_uri(uri, "pipe", "s3://bucket/key")?;
 
     // Read all stdin into memory
     let mut buffer = Vec::new();
@@ -106,20 +115,7 @@ pub fn handle_pipe_command(uri: &str) -> Result<()> {
 pub fn handle_presign_command(uri: &str, expires: u64) -> Result<()> {
     use crate::protocol::s3::{S3Client, S3Config};
 
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "presign command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
+    let (bucket, key) = parse_s3_uri(uri, "presign", "s3://bucket/key")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -155,20 +151,7 @@ pub fn handle_ls_command(
         has_wildcards, S3Client, S3Config, S3Operations, VersioningOperations,
     };
 
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "ls command requires an S3 URI (s3://bucket/prefix)".to_string(),
-            ))
-        }
-    };
+    let (bucket, key) = parse_s3_uri(uri, "ls", "s3://bucket/prefix")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -301,20 +284,7 @@ pub fn handle_ls_command(
 pub fn handle_head_command(uri: &str, version_id: Option<String>) -> Result<()> {
     use crate::protocol::s3::{S3Client, S3Config, VersioningOperations};
 
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "head command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
+    let (bucket, key) = parse_s3_uri(uri, "head", "s3://bucket/key")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -487,20 +457,7 @@ pub fn handle_du_command(uri: &str, group: bool, all_versions: bool) -> Result<(
     use crate::protocol::s3::{S3Client, S3Config, S3Operations, VersioningOperations};
     use std::collections::HashMap;
 
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "du command requires an S3 URI (s3://bucket/prefix)".to_string(),
-            ))
-        }
-    };
+    let (bucket, key) = parse_s3_uri(uri, "du", "s3://bucket/prefix")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -642,20 +599,7 @@ pub fn handle_rm_command(
 ) -> Result<()> {
     use crate::protocol::s3::{has_wildcards, S3Client, S3Config, VersioningOperations};
 
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "rm command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
+    let (bucket, key) = parse_s3_uri(uri, "rm", "s3://bucket/key")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -783,33 +727,8 @@ pub fn handle_rm_command(
 pub fn handle_mv_command(source: &str, dest: &str) -> Result<()> {
     use crate::protocol::s3::{S3Client, S3Config, S3Operations};
 
-    let (_src_protocol, src_key_path) = Protocol::from_uri(source)?;
-    let src_key = src_key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-    let src_bucket = match Protocol::from_uri(source)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "mv command requires S3 URIs (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    let (_dst_protocol, dst_key_path) = Protocol::from_uri(dest)?;
-    let dst_key = dst_key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-    let dst_bucket = match Protocol::from_uri(dest)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "mv command requires S3 URIs (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
+    let (src_bucket, src_key) = parse_s3_uri(source, "mv", "s3://bucket/key")?;
+    let (dst_bucket, dst_key) = parse_s3_uri(dest, "mv", "s3://bucket/key")?;
 
     if src_bucket != dst_bucket {
         return Err(OrbitError::Config(
@@ -847,19 +766,7 @@ pub fn handle_mv_command(source: &str, dest: &str) -> Result<()> {
 pub fn handle_mb_command(bucket_uri: &str) -> Result<()> {
     use crate::protocol::s3::{S3Client, S3Config};
 
-    let bucket_name = match Protocol::from_uri(bucket_uri) {
-        Ok((Protocol::S3 { bucket, .. }, _)) => bucket,
-        _ => bucket_uri
-            .trim_start_matches("s3://")
-            .trim_end_matches('/')
-            .to_string(),
-    };
-
-    if bucket_name.is_empty() {
-        return Err(OrbitError::Config(
-            "mb command requires a bucket name (s3://bucket-name)".to_string(),
-        ));
-    }
+    let bucket_name = parse_bucket_name(bucket_uri, "mb")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -883,19 +790,7 @@ pub fn handle_mb_command(bucket_uri: &str) -> Result<()> {
 pub fn handle_rb_command(bucket_uri: &str) -> Result<()> {
     use crate::protocol::s3::{S3Client, S3Config};
 
-    let bucket_name = match Protocol::from_uri(bucket_uri) {
-        Ok((Protocol::S3 { bucket, .. }, _)) => bucket,
-        _ => bucket_uri
-            .trim_start_matches("s3://")
-            .trim_end_matches('/')
-            .to_string(),
-    };
-
-    if bucket_name.is_empty() {
-        return Err(OrbitError::Config(
-            "rb command requires a bucket name (s3://bucket-name)".to_string(),
-        ));
-    }
+    let bucket_name = parse_bucket_name(bucket_uri, "rb")?;
 
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
@@ -951,4 +846,76 @@ pub fn days_to_ymd(days: u64) -> (u64, u64, u64) {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
     (y, m, d)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, UNIX_EPOCH};
+
+    #[test]
+    fn test_parse_s3_uri_accepts_object_key() {
+        let (bucket, key) = parse_s3_uri("s3://demo/path/to/file.txt", "cat", "s3://bucket/key")
+            .expect("expected valid S3 URI");
+
+        assert_eq!(bucket, "demo");
+        assert_eq!(key, "path/to/file.txt");
+    }
+
+    #[test]
+    fn test_parse_s3_uri_rejects_non_s3_protocol() {
+        let err = parse_s3_uri("C:/temp/file.txt", "cat", "s3://bucket/key").unwrap_err();
+
+        assert!(err
+            .to_string()
+            .contains("cat command requires an S3 URI (s3://bucket/key)"));
+    }
+
+    #[test]
+    fn test_parse_bucket_name_accepts_s3_uri_and_raw_name() {
+        assert_eq!(
+            parse_bucket_name("s3://demo-bucket", "mb").unwrap(),
+            "demo-bucket"
+        );
+        assert_eq!(
+            parse_bucket_name("demo-bucket", "mb").unwrap(),
+            "demo-bucket"
+        );
+    }
+
+    #[test]
+    fn test_parse_bucket_name_rejects_empty_name() {
+        let err = parse_bucket_name("", "rb").unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("rb command requires a bucket name (s3://bucket-name)"));
+    }
+
+    #[test]
+    fn test_s3_handlers_reject_non_s3_uris_before_network() {
+        let handlers = [
+            handle_cat_command("not-a-uri"),
+            handle_presign_command("not-a-uri", 60),
+            handle_head_command("not-a-uri", None),
+            handle_du_command("not-a-uri", false, false),
+            handle_rm_command("not-a-uri", false, None, true),
+            handle_mv_command("not-a-uri", "s3://bucket/key"),
+        ];
+
+        for result in handlers {
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_days_to_ymd_known_dates() {
+        assert_eq!(days_to_ymd(0), (1970, 1, 1));
+        assert_eq!(days_to_ymd(11016), (2000, 2, 29));
+    }
+
+    #[test]
+    fn test_format_system_time_unix_epoch() {
+        let formatted = format_system_time(UNIX_EPOCH + Duration::from_secs(0));
+        assert_eq!(formatted, "1970-01-01 00:00:00");
+    }
 }

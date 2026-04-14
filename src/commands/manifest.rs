@@ -13,6 +13,22 @@ use crate::config::{ChunkingStrategy, CopyConfig};
 use crate::error::{OrbitError, Result, EXIT_FATAL};
 use crate::manifest_integration::ManifestGenerator;
 
+fn parse_chunking_strategy(chunking: &str, chunk_size: u32) -> Result<ChunkingStrategy> {
+    match chunking {
+        "cdc" => Ok(ChunkingStrategy::Cdc {
+            avg_kib: chunk_size,
+            algo: "gear".to_string(),
+        }),
+        "fixed" => Ok(ChunkingStrategy::Fixed {
+            size_kib: chunk_size,
+        }),
+        _ => Err(OrbitError::Config(format!(
+            "Invalid chunking strategy: {}",
+            chunking
+        ))),
+    }
+}
+
 #[derive(Subcommand)]
 pub enum ManifestCommands {
     /// Create a flight plan without transferring data
@@ -111,15 +127,9 @@ pub fn handle_manifest_plan(
     );
     println!();
 
-    let chunking_strategy = match chunking.as_str() {
-        "cdc" => ChunkingStrategy::Cdc {
-            avg_kib: chunk_size,
-            algo: "gear".to_string(),
-        },
-        "fixed" => ChunkingStrategy::Fixed {
-            size_kib: chunk_size,
-        },
-        _ => {
+    let chunking_strategy = match parse_chunking_strategy(&chunking, chunk_size) {
+        Ok(strategy) => strategy,
+        Err(_) => {
             print_error(
                 &format!("Invalid chunking strategy: {}", chunking),
                 Some("Use 'cdc' or 'fixed'"),
@@ -406,4 +416,49 @@ pub fn handle_manifest_info(path: PathBuf) -> Result<()> {
         Some("Ensure the file is a valid Orbit manifest"),
     );
     std::process::exit(EXIT_FATAL);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_chunking_strategy_cdc() {
+        match parse_chunking_strategy("cdc", 256).unwrap() {
+            ChunkingStrategy::Cdc { avg_kib, algo } => {
+                assert_eq!(avg_kib, 256);
+                assert_eq!(algo, "gear");
+            }
+            other => panic!("expected cdc strategy, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_chunking_strategy_fixed() {
+        match parse_chunking_strategy("fixed", 512).unwrap() {
+            ChunkingStrategy::Fixed { size_kib } => assert_eq!(size_kib, 512),
+            other => panic!("expected fixed strategy, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_chunking_strategy_rejects_invalid_value() {
+        let err = parse_chunking_strategy("bogus", 256).unwrap_err();
+        assert!(err.to_string().contains("Invalid chunking strategy: bogus"));
+    }
+
+    #[test]
+    fn test_handle_manifest_diff_is_placeholder_but_ok() {
+        let result = handle_manifest_diff(PathBuf::from("manifests"), PathBuf::from("target"));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_handle_manifest_command_dispatches_diff() {
+        let result = handle_manifest_command(ManifestCommands::Diff {
+            manifest_dir: PathBuf::from("manifests"),
+            target: PathBuf::from("target"),
+        });
+        assert!(result.is_ok());
+    }
 }
