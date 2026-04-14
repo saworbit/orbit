@@ -3259,4 +3259,195 @@ mod tests {
             "auto-network should disable zero-copy"
         );
     }
+
+    #[test]
+    fn test_resolve_transfer_config_explicit_profile_skips_auto_network_overlay() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "-s",
+            "/src",
+            "-d",
+            "s3://bucket/key",
+            "--profile",
+            "fast",
+        ])
+        .unwrap();
+
+        let base = CopyConfig::default();
+        let fast = CopyConfig::fast_preset();
+        let (config, _json_output, _quiet) =
+            resolve_transfer_config(&cli, base, false, None, Some(ProfileArg::Fast), true, false);
+
+        assert_eq!(config.compression, fast.compression);
+        assert_eq!(config.resume_enabled, fast.resume_enabled);
+        assert_eq!(config.parallel, fast.parallel);
+        assert_eq!(config.sparse_mode, fast.sparse_mode);
+        assert_eq!(config.use_zero_copy, fast.use_zero_copy);
+    }
+
+    #[test]
+    fn test_resolve_transfer_config_metadata_and_recursive_overrides() {
+        let disable_cli = Cli::try_parse_from([
+            "orbit",
+            "-s",
+            "/src",
+            "-d",
+            "/dst",
+            "--no-preserve-metadata",
+            "--strict-metadata",
+            "--verify-metadata",
+            "--no-auto-recursive",
+        ])
+        .unwrap();
+
+        let disable_base = CopyConfig {
+            preserve_metadata: true,
+            recursive: false,
+            ..CopyConfig::default()
+        };
+        let (disabled, _json_output, _quiet) =
+            resolve_transfer_config(&disable_cli, disable_base, false, None, None, false, true);
+
+        assert!(!disabled.preserve_metadata);
+        assert!(disabled.strict_metadata);
+        assert!(disabled.verify_metadata);
+        assert!(
+            !disabled.recursive,
+            "--no-auto-recursive should keep directory sources non-recursive"
+        );
+
+        let enable_cli =
+            Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst", "--preserve-metadata"])
+                .unwrap();
+        let enable_base = CopyConfig {
+            preserve_metadata: false,
+            recursive: false,
+            ..CopyConfig::default()
+        };
+        let (enabled, _json_output, _quiet) =
+            resolve_transfer_config(&enable_cli, enable_base, false, None, None, false, true);
+
+        assert!(enabled.preserve_metadata);
+        assert!(
+            enabled.recursive,
+            "directory sources should auto-enable recursive when allowed"
+        );
+    }
+
+    #[test]
+    fn test_resolve_transfer_config_progress_overrides() {
+        let show_cli =
+            Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst", "--show-progress"]).unwrap();
+        let show_base = CopyConfig {
+            show_progress: false,
+            ..CopyConfig::default()
+        };
+        let (shown, _json_output, _quiet) =
+            resolve_transfer_config(&show_cli, show_base, false, None, None, false, false);
+        assert!(
+            shown.show_progress,
+            "--show-progress should enable progress"
+        );
+
+        let no_progress_cli =
+            Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst", "--no-progress"]).unwrap();
+        let no_progress_base = CopyConfig {
+            show_progress: true,
+            ..CopyConfig::default()
+        };
+        let (hidden, _json_output, _quiet) = resolve_transfer_config(
+            &no_progress_cli,
+            no_progress_base,
+            false,
+            None,
+            None,
+            false,
+            false,
+        );
+        assert!(
+            !hidden.show_progress,
+            "--no-progress should disable progress"
+        );
+    }
+
+    #[test]
+    fn test_resolve_transfer_config_scalar_cli_overrides() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "-s",
+            "/src",
+            "-d",
+            "/dst",
+            "--mode",
+            "update",
+            "--retry-delay",
+            "9",
+            "--chunk-size",
+            "2",
+            "--max-bandwidth",
+            "3",
+            "--concurrency",
+            "8",
+            "--dry-run",
+            "--log-level",
+            "debug",
+            "--verbose",
+            "--compress",
+            "zstd:9",
+        ])
+        .unwrap();
+
+        let base = CopyConfig::default();
+        let (config, _json_output, _quiet) =
+            resolve_transfer_config(&cli, base, false, None, None, false, false);
+
+        assert_eq!(config.copy_mode, CopyMode::Update);
+        assert_eq!(config.retry_delay_secs, 9);
+        assert_eq!(config.chunk_size, 2 * 1024);
+        assert_eq!(config.max_bandwidth, 3 * 1024 * 1024);
+        assert_eq!(config.concurrency, 8);
+        assert!(config.dry_run);
+        assert_eq!(config.log_level, orbit::config::LogLevel::Debug);
+        assert!(config.verbose);
+        assert_eq!(config.compression, CompressionType::Zstd { level: 9 });
+    }
+
+    #[test]
+    fn test_resolve_transfer_config_zero_copy_overrides() {
+        let enable_cli =
+            Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst", "--zero-copy"]).unwrap();
+        let enable_base = CopyConfig {
+            use_zero_copy: false,
+            ..CopyConfig::default()
+        };
+        let (enabled, _json_output, _quiet) =
+            resolve_transfer_config(&enable_cli, enable_base, false, None, None, false, false);
+        assert!(enabled.use_zero_copy);
+
+        let disable_cli =
+            Cli::try_parse_from(["orbit", "-s", "/src", "-d", "/dst", "--no-zero-copy"]).unwrap();
+        let disable_base = CopyConfig {
+            use_zero_copy: true,
+            ..CopyConfig::default()
+        };
+        let (disabled, _json_output, _quiet) =
+            resolve_transfer_config(&disable_cli, disable_base, false, None, None, false, false);
+        assert!(!disabled.use_zero_copy);
+    }
+
+    #[test]
+    fn test_handle_subcommand_simple_variants_return_ok() {
+        assert!(handle_subcommand(Commands::Stats).is_ok());
+        assert!(handle_subcommand(Commands::Presets).is_ok());
+        assert!(handle_subcommand(Commands::Capabilities).is_ok());
+    }
+
+    #[test]
+    #[should_panic(expected = "transfer shorthands handled in run()")]
+    fn test_handle_subcommand_shorthand_is_unreachable() {
+        let _ = handle_subcommand(Commands::Sync {
+            source: "/src".to_string(),
+            dest: "/dst".to_string(),
+        });
+    }
 }
