@@ -62,7 +62,6 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Error handling
 thiserror = "2.0"
-anyhow = "1.0"
 
 # File metadata utilities
 filetime = "0.2"
@@ -186,9 +185,9 @@ inherits = "release"
 
 [features]
 # Minimal default: local file copy only, zero-copy optimizations
-# For network protocols or GUI, explicitly opt-in with --features
-# Phase 1: Added tokio and async-trait for OrbitSystem abstraction
-default = ["zero-copy", "orbit-system"]
+# For network protocols, explicitly opt-in with --features (e.g., s3-native, smb-native)
+# Tokio (orbit-system) is pulled automatically by any network backend feature
+default = ["zero-copy"]
 
 # OrbitSystem abstraction layer (Phase 1)
 orbit-system = ["dep:tokio", "dep:async-trait"]

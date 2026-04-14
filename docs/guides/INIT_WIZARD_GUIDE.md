@@ -232,10 +232,31 @@ After running `orbit init`, all Orbit commands automatically use your configurat
 
 ```bash
 # No flags needed — uses your optimized config
-orbit -s /data -d /backup --recursive
+orbit /data /backup --recursive
 
 # Override specific settings if needed
-orbit -s /data -d /backup --recursive --parallel 16
+orbit /data /backup --recursive --parallel 16
+```
+
+## CLI Profile Presets (--profile)
+
+In addition to `orbit init` (which generates a persistent config file), you can apply preset configurations per-transfer using the `--profile` flag:
+
+```bash
+orbit /data /backup -R --profile fast       # Maximum speed (zero-copy, no checksums)
+orbit /data /backup -R --profile safe       # Maximum reliability (checksums, resume, retries)
+orbit /data /backup -R --profile backup     # Reliable backups (checksums + Zstd + resume + metadata)
+orbit /data /backup -R --profile network    # Network-optimized (Zstd, resume, 10 retries)
+```
+
+**How `--profile` interacts with `orbit init`:**
+- The `--profile` preset is applied as the base configuration
+- CLI flags then override individual settings from the preset
+- If no `--profile` is specified, the config from `~/.orbit/orbit.toml` (from `orbit init`) is used
+
+**View available presets:**
+```bash
+orbit presets
 ```
 
 ## Manual Configuration

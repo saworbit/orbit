@@ -18,7 +18,6 @@ pub mod guidance;
 pub mod hardlink;
 pub mod inplace;
 pub mod link_dest;
-pub mod metadata;
 pub mod metadata_ops;
 pub mod probe;
 pub mod progress;

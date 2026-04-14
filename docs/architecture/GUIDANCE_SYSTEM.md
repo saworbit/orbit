@@ -31,7 +31,9 @@ The Config Optimizer serves five critical functions:
 - ✅ All v1.0 features
 - ✅ **Active system probing** — CPU, RAM, I/O throughput
 - ✅ **Destination type detection** — Local, SMB, NFS, S3, Azure, GCS
-- ✅ **Environment-aware auto-tuning** — 4 new intelligent rules
+- ✅ **Environment-aware auto-tuning** — 6 new intelligent rules
+- ✅ **Hardware probe caching** — CPU cores and total RAM cached for 1 hour; available RAM probed fresh
+- ✅ **Auto-tune summary display** — Applied tuning decisions shown in transfer completion output
 
 ## Design Pattern
 
@@ -342,6 +344,39 @@ These rules use system profiling to intelligently optimize configuration based o
 🔧 Cloud: Detected cloud storage destination. Enabling compression to reduce network transfer.
 🔧 Cloud: Increased retry attempts to 10 for cloud storage reliability.
 🔧 Cloud: Enabled exponential backoff for cloud API rate limiting.
+```
+
+### Active Rule 5: Local-to-Local Worker Optimization
+
+**Trigger**: Destination is local, system has >8 CPU cores, and `parallel == 0` (auto)
+
+**Action**:
+- Set workers to `cores / 2`
+
+**Rationale**:
+- Too many workers on local I/O causes contention
+- `cores / 2` balances parallelism with I/O throughput
+- Only applies when the user hasn't set a manual worker count
+
+**Example**:
+```
+⚡ AutoTune: Local transfer with 16 cores. Setting workers to 8 for optimal throughput.
+```
+
+### Active Rule 6: Fast I/O Chunk Size Optimization
+
+**Trigger**: I/O throughput >500 MB/s and current chunk size ≤1MB
+
+**Action**:
+- Increase chunk size to 4MB
+
+**Rationale**:
+- Fast NVMe drives benefit from larger chunks (fewer syscalls per byte)
+- Only activates when I/O speed can saturate small chunk sizes
+
+**Example**:
+```
+⚡ AutoTune: Fast I/O detected (1200 MB/s). Increasing chunk size to 4 MB.
 ```
 
 ---

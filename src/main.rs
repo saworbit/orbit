@@ -4,19 +4,18 @@ use clap::{Parser, Subcommand, ValueEnum};
 use orbit::{
     cli_style::{
         self, capability_table, format_bytes, format_duration, guidance_box, header_box,
-        preset_table, print_error, print_info, section_header, transfer_summary_table, Icons,
-        PresetInfo, Theme, TransferSummary,
+        preset_table, print_error, section_header, transfer_summary_table, Icons, PresetInfo,
+        Theme, TransferSummary,
     },
+    commands::manifest::ManifestCommands,
     config::{
-        AuditFormat, ChunkingStrategy, CompressionType, CopyConfig, CopyMode, ErrorMode, LogLevel,
-        SymlinkMode,
+        AuditFormat, CompressionType, CopyConfig, CopyMode, ErrorMode, LogLevel, SymlinkMode,
     },
     copy_directory, copy_file,
     core::batch::TransferJournal,
     core::guidance::ConfigOptimizer,
-    error::{OrbitError, Result, EXIT_FATAL, EXIT_SUCCESS},
+    error::{OrbitError, Result, EXIT_SUCCESS},
     get_zero_copy_capabilities, is_zero_copy_available, logging,
-    manifest_integration::ManifestGenerator,
     protocol::Protocol,
     stats::TransferStats,
     CopyStats,
@@ -27,13 +26,25 @@ use std::path::PathBuf;
 #[command(name = "orbit")]
 #[command(version, about = "Intelligent file transfer with compression, resume, and zero-copy optimization", long_about = None)]
 struct Cli {
-    /// Source path or URI (file://, smb://, etc.)
+    /// Source path or URI (positional: orbit <SOURCE> <DEST>)
     #[arg(short = 's', long = "source", value_name = "PATH")]
     source: Option<String>,
 
-    /// Destination path or URI
+    /// Destination path or URI (positional: orbit <SOURCE> <DEST>)
     #[arg(short = 'd', long = "dest", value_name = "PATH")]
     destination: Option<String>,
+
+    /// Source path (positional alternative to -s/--source)
+    #[arg(index = 1, value_name = "SOURCE", conflicts_with = "source")]
+    pos_source: Option<String>,
+
+    /// Destination path (positional alternative to -d/--dest)
+    #[arg(index = 2, value_name = "DEST", conflicts_with = "destination")]
+    pos_dest: Option<String>,
+
+    /// Configuration profile preset (fast, safe, backup, network)
+    #[arg(long, value_enum, global = true)]
+    profile: Option<ProfileArg>,
 
     /// Copy mode
     #[arg(
@@ -522,57 +533,6 @@ enum Commands {
     },
 }
 
-#[derive(Subcommand)]
-enum ManifestCommands {
-    /// Create a flight plan without transferring data
-    Plan {
-        /// Source path
-        #[arg(short, long)]
-        source: PathBuf,
-
-        /// Destination path
-        #[arg(short, long)]
-        dest: PathBuf,
-
-        /// Output directory for manifests
-        #[arg(short, long)]
-        output: PathBuf,
-
-        /// Chunking strategy: cdc or fixed
-        #[arg(long, default_value = "cdc")]
-        chunking: String,
-
-        /// Average chunk size in KiB (for CDC) or fixed size (for fixed)
-        #[arg(long, default_value = "256")]
-        chunk_size: u32,
-    },
-
-    /// Verify a completed transfer using manifests
-    Verify {
-        /// Directory containing manifests
-        #[arg(short, long)]
-        manifest_dir: PathBuf,
-    },
-
-    /// Show differences between manifest and target
-    Diff {
-        /// Directory containing manifests
-        #[arg(short, long)]
-        manifest_dir: PathBuf,
-
-        /// Target directory to compare
-        #[arg(short, long)]
-        target: PathBuf,
-    },
-
-    /// Display manifest information
-    Info {
-        /// Path to flight plan or cargo manifest
-        #[arg(short, long)]
-        path: PathBuf,
-    },
-}
-
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum CopyModeArg {
     Copy,
@@ -590,6 +550,19 @@ impl From<CopyModeArg> for CopyMode {
             CopyModeArg::Mirror => CopyMode::Mirror,
         }
     }
+}
+
+/// Configuration profile presets
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum ProfileArg {
+    /// Maximum speed: zero-copy, no checksums, no resume
+    Fast,
+    /// Maximum reliability: checksums, resume, retries
+    Safe,
+    /// Optimized for backup: reliability + compression
+    Backup,
+    /// Optimized for network/cloud: compression, resume, retries
+    Network,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
@@ -747,7 +720,7 @@ fn main() {
     let code = match run() {
         Ok(()) => EXIT_SUCCESS,
         Err(e) => {
-            eprintln!("Error: {}", e);
+            print_error(&format!("{}", e), e.suggestion());
             e.exit_code()
         }
     };
@@ -803,9 +776,11 @@ fn run() -> Result<()> {
         ));
     }
 
+    // Resolve positional args: positional takes precedence if --source/--dest not given
     let destination = cli
         .destination
-        .ok_or_else(|| OrbitError::Config("Destination path required".to_string()))?;
+        .or(cli.pos_dest)
+        .ok_or_else(|| OrbitError::Config("Destination path required. Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>".to_string()))?;
 
     let (_dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
 
@@ -821,16 +796,25 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    // Validate source
-    let source = cli
-        .source
-        .ok_or_else(|| OrbitError::Config("Source path required".to_string()))?;
+    // Resolve source: positional takes precedence if --source not given
+    let source = cli.source.or(cli.pos_source).ok_or_else(|| {
+        OrbitError::Config(
+            "Source path required. Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>"
+                .to_string(),
+        )
+    })?;
 
     // Parse URIs
     let (_source_protocol, source_path) = Protocol::from_uri(&source)?;
 
-    // Reuse the already-loaded config
-    let mut config = base_config;
+    // Apply profile preset as base, then layer file config, then CLI overrides
+    let mut config = match cli.profile {
+        Some(ProfileArg::Fast) => CopyConfig::fast_preset(),
+        Some(ProfileArg::Safe) => CopyConfig::safe_preset(),
+        Some(ProfileArg::Backup) => CopyConfig::backup_preset(),
+        Some(ProfileArg::Network) => CopyConfig::network_preset(),
+        None => base_config,
+    };
 
     // Override config with CLI arguments
     config.copy_mode = cli.mode.into();
@@ -953,6 +937,14 @@ fn run() -> Result<()> {
 
     let config = optimized.final_config;
 
+    // Collect auto-tune notices for the summary
+    let auto_tune_notices: Vec<_> = optimized
+        .notices
+        .iter()
+        .filter(|n| n.level == orbit::core::guidance::NoticeLevel::AutoTune)
+        .cloned()
+        .collect();
+
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {
         copy_directory(&source_path, &dest_path, &config)?
@@ -961,7 +953,7 @@ fn run() -> Result<()> {
     };
 
     // Print summary
-    print_summary(&stats);
+    print_summary(&stats, &auto_tune_notices);
 
     // Print execution statistics if --stat was requested
     if config.show_stats {
@@ -973,8 +965,7 @@ fn run() -> Result<()> {
 
 fn handle_subcommand(command: Commands) -> Result<()> {
     match command {
-        Commands::Init => orbit::commands::init::run_init_wizard()
-            .map_err(|e| OrbitError::Other(format!("Initialization failed: {}", e))),
+        Commands::Init => orbit::commands::init::run_init_wizard(),
         Commands::Stats => {
             let stats = TransferStats::default();
             stats.print();
@@ -995,14 +986,20 @@ fn handle_subcommand(command: Commands) -> Result<()> {
             generate(shell, &mut cmd, "orbit", &mut std::io::stdout());
             Ok(())
         }
-        Commands::Manifest(manifest_cmd) => handle_manifest_command(manifest_cmd),
-        Commands::Run { file, workers } => handle_run_command(file, workers),
+        Commands::Manifest(manifest_cmd) => {
+            orbit::commands::manifest::handle_manifest_command(manifest_cmd)
+        }
+        Commands::Run { file, workers } => {
+            orbit::commands::batch::handle_run_command(file, workers)
+        }
         #[cfg(feature = "s3-native")]
-        Commands::Cat { uri } => handle_cat_command(&uri),
+        Commands::Cat { uri } => orbit::commands::s3::handle_cat_command(&uri),
         #[cfg(feature = "s3-native")]
-        Commands::Pipe { uri } => handle_pipe_command(&uri),
+        Commands::Pipe { uri } => orbit::commands::s3::handle_pipe_command(&uri),
         #[cfg(feature = "s3-native")]
-        Commands::Presign { uri, expires } => handle_presign_command(&uri, expires),
+        Commands::Presign { uri, expires } => {
+            orbit::commands::s3::handle_presign_command(&uri, expires)
+        }
         #[cfg(feature = "s3-native")]
         Commands::Ls {
             uri,
@@ -1010,372 +1007,37 @@ fn handle_subcommand(command: Commands) -> Result<()> {
             storage_class,
             all_versions,
             show_fullpath,
-        } => handle_ls_command(&uri, etag, storage_class, all_versions, show_fullpath),
+        } => orbit::commands::s3::handle_ls_command(
+            &uri,
+            etag,
+            storage_class,
+            all_versions,
+            show_fullpath,
+        ),
         #[cfg(feature = "s3-native")]
-        Commands::Head { uri, version_id } => handle_head_command(&uri, version_id),
+        Commands::Head { uri, version_id } => {
+            orbit::commands::s3::handle_head_command(&uri, version_id)
+        }
         #[cfg(feature = "s3-native")]
         Commands::Du {
             uri,
             group,
             all_versions,
-        } => handle_du_command(&uri, group, all_versions),
+        } => orbit::commands::s3::handle_du_command(&uri, group, all_versions),
         #[cfg(feature = "s3-native")]
         Commands::Rm {
             uri,
             all_versions,
             version_id,
             dry_run,
-        } => handle_rm_command(&uri, all_versions, version_id, dry_run),
+        } => orbit::commands::s3::handle_rm_command(&uri, all_versions, version_id, dry_run),
         #[cfg(feature = "s3-native")]
-        Commands::Mv { source, dest } => handle_mv_command(&source, &dest),
+        Commands::Mv { source, dest } => orbit::commands::s3::handle_mv_command(&source, &dest),
         #[cfg(feature = "s3-native")]
-        Commands::Mb { bucket } => handle_mb_command(&bucket),
+        Commands::Mb { bucket } => orbit::commands::s3::handle_mb_command(&bucket),
         #[cfg(feature = "s3-native")]
-        Commands::Rb { bucket } => handle_rb_command(&bucket),
+        Commands::Rb { bucket } => orbit::commands::s3::handle_rb_command(&bucket),
     }
-}
-
-fn handle_manifest_command(command: ManifestCommands) -> Result<()> {
-    match command {
-        ManifestCommands::Plan {
-            source,
-            dest,
-            output,
-            chunking,
-            chunk_size,
-        } => handle_manifest_plan(source, dest, output, chunking, chunk_size),
-        ManifestCommands::Verify { manifest_dir } => handle_manifest_verify(manifest_dir),
-        ManifestCommands::Diff {
-            manifest_dir,
-            target,
-        } => handle_manifest_diff(manifest_dir, target),
-        ManifestCommands::Info { path } => handle_manifest_info(path),
-    }
-}
-
-fn handle_manifest_plan(
-    source: PathBuf,
-    dest: PathBuf,
-    output: PathBuf,
-    chunking: String,
-    chunk_size: u32,
-) -> Result<()> {
-    section_header(&format!("{} Creating Flight Plan", Icons::MANIFEST));
-    println!();
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Source:"),
-        Theme::value(source.display())
-    );
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Dest:"),
-        Theme::value(dest.display())
-    );
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Output:"),
-        Theme::value(output.display())
-    );
-    println!();
-
-    let chunking_strategy = match chunking.as_str() {
-        "cdc" => ChunkingStrategy::Cdc {
-            avg_kib: chunk_size,
-            algo: "gear".to_string(),
-        },
-        "fixed" => ChunkingStrategy::Fixed {
-            size_kib: chunk_size,
-        },
-        _ => {
-            print_error(
-                &format!("Invalid chunking strategy: {}", chunking),
-                Some("Use 'cdc' or 'fixed'"),
-            );
-            std::process::exit(EXIT_FATAL);
-        }
-    };
-
-    let config = CopyConfig {
-        generate_manifest: true,
-        manifest_output_dir: Some(output.clone()),
-        chunking_strategy,
-        ..Default::default()
-    };
-
-    let mut generator = ManifestGenerator::new(&source, &dest, &config)?;
-
-    if source.is_file() {
-        let file_name = source
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("file");
-
-        print_info(&format!("Processing: {}", file_name));
-        generator.generate_file_manifest(&source, file_name)?;
-    } else if source.is_dir() {
-        use walkdir::WalkDir;
-
-        for entry in WalkDir::new(&source).into_iter().filter_map(|e| e.ok()) {
-            if entry.file_type().is_file() {
-                let relative_path = entry
-                    .path()
-                    .strip_prefix(&source)
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string();
-
-                println!("  {} {}", Theme::muted(Icons::ARROW_RIGHT), relative_path);
-                generator.generate_file_manifest(entry.path(), &relative_path)?;
-            }
-        }
-    } else {
-        print_error(
-            "Source path does not exist or is not accessible",
-            Some("Check the path and try again"),
-        );
-        std::process::exit(EXIT_FATAL);
-    }
-
-    generator.finalize("sha256:pending")?;
-
-    println!();
-    cli_style::print_success(&format!("Flight plan created at: {}", output.display()));
-
-    Ok(())
-}
-
-fn handle_manifest_verify(manifest_dir: PathBuf) -> Result<()> {
-    use orbit::manifests::{CargoManifest, FlightPlan};
-
-    section_header(&format!("{} Verifying Manifests", Icons::SHIELD));
-    println!();
-    println!(
-        "  {} {}",
-        Theme::muted("Directory:"),
-        Theme::value(manifest_dir.display())
-    );
-    println!();
-
-    let flight_plan_path = manifest_dir.join("job.flightplan.json");
-    if !flight_plan_path.exists() {
-        print_error(
-            &format!("Flight plan not found: {}", flight_plan_path.display()),
-            Some("Run 'orbit manifest plan' first"),
-        );
-        std::process::exit(EXIT_FATAL);
-    }
-
-    let flight_plan = FlightPlan::load(&flight_plan_path)
-        .map_err(|e| OrbitError::Other(format!("Failed to load flight plan: {}", e)))?;
-
-    // Display flight plan info
-    let status = if flight_plan.is_finalized() {
-        format!("{} Finalized", Icons::SUCCESS)
-    } else {
-        format!("{} Pending", Icons::PENDING)
-    };
-
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Job ID:"),
-        Theme::value(&flight_plan.job_id)
-    );
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Files:"),
-        Theme::value(flight_plan.files.len())
-    );
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Status:"),
-        if flight_plan.is_finalized() {
-            Theme::success(&status)
-        } else {
-            Theme::warning(&status)
-        }
-    );
-    println!();
-
-    let mut verified = 0;
-    let mut failed = 0;
-
-    for file_ref in &flight_plan.files {
-        let cargo_path = manifest_dir.join(&file_ref.cargo);
-
-        if !cargo_path.exists() {
-            println!(
-                "  {} {} {}",
-                Theme::error(Icons::ERROR),
-                file_ref.path,
-                Theme::error("(missing)")
-            );
-            failed += 1;
-            continue;
-        }
-
-        match CargoManifest::load(&cargo_path) {
-            Ok(cargo) => {
-                println!(
-                    "  {} {} {} windows, {}",
-                    Theme::success(Icons::SUCCESS),
-                    file_ref.path,
-                    cargo.windows.len(),
-                    format_bytes(cargo.size)
-                );
-                verified += 1;
-            }
-            Err(e) => {
-                println!(
-                    "  {} {} {}",
-                    Theme::error(Icons::ERROR),
-                    file_ref.path,
-                    Theme::error(format!("({})", e))
-                );
-                failed += 1;
-            }
-        }
-    }
-
-    println!();
-    if failed == 0 {
-        cli_style::print_success(&format!(
-            "Verification complete: {} files verified",
-            verified
-        ));
-    } else {
-        cli_style::print_warning(&format!(
-            "Verification complete: {} verified, {} failed",
-            verified, failed
-        ));
-    }
-
-    Ok(())
-}
-
-fn handle_manifest_diff(manifest_dir: PathBuf, target: PathBuf) -> Result<()> {
-    section_header(&format!("{} Comparing Manifests", Icons::STATS));
-    println!();
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Manifests:"),
-        Theme::value(manifest_dir.display())
-    );
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("Target:"),
-        Theme::value(target.display())
-    );
-    println!();
-
-    cli_style::print_warning("Diff operation not yet fully implemented");
-    println!(
-        "  {} This will compare manifest metadata with actual files",
-        Theme::muted(Icons::ARROW_RIGHT)
-    );
-    println!();
-
-    Ok(())
-}
-
-fn handle_manifest_info(path: PathBuf) -> Result<()> {
-    use orbit::manifests::{CargoManifest, FlightPlan};
-
-    if !path.exists() {
-        print_error(
-            &format!("Path not found: {}", path.display()),
-            Some("Check the file path and try again"),
-        );
-        std::process::exit(EXIT_FATAL);
-    }
-
-    if let Ok(flight_plan) = FlightPlan::load(&path) {
-        section_header(&format!("{} Flight Plan", Icons::MANIFEST));
-        println!();
-
-        let items = vec![
-            ("Schema", flight_plan.schema.clone()),
-            ("Job ID", flight_plan.job_id.clone()),
-            ("Created", flight_plan.created_utc.to_string()),
-            (
-                "Source",
-                format!(
-                    "{} ({})",
-                    flight_plan.source.root, flight_plan.source.endpoint_type
-                ),
-            ),
-            (
-                "Target",
-                format!(
-                    "{} ({})",
-                    flight_plan.target.root, flight_plan.target.endpoint_type
-                ),
-            ),
-            ("Files", flight_plan.files.len().to_string()),
-            ("Encryption", flight_plan.policy.encryption.aead.clone()),
-        ];
-
-        for (key, value) in items {
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted(format!("{}:", key)),
-                Theme::value(&value)
-            );
-        }
-
-        if let Some(classification) = &flight_plan.policy.classification {
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Classification:"),
-                Theme::value(classification)
-            );
-        }
-
-        println!();
-        return Ok(());
-    }
-
-    if let Ok(cargo) = CargoManifest::load(&path) {
-        section_header(&format!("{} Cargo Manifest", Icons::FILE));
-        println!();
-
-        let items = vec![
-            ("Schema", cargo.schema.clone()),
-            ("Path", cargo.path.clone()),
-            ("Size", format_bytes(cargo.size)),
-            ("Chunking", cargo.chunking.chunking_type.clone()),
-            ("Windows", cargo.windows.len().to_string()),
-            ("Chunks", cargo.total_chunks().to_string()),
-        ];
-
-        for (key, value) in items {
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted(format!("{}:", key)),
-                Theme::value(&value)
-            );
-        }
-
-        println!();
-        return Ok(());
-    }
-
-    print_error(
-        "Not a valid flight plan or cargo manifest",
-        Some("Ensure the file is a valid Orbit manifest"),
-    );
-    std::process::exit(EXIT_FATAL);
 }
 
 fn print_presets() {
@@ -1408,6 +1070,15 @@ fn print_presets() {
             best_for: "Critical data".to_string(),
         },
         PresetInfo {
+            icon: Icons::LIGHTNING,
+            name: "BACKUP",
+            checksum: true,
+            resume: true,
+            compression: "Zstd:3".to_string(),
+            zero_copy: false,
+            best_for: "Reliable backups".to_string(),
+        },
+        PresetInfo {
             icon: Icons::GLOBE,
             name: "NETWORK",
             checksum: true,
@@ -1415,15 +1086,6 @@ fn print_presets() {
             compression: "Zstd:3".to_string(),
             zero_copy: false,
             best_for: "Remote/slow networks".to_string(),
-        },
-        PresetInfo {
-            icon: Icons::LIGHTNING,
-            name: "NEUTRINO",
-            checksum: false,
-            resume: false,
-            compression: "None".to_string(),
-            zero_copy: true,
-            best_for: "Many small files".to_string(),
         },
     ];
 
@@ -1435,7 +1097,7 @@ fn print_presets() {
     println!(
         "  {} {}",
         Theme::muted("Fast local copy:"),
-        Theme::primary("orbit -s /data -d /backup -R --profile standard")
+        Theme::primary("orbit -s /data -d /backup -R --profile fast")
     );
     println!(
         "  {} {}",
@@ -1619,7 +1281,7 @@ fn print_exec_stats(stats: &CopyStats) {
     println!();
 }
 
-fn print_summary(stats: &CopyStats) {
+fn print_summary(stats: &CopyStats, auto_tune_notices: &[orbit::core::guidance::Notice]) {
     println!();
     header_box(
         "Transfer Complete",
@@ -1657,1241 +1319,34 @@ fn print_summary(stats: &CopyStats) {
     };
 
     println!("{}", transfer_summary_table(&summary));
-    println!();
-}
 
-// ============================================================================
-// Batch Run Command
-// ============================================================================
-
-fn split_command_line(line: &str) -> Result<Vec<String>> {
-    let mut args = Vec::new();
-    let mut current = String::new();
-    let mut chars = line.chars().peekable();
-    let mut in_single = false;
-    let mut in_double = false;
-
-    while let Some(c) = chars.next() {
-        match c {
-            '\'' if !in_double => {
-                in_single = !in_single;
-            }
-            '"' if !in_single => {
-                in_double = !in_double;
-            }
-            '\\' if !in_single => {
-                if let Some(next) = chars.peek().copied() {
-                    if next.is_whitespace() || next == '"' || next == '\'' || next == '\\' {
-                        chars.next();
-                        current.push(next);
-                    } else {
-                        current.push('\\');
-                    }
-                } else {
-                    current.push('\\');
-                }
-            }
-            c if c.is_whitespace() && !in_single && !in_double => {
-                if !current.is_empty() {
-                    args.push(current.clone());
-                    current.clear();
-                }
-                while let Some(next) = chars.peek() {
-                    if next.is_whitespace() {
-                        chars.next();
-                    } else {
-                        break;
-                    }
-                }
-            }
-            _ => current.push(c),
-        }
-    }
-
-    if in_single || in_double {
-        return Err(OrbitError::Config(
-            "Unclosed quote in batch command line".to_string(),
-        ));
-    }
-
-    if !current.is_empty() {
-        args.push(current);
-    }
-
-    Ok(args)
-}
-
-fn normalize_batch_args(line: &str, tokens: Vec<String>) -> Result<Vec<String>> {
-    if tokens.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let first = tokens[0].as_str();
-
-    if first == "orbit" {
-        let args = tokens[1..].to_vec();
-        if args.first().map(|s| s.as_str()) == Some("run") {
-            return Err(OrbitError::Config(
-                "Nested 'orbit run' is not supported in batch mode".to_string(),
-            ));
-        }
-        return Ok(args);
-    }
-
-    if first == "cp" || first == "copy" || first == "sync" {
-        if tokens.len() < 3 {
-            return Err(OrbitError::Config(format!(
-                "Invalid command (need: {} <src> <dest>): {}",
-                first, line
-            )));
-        }
-
-        let mut args = vec![
-            "--source".to_string(),
-            tokens[1].clone(),
-            "--dest".to_string(),
-            tokens[2].clone(),
-        ];
-
-        if first == "sync" {
-            args.push("--mode".to_string());
-            args.push("sync".to_string());
-        }
-
-        args.extend(tokens[3..].iter().cloned());
-        return Ok(args);
-    }
-
-    if first == "run" {
-        return Err(OrbitError::Config(
-            "Nested 'orbit run' is not supported in batch mode".to_string(),
-        ));
-    }
-
-    Ok(tokens)
-}
-
-fn handle_run_command(file: Option<PathBuf>, workers: usize) -> Result<()> {
-    use std::io::BufRead;
-    use std::process::{Command, Stdio};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
-    use std::time::Instant;
-
-    section_header(&format!("{} Batch Execution", Icons::ROCKET));
-    println!();
-
-    // Read commands from file or stdin
-    let lines: Vec<String> = if let Some(path) = file {
-        let file = std::fs::File::open(&path).map_err(|e| {
-            OrbitError::Other(format!(
-                "Failed to open command file {}: {}",
-                path.display(),
-                e
-            ))
-        })?;
-        std::io::BufReader::new(file)
-            .lines()
-            .map_while(|line| line.ok())
-            .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
-            .collect()
-    } else {
-        let stdin = std::io::stdin();
-        stdin
-            .lock()
-            .lines()
-            .map_while(|line| line.ok())
-            .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
-            .collect()
-    };
-
-    if lines.is_empty() {
-        print_info("No commands to execute.");
-        return Ok(());
-    }
-
-    let mut parsed_commands = Vec::new();
-    let mut invalid = 0usize;
-
-    for line in &lines {
-        let tokens = match split_command_line(line) {
-            Ok(tokens) => tokens,
-            Err(e) => {
-                eprintln!("WARN: {}: {}", line, e);
-                invalid += 1;
-                continue;
-            }
-        };
-
-        if tokens.is_empty() {
-            continue;
-        }
-
-        match normalize_batch_args(line, tokens) {
-            Ok(args) => {
-                if !args.is_empty() {
-                    parsed_commands.push((line.clone(), args));
-                }
-            }
-            Err(e) => {
-                eprintln!("WARN: {}: {}", line, e);
-                invalid += 1;
-            }
-        }
-    }
-
-    let total = parsed_commands.len() + invalid;
-    let worker_count = if workers == 0 { 1 } else { workers };
-
-    if parsed_commands.is_empty() {
-        section_header(&format!("{} Batch Complete", Icons::SUCCESS));
+    // Display auto-tune notices if any
+    let auto_tune: Vec<_> = auto_tune_notices
+        .iter()
+        .filter(|n| n.level == orbit::core::guidance::NoticeLevel::AutoTune)
+        .collect();
+    if !auto_tune.is_empty() {
         println!();
-        println!(
-            "  {} {} {} succeeded, {} failed in {}",
-            Icons::BULLET,
-            Theme::value(total),
-            Theme::success(0),
-            Theme::error(invalid),
-            Theme::value(format_duration(0.0))
-        );
+        section_header(&format!("{} Auto-Tuned Settings", Icons::GEAR));
         println!();
-        return Ok(());
+        for notice in &auto_tune {
+            println!(
+                "  {} {} {}",
+                Icons::LIGHTNING,
+                Theme::muted(&notice.code),
+                notice.message
+            );
+        }
     }
 
-    println!(
-        "  {} {} commands with {} workers",
-        Icons::BULLET,
-        Theme::value(total),
-        Theme::value(worker_count)
-    );
     println!();
-
-    let succeeded = Arc::new(AtomicUsize::new(0));
-    let failed = Arc::new(AtomicUsize::new(invalid));
-    let start = Instant::now();
-
-    let exe = std::env::current_exe()
-        .map_err(|e| OrbitError::Other(format!("Failed to resolve current executable: {}", e)))?;
-
-    // Use a thread pool to execute commands in parallel
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(worker_count.min(parsed_commands.len().max(1)))
-        .build()
-        .map_err(|e| OrbitError::Other(format!("Failed to create thread pool: {}", e)))?;
-
-    pool.scope(|s| {
-        for (cmd_line, args) in &parsed_commands {
-            let succeeded = succeeded.clone();
-            let failed = failed.clone();
-            let exe = exe.clone();
-            let args = args.clone();
-            let cmd_line = cmd_line.clone();
-            s.spawn(move |_| {
-                let status = Command::new(&exe)
-                    .args(&args)
-                    .stdin(Stdio::inherit())
-                    .stdout(Stdio::inherit())
-                    .stderr(Stdio::inherit())
-                    .status();
-
-                match status {
-                    Ok(status) if status.success() => {
-                        succeeded.fetch_add(1, Ordering::Relaxed);
-                    }
-                    Ok(status) => {
-                        let code = status.code().unwrap_or(-1);
-                        eprintln!("ERROR: command failed (exit {}): {}", code, cmd_line);
-                        failed.fetch_add(1, Ordering::Relaxed);
-                    }
-                    Err(e) => {
-                        eprintln!("ERROR: failed to run '{}': {}", cmd_line, e);
-                        failed.fetch_add(1, Ordering::Relaxed);
-                    }
-                }
-            });
-        }
-    });
-
-    let elapsed = start.elapsed();
-    let ok = succeeded.load(Ordering::Relaxed);
-    let err = failed.load(Ordering::Relaxed);
-
-    println!();
-    section_header(&format!("{} Batch Complete", Icons::SUCCESS));
-    println!();
-    println!(
-        "  {} {} {} succeeded, {} failed in {}",
-        Icons::BULLET,
-        Theme::value(total),
-        Theme::success(ok),
-        if err > 0 {
-            Theme::error(err).to_string()
-        } else {
-            Theme::muted(err).to_string()
-        },
-        Theme::value(format_duration(elapsed.as_secs_f64()))
-    );
-    println!();
-
-    Ok(())
-}
-
-// ============================================================================
-// S3 Streaming Commands (cat, pipe, presign)
-// ============================================================================
-
-#[cfg(feature = "s3-native")]
-fn handle_cat_command(uri: &str) -> Result<()> {
-    use orbit::protocol::s3::{S3Client, S3Config, S3Operations};
-    use std::io::Write;
-
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    // Extract bucket from URI
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "cat command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket);
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        let data = client
-            .download_bytes(&key)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to download: {}", e)))?;
-
-        std::io::stdout()
-            .write_all(&data)
-            .map_err(|e| OrbitError::Other(format!("Failed to write to stdout: {}", e)))?;
-        std::io::stdout()
-            .flush()
-            .map_err(|e| OrbitError::Other(format!("Failed to flush stdout: {}", e)))?;
-
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_pipe_command(uri: &str) -> Result<()> {
-    use bytes::Bytes;
-    use orbit::protocol::s3::{S3Client, S3Config, S3Operations};
-    use std::io::Read;
-
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "pipe command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    // Read all stdin into memory
-    let mut buffer = Vec::new();
-    std::io::stdin()
-        .read_to_end(&mut buffer)
-        .map_err(|e| OrbitError::Other(format!("Failed to read from stdin: {}", e)))?;
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket);
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        client
-            .upload_bytes(Bytes::from(buffer), &key)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to upload: {}", e)))?;
-
-        eprintln!("Uploaded to s3://{}", key);
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_presign_command(uri: &str, expires: u64) -> Result<()> {
-    use orbit::protocol::s3::{S3Client, S3Config};
-
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "presign command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        let url = client
-            .presign_get(&key, std::time::Duration::from_secs(expires))
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to generate pre-signed URL: {}", e)))?;
-
-        println!("{}", url);
-        Ok(())
-    })
-}
-
-// ============================================================================
-// S3 Object Management Commands (ls, head, du, rm, mv, mb, rb)
-// ============================================================================
-
-#[cfg(feature = "s3-native")]
-fn handle_ls_command(
-    uri: &str,
-    show_etag: bool,
-    show_storage_class: bool,
-    all_versions: bool,
-    show_fullpath: bool,
-) -> Result<()> {
-    use orbit::protocol::s3::{
-        has_wildcards, S3Client, S3Config, S3Operations, VersioningOperations,
-    };
-
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "ls command requires an S3 URI (s3://bucket/prefix)".to_string(),
-            ))
-        }
-    };
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        if all_versions {
-            let result = client
-                .list_object_versions(&key)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to list versions: {}", e)))?;
-
-            for version in &result.versions {
-                let date_str = format_system_time(version.last_modified);
-                let size_str = format_bytes(version.size);
-                let key_display = if show_fullpath {
-                    format!("s3://{}/{}", bucket, version.key)
-                } else {
-                    version.key.clone()
-                };
-                let latest_marker = if version.is_latest { " [LATEST]" } else { "" };
-
-                print!(
-                    "{}  {:>10}  {}  {}{}",
-                    date_str, size_str, version.version_id, key_display, latest_marker
-                );
-                if let Some(ref sc) = version.storage_class {
-                    if show_storage_class {
-                        print!("  {}", sc);
-                    }
-                }
-                println!();
-            }
-
-            for dm in &result.delete_markers {
-                let date_str = format_system_time(dm.last_modified);
-                let key_display = if show_fullpath {
-                    format!("s3://{}/{}", bucket, dm.key)
-                } else {
-                    dm.key.clone()
-                };
-                println!(
-                    "{}  {:>10}  {}  {} [DELETE MARKER]",
-                    date_str, "(marker)", dm.version_id, key_display
-                );
-            }
-
-            let total = result.versions.len() + result.delete_markers.len();
-            eprintln!(
-                "\n{} versions, {} delete markers",
-                result.versions.len(),
-                result.delete_markers.len()
-            );
-            if total == 0 {
-                eprintln!("No objects found.");
-            }
-        } else {
-            let mut all_objects = Vec::new();
-            let use_wildcard = has_wildcards(&key);
-
-            if use_wildcard {
-                let result = client
-                    .list_objects_with_wildcard(&key)
-                    .await
-                    .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
-                all_objects = result.objects;
-            } else {
-                let mut continuation_token = None;
-                loop {
-                    let result = client
-                        .list_objects_paginated(&key, continuation_token, None)
-                        .await
-                        .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
-                    all_objects.extend(result.objects);
-                    if result.is_truncated {
-                        continuation_token = result.continuation_token;
-                    } else {
-                        break;
-                    }
-                }
-            }
-
-            for obj in &all_objects {
-                let date_str = obj
-                    .last_modified
-                    .map(format_system_time)
-                    .unwrap_or_else(|| "                   ".to_string());
-                let size_str = format_bytes(obj.size);
-                let key_display = if show_fullpath {
-                    format!("s3://{}/{}", bucket, obj.key)
-                } else {
-                    obj.key.clone()
-                };
-
-                print!("{}  {:>10}  {}", date_str, size_str, key_display);
-
-                if show_etag {
-                    if let Some(ref etag) = obj.etag {
-                        print!("  {}", etag);
-                    }
-                }
-                if show_storage_class {
-                    if let Some(ref sc) = obj.storage_class {
-                        print!("  {}", sc);
-                    }
-                }
-                println!();
-            }
-
-            if all_objects.is_empty() {
-                eprintln!("No objects found.");
-            } else {
-                let total_size: u64 = all_objects.iter().map(|o| o.size).sum();
-                eprintln!(
-                    "\n{} objects, {} total",
-                    all_objects.len(),
-                    format_bytes(total_size)
-                );
-            }
-        }
-
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_head_command(uri: &str, version_id: Option<String>) -> Result<()> {
-    use orbit::protocol::s3::{S3Client, S3Config, VersioningOperations};
-
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "head command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        if let Some(ref vid) = version_id {
-            let version = client
-                .get_version_metadata(&key, vid)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to get version metadata: {}", e)))?;
-
-            section_header(&format!("{} S3 Object Version", Icons::FILE));
-            println!();
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Key:"),
-                Theme::value(&version.key)
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Version ID:"),
-                Theme::value(&version.version_id)
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Size:"),
-                Theme::value(format_bytes(version.size))
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Last Modified:"),
-                Theme::value(format_system_time(version.last_modified))
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("ETag:"),
-                Theme::value(&version.etag)
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Is Latest:"),
-                Theme::value(version.is_latest)
-            );
-            if let Some(ref sc) = version.storage_class {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Storage Class:"),
-                    Theme::value(sc)
-                );
-            }
-            println!();
-        } else {
-            let metadata = client
-                .get_metadata(&key)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to get metadata: {}", e)))?;
-
-            section_header(&format!("{} S3 Object Metadata", Icons::FILE));
-            println!();
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Key:"),
-                Theme::value(&metadata.key)
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Size:"),
-                Theme::value(format_bytes(metadata.size))
-            );
-            if let Some(ref lm) = metadata.last_modified {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Last Modified:"),
-                    Theme::value(format_system_time(*lm))
-                );
-            }
-            if let Some(ref etag) = metadata.etag {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("ETag:"),
-                    Theme::value(etag)
-                );
-            }
-            if let Some(ref sc) = metadata.storage_class {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Storage Class:"),
-                    Theme::value(sc)
-                );
-            }
-            if let Some(ref ct) = metadata.content_type {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Content-Type:"),
-                    Theme::value(ct)
-                );
-            }
-            if let Some(ref ce) = metadata.content_encoding {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Content-Encoding:"),
-                    Theme::value(ce)
-                );
-            }
-            if let Some(ref cc) = metadata.cache_control {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Cache-Control:"),
-                    Theme::value(cc)
-                );
-            }
-            if let Some(ref cd) = metadata.content_disposition {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Content-Disposition:"),
-                    Theme::value(cd)
-                );
-            }
-            if let Some(ref vid) = metadata.version_id {
-                println!(
-                    "  {} {} {}",
-                    Icons::BULLET,
-                    Theme::muted("Version ID:"),
-                    Theme::value(vid)
-                );
-            }
-            if let Some(ref sse) = metadata.server_side_encryption {
-                println!(
-                    "  {} {} {:?}",
-                    Icons::BULLET,
-                    Theme::muted("Encryption:"),
-                    sse
-                );
-            }
-            if !metadata.metadata.is_empty() {
-                println!("  {} {}", Icons::BULLET, Theme::muted("User Metadata:"));
-                for (k, v) in &metadata.metadata {
-                    println!("    {} = {}", Theme::muted(k), Theme::value(v));
-                }
-            }
-            println!();
-        }
-
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_du_command(uri: &str, group: bool, all_versions: bool) -> Result<()> {
-    use orbit::protocol::s3::{S3Client, S3Config, S3Operations, VersioningOperations};
-    use std::collections::HashMap;
-
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "du command requires an S3 URI (s3://bucket/prefix)".to_string(),
-            ))
-        }
-    };
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        section_header(&format!("{} S3 Storage Usage", Icons::STATS));
-        println!();
-        println!(
-            "  {} {} s3://{}/{}",
-            Icons::BULLET,
-            Theme::muted("Prefix:"),
-            bucket,
-            key
-        );
-        println!();
-
-        if all_versions {
-            let result = client
-                .list_object_versions(&key)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to list versions: {}", e)))?;
-
-            let total_count = result.versions.len() as u64;
-            let total_size: u64 = result.versions.iter().map(|v| v.size).sum();
-
-            if group {
-                let mut groups: HashMap<String, (u64, u64)> = HashMap::new();
-                for version in &result.versions {
-                    let sc = version
-                        .storage_class
-                        .clone()
-                        .unwrap_or_else(|| "STANDARD".to_string());
-                    let entry = groups.entry(sc).or_insert((0, 0));
-                    entry.0 += 1;
-                    entry.1 += version.size;
-                }
-                for (class, (count, size)) in &groups {
-                    println!(
-                        "  {} {:>10}  {:>8} objects  {}",
-                        Icons::BULLET,
-                        format_bytes(*size),
-                        count,
-                        Theme::value(class)
-                    );
-                }
-                println!();
-            }
-
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Total objects (all versions):"),
-                Theme::value(total_count)
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Total size:"),
-                Theme::value(format_bytes(total_size))
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Delete markers:"),
-                Theme::value(result.delete_markers.len())
-            );
-        } else {
-            let mut all_objects = Vec::new();
-            let mut continuation_token = None;
-            loop {
-                let result = client
-                    .list_objects_paginated(&key, continuation_token, None)
-                    .await
-                    .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
-                all_objects.extend(result.objects);
-                if result.is_truncated {
-                    continuation_token = result.continuation_token;
-                } else {
-                    break;
-                }
-            }
-
-            let total_count = all_objects.len() as u64;
-            let total_size: u64 = all_objects.iter().map(|o| o.size).sum();
-
-            if group {
-                let mut groups: HashMap<String, (u64, u64)> = HashMap::new();
-                for obj in &all_objects {
-                    let sc = obj
-                        .storage_class
-                        .as_ref()
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "STANDARD".to_string());
-                    let entry = groups.entry(sc).or_insert((0, 0));
-                    entry.0 += 1;
-                    entry.1 += obj.size;
-                }
-                for (class, (count, size)) in &groups {
-                    println!(
-                        "  {} {:>10}  {:>8} objects  {}",
-                        Icons::BULLET,
-                        format_bytes(*size),
-                        count,
-                        Theme::value(class)
-                    );
-                }
-                println!();
-            }
-
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Total objects:"),
-                Theme::value(total_count)
-            );
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("Total size:"),
-                Theme::value(format_bytes(total_size))
-            );
-        }
-
-        println!();
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_rm_command(
-    uri: &str,
-    all_versions: bool,
-    version_id: Option<String>,
-    dry_run: bool,
-) -> Result<()> {
-    use orbit::protocol::s3::{has_wildcards, S3Client, S3Config, VersioningOperations};
-
-    let (_protocol, key_path) = Protocol::from_uri(uri)?;
-    let key = key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-
-    let bucket = match Protocol::from_uri(uri)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "rm command requires an S3 URI (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        if let Some(ref vid) = version_id {
-            if dry_run {
-                println!(
-                    "(dry-run) Would delete: s3://{}/{} version {}",
-                    bucket, key, vid
-                );
-                return Ok(());
-            }
-            client
-                .delete_object_version(&key, vid)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to delete version: {}", e)))?;
-            print_info(&format!("Deleted s3://{}/{} version {}", bucket, key, vid));
-            return Ok(());
-        }
-
-        if all_versions {
-            let result = client
-                .list_object_versions(&key)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to list versions: {}", e)))?;
-            let total = result.versions.len() + result.delete_markers.len();
-            if total == 0 {
-                print_info("No objects or versions found.");
-                return Ok(());
-            }
-            if dry_run {
-                for v in &result.versions {
-                    println!(
-                        "(dry-run) Would delete: s3://{}/{} version {}",
-                        bucket, v.key, v.version_id
-                    );
-                }
-                for dm in &result.delete_markers {
-                    println!(
-                        "(dry-run) Would delete marker: s3://{}/{} version {}",
-                        bucket, dm.key, dm.version_id
-                    );
-                }
-                println!(
-                    "\n(dry-run) Would delete {} versions, {} delete markers",
-                    result.versions.len(),
-                    result.delete_markers.len()
-                );
-                return Ok(());
-            }
-            for v in &result.versions {
-                client
-                    .delete_object_version(&v.key, &v.version_id)
-                    .await
-                    .map_err(|e| {
-                        OrbitError::Other(format!(
-                            "Failed to delete version {} of {}: {}",
-                            v.version_id, v.key, e
-                        ))
-                    })?;
-            }
-            for dm in &result.delete_markers {
-                client
-                    .delete_object_version(&dm.key, &dm.version_id)
-                    .await
-                    .map_err(|e| {
-                        OrbitError::Other(format!(
-                            "Failed to delete marker {} of {}: {}",
-                            dm.version_id, dm.key, e
-                        ))
-                    })?;
-            }
-            print_info(&format!(
-                "Deleted {} versions, {} delete markers",
-                result.versions.len(),
-                result.delete_markers.len()
-            ));
-            return Ok(());
-        }
-
-        if has_wildcards(&key) {
-            let result = client
-                .list_objects_with_wildcard(&key)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to list objects: {}", e)))?;
-            if result.objects.is_empty() {
-                print_info("No objects matched the pattern.");
-                return Ok(());
-            }
-            let keys: Vec<String> = result.objects.iter().map(|o| o.key.clone()).collect();
-            if dry_run {
-                for k in &keys {
-                    println!("(dry-run) Would delete: s3://{}/{}", bucket, k);
-                }
-                println!("\n(dry-run) Would delete {} objects", keys.len());
-                return Ok(());
-            }
-            client
-                .delete_batch(&keys)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to batch delete: {}", e)))?;
-            print_info(&format!("Deleted {} objects", keys.len()));
-        } else {
-            if dry_run {
-                println!("(dry-run) Would delete: s3://{}/{}", bucket, key);
-                return Ok(());
-            }
-            client
-                .delete(&key)
-                .await
-                .map_err(|e| OrbitError::Other(format!("Failed to delete: {}", e)))?;
-            print_info(&format!("Deleted s3://{}/{}", bucket, key));
-        }
-
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_mv_command(source: &str, dest: &str) -> Result<()> {
-    use orbit::protocol::s3::{S3Client, S3Config, S3Operations};
-
-    let (_src_protocol, src_key_path) = Protocol::from_uri(source)?;
-    let src_key = src_key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-    let src_bucket = match Protocol::from_uri(source)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "mv command requires S3 URIs (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    let (_dst_protocol, dst_key_path) = Protocol::from_uri(dest)?;
-    let dst_key = dst_key_path
-        .to_string_lossy()
-        .trim_start_matches('/')
-        .to_string();
-    let dst_bucket = match Protocol::from_uri(dest)? {
-        (Protocol::S3 { bucket, .. }, _) => bucket,
-        _ => {
-            return Err(OrbitError::Config(
-                "mv command requires S3 URIs (s3://bucket/key)".to_string(),
-            ))
-        }
-    };
-
-    if src_bucket != dst_bucket {
-        return Err(OrbitError::Config(
-            "mv command currently only supports moves within the same bucket".to_string(),
-        ));
-    }
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(src_bucket.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        client
-            .copy_object(&src_key, &dst_key)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to copy object: {}", e)))?;
-
-        client
-            .delete(&src_key)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to delete source after copy: {}", e)))?;
-
-        print_info(&format!(
-            "Moved s3://{}/{} -> s3://{}/{}",
-            src_bucket, src_key, dst_bucket, dst_key
-        ));
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_mb_command(bucket_uri: &str) -> Result<()> {
-    use orbit::protocol::s3::{S3Client, S3Config};
-
-    let bucket_name = match Protocol::from_uri(bucket_uri) {
-        Ok((Protocol::S3 { bucket, .. }, _)) => bucket,
-        _ => bucket_uri
-            .trim_start_matches("s3://")
-            .trim_end_matches('/')
-            .to_string(),
-    };
-
-    if bucket_name.is_empty() {
-        return Err(OrbitError::Config(
-            "mb command requires a bucket name (s3://bucket-name)".to_string(),
-        ));
-    }
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket_name.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        client
-            .create_bucket(&bucket_name)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create bucket: {}", e)))?;
-
-        print_info(&format!("Created bucket: s3://{}", bucket_name));
-        Ok(())
-    })
-}
-
-#[cfg(feature = "s3-native")]
-fn handle_rb_command(bucket_uri: &str) -> Result<()> {
-    use orbit::protocol::s3::{S3Client, S3Config};
-
-    let bucket_name = match Protocol::from_uri(bucket_uri) {
-        Ok((Protocol::S3 { bucket, .. }, _)) => bucket,
-        _ => bucket_uri
-            .trim_start_matches("s3://")
-            .trim_end_matches('/')
-            .to_string(),
-    };
-
-    if bucket_name.is_empty() {
-        return Err(OrbitError::Config(
-            "rb command requires a bucket name (s3://bucket-name)".to_string(),
-        ));
-    }
-
-    let runtime = tokio::runtime::Runtime::new()
-        .map_err(|e| OrbitError::Other(format!("Failed to start async runtime: {}", e)))?;
-
-    runtime.block_on(async {
-        let config = S3Config::new(bucket_name.clone());
-        let client = S3Client::new(config)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to create S3 client: {}", e)))?;
-
-        client
-            .delete_bucket(&bucket_name)
-            .await
-            .map_err(|e| OrbitError::Other(format!("Failed to delete bucket: {}", e)))?;
-
-        print_info(&format!("Deleted bucket: s3://{}", bucket_name));
-        Ok(())
-    })
-}
-
-/// Format a SystemTime as a human-readable date string
-#[cfg(feature = "s3-native")]
-fn format_system_time(time: std::time::SystemTime) -> String {
-    let duration = time
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = duration.as_secs();
-    let days = secs / 86400;
-    let remaining = secs % 86400;
-    let hours = remaining / 3600;
-    let minutes = (remaining % 3600) / 60;
-    let seconds = remaining % 60;
-    let (year, month, day) = days_to_ymd(days);
-    format!(
-        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-        year, month, day, hours, minutes, seconds
-    )
-}
-
-/// Convert days since Unix epoch to (year, month, day)
-#[cfg(feature = "s3-native")]
-fn days_to_ymd(days: u64) -> (u64, u64, u64) {
-    let z = days + 719468;
-    let era = z / 146097;
-    let doe = z - era * 146097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    (y, m, d)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use clap::Parser;
+    use orbit::commands::batch::{normalize_batch_args, split_command_line};
 
     #[test]
     fn test_version() {

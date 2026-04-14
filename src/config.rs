@@ -656,6 +656,24 @@ impl CopyConfig {
         }
     }
 
+    /// Create a configuration optimized for backups: reliability + compression
+    pub fn backup_preset() -> Self {
+        Self {
+            verify_checksum: true,
+            resume_enabled: true,
+            compression: CompressionType::Zstd { level: 3 },
+            sparse_mode: crate::core::sparse::SparseMode::Never,
+            retry_attempts: 5,
+            exponential_backoff: true,
+            preserve_metadata: true,
+            use_zero_copy: false,
+            generate_manifest: false,
+            manifest_output_dir: None,
+            chunking_strategy: ChunkingStrategy::default(),
+            ..Default::default()
+        }
+    }
+
     /// Resolve the effective worker count based on the backend type.
     /// If `parallel` is 0 (auto), returns CPU count for local ops
     /// or DEFAULT_NETWORK_WORKERS for network ops.

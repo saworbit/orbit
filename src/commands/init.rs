@@ -14,7 +14,7 @@
 
 use crate::config::{CompressionType, CopyConfig, CopyMode};
 use crate::core::{probe::Probe, sparse::SparseMode};
-use anyhow::Result;
+use crate::error::{OrbitError, Result};
 use console::style;
 use dialoguer::{theme::ColorfulTheme, Confirm, Select};
 use std::fs;
@@ -30,7 +30,8 @@ pub fn run_init_wizard() -> Result<()> {
         && !Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt("Existing configuration found. Overwrite?")
             .default(false)
-            .interact()?
+            .interact()
+            .map_err(|e| OrbitError::Other(format!("Input error: {}", e)))?
     {
         println!("\n{}", style("Configuration unchanged.").cyan());
         return Ok(());
@@ -79,7 +80,8 @@ pub fn run_init_wizard() -> Result<()> {
         .with_prompt("What is your primary use case?")
         .default(0)
         .items(use_cases)
-        .interact()?;
+        .interact()
+        .map_err(|e| OrbitError::Other(format!("Input error: {}", e)))?;
 
     // 4. Configuration Synthesis
     let mut config = match selection {
@@ -100,7 +102,8 @@ pub fn run_init_wizard() -> Result<()> {
     let generate_secret = Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Generate secure JWT secret for Web Dashboard?")
         .default(true)
-        .interact()?;
+        .interact()
+        .map_err(|e| OrbitError::Other(format!("Input error: {}", e)))?;
 
     if generate_secret {
         let secret = generate_jwt_secret();
@@ -122,7 +125,7 @@ pub fn run_init_wizard() -> Result<()> {
     fs::create_dir_all(config_dir)?;
     config
         .to_file(&config_path)
-        .map_err(|e| anyhow::anyhow!("Failed to save configuration: {}", e))?;
+        .map_err(|e| OrbitError::Config(format!("Failed to save configuration: {}", e)))?;
 
     print_summary(&config_path, &config);
 
@@ -150,8 +153,8 @@ fn print_welcome() {
 
 /// Get the default configuration file path
 fn get_default_config_path() -> Result<PathBuf> {
-    let home =
-        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
+    let home = dirs::home_dir()
+        .ok_or_else(|| OrbitError::Config("Could not determine home directory".to_string()))?;
     Ok(home.join(".orbit").join("orbit.toml"))
 }
 

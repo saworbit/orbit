@@ -18,7 +18,7 @@ use super::concurrency::ConcurrencyLimiter;
 use super::disk_guardian::{self, GuardianConfig};
 use super::filter::FilterList;
 use super::hardlink::{create_hardlink, HardlinkTracker};
-use super::metadata::preserve_metadata;
+use super::metadata_ops::preserve_metadata;
 use super::progress::ProgressPublisher;
 use super::validation::matches_exclude_pattern;
 use super::CopyStats;

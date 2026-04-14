@@ -176,6 +176,52 @@ impl OrbitError {
         matches!(self, OrbitError::ZeroCopyUnsupported)
     }
 
+    /// Get a user-friendly suggestion for how to resolve this error
+    pub fn suggestion(&self) -> Option<&str> {
+        match self {
+            OrbitError::SourceNotFound(_) => {
+                Some("Check that the path exists and you have read permissions")
+            }
+            OrbitError::InvalidPath(_) => {
+                Some("Verify the path is valid and does not contain unsupported characters")
+            }
+            OrbitError::InsufficientDiskSpace { .. } => {
+                Some("Free up disk space or use --compress zstd:3 to reduce transfer size")
+            }
+            OrbitError::Config(msg) if msg.contains("path required") => {
+                Some("Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>")
+            }
+            OrbitError::Config(_) => {
+                Some("Check your config file or CLI flags. Run 'orbit init' to reconfigure")
+            }
+            OrbitError::Compression(_) | OrbitError::Decompression(_) => {
+                Some("The data may be corrupted. Try --compress none or re-transfer the source")
+            }
+            OrbitError::Resume(_) => Some(
+                "Resume state may be stale. Try without --resume or delete the resume checkpoint",
+            ),
+            OrbitError::ChecksumMismatch { .. } => {
+                Some("File integrity check failed. Re-transfer the file or use --no-verify to skip")
+            }
+            OrbitError::RetriesExhausted { .. } => {
+                Some("Increase --retry-attempts or check network/disk health")
+            }
+            OrbitError::ZeroCopyUnsupported => {
+                Some("Use --no-zero-copy to fall back to buffered transfer")
+            }
+            OrbitError::Protocol(_) => {
+                Some("Check network connectivity and endpoint configuration")
+            }
+            OrbitError::Authentication(_) => {
+                Some("Check your credentials or run 'orbit init' to reconfigure")
+            }
+            OrbitError::MetadataFailed(_) => {
+                Some("Use --no-preserve-metadata or check destination filesystem permissions")
+            }
+            _ => None,
+        }
+    }
+
     /// Get error category for logging and instrumentation
     pub fn category(&self) -> ErrorCategory {
         match self {

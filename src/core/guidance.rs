@@ -382,7 +382,42 @@ impl ConfigOptimizer {
         }
 
         // =================================================================================
-        // ACTIVE RULE 4: Cloud Storage Optimization
+        // ACTIVE RULE 4: Local-to-Local Worker Optimization
+        // =================================================================================
+        // With many cores and fast local I/O, auto-set workers to cores/2
+        if !profile.dest_filesystem_type.is_network()
+            && !profile.dest_filesystem_type.is_cloud_storage()
+            && profile.logical_cores > 8
+            && config.parallel == 0
+        {
+            let workers = profile.logical_cores / 2;
+            config.parallel = workers;
+            notices.push(Notice::auto_tune(
+                "Performance",
+                &format!(
+                    "Local transfer with {} cores. Auto-setting {} parallel workers.",
+                    profile.logical_cores, workers
+                ),
+            ));
+        }
+
+        // =================================================================================
+        // ACTIVE RULE 5: Fast I/O Chunk Size Optimization
+        // =================================================================================
+        // When I/O throughput is high and we're using buffered copy, increase chunk size
+        if profile.estimated_io_throughput > 500.0 && config.chunk_size <= 1024 * 1024 {
+            config.chunk_size = 4 * 1024 * 1024; // 4 MB
+            notices.push(Notice::auto_tune(
+                "Performance",
+                &format!(
+                    "Fast I/O detected ({:.0} MB/s). Increased chunk size to 4 MB for better throughput.",
+                    profile.estimated_io_throughput
+                ),
+            ));
+        }
+
+        // =================================================================================
+        // ACTIVE RULE 6: Cloud Storage Optimization
         // =================================================================================
         if profile.dest_filesystem_type.is_cloud_storage() {
             // Cloud storage benefits from compression due to network costs

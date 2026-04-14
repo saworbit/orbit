@@ -3175,7 +3175,6 @@ name = "orbit"
 version = "0.6.0"
 dependencies = [
  "adler2",
- "anyhow",
  "assert_fs",
  "async-trait",
  "aws-config",

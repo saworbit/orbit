@@ -4,6 +4,42 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+#### CLI Enhancements
+- **Positional arguments**: `orbit /src /dest` now works as an alternative to `-s /src -d /dest`
+- **`--profile` preset flag**: Apply a named configuration preset (`fast`, `safe`, `backup`, `network`) from the command line. Each preset provides opinionated defaults tuned for its use case
+- **`orbit presets` subcommand**: Displays available profiles with a comparison table
+
+#### Configuration Presets
+- **`CopyConfig::backup_preset()`**: Backup-specific preset with checksum verification, Zstd compression, resume, metadata preservation, and 5 retries — distinct from the `safe` preset
+- **`CopyConfig::fast_preset()`**, **`safe_preset()`**, **`network_preset()`**: Existing presets now accessible via the CLI `--profile` flag
+
+#### User Experience
+- **Actionable error messages**: All `OrbitError` variants now include a `suggestion()` method returning context-specific remediation hints (e.g., "Free up disk space or use --compress zstd:3 to reduce transfer size")
+- **Auto-tune summary**: Transfer completion output now displays any auto-tuned settings applied by the Config Optimizer (e.g., worker count adjustments, chunk size increases)
+- **Hardware probe caching**: CPU core count and total RAM are cached to `~/.orbit/probe_cache.json` (1-hour TTL) to avoid re-probing on every invocation. Available RAM is always probed fresh to reflect current memory pressure
+
+#### Config Optimizer (Guidance System)
+- **Rule 4 — Local-to-Local Worker Optimization**: Automatically sets workers to `cores/2` when more than 8 cores are available and `parallel == 0`
+- **Rule 5 — Fast I/O Chunk Size**: Increases chunk size to 4MB when I/O throughput exceeds 500 MB/s and the current chunk size is 1MB or less
+
+### Changed
+
+#### Codebase Restructuring
+- **main.rs reduced from 3,420 to 1,871 lines** (45% reduction): Extracted subcommand handlers into dedicated modules:
+  - `src/commands/s3.rs` — 10 S3 command handlers (`cat`, `pipe`, `presign`, `ls`, `head`, `du`, `rm`, `mv`, `mb`, `rb`) plus helper functions
+  - `src/commands/manifest.rs` — `ManifestCommands` enum and handlers (`plan`, `verify`, `diff`, `info`)
+  - `src/commands/batch.rs` — Batch execution (`run`, `split_command_line`, `normalize_batch_args`)
+- **Metadata module consolidation**: Merged `src/core/metadata.rs` into `src/core/metadata_ops.rs`, eliminating a redundant module
+- **Default features simplified**: Removed `orbit-system` (Tokio) from default features. Tokio is now only pulled in by network backend features (`s3-native`, `ssh-backend`, `azure-native`, `gcs-native`, `smb-native`), reducing default binary size and compile times
+
+#### Error Handling
+- **Removed `anyhow` dependency**: All error handling now uses `thiserror`-based `OrbitError` types. The `orbit init` wizard previously used `anyhow::Result`; it now returns `crate::error::Result<()>` with properly typed errors
+
+#### Documentation
+- Marked incomplete features with TODO annotations: manifest diff (alpha stub), Windows file attribute preservation, ACL preservation
+
 ### Removed — Simplification Pass
 
 Orbit was simplified back to its core: a fast, reliable file transfer tool. Speculative and unused components were removed to reduce complexity.

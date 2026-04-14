@@ -118,13 +118,14 @@ orbit (CLI/Library)
 ### Simple File Copy
 
 ```
-orbit --source /data --dest /backup --recursive
+orbit /data /backup --recursive --profile backup
 
 User CLI
     │
     ▼
 ┌─────────────────────┐
 │   Parse Arguments   │
+│   Apply Profile     │
 │   Load Config       │
 └─────────┬───────────┘
           │
@@ -308,8 +309,11 @@ Source Files                              Destination
 Single-machine file operations with no external dependencies.
 
 ```bash
-# Simple copy
-orbit --source /data --dest /backup --recursive
+# Simple copy (positional arguments)
+orbit /data /backup --recursive
+
+# With a preset profile
+orbit /data /backup --recursive --profile backup
 
 # With compression and verification
 orbit --source /data --dest /backup \
@@ -328,8 +332,10 @@ orbit sync --source /project --dest /backup --smart
 ### CLI Arguments
 
 ```bash
-orbit --source <PATH>           # Source path (required)
-      --dest <PATH>             # Destination path (required)
+orbit <SOURCE> <DEST> [FLAGS]   # Positional arguments
+orbit --source <PATH>           # Source path (named flag)
+      --dest <PATH>             # Destination path (named flag)
+      --profile <PRESET>        # Apply preset: fast|safe|backup|network
       --recursive               # Copy directories recursively
       --compression <TYPE>      # none|lz4|zstd
       --checksum <TYPE>         # none|sha256|blake3
@@ -358,12 +364,16 @@ orbit = { version = "0.6", features = ["full"] }  # Everything
 
 # Or selective features:
 orbit = { version = "0.6", features = [
-    "zero-copy",        # Platform optimizations
-    "smb-native",       # SMB2/3 support
-    "s3-native",        # AWS S3 support
+    "zero-copy",        # Platform optimizations (default)
+    "smb-native",       # SMB2/3 support (includes Tokio)
+    "s3-native",        # AWS S3 support (includes Tokio)
     "opentelemetry",    # Distributed tracing
 ] }
 ```
+
+> **Note:** The default build includes only `zero-copy`. Tokio is not included by
+> default — it is pulled in automatically by network backend features (`s3-native`,
+> `ssh-backend`, `azure-native`, `gcs-native`, `smb-native`).
 
 ---
 
@@ -471,9 +481,12 @@ Event N+1 (prev_hmac: def456, HMAC: ...)
 
 ### Near-term (v0.7.x)
 
-- Enhanced init wizard with active probing
-- Configuration file support (TOML)
-- Improved error messages and recovery
+- ✅ Enhanced init wizard with active probing
+- ✅ Configuration file support (TOML)
+- ✅ Improved error messages with actionable suggestions
+- ✅ CLI simplification: positional args, `--profile` presets
+- ✅ Hardware probe caching and auto-tune summary display
+- ✅ Removed `anyhow` dependency (unified on `thiserror`/`OrbitError`)
 
 ### Future (v1.0+)
 

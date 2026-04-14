@@ -9,9 +9,70 @@
  */
 
 use crate::error::Result;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 use sysinfo::{Disks, System};
+
+/// Cached hardware profile (stable metrics only, destination-independent).
+/// Note: available_ram_gb is intentionally excluded — it's a live memory-pressure
+/// signal that must be probed fresh each invocation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HardwareCache {
+    logical_cores: usize,
+    total_memory_gb: u64,
+    #[serde(with = "system_time_serde")]
+    cached_at: SystemTime,
+}
+
+mod system_time_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    pub fn serialize<S: Serializer>(time: &SystemTime, s: S) -> Result<S::Ok, S::Error> {
+        let dur = time.duration_since(UNIX_EPOCH).unwrap_or(Duration::ZERO);
+        dur.as_secs().serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<SystemTime, D::Error> {
+        let secs = u64::deserialize(d)?;
+        Ok(UNIX_EPOCH + Duration::from_secs(secs))
+    }
+}
+
+impl HardwareCache {
+    const TTL_SECS: u64 = 3600; // 1 hour
+
+    fn cache_path() -> Option<std::path::PathBuf> {
+        dirs::home_dir().map(|h| h.join(".orbit").join("probe_cache.json"))
+    }
+
+    fn load() -> Option<Self> {
+        let path = Self::cache_path()?;
+        let data = std::fs::read_to_string(path).ok()?;
+        let cache: Self = serde_json::from_str(&data).ok()?;
+
+        // Check TTL
+        let age = SystemTime::now()
+            .duration_since(cache.cached_at)
+            .unwrap_or_default();
+        if age.as_secs() > Self::TTL_SECS {
+            return None;
+        }
+        Some(cache)
+    }
+
+    fn save(&self) {
+        if let Some(path) = Self::cache_path() {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Ok(data) = serde_json::to_string(self) {
+                let _ = std::fs::write(path, data);
+            }
+        }
+    }
+}
 
 /// System profile containing hardware and environment metrics
 #[derive(Debug, Clone)]
@@ -79,28 +140,37 @@ impl FileSystemType {
 pub struct Probe;
 
 impl Probe {
-    /// Scan the system and destination environment to build a profile
+    /// Scan the system and destination environment to build a profile.
+    /// Hardware info (CPU, RAM) is cached for 1 hour to avoid re-probing on every invocation.
+    /// Filesystem type and I/O throughput are always probed fresh (destination-dependent).
     pub fn scan(dest_path: &Path) -> Result<SystemProfile> {
+        // Try to load cached stable hardware info (CPU cores, total RAM)
+        // Available RAM is always probed fresh — it's a live memory-pressure signal
         let mut sys = System::new_all();
         sys.refresh_all();
-
-        // 1. Detect CPU cores
-        let logical_cores = sys.cpus().len().max(1); // Ensure at least 1
-
-        // 2. Detect RAM (convert from bytes to GB)
         let available_ram_gb = sys.available_memory() / 1024 / 1024 / 1024;
-        let total_memory_gb = sys.total_memory() / 1024 / 1024 / 1024;
 
-        // 3. Create Disks instance for filesystem detection
+        let (logical_cores, total_memory_gb) = if let Some(cache) = HardwareCache::load() {
+            (cache.logical_cores, cache.total_memory_gb)
+        } else {
+            let cores = sys.cpus().len().max(1);
+            let total_mem = sys.total_memory() / 1024 / 1024 / 1024;
+
+            // Save stable metrics to cache for future invocations
+            let cache = HardwareCache {
+                logical_cores: cores,
+                total_memory_gb: total_mem,
+                cached_at: SystemTime::now(),
+            };
+            cache.save();
+
+            (cores, total_mem)
+        };
+
+        // Always probe destination-specific info fresh
         let disks = Disks::new_with_refreshed_list();
-
-        // 4. Detect filesystem type
         let dest_filesystem_type = Self::detect_fs_type(dest_path, &disks);
-
-        // 4. IO Micro-benchmark (write 10MB test)
         let estimated_io_throughput = Self::benchmark_io(dest_path);
-
-        // 5. Battery status (future enhancement - placeholder)
         let is_battery_power = false;
 
         Ok(SystemProfile {

@@ -180,6 +180,86 @@ This measurement informs compression decisions.
 - Higher retries handle transient API failures
 - Exponential backoff prevents API throttling
 
+### Rule 5: Local-to-Local Worker Optimization
+
+**Triggers when:**
+- System has >8 CPU cores AND
+- `parallel` is set to 0 (auto) AND
+- Destination is local filesystem
+
+**Action:**
+- ⚙️ Sets workers to `cores / 2`
+
+**Example:**
+```
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
+│ ⚡ AutoTune: Local transfer with 16 cores.
+│              Setting workers to 8 for optimal throughput.
+└────────────────────────────────────────────────────┘
+```
+
+**Why it helps:**
+- Too many workers on local I/O can cause contention
+- `cores / 2` balances parallelism with I/O throughput
+- Only applies when the user hasn't set a manual value
+
+### Rule 6: Fast I/O Chunk Size Optimization
+
+**Triggers when:**
+- I/O throughput exceeds 500 MB/s AND
+- Current chunk size is 1 MB or less
+
+**Action:**
+- ⚙️ Increases chunk size to 4 MB
+
+**Example:**
+```
+┌── 🛰️  Orbit Config Optimizer ───────────────────────┐
+│ ⚡ AutoTune: Fast I/O detected (1200 MB/s).
+│              Increasing chunk size to 4 MB.
+└────────────────────────────────────────────────────┘
+```
+
+**Why it helps:**
+- Fast NVMe drives benefit from larger chunk sizes
+- Reduces syscall overhead per byte transferred
+- Only activates when I/O speed can saturate small chunks
+
+## Hardware Probe Caching
+
+To avoid re-probing stable hardware on every invocation, Orbit caches CPU core count and total RAM to `~/.orbit/probe_cache.json` with a 1-hour TTL.
+
+**What is cached (stable metrics):**
+- CPU logical core count
+- Total system memory (GB)
+
+**What is always probed fresh:**
+- Available RAM (GB) — changes with system load, critical for memory-pressure decisions
+- Destination filesystem type — depends on the transfer target
+- I/O throughput — depends on the destination disk
+
+**Cache location:** `~/.orbit/probe_cache.json`
+**TTL:** 1 hour (after which the cache is re-populated)
+
+## Auto-Tune Summary Display
+
+When the Config Optimizer applies auto-tune rules, these are now displayed at the end of the transfer summary:
+
+```
+┌── Transfer Complete ──────────────────────────────┐
+│ All operations finished successfully              │
+└───────────────────────────────────────────────────┘
+
+  Files: 42 copied, 0 skipped, 0 failed
+  Size: 1.5 GiB in 3.2s (480 MiB/s)
+
+── ⚙️ Auto-Tuned Settings ──────────────────────────
+  ⚡ LOCAL_WORKERS  Set workers to 8 for local transfer with 16 cores
+  ⚡ FAST_IO_CHUNK  Increased chunk size to 4 MB for fast I/O (1200 MB/s)
+```
+
+This gives visibility into what Orbit optimized automatically without cluttering the pre-transfer output.
+
 ## Examples
 
 ### Example 1: Local to SMB Transfer
@@ -285,7 +365,9 @@ New Active Optimization Rules (v0.7.0):
   ✓ CPU/IO optimization
   ✓ Memory protection
   ✓ Cloud storage tuning
-  (4 new rules)
+  ✓ Local worker optimization
+  ✓ Fast I/O chunk sizing
+  (6 new rules)
 ```
 
 **Example with both:**
@@ -332,6 +414,8 @@ $ orbit -s /data -d /backup --recursive --verbose
 [DEBUG] Active Rule 2 (CPU/IO): Not triggered (I/O speed OK)
 [DEBUG] Active Rule 3 (Memory): Not triggered (sufficient RAM)
 [DEBUG] Active Rule 4 (Cloud): Not triggered (not cloud)
+[DEBUG] Active Rule 5 (Workers): Triggered — set workers to 4 (8 cores / 2)
+[DEBUG] Active Rule 6 (Chunks): Not triggered (I/O speed below threshold)
 ```
 
 ### Probe Failures

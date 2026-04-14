@@ -315,6 +315,8 @@ The Config Optimizer acts as an intelligent pre-processor, analyzing your config
 | **🆕 CPU/IO Optimization** | ≥8 cores + <50 MB/s I/O | Enable Zstd:3 compression | 🔧 |
 | **🆕 Low Memory** | <1GB RAM + >4 parallel | Reduce to 2 parallel operations | 🔧 |
 | **🆕 Cloud Storage** | S3/Azure/GCS destination | Enable compression + backoff | 🔧 |
+| **🆕 Local Worker Opt.** | >8 cores + parallel=0 | Set workers to cores/2 | 🔧 |
+| **🆕 Fast I/O Chunks** | >500 MB/s + chunk≤1MB | Increase chunk size to 4MB | 🔧 |
 
 **Philosophy:**
 > Users express **intent**. Orbit ensures **technical correctness**.
@@ -1334,11 +1336,11 @@ Configuration Setup
 ✅ Configuration saved to: /home/user/.orbit/orbit.toml
 ```
 
-**Pre-configured profiles:**
-- **Backup** → Resume, checksum verification, 5 retries
-- **Sync** → Zero-copy, trust modtime, maximum speed
-- **Cloud** → Zstd compression, 10 retries, exponential backoff
-- **Network** → Resume + compression balanced for SMB/NFS
+**Pre-configured profiles (also available via `--profile` flag):**
+- **Fast** → Zero-copy, no checksums, no resume — maximum speed for local SSD/NVMe
+- **Safe** → Checksums, resume, retries — maximum reliability for critical data
+- **Backup** → Checksums + Zstd compression + resume + metadata preservation — reliable backups
+- **Network** → Zstd compression, resume, 10 retries — optimized for remote/slow networks
 
 After running `orbit init`, your config is ready! All transfers will use your optimized settings automatically.
 
@@ -1349,8 +1351,16 @@ After running `orbit init`, your config is ready! All transfers will use your op
 ### Basic Usage
 
 ```bash
-# Simple copy
+# Simple copy (positional arguments)
+orbit source.txt destination.txt
+
+# Or with named flags
 orbit --source source.txt --dest destination.txt
+
+# Use a preset profile for common scenarios
+orbit /data /backup -R --profile backup     # Reliable backup: checksums + compression + resume
+orbit /data /backup -R --profile fast       # Maximum speed: zero-copy, no checksums
+orbit /data /backup -R --profile network    # Network-optimized: compression + resume + retries
 
 # Copy with resume and checksum verification
 orbit --source large-file.iso --dest /backup/large-file.iso --resume
@@ -1663,9 +1673,10 @@ audit_log_path = "/var/log/orbit_audit.log"
 ### Configuration Priority
 
 1. CLI arguments (highest)
-2. `./orbit.toml` (project)
-3. `~/.orbit/orbit.toml` (user)
-4. Built-in defaults (lowest)
+2. `--profile` preset (applied as base, then CLI flags override)
+3. `./orbit.toml` (project)
+4. `~/.orbit/orbit.toml` (user)
+5. Built-in defaults (lowest)
 
 ---
 
@@ -1695,7 +1706,7 @@ Orbit features a universal I/O abstraction layer that decouples core logic from 
 use orbit::system::LocalSystem;
 use orbit_core_interface::OrbitSystem;
 
-async fn example() -> anyhow::Result<()> {
+async fn example() -> orbit::error::Result<()> {
     let system = LocalSystem::new();
     let header = system.read_header(path, 512).await?;
     // Same code works for future RemoteSystem!
@@ -1766,8 +1777,17 @@ For complete security audit results, dependency chain analysis, and mitigation d
 
 **Transfer operations:**
 ```bash
-orbit --source <PATH> --dest <PATH> [FLAGS]
+orbit <SOURCE> <DEST> [FLAGS]               # Positional arguments
+orbit --source <PATH> --dest <PATH> [FLAGS]  # Named flags
 ```
+
+**Profile presets:**
+| Flag | Description |
+|------|-------------|
+| `--profile fast` | Maximum speed: zero-copy, no checksums, no resume |
+| `--profile safe` | Maximum reliability: checksums, resume, retries |
+| `--profile backup` | Reliable backups: checksums + Zstd compression + resume + metadata |
+| `--profile network` | Network-optimized: Zstd compression, resume, 10 retries |
 
 **Parallelism flags:**
 | Flag | Description | Default |
@@ -1850,6 +1870,13 @@ orbit <init|stats|presets|capabilities>   # Configuration & info
 **Alpha/Experimental:**
 - V2 Architecture (CDC, semantic replication, global dedup)
 - SMB2/3 native implementation (awaiting upstream fix)
+
+### ✅ Recently Completed
+
+- **Simplified CLI**: Positional arguments (`orbit /src /dest`), `--profile` presets, actionable error messages
+- **Codebase restructuring**: main.rs reduced by 45%, subcommand handlers extracted to dedicated modules
+- **Config Optimizer enhancements**: Hardware probe caching, auto-tune summary display, new worker/chunk rules
+- **Dependency cleanup**: Removed `anyhow`, made Tokio optional (only for network backends)
 
 ### 🚧 In Progress
 
