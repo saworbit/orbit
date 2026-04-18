@@ -154,6 +154,7 @@ libc = "0.2"
 tempfile = "3.10"
 criterion = "0.8"
 assert_fs = "1.1"
+assert_cmd = "2.0"
 predicates = "3.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 adler2 = "2.0"  # For Adler-32 test validation
