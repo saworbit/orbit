@@ -6,7 +6,15 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+#### New Commands
+- **`orbit cp <SRC> <DST>`**: Intuitive copy alias — identical to bare `orbit` but reads more naturally in scripts and documentation
+- **`orbit explain <SRC> <DST>`**: Dry-run explainer that prints a plain-English summary of what Orbit *would* do (mode, compression, checksums, parallelism, filters, etc.) without touching any files
+- **`orbit history`**: Shows recent transfer history from the audit log in a human-friendly table. Supports `--audit-file <path>`, `--limit N`, and `--json` for machine-readable output
+
 #### CLI Enhancements
+- **`--compress auto`**: Context-aware compression — picks Zstd:3 for remote destinations and LZ4 for local cross-device transfers; leaves compression off for same-device copies
+- **Two-tier `--help` system**: Default help shows ~20 essential flags; `--help-all` (or `orbit explain`) reveals the full set of 70+ flags. Advanced, S3, and observability flags are hidden from default help to reduce cognitive load
+- **One-time first-run tip**: On first invocation (no `~/.orbit/.tip-shown` sentinel), Orbit prints a quick-start hint pointing users to `orbit init`, `orbit explain`, and `orbit --help`
 - **Positional arguments**: `orbit /src /dest` now works as an alternative to `-s /src -d /dest`
 - **`--profile` preset flag**: Apply a named configuration preset (`fast`, `safe`, `backup`, `network`) from the command line. Each preset provides opinionated defaults tuned for its use case
 - **`orbit presets` subcommand**: Displays available profiles with a comparison table
@@ -26,12 +34,17 @@ All notable changes to Orbit will be documented in this file.
 - **`CopyConfig::fast_preset()`**, **`safe_preset()`**, **`network_preset()`**: Existing presets now accessible via the CLI `--profile` flag
 
 #### User Experience
+- **Smart error suggestions with fuzzy matching**: `SourceNotFound` errors now suggest similar filenames in the same directory using Levenshtein distance, detect glob patterns (e.g., `*.txt`), and expand relative paths — all without external dependencies
 - **Actionable error messages**: All `OrbitError` variants now include a `suggestion()` method returning context-specific remediation hints (e.g., "Free up disk space or use --compress zstd:3 to reduce transfer size")
 - **Auto-tune summary**: Transfer completion output now displays any auto-tuned settings applied by the Config Optimizer (e.g., worker count adjustments, chunk size increases)
 - **Hardware probe caching**: CPU core count and total RAM are cached to `~/.orbit/probe_cache.json` (1-hour TTL) to avoid re-probing on every invocation. Available RAM is always probed fresh to reflect current memory pressure
 - **Auto-network detection**: When the destination is a remote URI (s3://, smb://, ssh://, etc.) and no `--profile` is specified, Orbit automatically enables resume, compression, exponential backoff, and higher retries — without clobbering any values the user customized in their config file
 - **First-run hint**: If no `~/.orbit/orbit.toml` exists, Orbit suggests running `orbit init` on first use
 - **Config file error reporting**: Invalid config files now produce a visible warning and fall back to defaults, instead of silently ignoring parse errors
+
+#### Init Wizard Enhancements
+- **Exclusion pattern presets**: New step in the wizard lets users pick from common exclusion sets (Development artifacts, Temporary files, OS files, All common, or None) — pre-populates `exclude_patterns` in `orbit.toml`
+- **Shell completions auto-install**: New step detects the user's shell (bash, zsh, fish, PowerShell) and offers to install tab-completion scripts to the appropriate config directory
 
 #### Config Optimizer (Guidance System)
 - **Rule 4 — Local-to-Local Worker Optimization**: Automatically sets workers to `cores/2` when more than 8 cores are available and `parallel == 0`
@@ -110,6 +123,14 @@ Orbit was simplified back to its core: a fast, reliable file transfer tool. Spec
 - **Documentation**: 15 obsolete docs moved to `docs/archive/`, README and ARCHITECTURE.md updated to reflect simplified crate structure
 
 ### Fixed
+
+#### CLI Stability
+- **Stack overflow in debug builds** (`main.rs`): Adding new subcommands with 70+ `global = true` clap flags exceeded the default 1 MiB thread stack in debug builds. Fixed by spawning `run()` on a 4 MiB thread via `std::thread::Builder`
+- **Global flag name collisions** (`main.rs`): `orbit history --log` collided with the global `--log` flag, and `-n` (limit) collided with global `-n` (no-clobber). Renamed to `--audit-file` and removed the `-n` short flag from `--limit`
+- **Unicode panic in path truncation** (`commands/history.rs`): `truncate_path` byte-sliced multibyte UTF-8 paths (CJK, emoji), causing panics. Rewritten to use `chars().count()` and `chars().skip()` for char-safe truncation
+- **Silent fallback on missing audit log** (`commands/history.rs`): When an explicit `--audit-file` path didn't exist, the command silently fell through to default locations instead of reporting an error. Now returns a clear "not found" error for explicit paths
+- **BOM-prefixed audit logs silently dropped** (`commands/history.rs`): Windows PowerShell writes a UTF-8 BOM (`\u{FEFF}`) that caused `serde_json::from_str` to fail. `parse_record` now strips the BOM before parsing
+- **Timestamp byte-slicing** (`commands/history.rs`): Changed `&record.timestamp[..19]` to `record.timestamp.chars().take(19).collect()` to avoid panicking on multibyte timestamps
 
 #### Correctness & Safety
 - **Path traversal protection** (`backend/local.rs`): Resolved symlink-based path traversal in the local backend by manually normalizing `..` components instead of relying on `fs::canonicalize` (which fails on non-existent paths). Paths that escape the configured root now clamp to root.

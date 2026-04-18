@@ -10,8 +10,10 @@ The `orbit init` command is an interactive setup wizard that helps you create an
 
 1. **Probing your system** — Automatically detects CPU cores, RAM, and I/O throughput
 2. **Understanding your needs** — Asks about your primary use case
-3. **Generating optimal settings** — Creates a configuration tuned for your specific scenario
-4. **Setting up security** — Optionally generates secure JWT secrets for the Web Dashboard
+3. **Setting up exclusions** — Offers common exclusion pattern presets (dev artifacts, temp files, OS files)
+4. **Installing shell completions** — Auto-detects your shell and offers tab-completion setup
+5. **Generating optimal settings** — Creates a configuration tuned for your specific scenario
+6. **Setting up security** — Optionally generates secure JWT secrets for the Web Dashboard
 
 ## Quick Start
 
@@ -121,7 +123,50 @@ Choose from four pre-optimized profiles:
 - Remote file servers
 - VPN or WAN transfers
 
-### Step 3: Security Configuration
+### Step 3: Exclusion Pattern Presets
+
+Choose common file patterns to exclude from all transfers:
+
+```
+? Common exclusion patterns to skip?
+  > Development artifacts (target/, node_modules/, .git/, __pycache__/)
+    Temporary files (*.tmp, *.log, *.swp, *~)
+    OS-generated files (.DS_Store, Thumbs.db, desktop.ini)
+    All common patterns (recommended)
+    None — I'll configure manually
+```
+
+**What each preset includes:**
+
+| Preset | Patterns |
+|--------|----------|
+| **Development** | `target/*`, `node_modules/*`, `.git/*`, `__pycache__/*`, `*.pyc` |
+| **Temporary** | `*.tmp`, `*.log`, `*.swp`, `*~`, `.*.swp` |
+| **OS files** | `.DS_Store`, `Thumbs.db`, `desktop.ini`, `$RECYCLE.BIN/*` |
+| **All common** | All of the above combined |
+
+The selected patterns are written to `exclude_patterns` in your `orbit.toml`. You can always edit them later.
+
+### Step 4: Shell Completions
+
+The wizard detects your shell and offers to install tab-completion scripts:
+
+```
+? Install shell completions? (Y/n)
+
+  Detected: bash
+  ✓ Completions written to ~/.bash_completion.d/orbit
+```
+
+**Supported shells:**
+- **Bash** → `~/.bash_completion.d/orbit`
+- **Zsh** → `~/.zsh/completions/_orbit`
+- **Fish** → `~/.config/fish/completions/orbit.fish`
+- **PowerShell** → Profile directory
+
+After installation, restart your shell (or `source` the completion file) to enable tab completion for all Orbit commands, flags, and subcommands.
+
+### Step 5: Security Configuration
 
 Optionally generate a secure JWT secret for the Orbit Web Dashboard:
 
@@ -144,7 +189,7 @@ Optionally generate a secure JWT secret for the Orbit Web Dashboard:
 - Keep this secret secure — it protects your Web Dashboard
 - Regenerate if compromised by running `orbit init` again
 
-### Step 4: Configuration Saved
+### Step 6: Configuration Saved
 
 ```
 ╔════════════════════════════════════════╗
@@ -380,12 +425,21 @@ Scanning system environment...
 ? What is your primary use case?
   > Backup (Reliability First)
 
-? Generate secure JWT Secret for Web Dashboard? Yes
+? Common exclusion patterns to skip?
+  > All common patterns (recommended)
+
+? Install shell completions? Yes (bash)
+  ✓ Completions written to ~/.bash_completion.d/orbit
+
+? Generate secure JWT Secret for Web Dashboard? No
 
 ✅ Configuration saved to: /home/alice/.orbit/orbit.toml
 
-# Now ready to use
-$ orbit -s ~/documents -d /backup/documents --recursive
+# Now ready to use — try explain first to see what Orbit will do
+$ orbit explain ~/documents /backup/documents -R
+
+# Then run it
+$ orbit ~/documents /backup/documents -R
 ```
 
 ### Example 2: Cloud Storage User
@@ -440,9 +494,24 @@ The wizard creates your **baseline config**, while Active Guidance provides **ru
 - **Configuration Reference:** [`docs/guides/quickstart_guide.md`](quickstart_guide.md)
 - **System Probing:** `src/core/probe.rs`
 
+## What's Next After Init?
+
+After running `orbit init`, try these commands:
+
+```bash
+# Preview what a transfer would do (no files touched)
+orbit explain /data /backup -R
+
+# Run your first transfer
+orbit cp /data /backup -R
+
+# View past transfers
+orbit history
+```
+
 ## Feedback
 
-The init wizard is new in v0.7.0 and we're actively improving it. Please report:
+The init wizard was introduced in v0.7.0 and continues to improve. Please report:
 - Confusing prompts or unclear options
 - System probe failures or inaccurate detection
 - Profile recommendations that don't match your use case

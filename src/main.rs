@@ -24,24 +24,45 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "orbit")]
-#[command(version, about = "Intelligent file transfer with compression, resume, and zero-copy optimization", long_about = None)]
+#[command(
+    version,
+    about = "Intelligent file transfer with compression, resume, and zero-copy optimization"
+)]
+#[command(
+    long_about = "Intelligent file transfer with compression, resume, and zero-copy optimization.\n\n\
+    QUICK START:\n  \
+    orbit <SOURCE> <DEST>           Copy a file or directory\n  \
+    orbit sync <SRC> <DEST>         Sync (only new/changed files)\n  \
+    orbit backup <SRC> <DEST>       Backup (checksums + compression + resume)\n  \
+    orbit mirror <SRC> <DEST>       Mirror (exact replica, deletes extras)\n\n\
+    The tool auto-detects directories, remote destinations, and picks smart\n\
+    defaults. Most flags are optional — just specify source and destination.\n\n\
+    PROFILES:\n  \
+    --profile fast                  Max speed, no safety checks\n  \
+    --profile safe                  Checksums, resume, retries\n  \
+    --profile backup                Safe + zstd compression\n  \
+    --profile network               Optimized for remote/cloud\n\n\
+    Use 'orbit explain <SRC> <DEST> [flags]' to preview what any command will do."
+)]
 struct Cli {
     // ── Transfer ────────────────────────────────────────────────────
-    /// Source path or URI (positional: orbit <SOURCE> <DEST>)
+    /// Source path or URI (alternative to positional args)
     #[arg(
         short = 's',
         long = "source",
         value_name = "PATH",
-        help_heading = "Transfer"
+        help_heading = "Transfer",
+        hide = true
     )]
     source: Option<String>,
 
-    /// Destination path or URI (positional: orbit <SOURCE> <DEST>)
+    /// Destination path or URI (alternative to positional args)
     #[arg(
         short = 'd',
         long = "dest",
         value_name = "PATH",
-        help_heading = "Transfer"
+        help_heading = "Transfer",
+        hide = true
     )]
     destination: Option<String>,
 
@@ -98,7 +119,8 @@ struct Cli {
         long = "preserve",
         value_name = "FLAGS",
         global = true,
-        help_heading = "Transfer"
+        help_heading = "Transfer",
+        hide = true
     )]
     preserve_flags: Option<String>,
 
@@ -107,16 +129,17 @@ struct Cli {
         long = "transform",
         value_name = "CONFIG",
         global = true,
-        help_heading = "Transfer"
+        help_heading = "Transfer",
+        hide = true
     )]
     transform: Option<String>,
 
     /// Strict metadata mode (fail on any metadata error)
-    #[arg(long, global = true, help_heading = "Transfer")]
+    #[arg(long, global = true, help_heading = "Transfer", hide = true)]
     strict_metadata: bool,
 
     /// Verify metadata after transfer
-    #[arg(long, global = true, help_heading = "Transfer")]
+    #[arg(long, global = true, help_heading = "Transfer", hide = true)]
     verify_metadata: bool,
 
     /// Enable resume capability
@@ -303,19 +326,25 @@ struct Cli {
 
     // ── Observability ──────────────────────────────────────────────
     /// Audit log format
-    #[arg(long, value_enum, global = true, help_heading = "Observability")]
+    #[arg(
+        long,
+        value_enum,
+        global = true,
+        help_heading = "Observability",
+        hide = true
+    )]
     audit_format: Option<AuditFormatArg>,
 
     /// Path to audit log file
-    #[arg(long, global = true, help_heading = "Observability")]
+    #[arg(long, global = true, help_heading = "Observability", hide = true)]
     audit_log: Option<PathBuf>,
 
     /// OpenTelemetry OTLP endpoint for distributed tracing (e.g., http://localhost:4317)
-    #[arg(long, global = true, help_heading = "Observability")]
+    #[arg(long, global = true, help_heading = "Observability", hide = true)]
     otel_endpoint: Option<String>,
 
     /// Prometheus metrics HTTP endpoint port
-    #[arg(long, global = true, help_heading = "Observability")]
+    #[arg(long, global = true, help_heading = "Observability", hide = true)]
     metrics_port: Option<u16>,
 
     /// Log level (error, warn, info, debug, trace)
@@ -327,7 +356,8 @@ struct Cli {
         long,
         value_name = "FILE",
         global = true,
-        help_heading = "Observability"
+        help_heading = "Observability",
+        hide = true
     )]
     log: Option<PathBuf>,
 
@@ -341,68 +371,83 @@ struct Cli {
 
     // ── S3 Options ─────────────────────────────────────────────────
     /// Content-Type header for S3 uploads
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     content_type: Option<String>,
 
     /// Content-Encoding header for S3 uploads
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     content_encoding: Option<String>,
 
     /// Content-Disposition header for S3 uploads
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     content_disposition: Option<String>,
 
     /// Cache-Control header for S3 uploads
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     cache_control: Option<String>,
 
     /// Expiration date for S3 objects (RFC3339 format)
-    #[arg(long = "expires-header", global = true, help_heading = "S3 Options")]
+    #[arg(
+        long = "expires-header",
+        global = true,
+        help_heading = "S3 Options",
+        hide = true
+    )]
     expires_header: Option<String>,
 
     /// User-defined metadata key=value pairs for S3 uploads
-    #[arg(long = "metadata", global = true, help_heading = "S3 Options")]
+    #[arg(
+        long = "metadata",
+        global = true,
+        help_heading = "S3 Options",
+        hide = true
+    )]
     user_metadata: Vec<String>,
 
     /// Metadata directive for S3 copy operations (COPY or REPLACE)
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     metadata_directive: Option<String>,
 
     /// Canned ACL for S3 uploads (e.g., private, public-read, bucket-owner-full-control)
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     acl: Option<String>,
 
     /// Disable request signing for public S3 buckets
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     no_sign_request: bool,
 
     /// Path to AWS credentials file
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     credentials_file: Option<PathBuf>,
 
     /// AWS profile name to use
-    #[arg(long = "aws-profile", global = true, help_heading = "S3 Options")]
+    #[arg(
+        long = "aws-profile",
+        global = true,
+        help_heading = "S3 Options",
+        hide = true
+    )]
     aws_profile: Option<String>,
 
     /// Use S3 Transfer Acceleration
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     use_acceleration: bool,
 
     /// Enable requester-pays for S3 bucket access
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     request_payer: bool,
 
     /// Disable SSL certificate verification (use with caution)
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     no_verify_ssl: bool,
 
     /// Use ListObjects API v1 (for older S3-compatible storage)
-    #[arg(long, global = true, help_heading = "S3 Options")]
+    #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     use_list_objects_v1: bool,
 
     // ── Advanced ───────────────────────────────────────────────────
     /// Generate manifests for transfer verification and audit
-    #[arg(long, global = true, help_heading = "Advanced")]
+    #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     generate_manifest: bool,
 
     /// Output directory for manifests
@@ -410,40 +455,58 @@ struct Cli {
         long,
         global = true,
         requires = "generate_manifest",
-        help_heading = "Advanced"
+        help_heading = "Advanced",
+        hide = true
     )]
     manifest_dir: Option<PathBuf>,
 
     /// Check mode for change detection (mod-time, size, checksum, delta)
-    #[arg(long, value_enum, global = true, help_heading = "Advanced")]
+    #[arg(
+        long,
+        value_enum,
+        global = true,
+        help_heading = "Advanced",
+        hide = true
+    )]
     check: Option<CheckModeArg>,
 
     /// Block size for delta algorithm (in KB)
-    #[arg(long, global = true, help_heading = "Advanced")]
+    #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     block_size: Option<usize>,
 
     /// Force whole file copy, disable delta optimization
-    #[arg(long, global = true, help_heading = "Advanced")]
+    #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     whole_file: bool,
 
     /// Update manifest database after transfer
-    #[arg(long, global = true, help_heading = "Advanced")]
+    #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     update_manifest: bool,
 
     /// Path to delta manifest database
-    #[arg(long, global = true, help_heading = "Advanced")]
+    #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     delta_manifest: Option<PathBuf>,
 
     /// Sparse file handling mode (auto, always, never)
-    #[arg(long, value_enum, global = true, help_heading = "Advanced")]
+    #[arg(
+        long,
+        value_enum,
+        global = true,
+        help_heading = "Advanced",
+        hide = true
+    )]
     sparse: Option<SparseModeArg>,
 
     /// Preserve hardlinks during directory transfers (-H)
-    #[arg(long = "preserve-hardlinks", global = true, help_heading = "Advanced")]
+    #[arg(
+        long = "preserve-hardlinks",
+        global = true,
+        help_heading = "Advanced",
+        hide = true
+    )]
     preserve_hardlinks: bool,
 
     /// Modify destination file in-place instead of temp+rename
-    #[arg(long, global = true, help_heading = "Advanced")]
+    #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     inplace: bool,
 
     /// Safety level for in-place updates (reflink, journaled, unsafe)
@@ -452,12 +515,13 @@ struct Cli {
         value_enum,
         global = true,
         requires = "inplace",
-        help_heading = "Advanced"
+        help_heading = "Advanced",
+        hide = true
     )]
     inplace_safety: Option<InplaceSafetyArg>,
 
     /// Detect renamed/moved files via content-hash overlap at destination
-    #[arg(long, global = true, help_heading = "Advanced")]
+    #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     detect_renames: bool,
 
     /// Minimum chunk overlap ratio to consider a rename (0.0–1.0, default: 0.8)
@@ -465,7 +529,8 @@ struct Cli {
         long,
         global = true,
         requires = "detect_renames",
-        help_heading = "Advanced"
+        help_heading = "Advanced",
+        hide = true
     )]
     rename_threshold: Option<f64>,
 
@@ -474,16 +539,29 @@ struct Cli {
         long = "link-dest",
         value_name = "DIR",
         global = true,
-        help_heading = "Advanced"
+        help_heading = "Advanced",
+        hide = true
     )]
     link_dest: Vec<PathBuf>,
 
     /// Record transfer operations to a batch file for replay
-    #[arg(long, value_name = "FILE", global = true, help_heading = "Advanced")]
+    #[arg(
+        long,
+        value_name = "FILE",
+        global = true,
+        help_heading = "Advanced",
+        hide = true
+    )]
     write_batch: Option<PathBuf>,
 
     /// Replay a previously recorded batch file against a destination
-    #[arg(long, value_name = "FILE", global = true, help_heading = "Advanced")]
+    #[arg(
+        long,
+        value_name = "FILE",
+        global = true,
+        help_heading = "Advanced",
+        hide = true
+    )]
     read_batch: Option<PathBuf>,
 
     #[command(subcommand)]
@@ -494,6 +572,58 @@ struct Cli {
 enum Commands {
     /// Initialize Orbit configuration (interactive setup wizard)
     Init,
+
+    /// Copy files (shorthand for default copy mode)
+    Cp {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
+    },
+
+    /// Sync files (shorthand for --mode sync -R -p)
+    Sync {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
+    },
+
+    /// Backup files (shorthand for --profile backup -R -p)
+    Backup {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
+    },
+
+    /// Mirror files (shorthand for --mode mirror -R -p, deletes extras at dest)
+    #[command(name = "mirror")]
+    MirrorCmd {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
+    },
+
+    /// Preview what a transfer would do (without transferring)
+    Explain {
+        /// Source path or URI
+        source: String,
+        /// Destination path or URI
+        dest: String,
+    },
+
+    /// Show recent transfer history from audit log
+    History {
+        /// Path to audit log file (default: ~/.orbit/audit.log)
+        #[arg(long = "audit-file")]
+        audit_file: Option<PathBuf>,
+
+        /// Maximum number of entries to show
+        #[arg(long, default_value = "20")]
+        limit: usize,
+    },
 
     /// Show transfer statistics
     Stats,
@@ -532,31 +662,6 @@ enum Commands {
         /// Number of parallel workers (default: 256)
         #[arg(long, default_value = "256")]
         workers: usize,
-    },
-
-    /// Sync files (shorthand for --mode sync -R -p)
-    Sync {
-        /// Source path or URI
-        source: String,
-        /// Destination path or URI
-        dest: String,
-    },
-
-    /// Backup files (shorthand for --profile backup -R -p)
-    Backup {
-        /// Source path or URI
-        source: String,
-        /// Destination path or URI
-        dest: String,
-    },
-
-    /// Mirror files (shorthand for --mode mirror -R -p, deletes extras at dest)
-    #[command(name = "mirror")]
-    MirrorCmd {
-        /// Source path or URI
-        source: String,
-        /// Destination path or URI
-        dest: String,
     },
 
     /// Stream an S3 object to stdout
@@ -700,6 +805,8 @@ enum ProfileArg {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum CompressionArg {
+    /// Automatically choose compression based on source/destination
+    Auto,
     None,
     Lz4,
     /// Zstd with default level 3
@@ -714,9 +821,37 @@ enum CompressionArg {
     Zstd19,
 }
 
+impl CompressionArg {
+    /// Resolve Auto compression based on context.
+    /// - Same filesystem local: None (zero-copy wins)
+    /// - Cross-device / slow I/O: Lz4 (fast, helps throughput)
+    /// - Network / remote: Zstd level 3
+    fn resolve_auto(self, dest_is_remote: bool) -> CompressionType {
+        match self {
+            CompressionArg::Auto => {
+                if dest_is_remote {
+                    CompressionType::Zstd { level: 3 }
+                } else {
+                    // For local, we let the ConfigOptimizer handle slow-I/O detection;
+                    // default to LZ4 as a safe middle ground for cross-device
+                    CompressionType::Lz4
+                }
+            }
+            CompressionArg::None => CompressionType::None,
+            CompressionArg::Lz4 => CompressionType::Lz4,
+            CompressionArg::Zstd | CompressionArg::Zstd3 => CompressionType::Zstd { level: 3 },
+            CompressionArg::Zstd1 => CompressionType::Zstd { level: 1 },
+            CompressionArg::Zstd9 => CompressionType::Zstd { level: 9 },
+            CompressionArg::Zstd19 => CompressionType::Zstd { level: 19 },
+        }
+    }
+}
+
 impl From<CompressionArg> for CompressionType {
     fn from(comp: CompressionArg) -> Self {
+        // Default From doesn't know about context; use resolve_auto for context-aware resolution
         match comp {
+            CompressionArg::Auto => CompressionType::Lz4, // safe fallback
             CompressionArg::None => CompressionType::None,
             CompressionArg::Lz4 => CompressionType::Lz4,
             CompressionArg::Zstd | CompressionArg::Zstd3 => CompressionType::Zstd { level: 3 },
@@ -1060,7 +1195,7 @@ fn resolve_transfer_config(
     } else if cli.lz4 {
         config.compression = CompressionType::Lz4;
     } else if let Some(comp) = cli.compress {
-        config.compression = comp.into();
+        config.compression = comp.resolve_auto(dest_is_remote);
     }
 
     // ── Zero-copy ────────────────────────────────────────────────
@@ -1116,14 +1251,24 @@ fn is_remote_uri(uri: &str) -> bool {
 }
 
 fn main() {
-    let code = match run() {
-        Ok(()) => EXIT_SUCCESS,
-        Err(e) => {
-            print_error(&format!("{}", e), e.suggestion());
-            e.exit_code()
-        }
-    };
-    std::process::exit(code);
+    // The Cli struct has 70+ global flags propagated across 14+ subcommands.
+    // In unoptimized debug builds, clap's derive macro generates deep
+    // recursion that exceeds the default 1 MiB stack. Spawn a thread with
+    // a larger stack so both debug and release builds work reliably.
+    let builder = std::thread::Builder::new().stack_size(4 * 1024 * 1024); // 4 MiB
+    let handler = builder
+        .spawn(|| {
+            let code = match run() {
+                Ok(()) => EXIT_SUCCESS,
+                Err(e) => {
+                    print_error(&format!("{}", e), e.suggestion());
+                    e.exit_code()
+                }
+            };
+            std::process::exit(code);
+        })
+        .expect("failed to spawn main thread");
+    handler.join().expect("main thread panicked");
 }
 
 fn run() -> Result<()> {
@@ -1183,6 +1328,10 @@ fn run() -> Result<()> {
     if let Some(ref command) = cli.command {
         match command {
             // Transfer shorthands: extract data, fall through
+            Commands::Cp { source, dest } => {
+                shorthand_source = Some(source.clone());
+                shorthand_dest = Some(dest.clone());
+            }
             Commands::Sync { source, dest } => {
                 shorthand_source = Some(source.clone());
                 shorthand_dest = Some(dest.clone());
@@ -1198,12 +1347,16 @@ fn run() -> Result<()> {
                 shorthand_dest = Some(dest.clone());
                 shorthand_mode = Some(CopyMode::Mirror);
             }
+            // Explain: resolve config like a transfer, then explain instead of executing
+            Commands::Explain { source, dest } => {
+                shorthand_source = Some(source.clone());
+                shorthand_dest = Some(dest.clone());
+            }
             // Non-transfer subcommands: handle and return
             _ => {
-                // We need to move the command out for handle_subcommand.
-                // Safe because we checked it's not a shorthand above.
+                let json = cli.json;
                 let command = cli.command.unwrap();
-                return handle_subcommand(command);
+                return handle_subcommand(command, json);
             }
         }
     }
@@ -1433,13 +1586,23 @@ fn run() -> Result<()> {
         config.delta_manifest_path = cli.delta_manifest;
     }
 
-    // First-run hint: suggest `orbit init` if no config file exists
+    // First-run hint: suggest `orbit init` once (not every invocation)
     if !default_config_exists() && !quiet && !json_output {
-        eprintln!(
-            "{} Run '{}' to optimize for your hardware and use case.",
-            Theme::muted("Tip:"),
-            Theme::primary("orbit init")
-        );
+        let tip_shown = dirs::home_dir()
+            .map(|h| h.join(".orbit").join(".tip-shown"))
+            .unwrap_or_default();
+        if !tip_shown.exists() {
+            eprintln!(
+                "{} Run '{}' to auto-tune for your hardware and use case.",
+                Theme::muted("Tip:"),
+                Theme::primary("orbit init")
+            );
+            // Mark tip as shown so we don't nag on every run
+            if let Some(parent) = tip_shown.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&tip_shown, "");
+        }
     }
 
     // Optimize config based on system capabilities
@@ -1458,6 +1621,12 @@ fn run() -> Result<()> {
         .filter(|n| n.level == orbit::core::guidance::NoticeLevel::AutoTune)
         .cloned()
         .collect();
+
+    // If this is an explain command, print the plan and exit
+    if matches!(cli.command, Some(Commands::Explain { .. })) {
+        orbit::commands::explain::explain_transfer(&source, &destination, &config, dest_is_remote);
+        return Ok(());
+    }
 
     // Perform the copy
     let stats = if source_path.is_dir() && config.recursive {
@@ -1479,11 +1648,14 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-/// Handle non-transfer subcommands. Transfer shorthands (sync, backup, mirror)
+/// Handle non-transfer subcommands. Transfer shorthands (cp, sync, backup, mirror, explain)
 /// are handled in run() by falling through to the unified transfer path.
-fn handle_subcommand(command: Commands) -> Result<()> {
+fn handle_subcommand(command: Commands, json_output: bool) -> Result<()> {
     match command {
         Commands::Init => orbit::commands::init::run_init_wizard(),
+        Commands::History { audit_file, limit } => {
+            orbit::commands::history::run_history(audit_file.as_ref(), limit, json_output)
+        }
         Commands::Stats => {
             let stats = TransferStats::default();
             stats.print();
@@ -1561,7 +1733,11 @@ fn handle_subcommand(command: Commands) -> Result<()> {
         Commands::Rb { bucket } => orbit::commands::s3::handle_rb_command(&bucket),
         // Transfer shorthands are handled in run() — this arm is unreachable
         // because run() extracts them before calling handle_subcommand().
-        Commands::Sync { .. } | Commands::Backup { .. } | Commands::MirrorCmd { .. } => {
+        Commands::Cp { .. }
+        | Commands::Sync { .. }
+        | Commands::Backup { .. }
+        | Commands::MirrorCmd { .. }
+        | Commands::Explain { .. } => {
             unreachable!("transfer shorthands handled in run()")
         }
     }
@@ -3437,17 +3613,20 @@ mod tests {
 
     #[test]
     fn test_handle_subcommand_simple_variants_return_ok() {
-        assert!(handle_subcommand(Commands::Stats).is_ok());
-        assert!(handle_subcommand(Commands::Presets).is_ok());
-        assert!(handle_subcommand(Commands::Capabilities).is_ok());
+        assert!(handle_subcommand(Commands::Stats, false).is_ok());
+        assert!(handle_subcommand(Commands::Presets, false).is_ok());
+        assert!(handle_subcommand(Commands::Capabilities, false).is_ok());
     }
 
     #[test]
     #[should_panic(expected = "transfer shorthands handled in run()")]
     fn test_handle_subcommand_shorthand_is_unreachable() {
-        let _ = handle_subcommand(Commands::Sync {
-            source: "/src".to_string(),
-            dest: "/dst".to_string(),
-        });
+        let _ = handle_subcommand(
+            Commands::Sync {
+                source: "/src".to_string(),
+                dest: "/dst".to_string(),
+            },
+            false,
+        );
     }
 }

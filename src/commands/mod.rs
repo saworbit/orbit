@@ -5,6 +5,8 @@
  */
 
 pub mod batch;
+pub mod explain;
+pub mod history;
 pub mod init;
 pub mod manifest;
 #[cfg(feature = "s3-native")]

@@ -31,7 +31,7 @@ orbit init
 orbit doctor
 ```
 
-`orbit init` scans your hardware, asks about your use case, and generates an optimized `~/.orbit/orbit.toml`. All subsequent commands use these settings automatically.
+`orbit init` scans your hardware, asks about your use case, sets up exclusion patterns, offers shell completion installation, and generates an optimized `~/.orbit/orbit.toml`. All subsequent commands use these settings automatically.
 
 ---
 
@@ -44,6 +44,9 @@ orbit input.txt output.txt
 
 ### Copy with Compression
 ```bash
+# Auto-detect best compression for your destination
+orbit large.dat backup.dat --compress auto
+
 # Quick Zstd shorthand (level 3, balanced)
 orbit large.dat backup.dat --zstd
 
@@ -62,6 +65,9 @@ orbit ./source_dir ./backup_dir
 
 ### Shorthand Subcommands
 ```bash
+# Copy (alias for bare orbit — reads naturally in scripts)
+orbit cp /data /backup
+
 # Sync (only copy new/changed files)
 orbit sync /project /backup
 
@@ -76,6 +82,26 @@ All global flags work with shorthands:
 ```bash
 orbit sync /data /backup --quiet --zstd --workers 8
 orbit backup /data s3://bucket/backup --retry-attempts 10
+```
+
+### Preview Before Running (Explain)
+```bash
+# See exactly what Orbit would do, in plain English — no files touched
+orbit explain /data /backup -R --zstd --resume
+```
+
+This shows your transfer plan: mode, compression, checksums, parallelism, filters, and more.
+
+### View Transfer History
+```bash
+# Show recent transfers from the audit log
+orbit history
+
+# Show last 50 entries in JSON format
+orbit history --limit 50 --json
+
+# Use a specific audit log file
+orbit history --audit-file /var/log/orbit/audit.jsonl
 ```
 
 ### Resume Interrupted Transfer
@@ -230,7 +256,22 @@ All commands use these defaults automatically. CLI flags override individual set
 
 ## 📊 Viewing Audit Logs
 
-### JSON Format (Default)
+### Built-in History Viewer (Recommended)
+```bash
+# Human-friendly table of recent transfers
+orbit history
+
+# Last 50 entries
+orbit history --limit 50
+
+# Machine-readable JSON output
+orbit history --json
+
+# Use a specific audit log file
+orbit history --audit-file /var/log/orbit/audit.jsonl
+```
+
+### Manual Inspection (JSON Format)
 ```bash
 # View all logs
 cat orbit_audit.log | jq
@@ -280,7 +321,7 @@ TEST_LOG=llm-debug RUST_LOG=debug \
 | `--source` | `-s` | Source path (or use positional) | `orbit src dst` |
 | `--dest` | `-d` | Destination path (or use positional) | `orbit src dst` |
 | `--recursive` | `-R` | Copy directories (auto-detected) | `-R` |
-| `--compress` | `-c` | Compression type | `--compress zstd:9` |
+| `--compress` | `-c` | Compression (`auto`, `zstd:N`, `lz4`, `none`) | `--compress auto` |
 | `--zstd` | | Shorthand for `--compress zstd:3` | `--zstd` |
 | `--lz4` | | Shorthand for `--compress lz4` | `--lz4` |
 | `--resume` | `-r` | Enable resume | `--resume` |
@@ -307,6 +348,9 @@ TEST_LOG=llm-debug RUST_LOG=debug \
 | `orbit mirror <SRC> <DST>` | Mirror mode (exact replica) | `orbit mirror /data /replica` |
 | `orbit doctor` | Validate config and probe system | `orbit doctor` |
 | `orbit init` | Interactive setup wizard | `orbit init` |
+| `orbit cp <SRC> <DST>` | Copy alias (same as bare `orbit`) | `orbit cp /data /backup` |
+| `orbit explain <SRC> <DST>` | Preview transfer plan (no files touched) | `orbit explain /data /backup -R` |
+| `orbit history` | View recent transfer history | `orbit history --limit 50` |
 | `orbit presets` | Show available profile presets | `orbit presets` |
 | `orbit run` | Batch execution from file | `orbit run --file cmds.txt` |
 
@@ -414,10 +458,11 @@ Before your first real copy:
 
 - [ ] Install: `cargo install --path .`
 - [ ] Test: `orbit --version`
-- [ ] Setup: `orbit init` (interactive wizard)
+- [ ] Setup: `orbit init` (interactive wizard — sets up config, exclusions, and shell completions)
 - [ ] Diagnose: `orbit doctor` (verify config + hardware)
+- [ ] Preview: `orbit explain /test /backup -R` (see what Orbit would do)
 - [ ] Try dry run: `orbit /test /backup --dry-run`
-- [ ] Read help: `orbit --help` (grouped by category)
+- [ ] Read help: `orbit --help` (essential flags) or `orbit --help-all` (every flag)
 - [ ] Run tests: `cargo test`
 
 ---

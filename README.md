@@ -114,7 +114,11 @@ Understanding feature stability helps you make informed decisions about what to 
 | **Metadata Preservation** | 🟡 Beta | Works well, extended attributes are platform-specific |
 | **Config Optimizer** | 🟡 Beta | Config validation with active probing |
 | **Init Wizard** | 🟡 Beta | Interactive setup with `orbit init` (v0.7.0) |
-| **Transfer Shorthands** | 🟡 Beta | `orbit sync`, `orbit backup`, `orbit mirror` with full flag support |
+| **Transfer Shorthands** | 🟡 Beta | `orbit sync`, `orbit backup`, `orbit mirror`, `orbit cp` with full flag support |
+| **`orbit explain`** | 🟡 Beta | Plain-English transfer plan preview before execution |
+| **`orbit history`** | 🟡 Beta | Human-friendly audit log viewer with `--json` output |
+| **Auto-Compression** | 🟡 Beta | `--compress auto` picks Zstd/LZ4/none based on destination |
+| **Smart Error Suggestions** | 🟡 Beta | Fuzzy filename matching, glob detection, path expansion on errors |
 | **Auto-Network Detection** | 🟡 Beta | Automatic resume/compression/retries for remote destinations |
 | **Active Environment Probing** | 🟡 Beta | Auto-tuning based on hardware/destination (v0.7.0) |
 | **Manifest System** | 🟡 Beta | File tracking and verification |
@@ -1315,8 +1319,10 @@ orbit init
 **What it does:**
 1. 🔍 **Scans your system** — Detects CPU cores, RAM, and I/O speed
 2. 💬 **Asks about your use case** — Backup, Sync, Cloud, or Network
-3. ⚙️ **Generates optimal config** — Auto-tuned for your hardware
-4. 💾 **Saves to `~/.orbit/orbit.toml`** — Ready to use immediately
+3. 🚫 **Sets up exclusions** — Picks from common exclusion presets (dev artifacts, temp files, OS junk)
+4. 🐚 **Installs shell completions** — Auto-detects your shell and offers tab-completion setup
+5. ⚙️ **Generates optimal config** — Auto-tuned for your hardware
+6. 💾 **Saves to `~/.orbit/orbit.toml`** — Ready to use immediately
 
 **Example session:**
 ```
@@ -1334,6 +1340,12 @@ Configuration Setup
     Sync (Speed First)
     Cloud Upload (Compression First)
     Network Transfer (Resume + Compression)
+
+? Common exclusion patterns to skip?
+  > All common patterns (recommended)
+
+? Install shell completions? Yes (bash)
+  ✓ Completions written to ~/.bash_completion.d/orbit
 
 ✅ Configuration saved to: /home/user/.orbit/orbit.toml
 ```
@@ -1359,12 +1371,23 @@ orbit source.txt destination.txt
 # Or with named flags
 orbit --source source.txt --dest destination.txt
 
-# ── Shorthand subcommands (NEW) ───────────────────────
+# ── Shorthand subcommands ─────────────────────────────
 # These set mode/profile automatically and support ALL global flags
+orbit cp /data /backup                           # Copy (alias for bare orbit — reads naturally)
 orbit sync /data /backup                         # Sync mode, recursive, metadata preserved
 orbit backup /data /backup                       # Backup profile (checksums + Zstd + resume)
 orbit mirror /data /backup                       # Mirror mode (exact replica)
 orbit sync /data /backup --zstd --workers 8      # Shorthands + global flags work together
+
+# ── Smart compression ────────────────────────────────
+orbit /data /backup --compress auto              # Picks Zstd for remote, LZ4 for cross-device, off for same-device
+
+# ── Understand before you run ─────────────────────────
+orbit explain /data /backup -R --zstd            # Shows what Orbit would do, in plain English
+
+# ── Transfer history ──────────────────────────────────
+orbit history                                    # Show recent transfers from audit log
+orbit history --limit 50 --json                  # Machine-readable, last 50 entries
 
 # ── Profiles ──────────────────────────────────────────
 orbit /data /backup -R --profile backup     # Reliable backup: checksums + compression + resume
@@ -1378,6 +1401,7 @@ orbit /data /backup -R --raw --no-stat      # Raw bytes, no stats summary
 
 # ── Diagnostics ───────────────────────────────────────
 orbit doctor                                # Validate config, probe hardware, check env
+orbit explain /src /dst -R --zstd           # Preview what Orbit would do (no files touched)
 
 # Copy with resume and checksum verification
 orbit --source large-file.iso --dest /backup/large-file.iso --resume

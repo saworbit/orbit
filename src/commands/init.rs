@@ -97,11 +97,94 @@ pub fn run_init_wizard() -> Result<()> {
         apply_profile_optimizations(&mut config, &prof);
     }
 
-    // 5. Security Bootstrap (Control Plane)
+    // 5. Common exclusion patterns
+    println!("\n{}", style("Default Exclusions").cyan().bold());
+    let exclusion_presets = &[
+        "Development (.git, node_modules, target/, __pycache__)",
+        "Temporary files (*.tmp, *.log, *.swp, ~*)",
+        "OS files (.DS_Store, Thumbs.db, desktop.ini)",
+        "All of the above",
+        "None — I'll configure manually",
+    ];
+
+    let excl_selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Auto-exclude common junk files?")
+        .default(3)
+        .items(exclusion_presets)
+        .interact()
+        .map_err(|e| OrbitError::Other(format!("Input error: {}", e)))?;
+
+    match excl_selection {
+        0 => {
+            config.exclude_patterns = vec![
+                ".git/**".to_string(),
+                "node_modules/**".to_string(),
+                "target/**".to_string(),
+                "__pycache__/**".to_string(),
+                ".venv/**".to_string(),
+            ];
+        }
+        1 => {
+            config.exclude_patterns = vec![
+                "*.tmp".to_string(),
+                "*.log".to_string(),
+                "*.swp".to_string(),
+                "~*".to_string(),
+                "*.bak".to_string(),
+            ];
+        }
+        2 => {
+            config.exclude_patterns = vec![
+                ".DS_Store".to_string(),
+                "Thumbs.db".to_string(),
+                "desktop.ini".to_string(),
+                "._*".to_string(),
+            ];
+        }
+        3 => {
+            config.exclude_patterns = vec![
+                ".git/**".to_string(),
+                "node_modules/**".to_string(),
+                "target/**".to_string(),
+                "__pycache__/**".to_string(),
+                ".venv/**".to_string(),
+                "*.tmp".to_string(),
+                "*.log".to_string(),
+                "*.swp".to_string(),
+                "~*".to_string(),
+                ".DS_Store".to_string(),
+                "Thumbs.db".to_string(),
+                "desktop.ini".to_string(),
+            ];
+        }
+        _ => {} // None — leave empty
+    }
+
+    if !config.exclude_patterns.is_empty() {
+        println!(
+            "  {} {} patterns configured",
+            style("✓").green().bold(),
+            config.exclude_patterns.len()
+        );
+    }
+
+    // 6. Shell completions
+    println!("\n{}", style("Shell Completions").cyan().bold());
+    let install_completions = Confirm::with_theme(&ColorfulTheme::default())
+        .with_prompt("Install tab-completion for your shell?")
+        .default(true)
+        .interact()
+        .map_err(|e| OrbitError::Other(format!("Input error: {}", e)))?;
+
+    if install_completions {
+        install_shell_completions();
+    }
+
+    // 7. Security Bootstrap (Control Plane)
     println!("\n{}", style("Security Configuration").cyan().bold());
     let generate_secret = Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Generate secure JWT secret for Web Dashboard?")
-        .default(true)
+        .default(false)
         .interact()
         .map_err(|e| OrbitError::Other(format!("Input error: {}", e)))?;
 
@@ -120,9 +203,14 @@ pub fn run_init_wizard() -> Result<()> {
         );
     }
 
-    // 6. Persistence
+    // 8. Persistence
     let config_dir = config_path.parent().unwrap();
     fs::create_dir_all(config_dir)?;
+
+    // Mark first-run tip as shown since they ran init
+    let tip_path = config_dir.join(".tip-shown");
+    let _ = fs::write(&tip_path, "");
+
     config
         .to_file(&config_path)
         .map_err(|e| OrbitError::Config(format!("Failed to save configuration: {}", e)))?;
@@ -237,6 +325,106 @@ fn apply_profile_optimizations(
         config.chunk_size = 512 * 1024; // 512 KB for low memory
     } else if profile.total_memory_gb >= 8 {
         config.chunk_size = 4 * 1024 * 1024; // 4 MB for high memory
+    }
+}
+
+/// Detect the user's shell and install completions automatically
+fn install_shell_completions() {
+    let shell = std::env::var("SHELL").unwrap_or_default();
+    let shell_name = if shell.contains("zsh") {
+        "zsh"
+    } else if shell.contains("bash") {
+        "bash"
+    } else if shell.contains("fish") {
+        "fish"
+    } else if cfg!(windows) {
+        "powershell"
+    } else {
+        println!(
+            "  {} {}",
+            style("⚠").yellow(),
+            style("Could not detect shell. Run 'orbit completions <shell>' manually.").dim()
+        );
+        return;
+    };
+
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            println!(
+                "  {} {}",
+                style("⚠").yellow(),
+                style("Could not find home directory.").dim()
+            );
+            return;
+        }
+    };
+
+    let (target_path, instruction) = match shell_name {
+        "bash" => {
+            let dir = home.join(".bash_completion.d");
+            let _ = fs::create_dir_all(&dir);
+            (
+                dir.join("orbit"),
+                "Sourced automatically by bash-completion",
+            )
+        }
+        "zsh" => {
+            let dir = home.join(".zsh").join("completions");
+            let _ = fs::create_dir_all(&dir);
+            (
+                dir.join("_orbit"),
+                "Add 'fpath=(~/.zsh/completions $fpath)' to .zshrc if not already set",
+            )
+        }
+        "fish" => {
+            let dir = home.join(".config").join("fish").join("completions");
+            let _ = fs::create_dir_all(&dir);
+            (dir.join("orbit.fish"), "Auto-loaded by fish")
+        }
+        "powershell" => {
+            let dir = home.join("Documents").join("PowerShell");
+            let _ = fs::create_dir_all(&dir);
+            (
+                dir.join("orbit_completions.ps1"),
+                "Add '. ~/Documents/PowerShell/orbit_completions.ps1' to $PROFILE",
+            )
+        }
+        _ => return,
+    };
+
+    // Generate completions by invoking ourselves as a subprocess.
+    // We can't access Cli::command() from the lib crate, so we shell out.
+    match std::process::Command::new("orbit")
+        .args(["completions", shell_name])
+        .output()
+    {
+        Ok(output) if output.status.success() => match fs::write(&target_path, &output.stdout) {
+            Ok(()) => {
+                println!(
+                    "  {} Completions installed to {}",
+                    style("✓").green().bold(),
+                    style(target_path.display()).cyan()
+                );
+                if !instruction.is_empty() {
+                    println!("  {} {}", style("ℹ").blue(), style(instruction).dim());
+                }
+            }
+            Err(e) => {
+                println!(
+                    "  {} Failed to write completions: {}",
+                    style("⚠").yellow(),
+                    e
+                );
+            }
+        },
+        _ => {
+            println!(
+                "  {} Run '{}' to generate completions manually.",
+                style("ℹ").blue(),
+                style(format!("orbit completions {}", shell_name)).cyan()
+            );
+        }
     }
 }
 

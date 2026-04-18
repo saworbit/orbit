@@ -465,7 +465,7 @@ pub fn format_duration(secs: f64) -> String {
 }
 
 /// Print a styled error message with optional suggestion
-pub fn print_error(message: &str, suggestion: Option<&str>) {
+pub fn print_error(message: &str, suggestion: Option<impl AsRef<str>>) {
     eprintln!(
         "\n{} {}",
         Theme::error(format!("{} Error:", Icons::ERROR)),
@@ -476,7 +476,7 @@ pub fn print_error(message: &str, suggestion: Option<&str>) {
         eprintln!(
             "  {} {}",
             Theme::muted(Icons::ARROW_RIGHT),
-            Theme::muted(hint)
+            Theme::muted(hint.as_ref())
         );
     }
     eprintln!();

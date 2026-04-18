@@ -176,49 +176,108 @@ impl OrbitError {
         matches!(self, OrbitError::ZeroCopyUnsupported)
     }
 
-    /// Get a user-friendly suggestion for how to resolve this error
-    pub fn suggestion(&self) -> Option<&str> {
+    /// Get a smart, context-aware suggestion for how to resolve this error.
+    /// For SourceNotFound, attempts fuzzy path matching to suggest corrections.
+    pub fn suggestion(&self) -> Option<String> {
         match self {
-            OrbitError::SourceNotFound(_) => {
-                Some("Check that the path exists and you have read permissions")
-            }
-            OrbitError::InvalidPath(_) => {
-                Some("Verify the path is valid and does not contain unsupported characters")
-            }
-            OrbitError::InsufficientDiskSpace { .. } => {
-                Some("Free up disk space or use --compress zstd:3 to reduce transfer size")
-            }
-            OrbitError::Config(msg) if msg.contains("path required") => {
-                Some("Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>")
-            }
-            OrbitError::Config(_) => {
-                Some("Check your config file or CLI flags. Run 'orbit init' to reconfigure")
-            }
-            OrbitError::Compression(_) | OrbitError::Decompression(_) => {
-                Some("The data may be corrupted. Try --compress none or re-transfer the source")
-            }
-            OrbitError::Resume(_) => Some(
-                "Resume state may be stale. Try without --resume or delete the resume checkpoint",
+            OrbitError::SourceNotFound(path) => Some(Self::smart_source_suggestion(path)),
+            OrbitError::InvalidPath(_) => Some(
+                "Verify the path is valid and does not contain unsupported characters".to_string(),
             ),
-            OrbitError::ChecksumMismatch { .. } => {
-                Some("File integrity check failed. Re-transfer the file or use --no-verify to skip")
+            OrbitError::InsufficientDiskSpace { .. } => Some(
+                "Free up disk space or use --compress zstd:3 to reduce transfer size".to_string(),
+            ),
+            OrbitError::Config(msg) if msg.contains("path required") => {
+                Some("Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>".to_string())
             }
+            OrbitError::Config(_) => Some(
+                "Check your config file or CLI flags. Run 'orbit init' to reconfigure".to_string(),
+            ),
+            OrbitError::Compression(_) | OrbitError::Decompression(_) => Some(
+                "The data may be corrupted. Try --compress none or re-transfer the source"
+                    .to_string(),
+            ),
+            OrbitError::Resume(_) => Some(
+                "Resume state may be stale. Try without --resume or delete the resume checkpoint"
+                    .to_string(),
+            ),
+            OrbitError::ChecksumMismatch { .. } => Some(
+                "File integrity check failed. Re-transfer the file or use --no-verify to skip"
+                    .to_string(),
+            ),
             OrbitError::RetriesExhausted { .. } => {
-                Some("Increase --retry-attempts or check network/disk health")
+                Some("Increase --retry-attempts or check network/disk health".to_string())
             }
             OrbitError::ZeroCopyUnsupported => {
-                Some("Use --no-zero-copy to fall back to buffered transfer")
+                Some("Use --no-zero-copy to fall back to buffered transfer".to_string())
             }
             OrbitError::Protocol(_) => {
-                Some("Check network connectivity and endpoint configuration")
+                Some("Check network connectivity and endpoint configuration".to_string())
             }
             OrbitError::Authentication(_) => {
-                Some("Check your credentials or run 'orbit init' to reconfigure")
+                Some("Check your credentials or run 'orbit init' to reconfigure".to_string())
             }
-            OrbitError::MetadataFailed(_) => {
-                Some("Use --no-preserve-metadata or check destination filesystem permissions")
-            }
+            OrbitError::MetadataFailed(_) => Some(
+                "Use --no-preserve-metadata or check destination filesystem permissions"
+                    .to_string(),
+            ),
             _ => None,
+        }
+    }
+
+    /// Generate a smart suggestion for SourceNotFound errors.
+    /// Checks for common mistakes: wrong directory, similar filenames, relative paths.
+    fn smart_source_suggestion(path: &PathBuf) -> String {
+        let mut suggestions = Vec::new();
+
+        // Check if it's a relative path that might need a different working directory
+        if path.is_relative() {
+            if let Ok(cwd) = std::env::current_dir() {
+                let absolute = cwd.join(path);
+                suggestions.push(format!("Looked for: {}", absolute.display()));
+            }
+        }
+
+        // Check parent directory for similar filenames (Levenshtein-like)
+        let parent = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        if let Some(filename) = path.file_name().and_then(|f| f.to_str()) {
+            if let Ok(entries) = std::fs::read_dir(parent) {
+                let mut candidates: Vec<(usize, String)> = entries
+                    .filter_map(|e| e.ok())
+                    .filter_map(|e| {
+                        let name = e.file_name().to_string_lossy().to_string();
+                        let dist = simple_distance(filename, &name);
+                        // Only suggest if close enough (distance < half the name length)
+                        if dist > 0 && dist <= (filename.len() / 2).max(2) {
+                            Some((dist, name))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                candidates.sort_by_key(|(dist, _)| *dist);
+
+                if let Some((_, best_match)) = candidates.first() {
+                    let suggested_path = parent.join(best_match);
+                    suggestions.push(format!("Did you mean '{}'?", suggested_path.display()));
+                }
+            }
+        }
+
+        // Check if it looks like a glob pattern
+        let path_str = path.to_string_lossy();
+        if path_str.contains('*') || path_str.contains('?') || path_str.contains('[') {
+            suggestions.push(
+                "This looks like a glob pattern — use --include with the pattern instead"
+                    .to_string(),
+            );
+        }
+
+        if suggestions.is_empty() {
+            "Check that the path exists and you have read permissions".to_string()
+        } else {
+            suggestions.join(". ")
         }
     }
 
@@ -303,6 +362,29 @@ impl fmt::Display for ErrorCategory {
             ErrorCategory::Unknown => write!(f, "unknown"),
         }
     }
+}
+
+/// Simple edit distance (Levenshtein) for fuzzy filename matching.
+/// Kept intentionally simple — no allocation beyond the 2-row DP table.
+fn simple_distance(a: &str, b: &str) -> usize {
+    let a = a.as_bytes();
+    let b = b.as_bytes();
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut curr = vec![0usize; b.len() + 1];
+
+    for i in 1..=a.len() {
+        curr[0] = i;
+        for j in 1..=b.len() {
+            let cost = if a[i - 1].eq_ignore_ascii_case(&b[j - 1]) {
+                0
+            } else {
+                1
+            };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b.len()]
 }
 
 impl fmt::Display for OrbitError {
