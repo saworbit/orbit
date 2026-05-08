@@ -30,8 +30,22 @@ use async_trait::async_trait;
 use std::path::Path;
 use std::pin::Pin;
 use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite};
-use anyhow::Result;
+use thiserror::Error;
 use std::time::SystemTime;
+
+#[derive(Error, Debug)]
+pub enum OrbitSystemError {
+    #[error("File not found: {0}")]
+    NotFound(std::path::PathBuf),
+    #[error("Permission denied: {0}")]
+    PermissionDenied(std::path::PathBuf),
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("System error: {0}")]
+    System(String),
+}
+
+pub type Result<T> = std::result::Result<T, OrbitSystemError>;
 
 /// Metadata for a file in the Orbit System
 #[derive(Debug, Clone)]

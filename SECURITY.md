@@ -295,11 +295,53 @@ We appreciate security researchers who help make Orbit safer:
 
 ---
 
+## Supply Chain Security
+
+### Software Bill of Materials (SBOM)
+
+Generate an SBOM for Orbit at any time:
+
+```bash
+# Using cargo-sbom (install: cargo install cargo-sbom)
+cargo sbom --output-format spdx_json_2_3 > orbit-sbom.spdx.json
+
+# Or using cargo-cyclonedx
+cargo cyclonedx --format json > orbit-bom.json
+```
+
+### Dependency Auditing
+
+Orbit uses multiple layers of dependency security:
+
+- **`deny.toml`**: Configured with `cargo-deny` to check licenses, advisories, and duplicate crates
+- **`cargo audit`**: Run in CI to catch known vulnerabilities
+- **Dependabot**: Weekly automated dependency update PRs
+- **Minimal defaults**: The default build pulls in only essential dependencies
+
+```bash
+# Run a full dependency audit locally
+cargo deny check
+cargo audit
+
+# Review dependency tree
+cargo tree --depth 2
+```
+
+### FIPS Considerations
+
+Orbit uses BLAKE3 and SHA-256 for checksums. For environments requiring FIPS 140-2 compliance:
+- SHA-256 is FIPS-approved; use `--checksum sha256` for FIPS-compliant checksums
+- BLAKE3 is not FIPS-approved but is the default for performance
+- Future releases may add a `fips` feature flag for FIPS-only crypto
+
+---
+
 ## Compliance & Certifications
 
 **Current Status:**
 - No formal certifications yet
 - Suitable for internal use and non-regulated data
+- SBOM generation supported (see above)
 - **Not yet certified for:**
   - HIPAA (healthcare data)
   - PCI-DSS (payment card data)
@@ -309,6 +351,7 @@ We appreciate security researchers who help make Orbit safer:
 - SOC 2 Type II preparation
 - Security audit by third-party firm
 - Penetration testing
+- Formal SBOM publishing with releases
 
 ---
 
@@ -360,5 +403,4 @@ We commit to:
 
 ---
 
-**Thank you for helping keep Orbit secure!** 🔒
-secure!** 🔒
+**Thank you for helping keep Orbit secure!**

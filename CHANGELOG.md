@@ -78,6 +78,10 @@ All notable changes to Orbit will be documented in this file.
 
 #### Error Handling
 - **Removed `anyhow` dependency**: All error handling now uses `thiserror`-based `OrbitError` types. The `orbit init` wizard previously used `anyhow::Result`; it now returns `crate::error::Result<()>` with properly typed errors
+- **Removed `anyhow` from `orbit-core-interface` and `orbit-core-semantic`**: The two remaining workspace crates that still depended on `anyhow` have been migrated to their own `thiserror`-based error types. `SemanticRegistry::determine_intent_async` now returns `orbit_core_semantic::Result<ReplicationIntent>`, with a new `SemanticError::ReadHeader` variant wrapping `OrbitSystemError` via `#[source]`. Doctests in `orbit-core-interface` updated to import the crate's own `Result` alias
+
+#### Workspace Cargo Hygiene
+- **`[workspace.dependencies]` inheritance**: Shared dependency versions (serde, serde_json, thiserror, tokio, async-trait, chrono, blake3, hex, bincode, rand, tracing stack, OpenTelemetry stack, tempfile, criterion) are now declared once at the workspace root and inherited by all 7 member crates via `{ workspace = true }`. Per-crate feature additions still work via `features = [...]`. Future version bumps now happen in one place instead of eight Cargo.toml files
 
 #### Documentation
 - Marked incomplete features with TODO annotations: manifest diff (alpha stub), Windows file attribute preservation, ACL preservation

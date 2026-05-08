@@ -3,7 +3,7 @@
 > A high-performance file transfer and data management system designed for reliability and scalability.
 
 **Version:** 0.6.0
-**Status:** Production-ready core
+**Status:** Alpha -- stable core with experimental advanced features
 
 ---
 
@@ -242,63 +242,60 @@ Source Files                              Destination
 
 ## Feature Matrix
 
-### Transfer Capabilities
+### Stable Core (Production-Ready)
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Buffered Copy** | ✅ Stable | Safe, cross-platform default |
-| **Zero-Copy** | ✅ Stable | Platform syscalls: copy_file_range, fcopyfile, CopyFileEx |
-| **Streaming** | ✅ Stable | Low memory for large files |
-| **Parallel Files** | ✅ Stable | Concurrent file transfers |
-| **Resume** | ✅ Stable | Checkpoint-based recovery |
-| **Bandwidth Limit** | ✅ Stable | Token bucket rate limiting |
+These features form the reliable foundation of Orbit. They are well-tested and safe for production use.
 
-### Compression & Verification
+| Feature | Description |
+|---------|-------------|
+| **Buffered Copy** | Safe, cross-platform default transfer mode |
+| **Zero-Copy** | Platform syscalls: copy_file_range, fcopyfile, CopyFileEx |
+| **Streaming** | Low-memory mode for large files |
+| **Parallel Files** | Concurrent file transfers via rayon |
+| **Resume** | Checkpoint-based recovery with chunk verification |
+| **Bandwidth Limit** | Token bucket rate limiting |
+| **LZ4 / Zstd** | Fast and balanced compression options |
+| **SHA-256 / BLAKE3** | Cryptographic checksum verification |
+| **OrbitSystem Trait** | Unified I/O abstraction for local/remote |
+| **Local Filesystem** | Primary use case, thoroughly tested |
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **LZ4** | ✅ Stable | Fast compression, lower ratio |
-| **Zstd** | ✅ Stable | Balanced speed/ratio, tunable level |
-| **SHA-256** | ✅ Stable | Standard cryptographic checksum |
-| **BLAKE3** | ✅ Stable | Modern, parallelizable, streaming |
+### Beta (Functional, Needs Real-World Validation)
 
-### Storage Backends
+These features work well but need broader real-world testing before being considered stable.
 
-| Backend | Status | Notes |
-|---------|--------|-------|
-| **Local Filesystem** | ✅ Stable | Primary use case |
-| **SSH/SFTP** | 🟡 Beta | Functional via ssh2 crate |
-| **S3** | 🟡 Beta | Multipart upload support |
-| **Azure Blob** | 🟡 Beta | Via object_store crate |
-| **GCS** | 🟡 Beta | Via object_store crate |
-| **SMB2/3** | 🟡 Beta | Native pure-Rust implementation |
+| Feature | Notes |
+|---------|-------|
+| **SSH/SFTP Backend** | Functional via ssh2 crate |
+| **S3 Backend** | Multipart upload, presign, wildcard listing |
+| **Azure Blob Backend** | Via object_store crate (v0.6.0) |
+| **GCS Backend** | Via object_store crate (v0.6.0) |
+| **SMB2/3 Backend** | Native pure-Rust (v0.11.0 upgrade) |
+| **Delta Detection (V1)** | rsync-style block-based diffing |
+| **Disk Guardian** | Pre-flight space/permission/path checks |
+| **Config Optimizer** | Config validation with active hardware probing |
+| **Init Wizard** | Interactive setup (`orbit init`) |
+| **Filter System** | Glob/regex include/exclude patterns |
+| **Metadata Preservation** | Permissions, timestamps, xattrs (platform-specific) |
+| **Manifest System** | File tracking and verification |
+| **Audit Logging** | JSONL telemetry with HMAC chaining |
+| **Global Dedup (V3)** | Universe index, O(log N) inserts, O(1) memory |
 
-### V2 Content-Aware Features
+### Alpha / Experimental (Expect Changes)
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Content-Defined Chunking** | 🟡 Beta | Gear Hash, 99.1% shift resilience |
-| **Semantic Prioritization** | 🟡 Beta | Critical → High → Normal → Low |
-| **Universe V3 Dedup** | 🟡 Beta | O(log N) inserts, O(1) memory |
-| **Global Deduplication** | 🟡 Beta | Across all files and backups |
+These features are under active development. They are feature-gated and should not be relied upon for production workloads. Expect API changes.
 
-### Additional Capabilities
+| Feature | Description |
+|---------|-------------|
+| **V2 CDC Engine** | Content-defined chunking with Gear Hash |
+| **Semantic Replication** | Priority-based file classification and ordering |
+| **Container Packing** | Chunk packing into .orbitpak files |
+| **Typed Provenance** | Structured event taxonomy (20 event types) |
+| **Composable Prioritizers** | Chainable sort criteria (semantic, size, age, retry) |
+| **Backpressure / Dead-Letter** | Flow control and quarantine for failed items |
+| **Link-Dest++** | Chunk-level incremental backup hardlinking |
+| **Transfer Journal** | Content-addressed batch operation journal |
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **OrbitSystem Trait** | ✅ Stable | Unified I/O abstraction |
-| **Init Wizard** | ✅ Stable | Interactive configuration setup |
-| **Active Probing** | ✅ Stable | Auto-detection of hardware/destination |
-| **Filter System** | ✅ Stable | Glob/regex include/exclude |
-| **Metadata Preservation** | ✅ Stable | Permissions, timestamps, xattrs |
-
-### Data Flow Patterns
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Container Packing** | 🔴 Alpha | Chunk packing into .orbitpak files, pool rotation |
-| **Typed Provenance** | 🔴 Alpha | Structured event taxonomy (20 event types) |
-| **Composable Prioritizers** | 🔴 Alpha | Chainable sort criteria (semantic, size, age, retry) |
+> **Guidance:** Use stable core features for production. Beta features are safe for non-critical use with testing. Alpha features are preview-only -- enable with `--smart` or explicit flags.
 
 ---
 
@@ -371,9 +368,11 @@ orbit = { version = "0.6", features = [
 ] }
 ```
 
-> **Note:** The default build includes only `zero-copy`. Tokio is not included by
-> default — it is pulled in automatically by network backend features (`s3-native`,
-> `ssh-backend`, `azure-native`, `gcs-native`, `smb-native`).
+> **Note:** The default build includes only `zero-copy`. The root binary's heavy
+> Tokio runtime features (multi-thread, networking, timers) are gated behind
+> network backend features (`s3-native`, `ssh-backend`, `azure-native`,
+> `gcs-native`, `smb-native`). A minimal `tokio` is still pulled in transitively
+> via the `orbit-core-interface` and `orbit-observability` workspace crates.
 
 ---
 
@@ -472,25 +471,58 @@ Event N+1 (prev_hmac: def456, HMAC: ...)
 
 ## Roadmap
 
-### Current (v0.6.x)
+### Phase 1: Stabilize & Simplify (Current)
 
-- ✅ Core transfer engine (buffered, zero-copy, streaming)
-- ✅ All backends (local, S3, Azure, GCS, SMB, SSH)
-- ✅ CDC + Semantic + Universe V3
-- ✅ Container packing, composable prioritizers, typed provenance
+Focus: Make the core rock-solid and the project approachable.
 
-### Near-term (v0.7.x)
+- Stabilize core local + S3/SSH transfers with 80%+ test coverage on core paths
+- Feature-gate experimental V2/V3 features behind `--smart` / alpha flags
+- Continue workspace refactoring: push logic from `src/` into dedicated crates
+- Expand integration tests (MinIO for S3, container-based SSH/SMB)
+- ✅ Workspace dependency inheritance in root Cargo.toml
 
-- ✅ Enhanced init wizard with active probing
-- ✅ Configuration file support (TOML)
-- ✅ Improved error messages with actionable suggestions
-- ✅ CLI simplification: positional args, `--profile` presets
-- ✅ Hardware probe caching and auto-tune summary display
-- ✅ Removed `anyhow` dependency (unified on `thiserror`/`OrbitError`)
+### Phase 2: Polish & Differentiate
 
-### Future (v1.0+)
+Focus: Performance proof-points and user experience.
 
+- Performance tuning with realistic benchmarks vs rsync/rclone
+- Stabilize one advanced feature (CDC resume + basic dedup)
+- Explore `io_uring` on Linux for async I/O
+- Enhanced UX: init wizard evolution, progress, telemetry
+- Profile-guided optimization (PGO) investigation
+- Grow documentation and examples
+
+### Phase 3: Expand & Community
+
+Focus: Ecosystem and production readiness.
+
+- Full backend parity (streaming Backend trait for all protocols)
+- Publish reusable crates (`orbit-core-cdc`, `orbit-core-interface`) to crates.io
+- Plugin framework exploration
 - Encryption at rest
+- `--watch` mode / daemon capabilities
+- WebDAV protocol support
+- v1.0 when core + 1-2 advanced features are production-grade
+
+### Completed Milestones
+
+- Core transfer engine (buffered, zero-copy, streaming)
+- All backends (local, S3, Azure, GCS, SMB, SSH)
+- CDC + Semantic + Universe V3 (alpha)
+- Enhanced init wizard with active probing
+- Configuration file support (TOML)
+- CLI simplification: positional args, `--profile` presets
+- Hardware probe caching and auto-tune summary
+- Removed `anyhow` from all first-party crates (unified on `thiserror`/`OrbitError`); transitive presence via third-party deps (`jsonschema`, `opentelemetry-otlp`) remains
+- UX overhaul: shorthands, `orbit doctor`, output control
+- Workspace dependency inheritance (single source of truth for shared deps)
+
+### Risks to Watch
+
+- **Scope creep**: New alpha features before core is solid
+- **Dependency bloat**: Large transitive deps from Tokio/aws-sdk
+- **Platform parity gaps**: Windows/macOS metadata and zero-copy edge cases
+- **Dedup at scale**: V2/V3 CDC not yet battle-tested with large real-world datasets
 
 ---
 

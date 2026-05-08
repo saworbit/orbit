@@ -50,6 +50,13 @@ pub enum SemanticError {
 
     #[error("Invalid file type: {0}")]
     InvalidType(String),
+
+    #[error("Failed to read file header for {path}: {source}")]
+    ReadHeader {
+        path: String,
+        #[source]
+        source: orbit_core_interface::OrbitSystemError,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, SemanticError>;
@@ -347,11 +354,11 @@ impl SemanticRegistry {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use orbit_core_semantic::SemanticRegistry;
+    /// use orbit_core_semantic::{SemanticRegistry, Result};
     /// use orbit_core_interface::OrbitSystem;
     /// use std::path::Path;
     ///
-    /// async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    /// async fn example<S: OrbitSystem>(system: &S) -> Result<()> {
     ///     let registry = SemanticRegistry::default();
     ///     let intent = registry.determine_intent_async(system, Path::new("/data/config.toml")).await?;
     ///     println!("Priority: {:?}", intent.priority);
@@ -362,12 +369,17 @@ impl SemanticRegistry {
         &self,
         system: &S,
         path: &Path,
-    ) -> anyhow::Result<ReplicationIntent> {
+    ) -> Result<ReplicationIntent> {
         // Read first 512 bytes for magic number detection and file type analysis
         // This is typically enough for most file format detection
-        let head_bytes = system.read_header(path, 512).await.map_err(|e| {
-            anyhow::anyhow!("Failed to read file header for {}: {}", path.display(), e)
-        })?;
+        let head_bytes =
+            system
+                .read_header(path, 512)
+                .await
+                .map_err(|source| SemanticError::ReadHeader {
+                    path: path.display().to_string(),
+                    source,
+                })?;
 
         // Use the synchronous version with the fetched header
         Ok(self.determine_intent(path, &head_bytes))

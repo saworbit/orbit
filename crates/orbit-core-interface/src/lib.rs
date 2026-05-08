@@ -14,10 +14,10 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use orbit_core_interface::{OrbitSystem, FileMetadata};
+//! use orbit_core_interface::{OrbitSystem, FileMetadata, Result};
 //! use std::path::Path;
 //!
-//! async fn analyze_file<S: OrbitSystem>(system: &S, path: &Path) -> anyhow::Result<()> {
+//! async fn analyze_file<S: OrbitSystem>(system: &S, path: &Path) -> Result<()> {
 //!     // Check if file exists
 //!     if !system.exists(path).await {
 //!         return Ok(());
@@ -166,9 +166,9 @@ pub trait OrbitSystem: Send + Sync + 'static {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use orbit_core_interface::OrbitSystem;
+    /// # use orbit_core_interface::{OrbitSystem, Result};
     /// # use std::path::Path;
-    /// # async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    /// # async fn example<S: OrbitSystem>(system: &S) -> Result<()> {
     /// let entries = system.read_dir(Path::new("/data")).await?;
     /// for entry in entries {
     ///     println!("{}: {} bytes", entry.path.display(), entry.len);
@@ -190,10 +190,10 @@ pub trait OrbitSystem: Send + Sync + 'static {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use orbit_core_interface::OrbitSystem;
+    /// # use orbit_core_interface::{OrbitSystem, Result};
     /// # use std::path::Path;
     /// # use tokio::io::AsyncReadExt;
-    /// # async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    /// # async fn example<S: OrbitSystem>(system: &S) -> Result<()> {
     /// let mut reader = system.reader(Path::new("/data/large.bin")).await?;
     /// let mut buffer = vec![0u8; 4096];
     /// let n = reader.read(&mut buffer).await?;
@@ -210,10 +210,10 @@ pub trait OrbitSystem: Send + Sync + 'static {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use orbit_core_interface::OrbitSystem;
+    /// # use orbit_core_interface::{OrbitSystem, Result};
     /// # use std::path::Path;
     /// # use tokio::io::AsyncWriteExt;
-    /// # async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    /// # async fn example<S: OrbitSystem>(system: &S) -> Result<()> {
     /// let mut writer = system.writer(Path::new("/data/output.bin")).await?;
     /// writer.write_all(b"Hello, Orbit!").await?;
     /// # Ok(())
@@ -247,9 +247,9 @@ pub trait OrbitSystem: Send + Sync + 'static {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use orbit_core_interface::OrbitSystem;
+    /// # use orbit_core_interface::{OrbitSystem, Result};
     /// # use std::path::Path;
-    /// # async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    /// # async fn example<S: OrbitSystem>(system: &S) -> Result<()> {
     /// // Read first 512 bytes for magic number detection
     /// let header = system.read_header(Path::new("/data/file.bin"), 512).await?;
     ///
@@ -285,9 +285,9 @@ pub trait OrbitSystem: Send + Sync + 'static {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use orbit_core_interface::OrbitSystem;
+    /// # use orbit_core_interface::{OrbitSystem, Result};
     /// # use std::path::Path;
-    /// # async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    /// # async fn example<S: OrbitSystem>(system: &S) -> Result<()> {
     /// // Hash first 1MB chunk
     /// let hash1 = system.calculate_hash(Path::new("/data/large.bin"), 0, 1024*1024).await?;
     ///

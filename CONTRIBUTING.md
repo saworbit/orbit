@@ -65,10 +65,10 @@ Orbit uses the **OrbitSystem trait** to abstract filesystem and compute operatio
 When adding new features that need filesystem access, use the `OrbitSystem` trait:
 
 ```rust
-use orbit_core_interface::OrbitSystem;
+use orbit_core_interface::{OrbitSystem, Result};
 use std::path::Path;
 
-async fn process_file<S: OrbitSystem>(system: &S, path: &Path) -> anyhow::Result<()> {
+async fn process_file<S: OrbitSystem>(system: &S, path: &Path) -> Result<()> {
     // Check if file exists
     if !system.exists(path).await {
         return Ok(());
@@ -81,6 +81,8 @@ async fn process_file<S: OrbitSystem>(system: &S, path: &Path) -> anyhow::Result
     Ok(())
 }
 ```
+
+> The `Result` type alias is `std::result::Result<T, OrbitSystemError>`. Orbit's first-party crates use `thiserror`-based error types throughout — avoid pulling `anyhow` into new code.
 
 #### Testing with MockSystem
 
@@ -132,22 +134,94 @@ cargo test --features network
 
 ---
 
+## 🏷️ Issue & PR Maturity Labels
+
+We use maturity labels to track the stability of features and focus effort where it matters most:
+
+| Label | Meaning | Contribution Focus |
+|-------|---------|-------------------|
+| `maturity:stable` | Production-ready, well-tested | Bug fixes, performance improvements |
+| `maturity:beta` | Functional, needs validation | Integration tests, edge-case testing, real-world reports |
+| `maturity:alpha` | Experimental, expect changes | Design feedback, API review (avoid large builds on top) |
+| `good-first-issue` | Approachable for new contributors | Great starting point |
+| `stabilize` | Promote a beta feature toward stable | Tests, docs, edge-case fixes needed |
+
+When opening a PR, tag it with the appropriate maturity label if it touches a specific feature area.
+
+---
+
+## 🎯 Stabilization Contributions
+
+The highest-leverage contributions right now are helping **promote beta features to stable**. To stabilize a feature:
+
+1. **Add integration tests** covering the happy path and key edge cases
+2. **Test on your platform** (Linux, macOS, Windows) and report results
+3. **Document gaps** you find -- missing error handling, unclear behavior, platform-specific issues
+4. **Write or improve guides** in `docs/guides/` for the feature
+
+Priority stabilization targets:
+- Resume/checkpoint edge cases (partial failures, concurrent access)
+- S3 backend (multipart uploads, large file handling, credential chains)
+- SSH/SFTP backend (connection handling, key formats, resume)
+- Disk Guardian (edge cases: symlinks, mount points, quotas)
+- Filter system (complex glob/regex interactions)
+
+---
+
+## 🔬 Testing Guidelines
+
+### Running Tests
+
+```bash
+# Full workspace test suite
+cargo test --workspace
+
+# With network backends
+cargo test --features network
+
+# Specific crate
+cargo test -p orbit-core-cdc
+```
+
+### Writing Tests
+
+- **Integration tests** are more valuable than unit tests for transfer logic
+- Use `MockSystem` (from `orbit-core-interface`) for tests that don’t need real I/O
+- For S3 tests, use MinIO or LocalStack containers when possible
+- Property-based tests (via `proptest`) are welcome for CDC and checksum logic
+- Always test resume scenarios: interrupt mid-transfer, verify recovery
+
+---
+
 ## 🚦 Feature Ideas
 
 We welcome contributions such as:
 
-- New protocol handlers (e.g. SFTP, SMB)
-- Optimisation improvements (e.g. multithreading, caching)
-- UX enhancements (e.g. better CLI output)
-- Reliability features (e.g. smarter retry/backoff)
-- Docs and examples
+- Stabilization of beta features (see above)
+- Integration tests for real backends (MinIO, SSH containers)
+- Performance benchmarks against rsync/rclone
+- UX enhancements (better CLI output, error messages)
+- Platform-specific testing and fixes
+- Documentation improvements
+
+---
+
+## 📋 Scope Review
+
+Before adding new features, consider:
+
+- **Does this stabilize existing functionality?** Preferred over new features.
+- **Can this be feature-gated?** New experimental features should use Cargo feature flags.
+- **Does this increase the default binary size?** Keep the minimal build small.
+- **Is there a simpler approach?** Three clear lines beat a clever abstraction.
 
 ---
 
 ## 💬 Communication
 
 - Open an Issue for bugs, feature requests, or design discussions
-- For now, we're using GitHub Issues + Discussions. A Discord or Matrix space may follow if interest grows.
+- Tag issues with maturity labels and platform labels (`os:linux`, `os:macos`, `os:windows`)
+- For now, we’re using GitHub Issues + Discussions. A Discord or Matrix space may follow if interest grows.
 
 ---
 
