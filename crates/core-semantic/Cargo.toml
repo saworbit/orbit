@@ -16,3 +16,4 @@ orbit-core-interface = { path = "../orbit-core-interface" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "rt"] }
