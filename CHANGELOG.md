@@ -76,15 +76,31 @@ All notable changes to Orbit will be documented in this file.
 - **Metadata module consolidation**: Merged `src/core/metadata.rs` into `src/core/metadata_ops.rs`, eliminating a redundant module
 - **Default features simplified**: Removed `orbit-system` (Tokio) from default features. Tokio is now only pulled in by network backend features (`s3-native`, `ssh-backend`, `azure-native`, `gcs-native`, `smb-native`), reducing default binary size and compile times
 
-#### Error Handling
-- **Removed `anyhow` dependency**: All error handling now uses `thiserror`-based `OrbitError` types. The `orbit init` wizard previously used `anyhow::Result`; it now returns `crate::error::Result<()>` with properly typed errors
-- **Removed `anyhow` from `orbit-core-interface` and `orbit-core-semantic`**: The two remaining workspace crates that still depended on `anyhow` have been migrated to their own `thiserror`-based error types. `SemanticRegistry::determine_intent_async` now returns `orbit_core_semantic::Result<ReplicationIntent>`, with a new `SemanticError::ReadHeader` variant wrapping `OrbitSystemError` via `#[source]`. Doctests in `orbit-core-interface` updated to import the crate's own `Result` alias
+#### Error Handling — `anyhow` fully removed from first-party crates
 
-#### Workspace Cargo Hygiene
-- **`[workspace.dependencies]` inheritance**: Shared dependency versions (serde, serde_json, thiserror, tokio, async-trait, chrono, blake3, hex, bincode, rand, tracing stack, OpenTelemetry stack, tempfile, criterion) are now declared once at the workspace root and inherited by all 7 member crates via `{ workspace = true }`. Per-crate feature additions still work via `features = [...]`. Future version bumps now happen in one place instead of eight Cargo.toml files
+All Orbit-authored crates now use `thiserror`-based error types. `anyhow` is no longer a direct dependency anywhere in the workspace; remaining occurrences in the lock file are transitive (via `jsonschema`, `opentelemetry-otlp`).
+
+- **Root crate**: `orbit init` wizard migrated from `anyhow::Result` to `crate::error::Result<()>` with typed `OrbitError` variants
+- **`orbit-core-interface`**: doc-comment-only `anyhow::Result` references replaced with the crate's own `Result` alias (`std::result::Result<T, OrbitSystemError>`); doctest imports updated accordingly
+- **`orbit-core-semantic`**: new `SemanticError::ReadHeader { path, #[source] source: OrbitSystemError }` variant replaces the single `anyhow!` call site in `determine_intent_async`, which now returns `orbit_core_semantic::Result<ReplicationIntent>`
+
+#### Workspace Cargo hygiene — `[workspace.dependencies]` inheritance
+
+Shared dependency versions are now declared once at the workspace root and inherited by all 7 member crates via `{ workspace = true }`. Per-crate feature additions still compose via `features = [...]`.
+
+- **Centralized**: serde, serde_json, thiserror, tokio, async-trait, chrono, blake3, hex, bincode, rand
+- **Centralized (tracing/OTel stack)**: tracing, tracing-subscriber, tracing-opentelemetry, opentelemetry, opentelemetry-otlp, opentelemetry_sdk
+- **Centralized (dev-deps)**: tempfile, criterion
+- **Impact**: Future version bumps happen in one Cargo.toml instead of eight; no functional changes (`cargo check --workspace --all-targets` clean for default and `--features network`)
 
 #### Documentation
 - Marked incomplete features with TODO annotations: manifest diff (alpha stub), Windows file attribute preservation, ACL preservation
+- **README restructured**: 2092 → 466 lines; detailed feature walkthroughs moved to `docs/`; added "Why Orbit vs rsync/rclone" comparison table and three-phase roadmap
+- **Created `docs/GETTING_STARTED.md`**: focused install + first-transfer guide extracted from the README
+- **`ARCHITECTURE.md`**: status updated to "Alpha — stable core with experimental advanced features"; feature matrix reorganized into Stable Core / Beta / Alpha tiers; flat roadmap replaced with three phases (Stabilize, Polish, Expand) plus Risks-to-Watch section
+- **`CONTRIBUTING.md`**: added maturity-label scheme (`maturity:stable/beta/alpha`, `stabilize`, `good-first-issue`), prioritized stabilization-target list, testing guidelines, and scope-review checklist; updated `OrbitSystem` code example to use `thiserror`-based `Result` instead of `anyhow::Result`
+- **`SECURITY.md`**: added Supply Chain Security section covering SBOM generation (`cargo-sbom`, `cargo-cyclonedx`), `cargo-deny` / `cargo audit` workflow, and FIPS guidance (use `--checksum sha256` for FIPS-approved checksums)
+- **`docs/specs/PHASE_1_ABSTRACTION_SPEC.md`**: spec's reference implementation updated to match shipped code (`thiserror` + `OrbitSystemError` enum + local `Result<T>` alias) instead of the original `anyhow::Result`
 
 ### Removed — Simplification Pass
 
