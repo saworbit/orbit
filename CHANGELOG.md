@@ -73,6 +73,11 @@ All notable changes to Orbit will be documented in this file.
   - `src/commands/s3.rs` — 10 S3 command handlers (`cat`, `pipe`, `presign`, `ls`, `head`, `du`, `rm`, `mv`, `mb`, `rb`) plus helper functions
   - `src/commands/manifest.rs` — `ManifestCommands` enum and handlers (`plan`, `verify`, `diff`, `info`)
   - `src/commands/batch.rs` — Batch execution (`run`, `split_command_line`, `normalize_batch_args`)
+- **Cli struct split into grouped `Args` sub-structs**: The monolithic `Cli` struct (~520 lines, 70+ fields) was decomposed into 9 `#[derive(Args)]` sub-structs flattened via `#[command(flatten)]`:
+  - `TransferArgs`, `ReliabilityArgs`, `PerformanceArgs`, `FilteringArgs`, `ConditionalCopyArgs`, `OutputArgs`, `ObservabilityArgs`, `S3Args`, `AdvancedArgs`
+  - The top-level `Cli` is now ~30 lines and only holds the flattened groups plus the `command` subcommand
+  - Every flag, attribute (`global`, `hide`, `conflicts_with`, `requires`, aliases), and `help_heading` is preserved — the user-facing CLI surface is unchanged
+  - Trade-off: field access in code moves from `cli.workers` to `cli.performance.workers`, but each derive target is smaller and the help is grouped at the source instead of via shared `help_heading` strings
 - **Metadata module consolidation**: Merged `src/core/metadata.rs` into `src/core/metadata_ops.rs`, eliminating a redundant module
 - **Default features simplified**: Removed `orbit-system` (Tokio) from default features. Tokio is now only pulled in by network backend features (`s3-native`, `ssh-backend`, `azure-native`, `gcs-native`, `smb-native`), reducing default binary size and compile times
 

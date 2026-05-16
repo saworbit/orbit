@@ -1,6 +1,6 @@
 /*! Orbit CLI */
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use orbit::{
     cli_style::{
         self, capability_table, format_bytes, format_duration, guidance_box, header_box,
@@ -45,7 +45,39 @@ use std::path::PathBuf;
     Use 'orbit explain <SRC> <DEST> [flags]' to preview what any command will do."
 )]
 struct Cli {
-    // ── Transfer ────────────────────────────────────────────────────
+    #[command(flatten)]
+    transfer: TransferArgs,
+
+    #[command(flatten)]
+    reliability: ReliabilityArgs,
+
+    #[command(flatten)]
+    performance: PerformanceArgs,
+
+    #[command(flatten)]
+    filtering: FilteringArgs,
+
+    #[command(flatten)]
+    conditional: ConditionalCopyArgs,
+
+    #[command(flatten)]
+    output: OutputArgs,
+
+    #[command(flatten)]
+    observability: ObservabilityArgs,
+
+    #[command(flatten)]
+    s3: S3Args,
+
+    #[command(flatten)]
+    advanced: AdvancedArgs,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Args)]
+struct TransferArgs {
     /// Source path or URI (alternative to positional args)
     #[arg(
         short = 's',
@@ -142,6 +174,13 @@ struct Cli {
     #[arg(long, global = true, help_heading = "Transfer", hide = true)]
     verify_metadata: bool,
 
+    /// Symbolic link mode
+    #[arg(long = "symlink", value_enum, global = true, help_heading = "Transfer")]
+    symlink: Option<SymlinkModeArg>,
+}
+
+#[derive(Args)]
+struct ReliabilityArgs {
     /// Enable resume capability
     #[arg(
         short = 'r',
@@ -151,6 +190,29 @@ struct Cli {
     )]
     resume: bool,
 
+    /// Number of retry attempts
+    #[arg(long, global = true, help_heading = "Reliability")]
+    retry_attempts: Option<u32>,
+
+    /// Initial retry delay in seconds
+    #[arg(long, global = true, help_heading = "Reliability")]
+    retry_delay: Option<u64>,
+
+    /// Use exponential backoff for retries
+    #[arg(long, global = true, help_heading = "Reliability")]
+    exponential_backoff: bool,
+
+    /// Error handling mode (abort, skip, partial)
+    #[arg(long, value_enum, global = true, help_heading = "Reliability")]
+    error_mode: Option<ErrorModeArg>,
+
+    /// Skip checksum verification
+    #[arg(long, global = true, help_heading = "Reliability")]
+    no_verify: bool,
+}
+
+#[derive(Args)]
+struct PerformanceArgs {
     /// Compression type (none, lz4, zstd, zstd:1, zstd:3, zstd:9, zstd:19)
     #[arg(
         short = 'c',
@@ -173,36 +235,6 @@ struct Cli {
     #[arg(long, global = true, conflicts_with_all = ["compress", "lz4"], help_heading = "Performance")]
     zstd: bool,
 
-    /// Show progress bar (override config)
-    #[arg(long = "show-progress", global = true, help_heading = "Output")]
-    show_progress: bool,
-
-    /// Symbolic link mode
-    #[arg(long = "symlink", value_enum, global = true, help_heading = "Transfer")]
-    symlink: Option<SymlinkModeArg>,
-
-    // ── Reliability ────────────────────────────────────────────────
-    /// Number of retry attempts
-    #[arg(long, global = true, help_heading = "Reliability")]
-    retry_attempts: Option<u32>,
-
-    /// Initial retry delay in seconds
-    #[arg(long, global = true, help_heading = "Reliability")]
-    retry_delay: Option<u64>,
-
-    /// Use exponential backoff for retries
-    #[arg(long, global = true, help_heading = "Reliability")]
-    exponential_backoff: bool,
-
-    /// Error handling mode (abort, skip, partial)
-    #[arg(long, value_enum, global = true, help_heading = "Reliability")]
-    error_mode: Option<ErrorModeArg>,
-
-    /// Skip checksum verification
-    #[arg(long, global = true, help_heading = "Reliability")]
-    no_verify: bool,
-
-    // ── Performance ────────────────────────────────────────────────
     /// Chunk size in KB
     #[arg(long, global = true, help_heading = "Performance")]
     chunk_size: Option<usize>,
@@ -243,8 +275,10 @@ struct Cli {
         help_heading = "Performance"
     )]
     no_zero_copy: bool,
+}
 
-    // ── Filtering ──────────────────────────────────────────────────
+#[derive(Args)]
+struct FilteringArgs {
     /// Include patterns - glob, regex, or path (can be specified multiple times)
     /// Examples: --include="*.rs" --include="regex:^src/.*"
     #[arg(long = "include", global = true, help_heading = "Filtering")]
@@ -264,8 +298,10 @@ struct Cli {
         help_heading = "Filtering"
     )]
     filter_from: Option<PathBuf>,
+}
 
-    // ── Conditional Copy ───────────────────────────────────────────
+#[derive(Args)]
+struct ConditionalCopyArgs {
     /// Do not overwrite existing destination files
     #[arg(long, short = 'n', global = true, help_heading = "Conditional Copy")]
     no_clobber: bool,
@@ -285,8 +321,14 @@ struct Cli {
     /// Flatten directory hierarchy during copy (strip path components)
     #[arg(long, global = true, help_heading = "Conditional Copy")]
     flatten: bool,
+}
 
-    // ── Output ─────────────────────────────────────────────────────
+#[derive(Args)]
+struct OutputArgs {
+    /// Show progress bar (override config)
+    #[arg(long = "show-progress", global = true, help_heading = "Output")]
+    show_progress: bool,
+
     /// Dry run - show what would be copied
     #[arg(long, global = true, help_heading = "Output")]
     dry_run: bool,
@@ -323,8 +365,10 @@ struct Cli {
     /// Output results as JSON Lines (one JSON object per line)
     #[arg(long, global = true, help_heading = "Output")]
     json: bool,
+}
 
-    // ── Observability ──────────────────────────────────────────────
+#[derive(Args)]
+struct ObservabilityArgs {
     /// Audit log format
     #[arg(
         long,
@@ -368,8 +412,10 @@ struct Cli {
     /// Path to config file (overrides default locations)
     #[arg(long, global = true, help_heading = "Observability")]
     config: Option<PathBuf>,
+}
 
-    // ── S3 Options ─────────────────────────────────────────────────
+#[derive(Args)]
+struct S3Args {
     /// Content-Type header for S3 uploads
     #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     content_type: Option<String>,
@@ -444,8 +490,10 @@ struct Cli {
     /// Use ListObjects API v1 (for older S3-compatible storage)
     #[arg(long, global = true, help_heading = "S3 Options", hide = true)]
     use_list_objects_v1: bool,
+}
 
-    // ── Advanced ───────────────────────────────────────────────────
+#[derive(Args)]
+struct AdvancedArgs {
     /// Generate manifests for transfer verification and audit
     #[arg(long, global = true, help_heading = "Advanced", hide = true)]
     generate_manifest: bool,
@@ -563,9 +611,6 @@ struct Cli {
         hide = true
     )]
     read_batch: Option<PathBuf>,
-
-    #[command(subcommand)]
-    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -1100,16 +1145,16 @@ fn resolve_transfer_config(
     }
 
     // ── Output modes ─────────────────────────────────────────────
-    let json_output = cli.json || config.json_output;
-    let quiet = cli.quiet;
+    let json_output = cli.output.json || config.json_output;
+    let quiet = cli.output.quiet;
 
     let (human_readable, show_stats) = resolve_output_modes(OutputModeInputs {
         json_output,
         quiet,
-        raw: cli.raw,
-        cli_human_readable: cli.human_readable,
-        cli_stat: cli.stat,
-        cli_no_stat: cli.no_stat,
+        raw: cli.output.raw,
+        cli_human_readable: cli.output.human_readable,
+        cli_stat: cli.output.stat,
+        cli_no_stat: cli.output.no_stat,
         config_human_readable: config.human_readable,
         config_show_stats: config.show_stats,
     });
@@ -1117,91 +1162,91 @@ fn resolve_transfer_config(
     config.show_stats = show_stats;
 
     // ── Metadata ─────────────────────────────────────────────────
-    if cli.no_preserve_metadata {
+    if cli.transfer.no_preserve_metadata {
         config.preserve_metadata = false;
-    } else if cli.preserve_metadata || cli.preserve_flags.is_some() {
+    } else if cli.transfer.preserve_metadata || cli.transfer.preserve_flags.is_some() {
         config.preserve_metadata = true;
     }
-    if cli.strict_metadata {
+    if cli.transfer.strict_metadata {
         config.strict_metadata = true;
     }
-    if cli.verify_metadata {
+    if cli.transfer.verify_metadata {
         config.verify_metadata = true;
     }
 
     // ── Recursive ────────────────────────────────────────────────
-    if !cli.no_auto_recursive && source_is_dir {
+    if !cli.transfer.no_auto_recursive && source_is_dir {
         config.recursive = true;
     }
-    if cli.recursive {
+    if cli.transfer.recursive {
         config.recursive = true;
     }
 
     // ── Progress ─────────────────────────────────────────────────
     // JSON mode suppresses progress to keep stdout machine-readable.
-    if cli.show_progress && !json_output {
+    if cli.output.show_progress && !json_output {
         config.show_progress = true;
-    } else if cli.no_progress || quiet || json_output {
+    } else if cli.output.no_progress || quiet || json_output {
         config.show_progress = false;
     }
 
     // ── Core transfer overrides ──────────────────────────────────
-    if let Some(mode) = cli.mode {
+    if let Some(mode) = cli.transfer.mode {
         config.copy_mode = mode.into();
     }
-    if cli.resume {
+    if cli.reliability.resume {
         config.resume_enabled = true;
     }
-    if let Some(attempts) = cli.retry_attempts {
+    if let Some(attempts) = cli.reliability.retry_attempts {
         config.retry_attempts = attempts;
     }
-    if let Some(delay) = cli.retry_delay {
+    if let Some(delay) = cli.reliability.retry_delay {
         config.retry_delay_secs = delay;
     }
-    if cli.exponential_backoff {
+    if cli.reliability.exponential_backoff {
         config.exponential_backoff = true;
     }
-    if let Some(size) = cli.chunk_size {
+    if let Some(size) = cli.performance.chunk_size {
         config.chunk_size = size.saturating_mul(1024);
     }
-    if let Some(bw) = cli.max_bandwidth {
+    if let Some(bw) = cli.performance.max_bandwidth {
         config.max_bandwidth = bw.saturating_mul(1024 * 1024);
     }
-    if let Some(w) = cli.workers {
+    if let Some(w) = cli.performance.workers {
         config.parallel = w;
     }
-    if let Some(c) = cli.concurrency {
+    if let Some(c) = cli.performance.concurrency {
         config.concurrency = c;
     }
-    if cli.dry_run {
+    if cli.output.dry_run {
         config.dry_run = true;
     }
-    if let Some(level) = cli.log_level {
+    if let Some(level) = cli.observability.log_level {
         config.log_level = level.into();
     }
-    if cli.verbose {
+    if cli.observability.verbose {
         config.verbose = true;
     }
     if json_output {
         config.json_output = true;
     }
-    if cli.no_verify {
+    if cli.reliability.no_verify {
         config.verify_checksum = false;
     }
 
     // ── Compression ──────────────────────────────────────────────
-    if cli.zstd {
+    if cli.performance.zstd {
         config.compression = CompressionType::Zstd { level: 3 };
-    } else if cli.lz4 {
+    } else if cli.performance.lz4 {
         config.compression = CompressionType::Lz4;
-    } else if let Some(comp) = cli.compress {
+    } else if let Some(comp) = cli.performance.compress {
         config.compression = comp.resolve_auto(dest_is_remote);
     }
 
     // ── Zero-copy ────────────────────────────────────────────────
-    if cli.zero_copy {
+    if cli.performance.zero_copy {
         config.use_zero_copy = true;
-    } else if cli.no_zero_copy {
+    } else if cli.performance.no_zero_copy {
         config.use_zero_copy = false;
     }
 
@@ -1251,10 +1296,11 @@ fn is_remote_uri(uri: &str) -> bool {
 }
 
 fn main() {
-    // The Cli struct has 70+ global flags propagated across 14+ subcommands.
-    // In unoptimized debug builds, clap's derive macro generates deep
-    // recursion that exceeds the default 1 MiB stack. Spawn a thread with
-    // a larger stack so both debug and release builds work reliably.
+    // The Cli struct flattens 9 Args sub-structs holding 70+ global flags
+    // propagated across 14+ subcommands. In unoptimized debug builds, clap's
+    // derive macro still generates deep recursion that can exceed the default
+    // 1 MiB stack. Spawn a thread with a larger stack so both debug and
+    // release builds work reliably.
     let builder = std::thread::Builder::new().stack_size(4 * 1024 * 1024); // 4 MiB
     let handler = builder
         .spawn(|| {
@@ -1275,7 +1321,7 @@ fn run() -> Result<()> {
     let cli = Cli::parse();
 
     // Load config: explicit --config > ~/.orbit/orbit.toml > defaults
-    let base_config = if let Some(ref config_path) = cli.config {
+    let base_config = if let Some(ref config_path) = cli.observability.config {
         CopyConfig::from_file(config_path).unwrap_or_else(|e| {
             cli_style::print_warning(&format!("Failed to load config file: {}", e));
             CopyConfig::default()
@@ -1300,14 +1346,14 @@ fn run() -> Result<()> {
         let mut log_config = base_config.clone();
 
         // Set logging config from CLI (including audit_log_path and otel_endpoint)
-        if let Some(level) = cli.log_level {
+        if let Some(level) = cli.observability.log_level {
             log_config.log_level = level.into();
         }
-        log_config.log_file = cli.log.clone();
-        log_config.verbose = cli.verbose;
-        log_config.audit_log_path = cli.audit_log.clone();
-        log_config.otel_endpoint = cli.otel_endpoint.clone();
-        log_config.metrics_port = cli.metrics_port;
+        log_config.log_file = cli.observability.log.clone();
+        log_config.verbose = cli.observability.verbose;
+        log_config.audit_log_path = cli.observability.audit_log.clone();
+        log_config.otel_endpoint = cli.observability.otel_endpoint.clone();
+        log_config.metrics_port = cli.observability.metrics_port;
 
         // Initialize logging
         if let Err(e) = logging::init_logging(&log_config) {
@@ -1354,14 +1400,14 @@ fn run() -> Result<()> {
             }
             // Non-transfer subcommands: handle and return
             _ => {
-                let json = cli.json;
+                let json = cli.output.json;
                 let command = cli.command.unwrap();
                 return handle_subcommand(command, json);
             }
         }
     }
 
-    if cli.read_batch.is_some() && cli.write_batch.is_some() {
+    if cli.advanced.read_batch.is_some() && cli.advanced.write_batch.is_some() {
         return Err(OrbitError::Config(
             "Cannot use --read-batch and --write-batch together".to_string(),
         ));
@@ -1373,13 +1419,13 @@ fn run() -> Result<()> {
     let is_shorthand = shorthand_source.is_some();
 
     let destination = shorthand_dest
-        .or(cli.destination.clone())
-        .or(cli.pos_dest.clone())
+        .or(cli.transfer.destination.clone())
+        .or(cli.transfer.pos_dest.clone())
         .ok_or_else(|| OrbitError::Config("Destination path required. Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>".to_string()))?;
 
     let (_dest_protocol, dest_path) = Protocol::from_uri(&destination)?;
 
-    if let Some(batch_path) = cli.read_batch.as_ref() {
+    if let Some(batch_path) = cli.advanced.read_batch.as_ref() {
         let journal = TransferJournal::load(batch_path).map_err(OrbitError::Io)?;
         let stats = journal.replay(&dest_path).map_err(OrbitError::Io)?;
         println!("Batch replay complete:");
@@ -1392,8 +1438,8 @@ fn run() -> Result<()> {
     }
 
     let source = shorthand_source
-        .or(cli.source.clone())
-        .or(cli.pos_source.clone())
+        .or(cli.transfer.source.clone())
+        .or(cli.transfer.pos_source.clone())
         .ok_or_else(|| {
             OrbitError::Config(
                 "Source path required. Usage: orbit <SOURCE> <DEST> or orbit -s <SOURCE> -d <DEST>"
@@ -1404,7 +1450,7 @@ fn run() -> Result<()> {
     let (_source_protocol, source_path) = Protocol::from_uri(&source)?;
 
     // ── Resolve config: profile → auto-network → shorthand → output modes → CLI overrides
-    let effective_profile = cli.profile.or(shorthand_profile);
+    let effective_profile = cli.transfer.profile.or(shorthand_profile);
     let dest_is_remote = is_remote_uri(&destination);
 
     let (mut config, json_output, quiet) = resolve_transfer_config(
@@ -1419,121 +1465,121 @@ fn run() -> Result<()> {
 
     // ── Remaining CLI overrides that move owned values out of Cli ──
     // These are not in resolve_transfer_config because it takes &Cli.
-    if let Some(flags) = cli.preserve_flags {
+    if let Some(flags) = cli.transfer.preserve_flags {
         config.preserve_flags = Some(flags);
     }
-    config.transform = cli.transform.or(config.transform);
-    if let Some(symlink) = cli.symlink {
+    config.transform = cli.transfer.transform.or(config.transform);
+    if let Some(symlink) = cli.transfer.symlink {
         config.symlink_mode = symlink.into();
     }
-    if let Some(err_mode) = cli.error_mode {
+    if let Some(err_mode) = cli.reliability.error_mode {
         config.error_mode = err_mode.into();
     }
-    if cli.log.is_some() {
-        config.log_file = cli.log;
+    if cli.observability.log.is_some() {
+        config.log_file = cli.observability.log;
     }
-    if !cli.include_patterns.is_empty() {
-        config.include_patterns = cli.include_patterns;
+    if !cli.filtering.include_patterns.is_empty() {
+        config.include_patterns = cli.filtering.include_patterns;
     }
-    if !cli.exclude_patterns.is_empty() {
-        config.exclude_patterns = cli.exclude_patterns;
+    if !cli.filtering.exclude_patterns.is_empty() {
+        config.exclude_patterns = cli.filtering.exclude_patterns;
     }
-    if cli.filter_from.is_some() {
-        config.filter_from = cli.filter_from;
+    if cli.filtering.filter_from.is_some() {
+        config.filter_from = cli.filtering.filter_from;
     }
 
     // S3 upload enhancement flags
-    if cli.content_type.is_some() {
-        config.s3_content_type = cli.content_type;
+    if cli.s3.content_type.is_some() {
+        config.s3_content_type = cli.s3.content_type;
     }
-    if cli.content_encoding.is_some() {
-        config.s3_content_encoding = cli.content_encoding;
+    if cli.s3.content_encoding.is_some() {
+        config.s3_content_encoding = cli.s3.content_encoding;
     }
-    if cli.content_disposition.is_some() {
-        config.s3_content_disposition = cli.content_disposition;
+    if cli.s3.content_disposition.is_some() {
+        config.s3_content_disposition = cli.s3.content_disposition;
     }
-    if cli.cache_control.is_some() {
-        config.s3_cache_control = cli.cache_control;
+    if cli.s3.cache_control.is_some() {
+        config.s3_cache_control = cli.s3.cache_control;
     }
-    if cli.expires_header.is_some() {
-        config.s3_expires_header = cli.expires_header;
+    if cli.s3.expires_header.is_some() {
+        config.s3_expires_header = cli.s3.expires_header;
     }
-    if !cli.user_metadata.is_empty() {
-        config.s3_user_metadata = cli.user_metadata;
+    if !cli.s3.user_metadata.is_empty() {
+        config.s3_user_metadata = cli.s3.user_metadata;
     }
-    if cli.metadata_directive.is_some() {
-        config.s3_metadata_directive = cli.metadata_directive;
+    if cli.s3.metadata_directive.is_some() {
+        config.s3_metadata_directive = cli.s3.metadata_directive;
     }
-    if cli.acl.is_some() {
-        config.s3_acl = cli.acl;
+    if cli.s3.acl.is_some() {
+        config.s3_acl = cli.s3.acl;
     }
 
     // S3 client configuration flags
-    if cli.no_sign_request {
+    if cli.s3.no_sign_request {
         config.s3_no_sign_request = true;
     }
-    if cli.credentials_file.is_some() {
-        config.s3_credentials_file = cli.credentials_file;
+    if cli.s3.credentials_file.is_some() {
+        config.s3_credentials_file = cli.s3.credentials_file;
     }
-    if cli.aws_profile.is_some() {
-        config.s3_aws_profile = cli.aws_profile;
+    if cli.s3.aws_profile.is_some() {
+        config.s3_aws_profile = cli.s3.aws_profile;
     }
-    if cli.use_acceleration {
+    if cli.s3.use_acceleration {
         config.s3_use_acceleration = true;
     }
-    if cli.request_payer {
+    if cli.s3.request_payer {
         config.s3_request_payer = true;
     }
-    if cli.no_verify_ssl {
+    if cli.s3.no_verify_ssl {
         config.s3_no_verify_ssl = true;
     }
-    if cli.use_list_objects_v1 {
+    if cli.s3.use_list_objects_v1 {
         config.s3_use_list_objects_v1 = true;
     }
 
     // Conditional copy flags
-    if cli.no_clobber {
+    if cli.conditional.no_clobber {
         config.no_clobber = true;
     }
-    if cli.if_size_differ {
+    if cli.conditional.if_size_differ {
         config.if_size_differ = true;
     }
-    if cli.if_source_newer {
+    if cli.conditional.if_source_newer {
         config.if_source_newer = true;
     }
-    if cli.flatten {
+    if cli.conditional.flatten {
         config.flatten = true;
     }
 
     // In-place, sparse, and advanced transfer flags
-    if let Some(sparse) = cli.sparse {
+    if let Some(sparse) = cli.advanced.sparse {
         config.sparse_mode = sparse.into();
     }
-    if cli.preserve_hardlinks {
+    if cli.advanced.preserve_hardlinks {
         config.preserve_hardlinks = true;
     }
-    if cli.inplace {
+    if cli.advanced.inplace {
         config.inplace = true;
     }
-    if let Some(safety) = cli.inplace_safety {
+    if let Some(safety) = cli.advanced.inplace_safety {
         config.inplace_safety = safety.into();
     }
-    if cli.detect_renames {
+    if cli.advanced.detect_renames {
         config.detect_renames = true;
     }
-    if let Some(threshold) = cli.rename_threshold {
+    if let Some(threshold) = cli.advanced.rename_threshold {
         config.rename_threshold = threshold;
     }
-    if !cli.link_dest.is_empty() {
-        config.link_dest = cli.link_dest;
+    if !cli.advanced.link_dest.is_empty() {
+        config.link_dest = cli.advanced.link_dest;
     }
-    config.write_batch = cli.write_batch.or(config.write_batch);
-    config.read_batch = cli.read_batch.or(config.read_batch);
+    config.write_batch = cli.advanced.write_batch.or(config.write_batch);
+    config.read_batch = cli.advanced.read_batch.or(config.read_batch);
 
     // Handle manifest generation
-    if cli.generate_manifest {
+    if cli.advanced.generate_manifest {
         config.generate_manifest = true;
-        config.manifest_output_dir = cli.manifest_dir;
+        config.manifest_output_dir = cli.advanced.manifest_dir;
     }
 
     // Show zero-copy status if enabled (suppressed in json/quiet mode)
@@ -1555,35 +1601,35 @@ fn run() -> Result<()> {
     }
 
     // Configure audit logging and observability
-    if let Some(fmt) = cli.audit_format {
+    if let Some(fmt) = cli.observability.audit_format {
         config.audit_format = fmt.into();
     }
-    if cli.audit_log.is_some() {
-        config.audit_log_path = cli.audit_log;
+    if cli.observability.audit_log.is_some() {
+        config.audit_log_path = cli.observability.audit_log;
     }
-    if cli.otel_endpoint.is_some() {
-        config.otel_endpoint = cli.otel_endpoint;
+    if cli.observability.otel_endpoint.is_some() {
+        config.otel_endpoint = cli.observability.otel_endpoint;
     }
-    config.metrics_port = cli.metrics_port.or(config.metrics_port);
+    config.metrics_port = cli.observability.metrics_port.or(config.metrics_port);
 
     // Configure delta detection
-    if let Some(check) = cli.check {
+    if let Some(check) = cli.advanced.check {
         config.check_mode = check.into();
     }
-    if let Some(bs) = cli.block_size {
+    if let Some(bs) = cli.advanced.block_size {
         config.delta_block_size = bs.saturating_mul(1024);
     }
-    if cli.whole_file {
+    if cli.advanced.whole_file {
         config.whole_file = true;
     }
-    if cli.update_manifest {
+    if cli.advanced.update_manifest {
         config.update_manifest = true;
     }
-    if cli.ignore_existing {
+    if cli.conditional.ignore_existing {
         config.ignore_existing = true;
     }
-    if cli.delta_manifest.is_some() {
-        config.delta_manifest_path = cli.delta_manifest;
+    if cli.advanced.delta_manifest.is_some() {
+        config.delta_manifest_path = cli.advanced.delta_manifest;
     }
 
     // First-run hint: suggest `orbit init` once (not every invocation)
@@ -2235,7 +2281,7 @@ mod tests {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt", "--workers", "64"])
                 .unwrap();
-        assert_eq!(cli.workers, Some(64));
+        assert_eq!(cli.performance.workers, Some(64));
     }
 
     #[test]
@@ -2250,7 +2296,7 @@ mod tests {
             "32",
         ])
         .unwrap();
-        assert_eq!(cli.workers, Some(32));
+        assert_eq!(cli.performance.workers, Some(32));
     }
 
     #[test]
@@ -2265,38 +2311,38 @@ mod tests {
             "10",
         ])
         .unwrap();
-        assert_eq!(cli.concurrency, Some(10));
+        assert_eq!(cli.performance.concurrency, Some(10));
     }
 
     #[test]
     fn test_concurrency_default_none() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
-        assert_eq!(cli.concurrency, None);
+        assert_eq!(cli.performance.concurrency, None);
     }
 
     #[test]
     fn test_workers_default_none() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
-        assert_eq!(cli.workers, None);
+        assert_eq!(cli.performance.workers, None);
     }
 
     #[test]
     fn test_stat_flag() {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt", "--stat"]).unwrap();
-        assert!(cli.stat);
+        assert!(cli.output.stat);
     }
 
     #[test]
     fn test_stat_default_false() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
-        assert!(!cli.stat);
+        assert!(!cli.output.stat);
     }
 
     #[test]
     fn test_human_readable_short_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt", "-H"]).unwrap();
-        assert!(cli.human_readable);
+        assert!(cli.output.human_readable);
     }
 
     #[test]
@@ -2310,14 +2356,14 @@ mod tests {
             "--human-readable",
         ])
         .unwrap();
-        assert!(cli.human_readable);
+        assert!(cli.output.human_readable);
     }
 
     #[test]
     fn test_human_readable_default_false() {
         // The CLI flag defaults to false; the *config* defaults to true now
         let cli = Cli::try_parse_from(["orbit", "-s", "src.txt", "-d", "dst.txt"]).unwrap();
-        assert!(!cli.human_readable);
+        assert!(!cli.output.human_readable);
     }
 
     #[test]
@@ -2448,11 +2494,11 @@ mod tests {
             "--recursive",
         ])
         .unwrap();
-        assert_eq!(cli.workers, Some(128));
-        assert_eq!(cli.concurrency, Some(8));
-        assert!(cli.stat);
-        assert!(cli.human_readable);
-        assert!(cli.recursive);
+        assert_eq!(cli.performance.workers, Some(128));
+        assert_eq!(cli.performance.concurrency, Some(8));
+        assert!(cli.output.stat);
+        assert!(cli.output.human_readable);
+        assert!(cli.transfer.recursive);
     }
 
     // === Flag parser tests ===
@@ -2460,15 +2506,15 @@ mod tests {
     #[test]
     fn test_flatten_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--flatten"]).unwrap();
-        assert!(cli.flatten);
+        assert!(cli.conditional.flatten);
     }
 
     #[test]
     fn test_detect_renames_flag() {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--detect-renames"]).unwrap();
-        assert!(cli.detect_renames);
-        assert_eq!(cli.rename_threshold, None);
+        assert!(cli.advanced.detect_renames);
+        assert_eq!(cli.advanced.rename_threshold, None);
     }
 
     #[test]
@@ -2484,8 +2530,8 @@ mod tests {
             "0.5",
         ])
         .unwrap();
-        assert!(cli.detect_renames);
-        assert!((cli.rename_threshold.unwrap() - 0.5).abs() < f64::EPSILON);
+        assert!(cli.advanced.detect_renames);
+        assert!((cli.advanced.rename_threshold.unwrap() - 0.5).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -2500,92 +2546,92 @@ mod tests {
             "text/plain",
         ])
         .unwrap();
-        assert_eq!(cli.content_type, Some("text/plain".to_string()));
+        assert_eq!(cli.s3.content_type, Some("text/plain".to_string()));
     }
 
     #[test]
     fn test_s3_no_sign_request_flag() {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-sign-request"]).unwrap();
-        assert!(cli.no_sign_request);
+        assert!(cli.s3.no_sign_request);
     }
 
     #[test]
     fn test_s3_aws_profile_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--aws-profile", "prod"])
             .unwrap();
-        assert_eq!(cli.aws_profile, Some("prod".to_string()));
+        assert_eq!(cli.s3.aws_profile, Some("prod".to_string()));
     }
 
     #[test]
     fn test_s3_use_acceleration_flag() {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--use-acceleration"]).unwrap();
-        assert!(cli.use_acceleration);
+        assert!(cli.s3.use_acceleration);
     }
 
     #[test]
     fn test_s3_flags_defaults() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
-        assert!(cli.content_type.is_none());
-        assert!(cli.content_encoding.is_none());
-        assert!(cli.acl.is_none());
-        assert!(!cli.no_sign_request);
-        assert!(cli.aws_profile.is_none());
-        assert!(!cli.use_acceleration);
-        assert!(!cli.request_payer);
-        assert!(!cli.no_verify_ssl);
-        assert!(!cli.flatten);
-        assert!(!cli.detect_renames);
+        assert!(cli.s3.content_type.is_none());
+        assert!(cli.s3.content_encoding.is_none());
+        assert!(cli.s3.acl.is_none());
+        assert!(!cli.s3.no_sign_request);
+        assert!(cli.s3.aws_profile.is_none());
+        assert!(!cli.s3.use_acceleration);
+        assert!(!cli.s3.request_payer);
+        assert!(!cli.s3.no_verify_ssl);
+        assert!(!cli.conditional.flatten);
+        assert!(!cli.advanced.detect_renames);
     }
 
     #[test]
     fn test_conditional_copy_defaults() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst"]).unwrap();
-        assert!(!cli.no_clobber);
-        assert!(!cli.if_size_differ);
-        assert!(!cli.if_source_newer);
+        assert!(!cli.conditional.no_clobber);
+        assert!(!cli.conditional.if_size_differ);
+        assert!(!cli.conditional.if_source_newer);
     }
 
     #[test]
     fn test_compression_shorthand_zstd() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--zstd"]).unwrap();
-        assert!(cli.zstd);
-        assert!(!cli.lz4);
-        assert!(cli.compress.is_none());
+        assert!(cli.performance.zstd);
+        assert!(!cli.performance.lz4);
+        assert!(cli.performance.compress.is_none());
     }
 
     #[test]
     fn test_compression_shorthand_lz4() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--lz4"]).unwrap();
-        assert!(cli.lz4);
-        assert!(!cli.zstd);
+        assert!(cli.performance.lz4);
+        assert!(!cli.performance.zstd);
     }
 
     #[test]
     fn test_compress_bare_zstd() {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--compress", "zstd"]).unwrap();
-        let comp: CompressionType = cli.compress.unwrap().into();
+        let comp: CompressionType = cli.performance.compress.unwrap().into();
         assert!(matches!(comp, CompressionType::Zstd { level: 3 }));
     }
 
     #[test]
     fn test_quiet_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "-q"]).unwrap();
-        assert!(cli.quiet);
+        assert!(cli.output.quiet);
     }
 
     #[test]
     fn test_raw_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--raw"]).unwrap();
-        assert!(cli.raw);
+        assert!(cli.output.raw);
     }
 
     #[test]
     fn test_no_stat_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-stat"]).unwrap();
-        assert!(cli.no_stat);
+        assert!(cli.output.no_stat);
     }
 
     #[test]
@@ -2593,14 +2639,14 @@ mod tests {
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-preserve-metadata"])
                 .unwrap();
-        assert!(cli.no_preserve_metadata);
+        assert!(cli.transfer.no_preserve_metadata);
     }
 
     #[test]
     fn test_no_auto_recursive_flag() {
         let cli = Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--no-auto-recursive"])
             .unwrap();
-        assert!(cli.no_auto_recursive);
+        assert!(cli.transfer.no_auto_recursive);
     }
 
     #[test]
@@ -2651,11 +2697,11 @@ mod tests {
         // retry_attempts should be None (not a default that overwrites the profile)
         let cli =
             Cli::try_parse_from(["orbit", "-s", "src", "-d", "dst", "--profile", "safe"]).unwrap();
-        assert_eq!(cli.retry_attempts, None);
-        assert_eq!(cli.retry_delay, None);
-        assert_eq!(cli.chunk_size, None);
-        assert_eq!(cli.workers, None);
-        assert_eq!(cli.concurrency, None);
+        assert_eq!(cli.reliability.retry_attempts, None);
+        assert_eq!(cli.reliability.retry_delay, None);
+        assert_eq!(cli.performance.chunk_size, None);
+        assert_eq!(cli.performance.workers, None);
+        assert_eq!(cli.performance.concurrency, None);
     }
 
     #[test]
@@ -3166,14 +3212,18 @@ mod tests {
         }
 
         // Global flags are accessible
-        assert!(cli.quiet, "--quiet should be parsed for sync");
-        assert!(cli.zstd, "--zstd should be parsed for sync");
+        assert!(cli.output.quiet, "--quiet should be parsed for sync");
+        assert!(cli.performance.zstd, "--zstd should be parsed for sync");
         assert_eq!(
-            cli.retry_attempts,
+            cli.reliability.retry_attempts,
             Some(7),
             "--retry-attempts should be parsed for sync"
         );
-        assert_eq!(cli.workers, Some(16), "--workers should be parsed for sync");
+        assert_eq!(
+            cli.performance.workers,
+            Some(16),
+            "--workers should be parsed for sync"
+        );
     }
 
     #[test]
@@ -3194,9 +3244,12 @@ mod tests {
             _ => panic!("Expected Backup subcommand"),
         }
 
-        assert!(cli.json, "--json should be parsed for backup");
-        assert!(cli.lz4, "--lz4 should be parsed for backup");
-        assert!(cli.no_verify, "--no-verify should be parsed for backup");
+        assert!(cli.output.json, "--json should be parsed for backup");
+        assert!(cli.performance.lz4, "--lz4 should be parsed for backup");
+        assert!(
+            cli.reliability.no_verify,
+            "--no-verify should be parsed for backup"
+        );
     }
 
     #[test]
@@ -3217,9 +3270,12 @@ mod tests {
             _ => panic!("Expected Mirror subcommand"),
         }
 
-        assert!(cli.raw, "--raw should be parsed for mirror");
-        assert!(cli.no_stat, "--no-stat should be parsed for mirror");
-        assert!(cli.resume, "--resume should be parsed for mirror");
+        assert!(cli.output.raw, "--raw should be parsed for mirror");
+        assert!(cli.output.no_stat, "--no-stat should be parsed for mirror");
+        assert!(
+            cli.reliability.resume,
+            "--resume should be parsed for mirror"
+        );
     }
 
     // === Config resolution integration tests ===

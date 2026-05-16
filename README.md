@@ -395,7 +395,7 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting, dependency audit res
 - Config resolution hardened: unified transfer path, auto-network detection
 - Saner defaults: `preserve_metadata`, `show_stats`, `human_readable` default to `true`
 - Simplified CLI: positional arguments, `--profile` presets, actionable errors
-- Codebase restructuring: main.rs reduced by 45%, subcommands extracted
+- Codebase restructuring: main.rs reduced by 45%, subcommands extracted; `Cli` struct split into 9 grouped `Args` sub-structs (`TransferArgs`, `ReliabilityArgs`, `PerformanceArgs`, etc.) for cleaner derive, faster parse, and easier maintenance
 - Dependency cleanup: `anyhow` removed from all first-party crates (unified on `thiserror`); root binary's heavy Tokio runtime features are feature-gated to network backends, though a minimal `tokio` is still pulled in transitively via `orbit-core-interface` and `orbit-observability`
 - Workspace dependency inheritance: shared dep versions managed centrally
 
