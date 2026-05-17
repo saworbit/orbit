@@ -10,7 +10,34 @@ This guide gets you from zero to your first transfer in under 5 minutes.
 
 ## Installation
 
-### From Source (Recommended)
+### Pre-built Binaries (Recommended)
+
+Each release on GitHub publishes pre-built binaries for Linux (static musl, no glibc dependency), macOS (universal — Intel + Apple Silicon), and Windows. Pre-built binaries include the `s3-native` + `backend-abstraction` features (S3 / Azure / GCS via `object_store`). For other feature combinations (SMB, SSH, `s3-cli`, etc.), build from source.
+
+Replace `v0.6.0` below with the version you want to install (see [the releases page](https://github.com/saworbit/orbit/releases) for the current list).
+
+```bash
+# Linux x86_64 (static musl — runs on any Linux distro)
+curl -L https://github.com/saworbit/orbit/releases/download/v0.6.0/orbit-v0.6.0-x86_64-unknown-linux-musl.tar.gz | tar xz
+sudo install -m 755 orbit /usr/local/bin/
+
+# Linux aarch64 (static musl)
+curl -L https://github.com/saworbit/orbit/releases/download/v0.6.0/orbit-v0.6.0-aarch64-unknown-linux-musl.tar.gz | tar xz
+sudo install -m 755 orbit /usr/local/bin/
+
+# macOS (universal — Intel + Apple Silicon)
+curl -L https://github.com/saworbit/orbit/releases/download/v0.6.0/orbit-v0.6.0-universal2-apple-darwin.tar.gz | tar xz
+sudo install -m 755 orbit /usr/local/bin/
+
+# Windows x86_64: download orbit-v0.6.0-x86_64-pc-windows-msvc.zip from
+# https://github.com/saworbit/orbit/releases and extract orbit.exe onto your PATH.
+
+orbit --version
+```
+
+SHA-256 checksums for every asset are published as `SHA256SUMS` on the same release page.
+
+### From Source
 
 ```bash
 git clone https://github.com/saworbit/orbit.git
