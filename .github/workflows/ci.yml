@@ -11,6 +11,20 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  dependency-policy:
+    name: Dependency Policy
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Check dependency policy
+      uses: EmbarkStudios/cargo-deny-action@v2
+      with:
+        command: check all
+        arguments: --workspace
+
   # Main build and test job with S3 features (default)
   build-and-test:
     runs-on: ubuntu-latest
