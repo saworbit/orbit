@@ -52,6 +52,15 @@ All notable changes to Orbit will be documented in this file.
 
 ### Changed
 
+#### Cloud Backends Standardized on `object_store` (Breaking for `s3-native` users)
+
+All three cloud Backends — S3, Azure Blob, and Google Cloud Storage — now go through the `object_store` crate via the unified async `Backend` trait. Previously S3 was inconsistent: the unified path wrapped a deep `aws-sdk-s3` client, while Azure/GCS already used `object_store`.
+
+- **`s3-native` feature**: now pulls `object_store/aws` instead of `aws-sdk-s3` + `aws-config`. The unified Backend keeps the same surface (`stat`/`list`/`read`/`write`/`delete`/`mkdir`/`rename`/`exists`). For default and `--features network` builds, this removes the entire `aws-sdk-*` / `aws-smithy-*` / `aws-runtime` transitive tree (~30 crates).
+- **New `s3-cli` feature** (opt-in, off by default; included in `full`): preserves the rich `orbit s3 ...` subcommand tree (`cat`, `pipe`, `presign`, `ls`, `head`, `du`, `rm`, `mv`, `mb`, `rb`) — including versioning, presigned URLs, fine-grained per-PUT controls, and `--no-sign-request` — by keeping `aws-sdk-s3` + `aws-config` behind this flag. Implies `s3-native`.
+- **Breaking**: users who previously built with `--features s3-native` to get the `orbit s3 ...` subcommands must now use `--features s3-cli` instead. The unified Backend (and `s3://` URIs via `orbit cp` / `orbit sync`) keeps working on plain `s3-native`.
+- **`BackendConfig::S3`**: now uses a new lightweight `S3BackendConfig` (mirrors `AzureConfig` / `GcsConfig`) instead of the heavy `protocol::s3::S3Config`. Code that constructed `BackendConfig::S3 { config: S3Config { .. }, .. }` directly must switch to `S3BackendConfig`. The `s3://` URI parser is unchanged.
+
 #### Config Defaults (Breaking)
 - **`preserve_metadata` default changed to `true`**: Previously `false`. Metadata is now preserved by default; use `--no-preserve-metadata` to opt out
 - **`show_stats` default changed to `true`**: Execution statistics are now shown by default; use `--no-stat` to suppress

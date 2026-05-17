@@ -9,11 +9,45 @@ use std::path::PathBuf;
 #[cfg(feature = "ssh-backend")]
 use super::ssh::{SshAuth, SshConfig};
 
-#[cfg(feature = "s3-native")]
-use crate::protocol::s3::S3Config;
-
 #[cfg(feature = "smb-native")]
 use super::smb::SmbConfig;
+
+/// S3 backend configuration for the unified `Backend` trait
+///
+/// This is a lightweight configuration struct used by the object_store-backed
+/// S3 backend. For the rich `orbit s3 ...` CLI subcommands (gated behind the
+/// `s3-cli` feature), see `crate::protocol::s3::S3Config`.
+#[cfg(feature = "s3-native")]
+#[derive(Debug, Clone, Default)]
+pub struct S3BackendConfig {
+    /// Bucket name
+    pub bucket: String,
+    /// AWS region (required for AWS S3; optional for S3-compatible endpoints)
+    pub region: Option<String>,
+    /// Custom endpoint URL (for MinIO, LocalStack, etc.)
+    pub endpoint: Option<String>,
+    /// AWS access key (falls back to environment / credential chain if unset)
+    pub access_key: Option<String>,
+    /// AWS secret key (falls back to environment / credential chain if unset)
+    pub secret_key: Option<String>,
+    /// Optional session token (for temporary credentials)
+    pub session_token: Option<String>,
+    /// Force path-style addressing (required for most S3-compatible services)
+    pub force_path_style: bool,
+    /// Skip request signing (anonymous access to public buckets)
+    pub skip_signature: bool,
+}
+
+#[cfg(feature = "s3-native")]
+impl S3BackendConfig {
+    /// Create a new S3 backend config with bucket name
+    pub fn new(bucket: impl Into<String>) -> Self {
+        Self {
+            bucket: bucket.into(),
+            ..Default::default()
+        }
+    }
+}
 
 /// Azure Blob Storage configuration
 #[cfg(feature = "azure-native")]
@@ -112,7 +146,7 @@ pub enum BackendConfig {
     #[cfg(feature = "s3-native")]
     S3 {
         /// S3 configuration
-        config: S3Config,
+        config: S3BackendConfig,
         /// Optional prefix (like a root directory)
         prefix: Option<String>,
     },
@@ -161,7 +195,7 @@ impl BackendConfig {
 
     /// Create S3 backend configuration
     #[cfg(feature = "s3-native")]
-    pub fn s3(config: S3Config) -> Self {
+    pub fn s3(config: S3BackendConfig) -> Self {
         Self::S3 {
             config,
             prefix: None,
@@ -170,7 +204,7 @@ impl BackendConfig {
 
     /// Create S3 backend with prefix
     #[cfg(feature = "s3-native")]
-    pub fn s3_with_prefix(config: S3Config, prefix: impl Into<String>) -> Self {
+    pub fn s3_with_prefix(config: S3BackendConfig, prefix: impl Into<String>) -> Self {
         Self::S3 {
             config,
             prefix: Some(prefix.into()),
@@ -387,7 +421,7 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect();
 
-            let mut s3_config = S3Config::new(bucket);
+            let mut s3_config = S3BackendConfig::new(bucket);
 
             if let Some(region) = query_pairs.get("region") {
                 s3_config.region = Some(region.clone());
@@ -405,8 +439,16 @@ pub fn parse_uri(uri: &str) -> BackendResult<(BackendConfig, PathBuf)> {
                 s3_config.secret_key = Some(secret_key.clone());
             }
 
+            if let Some(session_token) = query_pairs.get("session_token") {
+                s3_config.session_token = Some(session_token.clone());
+            }
+
             if let Some(path_style) = query_pairs.get("path_style") {
                 s3_config.force_path_style = path_style == "true";
+            }
+
+            if let Some(skip_sig) = query_pairs.get("skip_signature") {
+                s3_config.skip_signature = skip_sig == "true";
             }
 
             let config = if prefix.is_empty() {
@@ -679,7 +721,7 @@ pub fn from_env() -> BackendResult<BackendConfig> {
                     message: "ORBIT_S3_BUCKET not set".to_string(),
                 })?;
 
-            let mut s3_config = S3Config::new(bucket);
+            let mut s3_config = S3BackendConfig::new(bucket);
 
             if let Ok(region) = std::env::var("ORBIT_S3_REGION") {
                 s3_config.region = Some(region);

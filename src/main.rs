@@ -710,21 +710,21 @@ enum Commands {
     },
 
     /// Stream an S3 object to stdout
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Cat {
         /// S3 URI (s3://bucket/key)
         uri: String,
     },
 
     /// Stream stdin to an S3 object
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Pipe {
         /// S3 URI (s3://bucket/key)
         uri: String,
     },
 
     /// Generate a pre-signed URL for an S3 object
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Presign {
         /// S3 URI (s3://bucket/key)
         uri: String,
@@ -735,7 +735,7 @@ enum Commands {
     },
 
     /// List S3 objects
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Ls {
         /// S3 URI (s3://bucket/prefix or s3://bucket/pattern*)
         uri: String,
@@ -754,7 +754,7 @@ enum Commands {
     },
 
     /// Show S3 object metadata
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Head {
         /// S3 URI (s3://bucket/key)
         uri: String,
@@ -764,7 +764,7 @@ enum Commands {
     },
 
     /// Show S3 storage usage (object count and total size)
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Du {
         /// S3 URI (s3://bucket/prefix)
         uri: String,
@@ -777,7 +777,7 @@ enum Commands {
     },
 
     /// Delete S3 objects
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Rm {
         /// S3 URI (s3://bucket/key or s3://bucket/pattern*)
         uri: String,
@@ -793,7 +793,7 @@ enum Commands {
     },
 
     /// Move (rename) S3 objects
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Mv {
         /// Source S3 URI
         source: String,
@@ -802,14 +802,14 @@ enum Commands {
     },
 
     /// Create an S3 bucket
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Mb {
         /// Bucket name (s3://bucket-name)
         bucket: String,
     },
 
     /// Remove an S3 bucket
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     Rb {
         /// Bucket name (s3://bucket-name)
         bucket: String,
@@ -1732,15 +1732,15 @@ fn handle_subcommand(command: Commands, json_output: bool) -> Result<()> {
         Commands::Run { file, workers } => {
             orbit::commands::batch::handle_run_command(file, workers)
         }
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Cat { uri } => orbit::commands::s3::handle_cat_command(&uri),
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Pipe { uri } => orbit::commands::s3::handle_pipe_command(&uri),
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Presign { uri, expires } => {
             orbit::commands::s3::handle_presign_command(&uri, expires)
         }
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Ls {
             uri,
             etag,
@@ -1754,28 +1754,28 @@ fn handle_subcommand(command: Commands, json_output: bool) -> Result<()> {
             all_versions,
             show_fullpath,
         ),
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Head { uri, version_id } => {
             orbit::commands::s3::handle_head_command(&uri, version_id)
         }
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Du {
             uri,
             group,
             all_versions,
         } => orbit::commands::s3::handle_du_command(&uri, group, all_versions),
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Rm {
             uri,
             all_versions,
             version_id,
             dry_run,
         } => orbit::commands::s3::handle_rm_command(&uri, all_versions, version_id, dry_run),
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Mv { source, dest } => orbit::commands::s3::handle_mv_command(&source, &dest),
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Mb { bucket } => orbit::commands::s3::handle_mb_command(&bucket),
-        #[cfg(feature = "s3-native")]
+        #[cfg(feature = "s3-cli")]
         Commands::Rb { bucket } => orbit::commands::s3::handle_rb_command(&bucket),
         // Transfer shorthands are handled in run() — this arm is unreachable
         // because run() extracts them before calling handle_subcommand().
@@ -1894,6 +1894,7 @@ fn run_doctor() {
     section_header(&format!("{} Compiled Features", Icons::GEAR));
     let features: Vec<(&str, bool)> = vec![
         ("s3-native", cfg!(feature = "s3-native")),
+        ("s3-cli", cfg!(feature = "s3-cli")),
         ("smb-native", cfg!(feature = "smb-native")),
         ("ssh-backend", cfg!(feature = "ssh-backend")),
         ("azure-native", cfg!(feature = "azure-native")),
@@ -2088,7 +2089,7 @@ fn print_capabilities() {
         #[cfg(not(feature = "smb-native"))]
         ("SMB/CIFS", false, "Enable with --features smb-native"),
         #[cfg(feature = "s3-native")]
-        ("Amazon S3", true, "Multipart upload support"),
+        ("Amazon S3", true, "Via object_store"),
         #[cfg(not(feature = "s3-native"))]
         ("Amazon S3", false, "Enable with --features s3-native"),
         #[cfg(feature = "azure-native")]
@@ -2720,7 +2721,7 @@ mod tests {
     // === S3 subcommand parse tests ===
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_ls_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "ls", "s3://bucket/prefix"]).unwrap();
         match cli.command {
@@ -2742,7 +2743,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_ls_subcommand_with_flags() {
         let cli = Cli::try_parse_from([
             "orbit",
@@ -2773,7 +2774,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_head_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "head", "s3://bucket/key.txt"]).unwrap();
         match cli.command {
@@ -2786,7 +2787,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_head_subcommand_with_version() {
         let cli = Cli::try_parse_from([
             "orbit",
@@ -2806,7 +2807,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_du_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "du", "s3://bucket/prefix"]).unwrap();
         match cli.command {
@@ -2824,7 +2825,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_du_subcommand_with_group() {
         let cli = Cli::try_parse_from(["orbit", "du", "s3://bucket/prefix", "--group"]).unwrap();
         match cli.command {
@@ -2842,7 +2843,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_rm_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "rm", "s3://bucket/key.txt"]).unwrap();
         match cli.command {
@@ -2862,7 +2863,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_rm_subcommand_with_dry_run() {
         let cli =
             Cli::try_parse_from(["orbit", "rm", "s3://bucket/prefix/*", "--dry-run"]).unwrap();
@@ -2883,7 +2884,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_mv_subcommand() {
         let cli =
             Cli::try_parse_from(["orbit", "mv", "s3://bucket/old.txt", "s3://bucket/new.txt"])
@@ -2898,7 +2899,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_mb_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "mb", "s3://my-new-bucket"]).unwrap();
         match cli.command {
@@ -2910,7 +2911,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "s3-native")]
+    #[cfg(feature = "s3-cli")]
     fn test_rb_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "rb", "s3://my-old-bucket"]).unwrap();
         match cli.command {

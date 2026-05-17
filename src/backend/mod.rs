@@ -109,6 +109,9 @@ pub use gcs::GcsBackend;
 #[cfg(feature = "backend-abstraction")]
 pub use config::{parse_uri, BackendConfig};
 
+#[cfg(all(feature = "backend-abstraction", feature = "s3-native"))]
+pub use config::S3BackendConfig;
+
 #[cfg(all(feature = "backend-abstraction", feature = "azure-native"))]
 pub use config::AzureConfig;
 

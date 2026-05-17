@@ -9,5 +9,5 @@ pub mod explain;
 pub mod history;
 pub mod init;
 pub mod manifest;
-#[cfg(feature = "s3-native")]
+#[cfg(feature = "s3-cli")]
 pub mod s3;

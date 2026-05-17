@@ -11,7 +11,7 @@
 pub mod local;
 pub mod uri;
 
-#[cfg(feature = "s3-native")]
+#[cfg(feature = "s3-cli")]
 pub mod s3;
 
 use crate::error::Result;
@@ -94,16 +94,17 @@ impl Protocol {
             Protocol::S3 { .. } => {
                 #[cfg(feature = "s3-native")]
                 {
-                    // S3 native implementation requires async context
-                    // For now, return an error directing to the s3 module
+                    // The unified async `Backend` trait is the supported path
+                    // for S3. This legacy synchronous trait remains for SMB-
+                    // shaped callers; route S3 through `backend::S3Backend`.
                     Err(crate::error::OrbitError::Config(
-                        "S3 protocol requires s3-native feature and async context. Use protocols::s3 module directly.".to_string()
+                        "S3 protocol uses the async Backend abstraction. Use backend::S3Backend directly.".to_string()
                     ))
                 }
                 #[cfg(not(feature = "s3-native"))]
                 {
                     Err(crate::error::OrbitError::Config(
-                        "S3 protocol requires s3-native feature. Rebuild with --features s3-native"
+                        "S3 protocol requires the s3-native feature. Rebuild with --features s3-native"
                             .to_string(),
                     ))
                 }
