@@ -229,7 +229,7 @@ where
 
     // Preserve metadata if requested
     if config.preserve_metadata {
-        if let Err(e) = super::metadata::preserve_metadata(source_path, dest_path) {
+        if let Err(e) = super::metadata_ops::preserve_metadata(source_path, dest_path) {
             if config.strict_metadata {
                 log_error!("Failed to preserve metadata (strict mode): {}", e);
                 return Err(OrbitError::MetadataFailed(format!(

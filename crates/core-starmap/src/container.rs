@@ -179,10 +179,7 @@ impl ContainerWriter {
 
         // Check if container would exceed max size
         if self.current_offset + data.len() as u64 > self.max_size {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "Container full: would exceed max size",
-            ));
+            return Err(io::Error::other("Container full: would exceed max size"));
         }
 
         let offset = self.current_offset;

@@ -4,7 +4,170 @@ All notable changes to Orbit will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+#### Release Automation
+- **Cross-platform release workflow**: `.github/workflows/release.yml` now produces pre-built binaries on every `v*` tag — Linux x86_64 + aarch64 as **static musl** (single binary, no glibc dependency), macOS as a **universal2** fat binary (Intel + Apple Silicon), and Windows x86_64 MSVC. Linux and macOS builds use `cargo-zigbuild`; Windows uses native `cargo build`. Each release also publishes a `SHA256SUMS` file alongside the archives. Assets are named `orbit-vX.Y.Z-<target-triple>.{tar.gz,zip}`.
+
+#### New Commands
+- **`orbit cp <SRC> <DST>`**: Intuitive copy alias — identical to bare `orbit` but reads more naturally in scripts and documentation
+- **`orbit explain <SRC> <DST>`**: Dry-run explainer that prints a plain-English summary of what Orbit *would* do (mode, compression, checksums, parallelism, filters, etc.) without touching any files
+- **`orbit history`**: Shows recent transfer history from the audit log in a human-friendly table. Supports `--audit-file <path>`, `--limit N`, and `--json` for machine-readable output
+
+#### CLI Enhancements
+- **`--compress auto`**: Context-aware compression — picks Zstd:3 for remote destinations and LZ4 for local cross-device transfers; leaves compression off for same-device copies
+- **Two-tier `--help` system**: Default help shows ~20 essential flags; `--help-all` (or `orbit explain`) reveals the full set of 70+ flags. Advanced, S3, and observability flags are hidden from default help to reduce cognitive load
+- **One-time first-run tip**: On first invocation (no `~/.orbit/.tip-shown` sentinel), Orbit prints a quick-start hint pointing users to `orbit init`, `orbit explain`, and `orbit --help`
+- **Positional arguments**: `orbit /src /dest` now works as an alternative to `-s /src -d /dest`
+- **`--profile` preset flag**: Apply a named configuration preset (`fast`, `safe`, `backup`, `network`) from the command line. Each preset provides opinionated defaults tuned for its use case
+- **`orbit presets` subcommand**: Displays available profiles with a comparison table
+- **Transfer shorthand subcommands**: `orbit sync <SRC> <DST>`, `orbit backup <SRC> <DST>`, `orbit mirror <SRC> <DST>` — all global CLI flags (compression, retry, quiet, etc.) are fully supported alongside shorthands
+- **`orbit doctor` subcommand**: Validates configuration, probes hardware, lists compiled features, and checks environment variables — a one-stop diagnostic tool
+- **`--quiet` / `-q` flag**: Suppresses all non-essential output (progress, stats, guidance notices)
+- **`--raw` flag**: Disables human-readable formatting (outputs raw byte counts instead of "1.5 GiB")
+- **`--no-stat` flag**: Disables the end-of-run execution statistics summary
+- **`--no-preserve-metadata` flag**: Explicitly disables metadata preservation (overrides config default)
+- **`--no-auto-recursive` flag**: Prevents auto-detection of directory sources for recursive mode
+- **`--zstd` shorthand**: Equivalent to `--compress zstd:3` for quick Zstd compression
+- **`--lz4` shorthand**: Equivalent to `--compress lz4` for quick LZ4 compression
+- **Grouped `--help` output**: All CLI flags are organized under headings (Transfer, Reliability, Performance, Output, Filtering, etc.) for easier discovery
+
+#### Configuration Presets
+- **`CopyConfig::backup_preset()`**: Backup-specific preset with checksum verification, Zstd compression, resume, metadata preservation, and 5 retries — distinct from the `safe` preset
+- **`CopyConfig::fast_preset()`**, **`safe_preset()`**, **`network_preset()`**: Existing presets now accessible via the CLI `--profile` flag
+
+#### User Experience
+- **Smart error suggestions with fuzzy matching**: `SourceNotFound` errors now suggest similar filenames in the same directory using Levenshtein distance, detect glob patterns (e.g., `*.txt`), and expand relative paths — all without external dependencies
+- **Actionable error messages**: All `OrbitError` variants now include a `suggestion()` method returning context-specific remediation hints (e.g., "Free up disk space or use --compress zstd:3 to reduce transfer size")
+- **Auto-tune summary**: Transfer completion output now displays any auto-tuned settings applied by the Config Optimizer (e.g., worker count adjustments, chunk size increases)
+- **Hardware probe caching**: CPU core count and total RAM are cached to `~/.orbit/probe_cache.json` (1-hour TTL) to avoid re-probing on every invocation. Available RAM is always probed fresh to reflect current memory pressure
+- **Auto-network detection**: When the destination is a remote URI (s3://, smb://, ssh://, etc.) and no `--profile` is specified, Orbit automatically enables resume, compression, exponential backoff, and higher retries — without clobbering any values the user customized in their config file
+- **First-run hint**: If no `~/.orbit/orbit.toml` exists, Orbit suggests running `orbit init` on first use
+- **Config file error reporting**: Invalid config files now produce a visible warning and fall back to defaults, instead of silently ignoring parse errors
+
+#### Init Wizard Enhancements
+- **Exclusion pattern presets**: New step in the wizard lets users pick from common exclusion sets (Development artifacts, Temporary files, OS files, All common, or None) — pre-populates `exclude_patterns` in `orbit.toml`
+- **Shell completions auto-install**: New step detects the user's shell (bash, zsh, fish, PowerShell) and offers to install tab-completion scripts to the appropriate config directory
+
+#### Config Optimizer (Guidance System)
+- **Rule 4 — Local-to-Local Worker Optimization**: Automatically sets workers to `cores/2` when more than 8 cores are available and `parallel == 0`
+- **Rule 5 — Fast I/O Chunk Size**: Increases chunk size to 4MB when I/O throughput exceeds 500 MB/s and the current chunk size is 1MB or less
+
+### Changed
+
+#### Cloud Backends Standardized on `object_store` (Breaking for `s3-native` users)
+
+All three cloud Backends — S3, Azure Blob, and Google Cloud Storage — now go through the `object_store` crate via the unified async `Backend` trait. Previously S3 was inconsistent: the unified path wrapped a deep `aws-sdk-s3` client, while Azure/GCS already used `object_store`.
+
+- **`s3-native` feature**: now pulls `object_store/aws` instead of `aws-sdk-s3` + `aws-config`. The unified Backend keeps the same surface (`stat`/`list`/`read`/`write`/`delete`/`mkdir`/`rename`/`exists`). For default and `--features network` builds, this removes the entire `aws-sdk-*` / `aws-smithy-*` / `aws-runtime` transitive tree (~30 crates).
+- **New `s3-cli` feature** (opt-in, off by default; included in `full`): preserves the rich `orbit s3 ...` subcommand tree (`cat`, `pipe`, `presign`, `ls`, `head`, `du`, `rm`, `mv`, `mb`, `rb`) — including versioning, presigned URLs, fine-grained per-PUT controls, and `--no-sign-request` — by keeping `aws-sdk-s3` + `aws-config` behind this flag. Implies `s3-native`.
+- **Breaking**: users who previously built with `--features s3-native` to get the `orbit s3 ...` subcommands must now use `--features s3-cli` instead. The unified Backend (and `s3://` URIs via `orbit cp` / `orbit sync`) keeps working on plain `s3-native`.
+- **`BackendConfig::S3`**: now uses a new lightweight `S3BackendConfig` (mirrors `AzureConfig` / `GcsConfig`) instead of the heavy `protocol::s3::S3Config`. Code that constructed `BackendConfig::S3 { config: S3Config { .. }, .. }` directly must switch to `S3BackendConfig`. The `s3://` URI parser is unchanged.
+
+#### Config Defaults (Breaking)
+- **`preserve_metadata` default changed to `true`**: Previously `false`. Metadata is now preserved by default; use `--no-preserve-metadata` to opt out
+- **`show_stats` default changed to `true`**: Execution statistics are now shown by default; use `--no-stat` to suppress
+- **`human_readable` default changed to `true`**: Output now shows "1.5 GiB" by default; use `--raw` for byte counts
+- **CLI args with hardcoded defaults changed to `Option<T>`**: `retry_attempts`, `retry_delay`, `chunk_size`, `workers`, `concurrency`, and `max_bandwidth` no longer have clap-level defaults, preventing profile/config presets from being silently overwritten by clap default values
+
+#### Output Mode Consistency
+- **JSON mode now suppresses all human output**: When `json_output = true` (from `--json` flag or config file), `human_readable`, `show_stats`, and `show_progress` are all forced to `false`. Progress bars, pre-transfer status prints (zero-copy, manifest), and guidance notices are all suppressed to keep stdout machine-readable
+- **`--quiet` suppresses progress and stats**: Progress bars and execution statistics are disabled in quiet mode
+
+#### Config Resolution Architecture
+- **Unified transfer path for shorthand subcommands**: `orbit sync`, `orbit backup`, and `orbit mirror` now fall through to the same config resolution and CLI override logic as bare `orbit`. Previously they used a separate code path that ignored most global flags
+- **Extracted `resolve_transfer_config()` helper**: Profile selection, auto-network merge, shorthand defaults, output-mode resolution, and all CLI overrides are now in a single testable function
+- **Extracted `apply_auto_network()` helper**: Auto-network merge logic compares each field against `CopyConfig::default()` to distinguish user-customized values from defaults
+- **Extracted `resolve_output_modes()` helper**: Output-mode resolution (json/quiet/raw → human_readable/show_stats) with correct config-file baseline preservation
+
+#### Codebase Restructuring
+- **main.rs reduced from 3,420 to 1,871 lines** (45% reduction): Extracted subcommand handlers into dedicated modules:
+  - `src/commands/s3.rs` — 10 S3 command handlers (`cat`, `pipe`, `presign`, `ls`, `head`, `du`, `rm`, `mv`, `mb`, `rb`) plus helper functions
+  - `src/commands/manifest.rs` — `ManifestCommands` enum and handlers (`plan`, `verify`, `diff`, `info`)
+  - `src/commands/batch.rs` — Batch execution (`run`, `split_command_line`, `normalize_batch_args`)
+- **Cli struct split into grouped `Args` sub-structs**: The monolithic `Cli` struct (~520 lines, 70+ fields) was decomposed into 9 `#[derive(Args)]` sub-structs flattened via `#[command(flatten)]`:
+  - `TransferArgs`, `ReliabilityArgs`, `PerformanceArgs`, `FilteringArgs`, `ConditionalCopyArgs`, `OutputArgs`, `ObservabilityArgs`, `S3Args`, `AdvancedArgs`
+  - The top-level `Cli` is now ~30 lines and only holds the flattened groups plus the `command` subcommand
+  - Every flag, attribute (`global`, `hide`, `conflicts_with`, `requires`, aliases), and `help_heading` is preserved — the user-facing CLI surface is unchanged
+  - Trade-off: field access in code moves from `cli.workers` to `cli.performance.workers`, but each derive target is smaller and the help is grouped at the source instead of via shared `help_heading` strings
+- **Metadata module consolidation**: Merged `src/core/metadata.rs` into `src/core/metadata_ops.rs`, eliminating a redundant module
+- **Default features simplified**: Removed `orbit-system` (Tokio) from default features. Tokio is now only pulled in by network backend features (`s3-native`, `ssh-backend`, `azure-native`, `gcs-native`, `smb-native`), reducing default binary size and compile times
+
+#### Error Handling — `anyhow` fully removed from first-party crates
+
+All Orbit-authored crates now use `thiserror`-based error types. `anyhow` is no longer a direct dependency anywhere in the workspace; remaining occurrences in the lock file are transitive (via `jsonschema`, `opentelemetry-otlp`).
+
+- **Root crate**: `orbit init` wizard migrated from `anyhow::Result` to `crate::error::Result<()>` with typed `OrbitError` variants
+- **`orbit-core-interface`**: doc-comment-only `anyhow::Result` references replaced with the crate's own `Result` alias (`std::result::Result<T, OrbitSystemError>`); doctest imports updated accordingly
+- **`orbit-core-semantic`**: new `SemanticError::ReadHeader { path, #[source] source: OrbitSystemError }` variant replaces the single `anyhow!` call site in `determine_intent_async`, which now returns `orbit_core_semantic::Result<ReplicationIntent>`
+
+#### Workspace Cargo hygiene — `[workspace.dependencies]` inheritance
+
+Shared dependency versions are now declared once at the workspace root and inherited by all 7 member crates via `{ workspace = true }`. Per-crate feature additions still compose via `features = [...]`.
+
+- **Centralized**: serde, serde_json, thiserror, tokio, async-trait, chrono, blake3, hex, bincode, rand
+- **Centralized (tracing/OTel stack)**: tracing, tracing-subscriber, tracing-opentelemetry, opentelemetry, opentelemetry-otlp, opentelemetry_sdk
+- **Centralized (dev-deps)**: tempfile, criterion
+- **Impact**: Future version bumps happen in one Cargo.toml instead of eight; no functional changes (`cargo check --workspace --all-targets` clean for default and `--features network`)
+
+#### Documentation
+- Marked incomplete features with TODO annotations: manifest diff (alpha stub), Windows file attribute preservation, ACL preservation
+- **README restructured**: 2092 → 466 lines; detailed feature walkthroughs moved to `docs/`; added "Why Orbit vs rsync/rclone" comparison table and three-phase roadmap
+- **Created `docs/GETTING_STARTED.md`**: focused install + first-transfer guide extracted from the README
+- **`ARCHITECTURE.md`**: status updated to "Alpha — stable core with experimental advanced features"; feature matrix reorganized into Stable Core / Beta / Alpha tiers; flat roadmap replaced with three phases (Stabilize, Polish, Expand) plus Risks-to-Watch section
+- **`CONTRIBUTING.md`**: added maturity-label scheme (`maturity:stable/beta/alpha`, `stabilize`, `good-first-issue`), prioritized stabilization-target list, testing guidelines, and scope-review checklist; updated `OrbitSystem` code example to use `thiserror`-based `Result` instead of `anyhow::Result`
+- **`SECURITY.md`**: added Supply Chain Security section covering SBOM generation (`cargo-sbom`, `cargo-cyclonedx`), `cargo-deny` / `cargo audit` workflow, and FIPS guidance (use `--checksum sha256` for FIPS-approved checksums)
+- **`docs/specs/PHASE_1_ABSTRACTION_SPEC.md`**: spec's reference implementation updated to match shipped code (`thiserror` + `OrbitSystemError` enum + local `Result<T>` alias) instead of the original `anyhow::Result`
+
+### Removed — Simplification Pass
+
+Orbit was simplified back to its core: a fast, reliable file transfer tool. Speculative and unused components were removed to reduce complexity.
+
+#### Workspace Crates Removed (8 crates cut)
+- **magnetar** — Job execution engine (not integrated into core transfer flow)
+- **orbit-sentinel** — Autonomous resilience engine (Phase 5, speculative)
+- **orbit-ghost** — FUSE-based on-demand filesystem (speculative)
+- **orbit-connect** — Nucleus client / RemoteSystem (Grid topology, speculative)
+- **orbit-star** — Star Agent binary (Grid topology, speculative)
+- **orbit-proto** — gRPC protocol definitions (Grid topology, speculative)
+- **core-resilience** — Resilience patterns crate (not used by core binary)
+- **orbit-web** — Control Plane API / web server (optional, removed from workspace)
+
+#### Dead Modules Removed from `src/core/`
+- `terminology` — User-facing terminology abstraction (unused)
+- `resilient_sync` — Crash-proof sync with Magnetar integration (unused)
+- `enhanced_progress` — Multi-transfer progress bars (unused)
+- `external_sort` — External merge-sort for large file lists (unused)
+- `rename_detector` — Content-aware rename/move detection (unused)
+- `v2_integration` — V2 Architecture integration (unused)
+- `neutrino/` — Small file optimization "fast lane" (unused, feature-gated)
+
+#### CLI Changes
+- `--profile` / `--neutrino-threshold` — Removed (neutrino module removed)
+- `--raw` — Removed, then re-added in UX overhaul (disables human-readable formatting)
+- `--force-glacier-transfer` / `--ignore-glacier-warnings` — Removed (were parse-only no-ops, never wired to backend)
+- `orbit serve` subcommand — Removed (control plane removed from workspace)
+
+#### Features Removed
+- `api` / `gui` — Control plane features (orbit-web removed)
+- `protocols` — Deprecated empty feature
+- `network-all` — Duplicate of `network`
+- `wasm-release` / `release-min` build profiles
+
+### Changed
+
+- **Guidance → ConfigOptimizer**: Renamed `Guidance` struct to `ConfigOptimizer`, `FlightPlan` (config result) to `OptimizedConfig`, `plan()` to `optimize()`
+- **Documentation**: 15 obsolete docs moved to `docs/archive/`, README and ARCHITECTURE.md updated to reflect simplified crate structure
+
 ### Fixed
+
+#### CLI Stability
+- **Stack overflow in debug builds** (`main.rs`): Adding new subcommands with 70+ `global = true` clap flags exceeded the default 1 MiB thread stack in debug builds. Fixed by spawning `run()` on a 4 MiB thread via `std::thread::Builder`
+- **Global flag name collisions** (`main.rs`): `orbit history --log` collided with the global `--log` flag, and `-n` (limit) collided with global `-n` (no-clobber). Renamed to `--audit-file` and removed the `-n` short flag from `--limit`
+- **Unicode panic in path truncation** (`commands/history.rs`): `truncate_path` byte-sliced multibyte UTF-8 paths (CJK, emoji), causing panics. Rewritten to use `chars().count()` and `chars().skip()` for char-safe truncation
+- **Silent fallback on missing audit log** (`commands/history.rs`): When an explicit `--audit-file` path didn't exist, the command silently fell through to default locations instead of reporting an error. Now returns a clear "not found" error for explicit paths
+- **BOM-prefixed audit logs silently dropped** (`commands/history.rs`): Windows PowerShell writes a UTF-8 BOM (`\u{FEFF}`) that caused `serde_json::from_str` to fail. `parse_record` now strips the BOM before parsing
+- **Timestamp byte-slicing** (`commands/history.rs`): Changed `&record.timestamp[..19]` to `record.timestamp.chars().take(19).collect()` to avoid panicking on multibyte timestamps
 
 #### Correctness & Safety
 - **Path traversal protection** (`backend/local.rs`): Resolved symlink-based path traversal in the local backend by manually normalizing `..` components instead of relying on `fs::canonicalize` (which fails on non-existent paths). Paths that escape the configured root now clamp to root.

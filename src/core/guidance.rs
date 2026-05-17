@@ -1,8 +1,7 @@
 /*!
- * Guidance System ("Flight Computer")
+ * Config Optimizer
  *
- * Responsible for validating, sanitizing, and optimizing transfer configurations
- * before execution. It acts as the "Pre-flight Check" to ensure safety and performance.
+ * Validates, sanitizes, and optimizes transfer configurations before execution.
  */
 
 use crate::config::{CompressionType, CopyConfig, CopyMode};
@@ -14,11 +13,11 @@ use std::fmt;
 use std::path::Path;
 
 /// The Guidance system responsible for validating and optimizing transfer configurations.
-pub struct Guidance;
+pub struct ConfigOptimizer;
 
 /// The output of a guidance check, containing the optimized config and pilot notices.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlightPlan {
+pub struct OptimizedConfig {
     /// The sanitized and optimized configuration to be used for execution
     pub final_config: CopyConfig,
     /// Notices generated during the optimization pass
@@ -76,16 +75,19 @@ impl fmt::Display for Notice {
     }
 }
 
-impl Guidance {
+impl ConfigOptimizer {
     /// Runs pre-flight checks to sanitize and optimize the configuration.
     /// This version does not perform active environment probing.
-    pub fn plan(config: CopyConfig) -> Result<FlightPlan> {
-        Self::plan_with_probe(config, None)
+    pub fn optimize(config: CopyConfig) -> Result<OptimizedConfig> {
+        Self::optimize_with_probe(config, None)
     }
 
     /// Runs pre-flight checks with optional active environment probing.
     /// When dest_path is provided, the system will probe the environment and auto-tune settings.
-    pub fn plan_with_probe(mut config: CopyConfig, dest_path: Option<&Path>) -> Result<FlightPlan> {
+    pub fn optimize_with_probe(
+        mut config: CopyConfig,
+        dest_path: Option<&Path>,
+    ) -> Result<OptimizedConfig> {
         let mut notices = Vec::new();
         let sys_caps = ZeroCopyCapabilities::detect();
 
@@ -299,7 +301,7 @@ impl Guidance {
         }
         */
 
-        Ok(FlightPlan {
+        Ok(OptimizedConfig {
             final_config: config,
             notices,
         })
@@ -380,7 +382,42 @@ impl Guidance {
         }
 
         // =================================================================================
-        // ACTIVE RULE 4: Cloud Storage Optimization
+        // ACTIVE RULE 4: Local-to-Local Worker Optimization
+        // =================================================================================
+        // With many cores and fast local I/O, auto-set workers to cores/2
+        if !profile.dest_filesystem_type.is_network()
+            && !profile.dest_filesystem_type.is_cloud_storage()
+            && profile.logical_cores > 8
+            && config.parallel == 0
+        {
+            let workers = profile.logical_cores / 2;
+            config.parallel = workers;
+            notices.push(Notice::auto_tune(
+                "Performance",
+                &format!(
+                    "Local transfer with {} cores. Auto-setting {} parallel workers.",
+                    profile.logical_cores, workers
+                ),
+            ));
+        }
+
+        // =================================================================================
+        // ACTIVE RULE 5: Fast I/O Chunk Size Optimization
+        // =================================================================================
+        // When I/O throughput is high and we're using buffered copy, increase chunk size
+        if profile.estimated_io_throughput > 500.0 && config.chunk_size <= 1024 * 1024 {
+            config.chunk_size = 4 * 1024 * 1024; // 4 MB
+            notices.push(Notice::auto_tune(
+                "Performance",
+                &format!(
+                    "Fast I/O detected ({:.0} MB/s). Increased chunk size to 4 MB for better throughput.",
+                    profile.estimated_io_throughput
+                ),
+            ));
+        }
+
+        // =================================================================================
+        // ACTIVE RULE 6: Cloud Storage Optimization
         // =================================================================================
         if profile.dest_filesystem_type.is_cloud_storage() {
             // Cloud storage benefits from compression due to network costs
@@ -425,7 +462,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Resume must be disabled to prevent corruption
         assert!(!plan.final_config.resume_enabled);
@@ -440,7 +477,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Zero-copy must be disabled to allow streaming hash
         assert!(!plan.final_config.use_zero_copy);
@@ -455,7 +492,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Checksum verification must be disabled on resume
         assert!(!plan.final_config.verify_checksum);
@@ -471,7 +508,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(!plan.final_config.use_zero_copy);
         assert!(plan.notices.iter().any(|n| n.category == "Visibility"));
@@ -486,7 +523,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(!plan.final_config.use_zero_copy);
         assert!(plan.notices.iter().any(|n| n.category == "Logic"));
@@ -502,7 +539,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert_eq!(plan.final_config.use_zero_copy, false);
         assert!(plan
@@ -520,7 +557,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(plan.notices.iter().any(|n| n.category == "UX"));
     }
@@ -534,7 +571,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         assert!(plan.notices.iter().any(|n| n.category == "Performance"));
     }
@@ -547,7 +584,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Should have no notices for a clean, conflict-free config
         assert!(plan.notices.is_empty());
@@ -563,7 +600,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Multiple rules should have been triggered
         assert!(plan.notices.len() >= 2);
@@ -599,7 +636,7 @@ mod tests {
             ..Default::default()
         };
 
-        let plan = Guidance::plan(config).unwrap();
+        let plan = ConfigOptimizer::optimize(config).unwrap();
 
         // Zero-copy must be disabled because compression requires userspace buffering
         assert!(!plan.final_config.use_zero_copy);

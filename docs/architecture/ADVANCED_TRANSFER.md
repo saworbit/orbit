@@ -1,13 +1,12 @@
 # Advanced Transfer Features
 
-Six features inspired by rsync, reimplemented on Orbit's CDC + Star Map architecture.
+Five features inspired by rsync, reimplemented on Orbit's CDC + Star Map architecture.
 
 | Feature | Module | CLI | rsync | Orbit Improvement |
 |---------|--------|-----|-------|-------------------|
 | Sparse files | `core/sparse.rs` | `--sparse {auto\|always\|never}` | `--sparse` | Zero-cost detection during CDC; combinable with `--inplace` |
 | Hardlinks | `core/hardlink.rs` | `--preserve-hardlinks` | `-H` | Cross-platform (Unix inode + Windows FFI) |
 | In-place | `core/inplace.rs` | `--inplace --inplace-safety {reflink\|journaled\|unsafe}` | `--inplace` | Three safety tiers vs none |
-| Rename detect | `core/rename_detector.rs` | `--detect-renames --rename-threshold 0.8` | `--fuzzy` | Content-aware chunk overlap vs filename similarity |
 | link-dest++ | `core/link_dest.rs` | `--link-dest DIR` | `--link-dest` | Chunk-level partial reuse vs all-or-nothing |
 | Batch mode | `core/batch.rs` | `--write-batch FILE --read-batch FILE` | `--write-batch` | Content-addressed journal, portable across destinations |
 
@@ -32,11 +31,6 @@ Detects all-zero chunks **during CDC** (`chunk.data.iter().all(|&b| b == 0)` —
 
 `recover_from_journal()` restores from reflink snapshot first, then journal entries.
 
-## Rename Detection
-
-For each new source file: sample first/middle/last chunk hashes → query Star Map for candidates → compute full overlap ratio → use as delta basis if >= threshold (default 80%). Complexity: O(sample_size * files_per_chunk) per file.  
-**Current CLI:** Uses full-file hashing for exact-match rename detection only. Partial-overlap delta basis is planned.
-
 ## Link-Dest++
 
 `LinkDestResolver` checks reference directories in priority order. Returns `Hardlink` (100% match + same count), `DeltaBasis` (partial match >= 30% threshold), or `FullTransfer`. `quick_match()` pre-filters by size + mtime.  
@@ -56,7 +50,6 @@ For each new source file: sample first/middle/last chunk hashes → query Star M
 | `sparse.rs` | 10 | Holes, auto threshold, empty files, CDC conversion |
 | `hardlink.rs` | 9 | Creation, tracker groups, three-way links, error paths |
 | `inplace.rs` | 12 | All safety tiers, crash recovery, reflink fallback |
-| `rename_detector.rs` | 11 | Exact/partial/no match, custom threshold, same-path |
 | `link_dest.rs` | 12 | Hardlink/delta/full, thresholds, quick_match |
 | `batch.rs` | 12 | Save/load, all replay ops, version mismatch |
-| **Total** | **66** | |
+| **Total** | **55** | |

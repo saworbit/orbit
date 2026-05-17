@@ -188,7 +188,7 @@ impl VersionsListResult {
     /// Get all versions sorted by last modified (newest first)
     pub fn versions_sorted(&self) -> Vec<ObjectVersion> {
         let mut versions = self.versions.clone();
-        versions.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+        versions.sort_by_key(|version| std::cmp::Reverse(version.last_modified));
         versions
     }
 

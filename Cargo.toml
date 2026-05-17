@@ -4,19 +4,49 @@ members = [
     "crates/core-manifest",
     "crates/core-starmap",
     "crates/core-audit",
-    "crates/core-resilience",
     "crates/core-cdc",
     "crates/core-semantic",
-    "crates/orbit-core-interface",  # Phase 1: I/O Abstraction Layer
-    "crates/orbit-proto",           # Phase 2: gRPC Protocol Definitions
-    "crates/orbit-star",            # Phase 2: Star Agent Binary
-    "crates/orbit-connect",         # Phase 3: Nucleus Client & RemoteSystem
-    "crates/magnetar",              # Phase 4: Job Execution Engine
-    "crates/orbit-sentinel",        # Phase 5: Autonomous Resilience Engine
-    "crates/orbit-web",  # V2.2.0: Renamed to orbit-server (package), keeping directory name for now
-    "crates/orbit-observability",   # V3: Unified Observability & Immutable Audit Plane
-    "orbit-ghost",                  # Quantum Entanglement: FUSE-based on-demand filesystem
+    "crates/orbit-core-interface",
+    "crates/orbit-observability",
 ]
+
+# Shared dependency versions inherited by all workspace members.
+# Crates inherit a dep with `name = { workspace = true }` and may add features
+# locally with `name = { workspace = true, features = ["..."] }`.
+[workspace.dependencies]
+# Serialization / encoding
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+hex = "0.4"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Hashing
+blake3 = "1.5"
+
+# Error handling
+thiserror = "2.0"
+
+# Async runtime / traits
+tokio = "1"
+async-trait = "0.1"
+
+# Randomness
+rand = "0.9"
+
+# Tracing / observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-opentelemetry = "0.28"
+opentelemetry = "0.27"
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"] }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+
+# Dev dependencies
+tempfile = "3.10"
+criterion = "0.8"
 
 [package]
 name = "orbit"
@@ -32,8 +62,8 @@ keywords = ["file-copy", "resume", "compression", "checksum", "backup"]
 [dependencies]
 # Core dependencies
 clap = { version = "4.5", features = ["derive", "cargo"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 toml = "0.9"
 
 # File I/O and progress
@@ -47,7 +77,7 @@ zstd = "0.13"
 
 # Checksums
 sha2 = "0.10"
-blake3 = "1.5"
+blake3 = { workspace = true }
 
 # Parallel processing
 rayon = "1.10"
@@ -56,7 +86,7 @@ crossbeam-channel = "0.5"
 # System information
 sysinfo = "0.37"
 notify = "8.2"
-tempfile = "3.10"
+tempfile = { workspace = true }
 
 # Pattern matching
 glob = "0.3"
@@ -66,35 +96,31 @@ regex = "1.10"
 unicode-normalization = { version = "0.1", optional = true }
 
 # Date/time
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { workspace = true }
 
 # Error handling
-thiserror = "2.0"
-anyhow = "1.0"
+thiserror = { workspace = true }
 
 # File metadata utilities
 filetime = "0.2"
 clap_complete = "4.5"
 
 # Encoding
-hex = "0.4"
+hex = { workspace = true }
 base64 = "0.22"
-bincode = "1.3"
+bincode = { workspace = true }
 
 # Logging/tracing
 log = "0.4"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
-opentelemetry = { version = "0.27", optional = true }
-opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"], optional = true }
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"], optional = true }
-tracing-opentelemetry = { version = "0.28", optional = true }
-
-# Control Plane API integration (optional) - V2.2.0: Renamed from orbit-web to orbit-server
-orbit-server = { path = "crates/orbit-web", optional = true, default-features = false }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+opentelemetry = { workspace = true, optional = true }
+opentelemetry-otlp = { workspace = true, optional = true }
+opentelemetry_sdk = { workspace = true, optional = true }
+tracing-opentelemetry = { workspace = true, optional = true }
 
 # Random for backoff jitter
-rand = "0.9"
+rand = { workspace = true }
 
 # Phase 5: Onboarding wizard dependencies
 dialoguer = "0.11"
@@ -120,15 +146,19 @@ orbit-observability = { path = "crates/orbit-observability" }
 
 # SMB native dependencies (optional, feature-gated)
 bytes = { version = "1", optional = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "fs", "io-util"], optional = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "time", "sync", "fs", "io-util"], optional = true }
 smb = { version = "0.11.1", optional = true, default-features = false, features = ["async", "encrypt_aesgcm", "encrypt_aesccm", "std-fs-impls", "netbios-transport"] }
-async-trait = { version = "0.1", optional = true }
+async-trait = { workspace = true, optional = true }
 bitflags = { version = "2", optional = true }
 zeroize = { version = "1", optional = true }
 
-# S3 native dependencies (optional, feature-gated)
-aws-config = { version = "1.8", default-features = false, features = ["behavior-version-latest", "rustls"], optional = true }
-aws-sdk-s3 = { version = "1.116", default-features = false, features = ["rt-tokio", "rustls"], optional = true }
+# S3 dependencies (optional, feature-gated)
+# `url` is needed by the unified Backend abstraction for s3:// URI parsing.
+# `aws-sdk-s3` / `aws-config` / `mime_guess` only power the rich `orbit s3 ...`
+# CLI subcommands gated behind the opt-in `s3-cli` feature; the unified Backend
+# layer goes through `object_store` (see s3-native below).
+aws-config = { version = "1.8", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"], optional = true }
+aws-sdk-s3 = { version = "1.116", default-features = false, features = ["rt-tokio", "default-https-client"], optional = true }
 url = { version = "2.5", optional = true }
 mime_guess = { version = "2", optional = true }
 
@@ -136,9 +166,10 @@ mime_guess = { version = "2", optional = true }
 ssh2 = { version = "0.9", optional = true }
 secrecy = { version = "0.10", optional = true, features = ["serde"] }
 
-# Cloud Storage backends (Azure Blob, Google Cloud Storage) - optional, feature-gated
-# Using object_store crate with azure and gcp features
-object_store = { version = "0.11", features = ["azure", "gcp"], optional = true }
+# Cloud Storage backends (S3, Azure Blob, Google Cloud Storage) - optional, feature-gated
+# Using object_store crate with aws, azure, and gcp features. This is the
+# unified abstraction used by the `Backend` trait for all three providers.
+object_store = { version = "0.11", features = ["aws", "azure", "gcp"], optional = true }
 
 # Async utilities for backend abstraction
 futures = { version = "0.3", optional = true }
@@ -150,7 +181,6 @@ rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 # Zero-copy support (Linux)
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "0.38", features = ["fs"] }
 libc = "0.2"
 
 # Extended attributes (Unix only)
@@ -164,9 +194,10 @@ libc = "0.2"
 # Zero-copy support (Windows) - uses std library, no extra deps needed
 
 [dev-dependencies]
-tempfile = "3.10"
-criterion = "0.8"
+tempfile = { workspace = true }
+criterion = { workspace = true }
 assert_fs = "1.1"
+assert_cmd = "2.0"
 predicates = "3.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 adler2 = "2.0"  # For Adler-32 test validation
@@ -196,26 +227,11 @@ strip = true
 [profile.bench]
 inherits = "release"
 
-[profile.wasm-release]
-inherits = "release"
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-
-[profile.release-min]
-inherits = "release"
-opt-level = "z"        # Optimize for size
-lto = true             # Enable link-time optimization
-codegen-units = 1      # Single codegen unit for better optimization
-strip = true           # Strip symbols
-panic = "abort"        # Smaller panic handler
-
 [features]
 # Minimal default: local file copy only, zero-copy optimizations
-# For network protocols or GUI, explicitly opt-in with --features
-# Phase 1: Added tokio and async-trait for OrbitSystem abstraction
-default = ["zero-copy", "orbit-system"]
+# For network protocols, explicitly opt-in with --features (e.g., s3-native, smb-native)
+# Tokio (orbit-system) is pulled automatically by any network backend feature
+default = ["zero-copy"]
 
 # OrbitSystem abstraction layer (Phase 1)
 orbit-system = ["dep:tokio", "dep:async-trait"]
@@ -223,14 +239,19 @@ orbit-system = ["dep:tokio", "dep:async-trait"]
 # Zero-copy system calls for maximum performance
 zero-copy = []
 
-# Protocol support (experimental, deprecated - use specific protocol features)
-protocols = []
-
 # Native SMB2/3 client (pure Rust, async) - OFF by default
 smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
-# Native S3 client (pure Rust, async) - OFF by default
-s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "dep:mime_guess", "backend-abstraction"]
+# Unified S3 backend via object_store (matches Azure/GCS) - OFF by default.
+# This provides `s3://` support through the unified `Backend` trait without
+# pulling the full aws-sdk-s3 dependency tree.
+s3-native = ["dep:object_store", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
+
+# Rich S3 CLI subcommands (`orbit s3 ls/cp/sync/presign/versions/...`).
+# Pulls the full aws-sdk-s3 / aws-config tree for features object_store does
+# not expose (presigned URLs, versioning, fine-grained per-PUT controls,
+# storage class selection, --no-sign-request, etc.). Implies s3-native.
+s3-cli = ["s3-native", "dep:aws-config", "dep:aws-sdk-s3", "dep:mime_guess"]
 
 # SSH backend support - OFF by default
 ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
@@ -243,12 +264,6 @@ gcs-native = ["dep:object_store", "dep:tokio", "dep:async-trait", "dep:bytes", "
 
 # Unified backend abstraction layer - enables async backends with extensibility
 backend-abstraction = ["dep:tokio", "dep:async-trait", "dep:futures", "dep:pin-project", "dep:bytes", "dep:secrecy", "dep:url", "dep:once_cell"]
-
-# Control Plane API - OFF by default (use --features api to enable) - V2.2.0: Headless API server
-api = ["dep:orbit-server", "dep:tokio"]
-
-# GUI feature alias - maps to api for backward compatibility
-gui = ["api"]
 
 # Delta manifest persistence with SQLite - OFF by default
 delta-manifest = ["dep:rusqlite"]
@@ -268,14 +283,13 @@ opentelemetry = [
     "dep:tracing-opentelemetry",
 ]
 
-# Convenience: All network protocols
+# Convenience: All network protocols (unified Backend abstraction only,
+# without the heavy aws-sdk-s3 CLI surface — opt into s3-cli explicitly).
 network = ["s3-native", "smb-native", "ssh-backend", "azure-native", "gcs-native"]
 
-# NEW: Aggregated feature for all network protocols
-network-all = ["s3-native", "smb-native", "ssh-backend", "azure-native", "gcs-native"]
-
-# Full feature set (for development and power users)
-full = ["zero-copy", "network", "backend-abstraction", "delta-manifest", "extended-metadata", "api", "unicode-normalization"]
+# Full feature set (for development and power users) — includes s3-cli so the
+# entire `orbit s3 ...` subcommand tree is available.
+full = ["zero-copy", "network", "s3-cli", "backend-abstraction", "extended-metadata", "unicode-normalization"]
 
 # --- CI & Local Development Optimization ---
 # This profile override fixes "signal 7 [Bus error]" and "No space left on device" errors on CI.

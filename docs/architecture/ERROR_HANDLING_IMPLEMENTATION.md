@@ -320,7 +320,7 @@ Chose `tracing` over simple `log` crate for:
 
 Potential improvements identified:
 
-1. **Circuit Breaker Integration**: Integrate with the existing `magnetar` resilience crate's circuit breaker for faster failure detection
+1. **Circuit Breaker**: Add circuit breaker pattern for faster failure detection
 2. **Retry Budgets**: Implement per-session retry budgets to prevent infinite retry loops
 3. **Adaptive Backoff**: Adjust backoff based on error patterns and success rates
 4. **OpenTelemetry**: Add OpenTelemetry exporter for distributed tracing

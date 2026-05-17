@@ -168,7 +168,7 @@ pub fn info_box(title: &str, lines: &[&str]) {
     println!("└{}┘", "─".repeat(width));
 }
 
-/// Draw a guidance notice box (for the Guidance System)
+/// Draw a notice box showing config optimization results
 pub fn guidance_box(notices: &[Notice]) {
     if notices.is_empty() {
         return;
@@ -183,7 +183,7 @@ pub fn guidance_box(notices: &[Notice]) {
     let width = max_len.max(45) + 2;
 
     println!(
-        "??? {} Orbit Guidance System {}?",
+        "??? {} Orbit Notices {}?",
         Icons::SATELLITE,
         "?".repeat(width.saturating_sub(28))
     );
@@ -465,7 +465,7 @@ pub fn format_duration(secs: f64) -> String {
 }
 
 /// Print a styled error message with optional suggestion
-pub fn print_error(message: &str, suggestion: Option<&str>) {
+pub fn print_error(message: &str, suggestion: Option<impl AsRef<str>>) {
     eprintln!(
         "\n{} {}",
         Theme::error(format!("{} Error:", Icons::ERROR)),
@@ -476,7 +476,7 @@ pub fn print_error(message: &str, suggestion: Option<&str>) {
         eprintln!(
             "  {} {}",
             Theme::muted(Icons::ARROW_RIGHT),
-            Theme::muted(hint)
+            Theme::muted(hint.as_ref())
         );
     }
     eprintln!();

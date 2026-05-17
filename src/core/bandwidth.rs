@@ -49,10 +49,10 @@ impl BandwidthLimiter {
     /// Wait until we can transfer the given number of bytes
     pub fn wait_for_capacity(&self, bytes: u64) {
         if let Some(ref limiter) = self.limiter {
-            if self.bytes_per_token > 0 {
-                // Calculate tokens needed
-                let tokens_needed = (bytes / self.bytes_per_token).max(1) as u32;
-
+            if let Some(tokens_needed) = bytes
+                .checked_div(self.bytes_per_token)
+                .map(|tokens| tokens.max(1) as u32)
+            {
                 // Wait for tokens to become available
                 if let Some(tokens) = NonZeroU32::new(tokens_needed) {
                     while limiter.check_n(tokens).is_err() {

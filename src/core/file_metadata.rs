@@ -293,6 +293,7 @@ impl FileMetadata {
         if let Some(_attrs) = self.windows_attributes {
             // Windows file attributes would be set here
             // Currently requires winapi crate for full support
+            // TODO: Implement Windows file attribute preservation (requires winapi crate)
             tracing::debug!("Windows file attributes preservation not yet implemented");
         }
 
@@ -344,6 +345,7 @@ impl FileMetadata {
     }
 
     /// Apply ACLs to destination (platform-specific)
+    // TODO: Implement ACL preservation (requires platform-specific libraries)
     fn apply_acls(&self, dest_path: &Path) -> Result<()> {
         if let Some(_acls) = &self.acls {
             // ACL implementation would go here

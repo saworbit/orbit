@@ -36,7 +36,7 @@ pub struct CopyConfig {
     pub recursive: bool,
 
     /// Preserve file metadata (timestamps, permissions)
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub preserve_metadata: bool,
 
     /// Detailed metadata preservation flags (overrides preserve_metadata if set)
@@ -210,16 +210,6 @@ pub struct CopyConfig {
     #[serde(default)]
     pub check_mode_str: Option<String>,
 
-    /// Transfer profile: "neutrino" for small-file optimization
-    /// Options: "standard", "neutrino", "adaptive"
-    #[serde(default)]
-    pub transfer_profile: Option<String>,
-
-    /// Neutrino threshold in bytes (default: 8192 = 8KB)
-    /// Files smaller than this use the fast lane
-    #[serde(default = "default_neutrino_threshold")]
-    pub neutrino_threshold: u64,
-
     // === V3 Observability Configuration ===
     /// OpenTelemetry OTLP endpoint for distributed tracing
     /// Example: "http://localhost:4317" (Jaeger, Honeycomb, Datadog)
@@ -232,11 +222,11 @@ pub struct CopyConfig {
     pub metrics_port: Option<u16>,
 
     /// Show execution statistics summary at end of run
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub show_stats: bool,
 
     /// Human-readable output (e.g., "1.5 GiB" instead of raw bytes)
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub human_readable: bool,
 
     /// Output results as JSON Lines instead of human-readable text
@@ -381,7 +371,7 @@ impl Default for CopyConfig {
         Self {
             copy_mode: CopyMode::Copy,
             recursive: false,
-            preserve_metadata: false,
+            preserve_metadata: true,
             preserve_flags: None,
             transform: None,
             strict_metadata: false,
@@ -423,12 +413,10 @@ impl Default for CopyConfig {
             check_mode_str: None,
             delta_resume_enabled: true,
             delta_chunk_size: default_delta_block_size(),
-            transfer_profile: None,
-            neutrino_threshold: default_neutrino_threshold(),
             otel_endpoint: None,
             metrics_port: None,
-            show_stats: false,
-            human_readable: false,
+            show_stats: true,
+            human_readable: true,
             json_output: false,
             // S3 upload enhancement fields (Phase 3)
             s3_content_type: None,
@@ -573,7 +561,7 @@ pub enum InplaceSafety {
     #[default]
     Reflink,
 
-    /// Log original bytes to Magnetar state machine before each overwrite.
+    /// Log original bytes to an undo journal before each overwrite.
     /// Works on any filesystem. Slightly slower but crash-recoverable.
     Journaled,
 
@@ -613,10 +601,6 @@ fn default_retry_delay() -> u64 {
 
 fn default_delta_block_size() -> usize {
     1024 * 1024 // 1 MB
-}
-
-fn default_neutrino_threshold() -> u64 {
-    8 * 1024 // 8 KB
 }
 
 fn default_concurrency() -> usize {
@@ -664,6 +648,24 @@ impl CopyConfig {
             resume_enabled: true,
             retry_attempts: 5,
             exponential_backoff: true,
+            use_zero_copy: false,
+            generate_manifest: false,
+            manifest_output_dir: None,
+            chunking_strategy: ChunkingStrategy::default(),
+            ..Default::default()
+        }
+    }
+
+    /// Create a configuration optimized for backups: reliability + compression
+    pub fn backup_preset() -> Self {
+        Self {
+            verify_checksum: true,
+            resume_enabled: true,
+            compression: CompressionType::Zstd { level: 3 },
+            sparse_mode: crate::core::sparse::SparseMode::Never,
+            retry_attempts: 5,
+            exponential_backoff: true,
+            preserve_metadata: true,
             use_zero_copy: false,
             generate_manifest: false,
             manifest_output_dir: None,
@@ -733,8 +735,9 @@ mod tests {
         assert!(!config.resume_enabled);
         assert!(!config.generate_manifest);
         assert_eq!(config.concurrency, 5);
-        assert!(!config.show_stats);
-        assert!(!config.human_readable);
+        assert!(config.show_stats);
+        assert!(config.human_readable);
+        assert!(config.preserve_metadata);
     }
 
     #[test]
@@ -861,8 +864,8 @@ recursive = false
 "#;
         let config: CopyConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.concurrency, 5); // default
-        assert!(!config.show_stats); // default
-        assert!(!config.human_readable); // default
+        assert!(config.show_stats); // default (now true)
+        assert!(config.human_readable); // default (now true)
     }
 
     #[test]
@@ -1022,11 +1025,6 @@ audit_log_path = "/var/log/orbit_audit.log"
         assert_eq!(LogLevel::Info.to_tracing_level(), tracing::Level::INFO);
         assert_eq!(LogLevel::Debug.to_tracing_level(), tracing::Level::DEBUG);
         assert_eq!(LogLevel::Trace.to_tracing_level(), tracing::Level::TRACE);
-    }
-
-    #[test]
-    fn test_neutrino_threshold_default() {
-        assert_eq!(default_neutrino_threshold(), 8192);
     }
 
     #[test]

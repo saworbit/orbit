@@ -198,12 +198,21 @@ The default build configuration (`cargo build`) has **zero runtime security vuln
 - **Mitigation:** Remove once AWS SDK updates the `lru` dependency
 - **Actual Risk:** Low to Medium (transitive, not directly exposed)
 
+**Unsound Dependency: `rand` 0.8.x (RUSTSEC-2026-0097)**
+- **Status:** Transitive dependency through `object_store`, `opentelemetry_sdk`, `tonic`, and `smb`
+- **Dependency Chain:** `rand 0.8.5` -> `{object_store, opentelemetry_sdk, tower/tonic, smb*}` -> `orbit`
+- **Impact:** Unsoundness is triggered by `rand::rng()` with a custom logger
+- **Mitigation:**
+  - Updated all fixable transitive crates in `Cargo.lock`
+  - Ignored only this advisory in `.cargo/audit.toml` and `deny.toml`
+  - Will remove the exception once upstream crates migrate off `rand` 0.8.x
+- **Actual Risk:** Low for current Orbit usage (transitive only; no known direct use of the triggering pattern)
+
 #### 🎯 Security Posture by Feature Set
 
 | Build Configuration | Runtime Vulnerabilities | Notes |
 |---------------------|------------------------|-------|
 | Default (`cargo build`) | **None** | Recommended for production |
-| `--features api` | **None** | Web API uses SQLite only (MySQL disabled) |
 | `--features smb-native` | ⚠️ RSA timing (medium) | SMB connections only, opt-in |
 | `--features full` | ⚠️ RSA timing (medium) | Full test suite, not for production |
 
@@ -286,11 +295,53 @@ We appreciate security researchers who help make Orbit safer:
 
 ---
 
+## Supply Chain Security
+
+### Software Bill of Materials (SBOM)
+
+Generate an SBOM for Orbit at any time:
+
+```bash
+# Using cargo-sbom (install: cargo install cargo-sbom)
+cargo sbom --output-format spdx_json_2_3 > orbit-sbom.spdx.json
+
+# Or using cargo-cyclonedx
+cargo cyclonedx --format json > orbit-bom.json
+```
+
+### Dependency Auditing
+
+Orbit uses multiple layers of dependency security:
+
+- **`deny.toml`**: Configured with `cargo-deny` to check licenses, advisories, and duplicate crates
+- **`cargo audit`**: Run in CI to catch known vulnerabilities
+- **Dependabot**: Weekly automated dependency update PRs
+- **Minimal defaults**: The default build pulls in only essential dependencies
+
+```bash
+# Run a full dependency audit locally
+cargo deny check
+cargo audit
+
+# Review dependency tree
+cargo tree --depth 2
+```
+
+### FIPS Considerations
+
+Orbit uses BLAKE3 and SHA-256 for checksums. For environments requiring FIPS 140-2 compliance:
+- SHA-256 is FIPS-approved; use `--checksum sha256` for FIPS-compliant checksums
+- BLAKE3 is not FIPS-approved but is the default for performance
+- Future releases may add a `fips` feature flag for FIPS-only crypto
+
+---
+
 ## Compliance & Certifications
 
 **Current Status:**
 - No formal certifications yet
 - Suitable for internal use and non-regulated data
+- SBOM generation supported (see above)
 - **Not yet certified for:**
   - HIPAA (healthcare data)
   - PCI-DSS (payment card data)
@@ -300,6 +351,7 @@ We appreciate security researchers who help make Orbit safer:
 - SOC 2 Type II preparation
 - Security audit by third-party firm
 - Penetration testing
+- Formal SBOM publishing with releases
 
 ---
 
@@ -351,4 +403,4 @@ We commit to:
 
 ---
 
-**Thank you for helping keep Orbit secure!** 🔒
+**Thank you for helping keep Orbit secure!**

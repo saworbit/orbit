@@ -12,11 +12,36 @@
 
 use crate::core::file_metadata::{FileMetadata, PreserveFlags};
 use crate::core::transform::{transform_metadata, TransformConfig};
-use crate::error::Result;
+use crate::error::{OrbitError, Result};
+use filetime::{set_file_times, FileTime};
 use std::path::Path;
 
 #[cfg(feature = "backend-abstraction")]
 use crate::backend::{Backend, BackendResult};
+
+// =============================================================================
+// Basic metadata preservation (merged from metadata.rs)
+// =============================================================================
+
+/// Preserve file metadata (timestamps, permissions) from source to destination
+pub fn preserve_metadata(source_path: &Path, dest_path: &Path) -> Result<()> {
+    let metadata = std::fs::metadata(source_path).map_err(|e| {
+        OrbitError::MetadataFailed(format!("Failed to read source metadata: {}", e))
+    })?;
+
+    // Preserve permissions
+    std::fs::set_permissions(dest_path, metadata.permissions())
+        .map_err(|e| OrbitError::MetadataFailed(format!("Failed to set permissions: {}", e)))?;
+
+    // Preserve timestamps
+    let accessed = FileTime::from_last_access_time(&metadata);
+    let modified = FileTime::from_last_modification_time(&metadata);
+
+    set_file_times(dest_path, accessed, modified)
+        .map_err(|e| OrbitError::MetadataFailed(format!("Failed to set timestamps: {}", e)))?;
+
+    Ok(())
+}
 
 /// Metadata preservation operation
 #[derive(Default)]

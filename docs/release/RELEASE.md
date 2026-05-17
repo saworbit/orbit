@@ -21,7 +21,7 @@ Orbit uses a workspace-based release strategy where:
 - Independent crates (`magnetar`, `orbit-web`) may have their own versions
 - Releases include both source code and pre-built binaries for major platforms
 
-**Current Version:** `0.4.1`
+**Current Version:** `0.6.0`
 
 ---
 
@@ -271,62 +271,38 @@ See CHANGELOG.md for full details.
 git push origin v0.5.0
 ```
 
-### Step 8: Build Release Binaries
+### Step 8: Build Release Binaries (automated)
 
-Build binaries for all platforms:
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](../../.github/workflows/release.yml), which builds and publishes:
+
+| Asset | Built with | Notes |
+|-------|------------|-------|
+| `orbit-vX.Y.Z-x86_64-unknown-linux-musl.tar.gz` | `cargo-zigbuild` on `ubuntu-latest` | Static musl, no glibc dependency |
+| `orbit-vX.Y.Z-aarch64-unknown-linux-musl.tar.gz` | `cargo-zigbuild` on `ubuntu-latest` | Static musl, ARM64 |
+| `orbit-vX.Y.Z-universal2-apple-darwin.tar.gz` | `cargo-zigbuild` on `macos-latest` | Universal fat binary (Intel + Apple Silicon) |
+| `orbit-vX.Y.Z-x86_64-pc-windows-msvc.zip` | `cargo build` on `windows-latest` | Native MSVC |
+| `SHA256SUMS` | `sha256sum` over all of the above | Published alongside the archives |
+
+All binaries are built with `--features s3-native,backend-abstraction`. If you need a manual local rebuild for any reason:
 
 ```bash
-# Linux x86_64
-cargo build --release --target x86_64-unknown-linux-gnu
-
-# Linux ARM64
-cargo build --release --target aarch64-unknown-linux-gnu
-
-# macOS x86_64
-cargo build --release --target x86_64-apple-darwin
-
-# macOS ARM64 (Apple Silicon)
-cargo build --release --target aarch64-apple-darwin
-
-# Windows x86_64
-cargo build --release --target x86_64-pc-windows-msvc
-
-# Create archives
-mkdir -p releases/v0.5.0
-
-# Linux x86_64
-tar czf releases/v0.5.0/orbit-v0.5.0-x86_64-unknown-linux-gnu.tar.gz \
-  -C target/x86_64-unknown-linux-gnu/release orbit
-
-# macOS ARM64
-tar czf releases/v0.5.0/orbit-v0.5.0-aarch64-apple-darwin.tar.gz \
-  -C target/aarch64-apple-darwin/release orbit
-
-# Windows (zip)
-cd target/x86_64-pc-windows-msvc/release
-zip ../../../releases/v0.5.0/orbit-v0.5.0-x86_64-pc-windows-msvc.zip orbit.exe
-cd ../../..
+cargo build --release --target x86_64-unknown-linux-musl --features s3-native,backend-abstraction
+# (etc. — see release.yml for the exact target list)
 ```
 
-### Step 9: Create GitHub Release
+### Step 9: Create GitHub Release (automated)
+
+The same workflow's `release` job creates the GitHub release with `softprops/action-gh-release@v2`, attaches all archives plus `SHA256SUMS`, and renders install instructions in the release body. The release is marked as a pre-release automatically if the tag name contains `alpha`, `beta`, or `rc`.
+
+If the workflow fails or you need to publish manually, fall back to:
 
 ```bash
-# Using GitHub CLI
 gh release create v0.5.0 \
-  --title "Orbit v0.5.0 - Web GUI Release" \
+  --title "Orbit v0.5.0" \
   --notes-file RELEASE_NOTES.md \
   releases/v0.5.0/orbit-v0.5.0-*.tar.gz \
   releases/v0.5.0/orbit-v0.5.0-*.zip
 ```
-
-Or manually on GitHub:
-1. Go to https://github.com/saworbit/orbit/releases/new
-2. Choose tag `v0.5.0`
-3. Set title: `Orbit v0.5.0 - Web GUI Release`
-4. Add release notes from CHANGELOG
-5. Upload binary archives
-6. Check "Set as the latest release"
-7. Publish release
 
 ### Step 10: Publish Announcement
 
@@ -343,10 +319,13 @@ Create announcement post with:
 ### 1. Verify Release
 
 ```bash
-# Test installation from GitHub release
-wget https://github.com/saworbit/orbit/releases/download/v0.5.0/orbit-v0.5.0-x86_64-unknown-linux-gnu.tar.gz
-tar xzf orbit-v0.5.0-x86_64-unknown-linux-gnu.tar.gz
+# Test installation from GitHub release (Linux x86_64 example)
+curl -L https://github.com/saworbit/orbit/releases/download/v0.6.0/orbit-v0.6.0-x86_64-unknown-linux-musl.tar.gz | tar xz
 ./orbit --version
+
+# Verify checksum
+curl -L https://github.com/saworbit/orbit/releases/download/v0.6.0/SHA256SUMS \
+  | grep orbit-v0.6.0-x86_64-unknown-linux-musl.tar.gz | sha256sum -c
 ```
 
 ### 2. Update Documentation
@@ -435,81 +414,18 @@ git push origin v0.5.1
 
 ### GitHub Actions Release Workflow
 
-Create `.github/workflows/release.yml`:
+The release pipeline lives at [`.github/workflows/release.yml`](../../.github/workflows/release.yml). It triggers on any tag matching `v*` and runs two jobs:
 
-```yaml
-name: Release
+1. **`build`** — a matrix across Linux musl (x86_64, aarch64) via `cargo-zigbuild`, macOS universal2 via `cargo-zigbuild`, and Windows MSVC via plain `cargo build`. All builds enable `--features s3-native,backend-abstraction`. Each job uploads its archive as a workflow artifact.
+2. **`release`** — downloads all artifacts, generates `SHA256SUMS`, and publishes a GitHub Release with platform-specific install instructions in the body. Tags containing `alpha`/`beta`/`rc` are marked as pre-releases automatically.
 
-on:
-  push:
-    tags:
-      - 'v*'
+Why these target choices:
 
-jobs:
-  build:
-    name: Build release binaries
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: macos-latest
-            target: x86_64-apple-darwin
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
+- **Static musl** for Linux means the same binary runs on Debian, RHEL, Alpine, and anything else with a modern kernel — no glibc version drama.
+- **universal2** for macOS ships one archive that works on both Intel and Apple Silicon Macs.
+- **`cargo-zigbuild`** lets us cross-compile from clean Linux/macOS runners without juggling per-target C toolchains; `zig cc` handles the `lz4-sys` / `zstd-sys` builds against musl out of the box.
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }} --all-features
-
-      - name: Create archive (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          tar czf ../../../orbit-${{ github.ref_name }}-${{ matrix.target }}.tar.gz orbit
-
-      - name: Create archive (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../orbit-${{ github.ref_name }}-${{ matrix.target }}.zip orbit.exe
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: orbit-${{ matrix.target }}
-          path: orbit-*
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            orbit-*/orbit-*
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
+To re-run a failed release without re-tagging, use the workflow's run page in the Actions tab and click **Re-run jobs**.
 
 ---
 
@@ -574,6 +490,6 @@ For questions about the release process:
 
 ---
 
-**Last Updated:** 2025-11-10
-**Current Version:** 0.4.1
-**Next Planned Release:** 0.5.0 (Web GUI)
+**Last Updated:** 2026-05-17
+**Current Version:** 0.6.0
+**Release Workflow:** [`.github/workflows/release.yml`](../../.github/workflows/release.yml) (musl Linux + universal2 macOS + MSVC Windows via cargo-zigbuild)

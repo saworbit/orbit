@@ -50,6 +50,13 @@ pub enum SemanticError {
 
     #[error("Invalid file type: {0}")]
     InvalidType(String),
+
+    #[error("Failed to read file header for {path}: {source}")]
+    ReadHeader {
+        path: String,
+        #[source]
+        source: orbit_core_interface::OrbitSystemError,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, SemanticError>;
@@ -347,11 +354,11 @@ impl SemanticRegistry {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use orbit_core_semantic::SemanticRegistry;
+    /// use orbit_core_semantic::{SemanticRegistry, Result};
     /// use orbit_core_interface::OrbitSystem;
     /// use std::path::Path;
     ///
-    /// async fn example<S: OrbitSystem>(system: &S) -> anyhow::Result<()> {
+    /// async fn example<S: OrbitSystem>(system: &S) -> Result<()> {
     ///     let registry = SemanticRegistry::default();
     ///     let intent = registry.determine_intent_async(system, Path::new("/data/config.toml")).await?;
     ///     println!("Priority: {:?}", intent.priority);
@@ -362,12 +369,17 @@ impl SemanticRegistry {
         &self,
         system: &S,
         path: &Path,
-    ) -> anyhow::Result<ReplicationIntent> {
+    ) -> Result<ReplicationIntent> {
         // Read first 512 bytes for magic number detection and file type analysis
         // This is typically enough for most file format detection
-        let head_bytes = system.read_header(path, 512).await.map_err(|e| {
-            anyhow::anyhow!("Failed to read file header for {}: {}", path.display(), e)
-        })?;
+        let head_bytes =
+            system
+                .read_header(path, 512)
+                .await
+                .map_err(|source| SemanticError::ReadHeader {
+                    path: path.display().to_string(),
+                    source,
+                })?;
 
         // Use the synchronous version with the fetched header
         Ok(self.determine_intent(path, &head_bytes))
@@ -395,6 +407,8 @@ impl Default for SemanticRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use orbit_core_interface::{FileMetadata, OrbitSystem, OrbitSystemError};
+    use std::path::PathBuf;
 
     #[test]
     fn test_priority_ordering() {
@@ -511,6 +525,73 @@ mod tests {
         let intent = registry.determine_intent(Path::new("database.wal"), b"");
         assert_eq!(intent.priority, Priority::High);
         assert!(intent.description.contains("WAL"));
+    }
+
+    struct FailingHeaderSystem;
+
+    #[async_trait::async_trait]
+    impl OrbitSystem for FailingHeaderSystem {
+        async fn exists(&self, _path: &Path) -> bool {
+            false
+        }
+
+        async fn metadata(&self, path: &Path) -> orbit_core_interface::Result<FileMetadata> {
+            Err(OrbitSystemError::NotFound(path.to_path_buf()))
+        }
+
+        async fn read_dir(&self, path: &Path) -> orbit_core_interface::Result<Vec<FileMetadata>> {
+            Err(OrbitSystemError::NotFound(path.to_path_buf()))
+        }
+
+        async fn reader(
+            &self,
+            _path: &Path,
+        ) -> orbit_core_interface::Result<Box<dyn tokio::io::AsyncRead + Unpin + Send>> {
+            unimplemented!("reader is not used by semantic header tests")
+        }
+
+        async fn writer(
+            &self,
+            _path: &Path,
+        ) -> orbit_core_interface::Result<Box<dyn tokio::io::AsyncWrite + Unpin + Send>> {
+            unimplemented!("writer is not used by semantic header tests")
+        }
+
+        async fn read_header(
+            &self,
+            path: &Path,
+            _len: usize,
+        ) -> orbit_core_interface::Result<Vec<u8>> {
+            Err(OrbitSystemError::NotFound(path.to_path_buf()))
+        }
+
+        async fn calculate_hash(
+            &self,
+            path: &Path,
+            _offset: u64,
+            _len: u64,
+        ) -> orbit_core_interface::Result<[u8; 32]> {
+            Err(OrbitSystemError::NotFound(path.to_path_buf()))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_determine_intent_async_wraps_header_errors() {
+        let registry = SemanticRegistry::default();
+        let path = PathBuf::from("/missing/config.toml");
+
+        let err = registry
+            .determine_intent_async(&FailingHeaderSystem, &path)
+            .await
+            .unwrap_err();
+
+        match err {
+            SemanticError::ReadHeader { path, source } => {
+                assert_eq!(path, "/missing/config.toml");
+                assert!(matches!(source, OrbitSystemError::NotFound(_)));
+            }
+            other => panic!("expected ReadHeader error, got {other:?}"),
+        }
     }
 
     #[test]

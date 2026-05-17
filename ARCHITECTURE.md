@@ -1,21 +1,19 @@
 # Orbit Architecture
 
-> A distributed file transfer and data management system designed for performance, reliability, and scalability.
+> A high-performance file transfer and data management system designed for reliability and scalability.
 
-**Version:** 0.6.0 (Core) / 2.2.0-rc.1 (Control Plane)
-**Status:** Production-ready core, Grid architecture in active development
+**Version:** 0.6.0
+**Status:** Alpha -- stable core with experimental advanced features
 
 ---
 
 ## Executive Summary
 
-Orbit is a Rust-based file transfer system that scales from a simple CLI tool to a distributed enterprise platform. It combines:
+Orbit is a Rust-based file transfer system that combines:
 
 - **High-performance transfers** via zero-copy syscalls, compression, and parallel I/O
 - **Content-aware synchronization** using content-defined chunking (CDC) with 99.1% shift resilience
 - **Global deduplication** across all files and backups via the Universe index
-- **Distributed architecture** with stateless agents (Stars) coordinated by a central Nucleus
-- **On-demand data access** through a FUSE filesystem that fetches blocks just-in-time
 
 ---
 
@@ -25,19 +23,10 @@ Orbit is a Rust-based file transfer system that scales from a simple CLI tool to
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              APPLICATION LAYER                                   │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│  CLI (orbit)          │  Control Plane API      │  GhostFS (FUSE)               │
-│  - copy/sync          │  - REST endpoints       │  - On-demand block fetch      │
-│  - backup/restore     │  - Job management       │  - Priority queue             │
-│  - verify             │  - Dashboard (React)    │  - Instant projection         │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                      │
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              ORCHESTRATION LAYER                                 │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│  Magnetar State Machine           │  Sentinel Resilience Engine                 │
-│  - Job lifecycle (SQLite/redb)    │  - OODA loop for chunk healing              │
-│  - Crash recovery                 │  - Under-replication detection              │
-│  - DAG dependencies               │  - Autonomous repair                        │
+│  CLI (orbit)                                                                    │
+│  - copy/sync                                                                    │
+│  - backup/restore                                                               │
+│  - verify                                                                       │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                       │
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -49,7 +38,7 @@ Orbit is a Rust-based file transfer system that scales from a simple CLI tool to
 │  - Composable prioritizers        │  - O(1) memory via streaming                │
 │  - Sync strategy selection        │  - Container packing (.orbitpak)            │
 │                                   │                                             │
-│  CDC Engine (Gear Hash)           │  Guidance System                            │
+│  CDC Engine (Gear Hash)           │  Config Optimizer                           │
 │  - Variable-size chunks           │  - Config validation                        │
 │  - 99.1% shift resilience         │  - Auto-tuning                              │
 │  - BLAKE3 content hashing         │  - Safety constraints                       │
@@ -58,16 +47,11 @@ Orbit is a Rust-based file transfer system that scales from a simple CLI tool to
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              TRANSPORT LAYER                                     │
 ├─────────────────────────────────────────────────────────────────────────────────┤
-│  OrbitSystem Abstraction          │  Grid Protocol (gRPC)                       │
-│  - LocalSystem (std::fs)          │  - Nucleus ↔ Star communication             │
-│  - RemoteSystem (future)          │  - Star-to-Star P2P                         │
-│                                   │  - mTLS encryption                          │
-│  Backend Registry                 │                                             │
-│  - Local filesystem               │  Resilience Primitives                      │
-│  - S3 / Azure / GCS               │  - Circuit breaker, connection pool         │
-│  - SSH/SFTP                       │  - Rate limiting, backpressure              │
-│  - SMB2/3 (native)                │  - Penalization, dead-letter queue          │
-│                                   │  - Health monitor, ref-counted GC           │
+│  OrbitSystem Abstraction          │  Backend Registry                           │
+│  - LocalSystem (std::fs)          │  - Local filesystem                         │
+│  - RemoteSystem (future)          │  - S3 / Azure / GCS                        │
+│                                   │  - SSH/SFTP                                 │
+│                                   │  - SMB2/3 (native)                          │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                       │
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -89,19 +73,18 @@ Orbit is a Rust-based file transfer system that scales from a simple CLI tool to
 
 ## Crate Architecture
 
-Orbit is organized as a Rust workspace with 16 member crates:
+Orbit is organized as a Rust workspace with 8 member crates:
 
 ### Core Transfer Engine
 
 | Crate | Purpose |
 |-------|---------|
 | **orbit** | Main CLI binary and library - file copy, sync, verify operations |
-| **orbit-core-manifest** | Flight plan and cargo manifest data structures |
+| **orbit-core-manifest** | Cargo manifest data structures |
 | **orbit-core-audit** | Audit logging, structured JSON telemetry, typed provenance events |
 | **orbit-core-starmap** | Binary indexing engine (Universe V1/V2/V3), container packing |
-| **orbit-core-resilience** | Fault tolerance: circuit breaker, rate limiter, connection pool, backpressure, penalization, dead-letter queue, health monitor, ref-counted GC |
 
-### V2 Content-Aware System
+### Content-Aware System
 
 | Crate | Purpose |
 |-------|---------|
@@ -109,28 +92,11 @@ Orbit is organized as a Rust workspace with 16 member crates:
 | **orbit-core-semantic** | Intent-based replication: file priority, sync strategy, composable prioritizers |
 | **orbit-core-interface** | OrbitSystem trait - universal I/O abstraction for local/remote |
 
-### Grid Architecture (Distributed)
+### Observability
 
 | Crate | Purpose |
 |-------|---------|
-| **orbit-proto** | gRPC protocol definitions (tonic/prost) |
-| **orbit-star** | Stateless remote agent with formalized lifecycle hooks |
-| **orbit-connect** | Client-side gRPC connectivity (Nucleus → Star), bulletin board |
-| **orbit-sentinel** | Autonomous resilience engine (OODA loop for chunk healing) |
-
-### Control Plane & Observability
-
-| Crate | Purpose |
-|-------|---------|
-| **orbit-server** | REST API, SQLite job tracking, OpenAPI/Swagger UI, React dashboard |
 | **orbit-observability** | Unified telemetry, audit chaining, OpenTelemetry integration |
-
-### Advanced Capabilities
-
-| Crate | Purpose |
-|-------|---------|
-| **magnetar** | Persistent job state machine with SQLite/redb backends |
-| **orbit-ghost** | FUSE-based on-demand filesystem with block-level JIT fetching |
 
 ### Dependency Graph
 
@@ -138,32 +104,11 @@ Orbit is organized as a Rust workspace with 16 member crates:
 orbit (CLI/Library)
 ├── orbit-core-manifest
 ├── orbit-core-audit
-├── orbit-core-starmap ──────────────────────┐
-├── orbit-core-cdc ──────────────────────────┤
-├── orbit-core-semantic ─────────────────────┤
-│   └── orbit-core-interface                 │
-├── orbit-core-resilience                    │
-├── orbit-observability                      │
-└── magnetar ────────────────────────────────┤
-    ├── orbit-core-cdc                       │
-    ├── orbit-core-starmap                   │
-    └── orbit-core-interface                 │
-                                             │
-orbit-server (Control Plane)                 │
-├── magnetar ────────────────────────────────┤
-├── orbit-sentinel ──────────────────────────┤
-│   ├── orbit-core-starmap ──────────────────┘
-│   ├── orbit-connect
-│   │   ├── orbit-core-interface
-│   │   └── orbit-proto
-│   └── orbit-star
-│       └── orbit-proto
+├── orbit-core-starmap
+├── orbit-core-cdc
+├── orbit-core-semantic
+│   └── orbit-core-interface
 └── orbit-observability
-
-orbit-ghost (On-Demand FS)
-├── fuser (FUSE bindings)
-├── sqlx (SQLite)
-└── magnetar (metadata source)
 ```
 
 ---
@@ -173,19 +118,20 @@ orbit-ghost (On-Demand FS)
 ### Simple File Copy
 
 ```
-orbit --source /data --dest /backup --recursive
+orbit /data /backup --recursive --profile backup
 
 User CLI
     │
     ▼
 ┌─────────────────────┐
 │   Parse Arguments   │
+│   Apply Profile     │
 │   Load Config       │
 └─────────┬───────────┘
           │
           ▼
 ┌─────────────────────┐
-│  Guidance System    │◄── Validates config, auto-tunes settings
+│  Config Optimizer   │◄── Validates config, auto-tunes settings
 │  - compression?     │
 │  - checksum?        │
 │  - bandwidth limit? │
@@ -292,188 +238,64 @@ Source Files                              Destination
            Global Deduplication Achieved ◄────┘
 ```
 
-### Distributed Grid Transfer
-
-```
-                    ┌─────────────────────────────┐
-                    │     Nucleus (Coordinator)    │
-                    │  ┌───────────────────────┐  │
-                    │  │ jobs.db (SQLite)      │  │
-                    │  │ universe_v3.db (redb) │  │
-                    │  │ Star Registry         │  │
-                    │  │ REST API + Dashboard  │  │
-                    │  └───────────┬───────────┘  │
-                    └──────────────┼──────────────┘
-                                   │
-                    ┌──────────────┼──────────────┐
-                    │              │              │
-            mTLS/gRPC       mTLS/gRPC      mTLS/gRPC
-                    │              │              │
-                    ▼              ▼              ▼
-          ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-          │  Star A     │ │  Star B     │ │  Star C     │
-          │  (NAS-1)    │ │  (NAS-2)    │ │  (Cloud)    │
-          │             │ │             │ │             │
-          │ LocalSystem │ │ LocalSystem │ │ LocalSystem │
-          │ CDC Engine  │ │ CDC Engine  │ │ CDC Engine  │
-          └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
-                 │               │               │
-                 │◄──── P2P Direct Links ───────►│
-                 │               │               │
-                 ▼               ▼               ▼
-          ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-          │ Local NVMe  │ │ Local SSD   │ │ Object Store│
-          └─────────────┘ └─────────────┘ └─────────────┘
-
-Key Benefits:
-- Compute moves to data (CDC runs locally on Stars)
-- P2P reduces Nucleus bandwidth
-- Horizontal scaling via Star agents
-- Stateless agents, centralized state
-```
-
-### On-Demand Filesystem (GhostFS)
-
-```
-Application: ffmpeg -i /mnt/ghost/video.mp4 output.mp4
-
-Application
-    │ read(offset=52428600, size=1MB)
-    ▼
-┌─────────────────────┐
-│   Kernel VFS        │
-└─────────┬───────────┘
-          │ FUSE Protocol
-          ▼
-┌─────────────────────────────────────────────┐
-│         OrbitGhostFS (FUSE Handler)         │
-│  ┌─────────────┐    ┌───────────────────┐   │
-│  │ Inode       │    │ MetadataOracle    │   │
-│  │ Translator  │───►│ (MagnetarAdapter) │   │
-│  │ u64 ↔ ID    │    │ SQLite queries    │   │
-│  └─────────────┘    └───────────────────┘   │
-└─────────────────────────┬───────────────────┘
-                          │
-                          ▼
-┌─────────────────────────────────────────────┐
-│              Entangler                      │
-│  ┌─────────────────────────────────────┐    │
-│  │ Calculate block: 52428600 / 1MB = 50│    │
-│  │                                     │    │
-│  │ Cache hit?  ───► YES ───► Return    │    │
-│  │      │                              │    │
-│  │      ▼ NO                           │    │
-│  │ Queue BlockRequest(file_id, 50)     │    │
-│  │ Poll for availability               │    │
-│  └──────────────────┬──────────────────┘    │
-└─────────────────────┼───────────────────────┘
-                      │ crossbeam-channel
-                      ▼
-┌─────────────────────────────────────────────┐
-│           Wormhole (Background)             │
-│  ┌─────────────────────────────────────┐    │
-│  │ Receive BlockRequest                │    │
-│  │ Fetch from backend (Orbit protocol) │    │
-│  │ Write to: {cache}/file_id_50.bin    │    │
-│  └─────────────────────────────────────┘    │
-└─────────────────────────────────────────────┘
-                      │
-                      ▼
-              Block Cache (Disk)
-              /tmp/orbit_cache/
-
-Result: Application reads 52MB into a 1TB file,
-        only 52MB transferred over network.
-```
-
 ---
 
 ## Feature Matrix
 
-### Transfer Capabilities
+### Stable Core (Production-Ready)
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Buffered Copy** | ✅ Stable | Safe, cross-platform default |
-| **Zero-Copy** | ✅ Stable | Platform syscalls: copy_file_range, fcopyfile, CopyFileEx |
-| **Streaming** | ✅ Stable | Low memory for large files |
-| **Parallel Files** | ✅ Stable | Concurrent file transfers |
-| **Resume** | ✅ Stable | Checkpoint-based recovery |
-| **Bandwidth Limit** | ✅ Stable | Token bucket rate limiting |
+These features form the reliable foundation of Orbit. They are well-tested and safe for production use.
 
-### Compression & Verification
+| Feature | Description |
+|---------|-------------|
+| **Buffered Copy** | Safe, cross-platform default transfer mode |
+| **Zero-Copy** | Platform syscalls: copy_file_range, fcopyfile, CopyFileEx |
+| **Streaming** | Low-memory mode for large files |
+| **Parallel Files** | Concurrent file transfers via rayon |
+| **Resume** | Checkpoint-based recovery with chunk verification |
+| **Bandwidth Limit** | Token bucket rate limiting |
+| **LZ4 / Zstd** | Fast and balanced compression options |
+| **SHA-256 / BLAKE3** | Cryptographic checksum verification |
+| **OrbitSystem Trait** | Unified I/O abstraction for local/remote |
+| **Local Filesystem** | Primary use case, thoroughly tested |
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **LZ4** | ✅ Stable | Fast compression, lower ratio |
-| **Zstd** | ✅ Stable | Balanced speed/ratio, tunable level |
-| **SHA-256** | ✅ Stable | Standard cryptographic checksum |
-| **BLAKE3** | ✅ Stable | Modern, parallelizable, streaming |
+### Beta (Functional, Needs Real-World Validation)
 
-### Storage Backends
+These features work well but need broader real-world testing before being considered stable.
 
-| Backend | Status | Notes |
-|---------|--------|-------|
-| **Local Filesystem** | ✅ Stable | Primary use case |
-| **SSH/SFTP** | 🟡 Beta | Functional via ssh2 crate |
-| **S3** | 🟡 Beta | Multipart upload support |
-| **Azure Blob** | 🟡 Beta | Via object_store crate |
-| **GCS** | 🟡 Beta | Via object_store crate |
-| **SMB2/3** | 🟡 Beta | Native pure-Rust implementation |
+| Feature | Notes |
+|---------|-------|
+| **SSH/SFTP Backend** | Functional via ssh2 crate |
+| **S3 Backend** | Multipart upload, presign, wildcard listing |
+| **Azure Blob Backend** | Via object_store crate (v0.6.0) |
+| **GCS Backend** | Via object_store crate (v0.6.0) |
+| **SMB2/3 Backend** | Native pure-Rust (v0.11.0 upgrade) |
+| **Delta Detection (V1)** | rsync-style block-based diffing |
+| **Disk Guardian** | Pre-flight space/permission/path checks |
+| **Config Optimizer** | Config validation with active hardware probing |
+| **Init Wizard** | Interactive setup (`orbit init`) |
+| **Filter System** | Glob/regex include/exclude patterns |
+| **Metadata Preservation** | Permissions, timestamps, xattrs (platform-specific) |
+| **Manifest System** | File tracking and verification |
+| **Audit Logging** | JSONL telemetry with HMAC chaining |
+| **Global Dedup (V3)** | Universe index, O(log N) inserts, O(1) memory |
 
-### V2 Content-Aware Features
+### Alpha / Experimental (Expect Changes)
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Content-Defined Chunking** | 🟡 Beta | Gear Hash, 99.1% shift resilience |
-| **Semantic Prioritization** | 🟡 Beta | Critical → High → Normal → Low |
-| **Universe V3 Dedup** | 🟡 Beta | O(log N) inserts, O(1) memory |
-| **Global Deduplication** | 🟡 Beta | Across all files and backups |
+These features are under active development. They are feature-gated and should not be relied upon for production workloads. Expect API changes.
 
-### Grid Architecture
+| Feature | Description |
+|---------|-------------|
+| **V2 CDC Engine** | Content-defined chunking with Gear Hash |
+| **Semantic Replication** | Priority-based file classification and ordering |
+| **Container Packing** | Chunk packing into .orbitpak files |
+| **Typed Provenance** | Structured event taxonomy (20 event types) |
+| **Composable Prioritizers** | Chainable sort criteria (semantic, size, age, retry) |
+| **Backpressure / Dead-Letter** | Flow control and quarantine for failed items |
+| **Link-Dest++** | Chunk-level incremental backup hardlinking |
+| **Transfer Journal** | Content-addressed batch operation journal |
 
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **OrbitSystem Trait** | ✅ Stable | Phase 1: Unified I/O abstraction |
-| **gRPC Protocol** | 🟡 Beta | Phase 2: Nucleus ↔ Star |
-| **Star Agent** | 🟡 Beta | Phase 3: Stateless remote execution |
-| **P2P Links** | 🔴 Alpha | Phase 4: Star-to-Star direct |
-| **Sentinel Healing** | 🔴 Alpha | Phase 5: Autonomous repair |
-
-### Control Plane
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **REST API** | 🔴 Alpha | Job management endpoints |
-| **SQLite Persistence** | 🟡 Beta | Via Magnetar state machine |
-| **React Dashboard** | 🔴 Alpha | Web-based job monitoring |
-| **OpenAPI/Swagger** | 🔴 Alpha | API documentation |
-
-### Advanced Capabilities
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Magnetar State Machine** | 🟡 Beta | Crash recovery, DAG dependencies |
-| **GhostFS (FUSE)** | 🟡 Beta | On-demand block-level access |
-| **Init Wizard** | ✅ Stable | Interactive configuration setup |
-| **Active Probing** | ✅ Stable | Auto-detection of hardware/destination |
-| **Filter System** | ✅ Stable | Glob/regex include/exclude |
-| **Metadata Preservation** | ✅ Stable | Permissions, timestamps, xattrs |
-
-### Data Flow Patterns
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| **Penalization** | 🔴 Alpha | Exponential backoff deprioritization for failed items |
-| **Dead-Letter Queue** | 🔴 Alpha | Bounded quarantine for permanently failed items |
-| **Backpressure** | 🔴 Alpha | Dual-threshold flow control (object count + byte size) |
-| **Ref-Counted GC** | 🔴 Alpha | WAL-gated garbage collection for deduplicated chunks |
-| **Health Monitor** | 🔴 Alpha | Continuous mid-transfer disk/throughput/error advisories |
-| **Container Packing** | 🔴 Alpha | Chunk packing into .orbitpak files, pool rotation |
-| **Typed Provenance** | 🔴 Alpha | Structured event taxonomy (20 event types) |
-| **Bulletin Board** | 🔴 Alpha | Centralized error/warning aggregation from all Stars |
-| **Composable Prioritizers** | 🔴 Alpha | Chainable sort criteria (semantic, size, age, retry) |
-| **Star Lifecycle Hooks** | 🔴 Alpha | State machine: registered → scheduled → draining → shutdown |
+> **Guidance:** Use stable core features for production. Beta features are safe for non-critical use with testing. Alpha features are preview-only -- enable with `--smart` or explicit flags.
 
 ---
 
@@ -484,8 +306,11 @@ Result: Application reads 52MB into a 1TB file,
 Single-machine file operations with no external dependencies.
 
 ```bash
-# Simple copy
-orbit --source /data --dest /backup --recursive
+# Simple copy (positional arguments)
+orbit /data /backup --recursive
+
+# With a preset profile
+orbit /data /backup --recursive --profile backup
 
 # With compression and verification
 orbit --source /data --dest /backup \
@@ -497,48 +322,6 @@ orbit --source /data --dest /backup \
 orbit sync --source /project --dest /backup --smart
 ```
 
-### 2. Control Plane Server
-
-Centralized job management with REST API and web dashboard.
-
-```bash
-# Start the Nucleus server
-orbit-server --port 8080 --database jobs.db
-
-# Submit jobs via REST API
-curl -X POST http://localhost:8080/jobs \
-     -H "Content-Type: application/json" \
-     -d '{"source": "/data", "destination": "/backup"}'
-```
-
-### 3. Distributed Grid
-
-Horizontal scaling with remote Star agents.
-
-```bash
-# On each storage node (Star)
-orbit-star --listen 0.0.0.0:9000 --cert star.pem
-
-# On the coordinator (Nucleus)
-orbit-server --port 8080 \
-             --stars star-a.local:9000,star-b.local:9000
-```
-
-### 4. On-Demand Filesystem
-
-Mount remote data locally with just-in-time fetching.
-
-```bash
-# Mount a job's data
-orbit-ghost --job-id 1 \
-            --database magnetar.db \
-            --mount-point /mnt/orbit
-
-# Access files (blocks fetched on demand)
-ls /mnt/orbit
-cat /mnt/orbit/data/file.txt
-```
-
 ---
 
 ## Configuration
@@ -546,8 +329,10 @@ cat /mnt/orbit/data/file.txt
 ### CLI Arguments
 
 ```bash
-orbit --source <PATH>           # Source path (required)
-      --dest <PATH>             # Destination path (required)
+orbit <SOURCE> <DEST> [FLAGS]   # Positional arguments
+orbit --source <PATH>           # Source path (named flag)
+      --dest <PATH>             # Destination path (named flag)
+      --profile <PRESET>        # Apply preset: fast|safe|backup|network
       --recursive               # Copy directories recursively
       --compression <TYPE>      # none|lz4|zstd
       --checksum <TYPE>         # none|sha256|blake3
@@ -576,13 +361,18 @@ orbit = { version = "0.6", features = ["full"] }  # Everything
 
 # Or selective features:
 orbit = { version = "0.6", features = [
-    "zero-copy",        # Platform optimizations
-    "smb-native",       # SMB2/3 support
-    "s3-native",        # AWS S3 support
-    "api",              # Control Plane
+    "zero-copy",        # Platform optimizations (default)
+    "smb-native",       # SMB2/3 support (includes Tokio)
+    "s3-native",        # AWS S3 support (includes Tokio)
     "opentelemetry",    # Distributed tracing
 ] }
 ```
+
+> **Note:** The default build includes only `zero-copy`. The root binary's heavy
+> Tokio runtime features (multi-thread, networking, timers) are gated behind
+> network backend features (`s3-native`, `ssh-backend`, `azure-native`,
+> `gcs-native`, `smb-native`). A minimal `tokio` is still pulled in transitively
+> via the `orbit-core-interface` and `orbit-observability` workspace crates.
 
 ---
 
@@ -639,8 +429,6 @@ Event N+1 (prev_hmac: def456, HMAC: ...)
 
 ### Network Security
 
-- **mTLS**: Mutual TLS for all Grid communication
-- **gRPC**: Protocol buffer serialization
 - **Rate Limiting**: Token bucket algorithm prevents abuse
 
 ### Access Control
@@ -669,7 +457,6 @@ Event N+1 (prev_hmac: def456, HMAC: ...)
 | Buffered copy | ~64KB per file |
 | CDC chunking | ~1MB window |
 | Universe V3 lookup | O(1) via streaming |
-| GhostFS | ~1MB per active block |
 
 ### Deduplication Efficiency
 
@@ -684,30 +471,58 @@ Event N+1 (prev_hmac: def456, HMAC: ...)
 
 ## Roadmap
 
-### Current (v0.6.x)
+### Phase 1: Stabilize & Simplify (Current)
 
-- ✅ Core transfer engine (buffered, zero-copy, streaming)
-- ✅ All backends (local, S3, Azure, GCS, SMB, SSH)
-- ✅ CDC + Semantic + Universe V3
-- ✅ Magnetar state machine
-- ✅ GhostFS on-demand filesystem
-- ✅ Data flow patterns (backpressure, penalization, dead-letter, health monitor, provenance, bulletin board, container packing, lifecycle hooks, composable prioritizers, ref-counted GC)
-- 🔄 Grid architecture (Stars, Nucleus)
+Focus: Make the core rock-solid and the project approachable.
 
-### Near-term (v0.7.x)
+- Stabilize core local + S3/SSH transfers with 80%+ test coverage on core paths
+- Feature-gate experimental V2/V3 features behind `--smart` / alpha flags
+- Continue workspace refactoring: push logic from `src/` into dedicated crates
+- Expand integration tests (MinIO for S3, container-based SSH/SMB)
+- ✅ Workspace dependency inheritance in root Cargo.toml
 
+### Phase 2: Polish & Differentiate
+
+Focus: Performance proof-points and user experience.
+
+- Performance tuning with realistic benchmarks vs rsync/rclone
+- Stabilize one advanced feature (CDC resume + basic dedup)
+- Explore `io_uring` on Linux for async I/O
+- Enhanced UX: init wizard evolution, progress, telemetry
+- Profile-guided optimization (PGO) investigation
+- Grow documentation and examples
+
+### Phase 3: Expand & Community
+
+Focus: Ecosystem and production readiness.
+
+- Full backend parity (streaming Backend trait for all protocols)
+- Publish reusable crates (`orbit-core-cdc`, `orbit-core-interface`) to crates.io
+- Plugin framework exploration
+- Encryption at rest
+- `--watch` mode / daemon capabilities
+- WebDAV protocol support
+- v1.0 when core + 1-2 advanced features are production-grade
+
+### Completed Milestones
+
+- Core transfer engine (buffered, zero-copy, streaming)
+- All backends (local, S3, Azure, GCS, SMB, SSH)
+- CDC + Semantic + Universe V3 (alpha)
 - Enhanced init wizard with active probing
 - Configuration file support (TOML)
-- Improved error messages and recovery
-- Windows native support for GhostFS (WinFSP)
+- CLI simplification: positional args, `--profile` presets
+- Hardware probe caching and auto-tune summary
+- Removed `anyhow` from all first-party crates (unified on `thiserror`/`OrbitError`); transitive presence via third-party deps (`jsonschema`, `opentelemetry-otlp`) remains
+- UX overhaul: shorthands, `orbit doctor`, output control
+- Workspace dependency inheritance (single source of truth for shared deps)
 
-### Future (v1.0+)
+### Risks to Watch
 
-- Production-hardened Grid deployment
-- Kubernetes operator for Star agents
-- ML-powered prefetching in GhostFS
-- Encryption at rest
-- Multi-tenant isolation
+- **Scope creep**: New alpha features before core is solid
+- **Dependency bloat**: Large transitive deps from Tokio/aws-sdk
+- **Platform parity gaps**: Windows/macOS metadata and zero-copy edge cases
+- **Dedup at scale**: V2/V3 CDC not yet battle-tested with large real-world datasets
 
 ---
 
@@ -746,12 +561,9 @@ cargo build --release --features full
 
 ### Documentation
 
-- [Guidance System](docs/architecture/GUIDANCE_SYSTEM.md) - Configuration validation
+- [Config Optimizer](docs/architecture/GUIDANCE_SYSTEM.md) - Configuration validation
 - [Disk Guardian](docs/architecture/DISK_GUARDIAN.md) - Pre-flight safety
 - [V2 Architecture](docs/architecture/ORBIT_V2_ARCHITECTURE.md) - CDC + Semantic
-- [Grid Specification](docs/specs/ORBIT_GRID_SPEC.md) - Distributed architecture
-- [GhostFS](orbit-ghost/ARCHITECTURE.md) - On-demand filesystem
-- [Data Flow Patterns](docs/architecture/DATA_FLOW_PATTERNS.md) - Backpressure, penalization, dead-letter, lifecycle hooks
 
 ---
 

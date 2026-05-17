@@ -34,15 +34,19 @@ Changelog template with:
 
 **Location:** [CHANGELOG.md](CHANGELOG.md)
 
-### 4. **GitHub Actions Workflow** (178 lines) - Automated Releases
+### 4. **GitHub Actions Workflow** - Automated Releases
 Full CI/CD automation:
-- ✅ Builds binaries for 5 platforms (Linux x64/ARM64, macOS x64/ARM64, Windows x64)
+- ✅ Cross-compiles 4 binaries via `cargo-zigbuild` + native MSVC:
+  - Linux x86_64 / aarch64 — **static musl** (no glibc dependency)
+  - macOS — **universal2** (Intel + Apple Silicon in one fat binary)
+  - Windows x86_64 — MSVC
 - ✅ Creates tar.gz archives (Unix) and zip (Windows)
-- ✅ Builds orbit-web with Leptos
+- ✅ Generates a `SHA256SUMS` file across all assets
 - ✅ Auto-creates GitHub releases with binaries
 - ✅ Generates release notes with install instructions
+- ✅ Marks `alpha`/`beta`/`rc` tags as pre-releases
 
-**Location:** [.github/workflows/release.yml](.github/workflows/release.yml)
+**Location:** [.github/workflows/release.yml](../../.github/workflows/release.yml)
 
 ---
 
@@ -81,16 +85,15 @@ git push origin v0.5.0
 
 ### What Gets Built
 
-When you push a tag like `v0.5.0`, GitHub Actions builds:
+When you push a tag like `v0.6.0`, GitHub Actions builds:
 
-1. **Linux x86_64**: `orbit-v0.5.0-x86_64-unknown-linux-gnu.tar.gz`
-2. **Linux ARM64**: `orbit-v0.5.0-aarch64-unknown-linux-gnu.tar.gz`
-3. **macOS x86_64**: `orbit-v0.5.0-x86_64-apple-darwin.tar.gz`
-4. **macOS ARM64**: `orbit-v0.5.0-aarch64-apple-darwin.tar.gz`
-5. **Windows x64**: `orbit-v0.5.0-x86_64-pc-windows-msvc.zip`
-6. **Orbit Web**: `orbit-web-v0.5.0.tar.gz`
+1. **Linux x86_64 (static musl)**: `orbit-v0.6.0-x86_64-unknown-linux-musl.tar.gz`
+2. **Linux aarch64 (static musl)**: `orbit-v0.6.0-aarch64-unknown-linux-musl.tar.gz`
+3. **macOS universal**: `orbit-v0.6.0-universal2-apple-darwin.tar.gz` (Intel + Apple Silicon)
+4. **Windows x64**: `orbit-v0.6.0-x86_64-pc-windows-msvc.zip`
+5. **Checksums**: `SHA256SUMS` (covering all of the above)
 
-All uploaded to: `https://github.com/saworbit/orbit/releases/tag/v0.5.0`
+All built with `--features s3-native,backend-abstraction` and uploaded to: `https://github.com/saworbit/orbit/releases/tag/v0.6.0`
 
 ---
 
