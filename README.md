@@ -59,7 +59,11 @@ Orbit aims to combine rsync/rclone reliability with modern systems programming s
 ## Quick Start
 
 ```bash
-# Install from source
+# Install a pre-built binary (Linux x86_64, static musl — see /releases for macOS universal, aarch64, Windows)
+curl -L https://github.com/saworbit/orbit/releases/download/v0.6.0/orbit-v0.6.0-x86_64-unknown-linux-musl.tar.gz | tar xz
+sudo install -m 755 orbit /usr/local/bin/
+
+# …or build from source
 git clone https://github.com/saworbit/orbit.git
 cd orbit && cargo build --release
 

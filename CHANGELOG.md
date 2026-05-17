@@ -6,6 +6,9 @@ All notable changes to Orbit will be documented in this file.
 
 ### Added
 
+#### Release Automation
+- **Cross-platform release workflow**: `.github/workflows/release.yml` now produces pre-built binaries on every `v*` tag — Linux x86_64 + aarch64 as **static musl** (single binary, no glibc dependency), macOS as a **universal2** fat binary (Intel + Apple Silicon), and Windows x86_64 MSVC. Linux and macOS builds use `cargo-zigbuild`; Windows uses native `cargo build`. Each release also publishes a `SHA256SUMS` file alongside the archives. Assets are named `orbit-vX.Y.Z-<target-triple>.{tar.gz,zip}`.
+
 #### New Commands
 - **`orbit cp <SRC> <DST>`**: Intuitive copy alias — identical to bare `orbit` but reads more naturally in scripts and documentation
 - **`orbit explain <SRC> <DST>`**: Dry-run explainer that prints a plain-English summary of what Orbit *would* do (mode, compression, checksums, parallelism, filters, etc.) without touching any files

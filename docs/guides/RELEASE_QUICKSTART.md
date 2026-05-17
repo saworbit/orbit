@@ -71,11 +71,15 @@ git push origin v0.5.0
 
 ### 5. GitHub Actions Does the Rest
 
-The release workflow automatically:
-- Builds binaries for all platforms
-- Creates GitHub release
-- Uploads release assets
-- Generates release notes
+The release workflow ([`.github/workflows/release.yml`](../../.github/workflows/release.yml)) automatically:
+- Cross-compiles four binaries with `cargo-zigbuild` + native MSVC:
+  - `orbit-vX.Y.Z-x86_64-unknown-linux-musl.tar.gz` (static musl)
+  - `orbit-vX.Y.Z-aarch64-unknown-linux-musl.tar.gz` (static musl)
+  - `orbit-vX.Y.Z-universal2-apple-darwin.tar.gz` (universal Intel + Apple Silicon)
+  - `orbit-vX.Y.Z-x86_64-pc-windows-msvc.zip`
+- Generates `SHA256SUMS` over all archives
+- Creates the GitHub release with install instructions and uploads all assets
+- Marks tags containing `alpha`/`beta`/`rc` as pre-releases
 
 ## That's It! 🎉
 
