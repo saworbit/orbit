@@ -152,7 +152,11 @@ async-trait = { workspace = true, optional = true }
 bitflags = { version = "2", optional = true }
 zeroize = { version = "1", optional = true }
 
-# S3 native dependencies (optional, feature-gated)
+# S3 dependencies (optional, feature-gated)
+# `url` is needed by the unified Backend abstraction for s3:// URI parsing.
+# `aws-sdk-s3` / `aws-config` / `mime_guess` only power the rich `orbit s3 ...`
+# CLI subcommands gated behind the opt-in `s3-cli` feature; the unified Backend
+# layer goes through `object_store` (see s3-native below).
 aws-config = { version = "1.8", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"], optional = true }
 aws-sdk-s3 = { version = "1.116", default-features = false, features = ["rt-tokio", "default-https-client"], optional = true }
 url = { version = "2.5", optional = true }
@@ -162,9 +166,10 @@ mime_guess = { version = "2", optional = true }
 ssh2 = { version = "0.9", optional = true }
 secrecy = { version = "0.10", optional = true, features = ["serde"] }
 
-# Cloud Storage backends (Azure Blob, Google Cloud Storage) - optional, feature-gated
-# Using object_store crate with azure and gcp features
-object_store = { version = "0.11", features = ["azure", "gcp"], optional = true }
+# Cloud Storage backends (S3, Azure Blob, Google Cloud Storage) - optional, feature-gated
+# Using object_store crate with aws, azure, and gcp features. This is the
+# unified abstraction used by the `Backend` trait for all three providers.
+object_store = { version = "0.11", features = ["aws", "azure", "gcp"], optional = true }
 
 # Async utilities for backend abstraction
 futures = { version = "0.3", optional = true }
@@ -237,8 +242,16 @@ zero-copy = []
 # Native SMB2/3 client (pure Rust, async) - OFF by default
 smb-native = ["dep:smb", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
 
-# Native S3 client (pure Rust, async) - OFF by default
-s3-native = ["dep:aws-config", "dep:aws-sdk-s3", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "dep:mime_guess", "backend-abstraction"]
+# Unified S3 backend via object_store (matches Azure/GCS) - OFF by default.
+# This provides `s3://` support through the unified `Backend` trait without
+# pulling the full aws-sdk-s3 dependency tree.
+s3-native = ["dep:object_store", "dep:url", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
+
+# Rich S3 CLI subcommands (`orbit s3 ls/cp/sync/presign/versions/...`).
+# Pulls the full aws-sdk-s3 / aws-config tree for features object_store does
+# not expose (presigned URLs, versioning, fine-grained per-PUT controls,
+# storage class selection, --no-sign-request, etc.). Implies s3-native.
+s3-cli = ["s3-native", "dep:aws-config", "dep:aws-sdk-s3", "dep:mime_guess"]
 
 # SSH backend support - OFF by default
 ssh-backend = ["dep:ssh2", "dep:secrecy", "dep:tokio", "dep:async-trait", "dep:bytes", "backend-abstraction"]
@@ -270,11 +283,13 @@ opentelemetry = [
     "dep:tracing-opentelemetry",
 ]
 
-# Convenience: All network protocols
+# Convenience: All network protocols (unified Backend abstraction only,
+# without the heavy aws-sdk-s3 CLI surface — opt into s3-cli explicitly).
 network = ["s3-native", "smb-native", "ssh-backend", "azure-native", "gcs-native"]
 
-# Full feature set (for development and power users)
-full = ["zero-copy", "network", "backend-abstraction", "extended-metadata", "unicode-normalization"]
+# Full feature set (for development and power users) — includes s3-cli so the
+# entire `orbit s3 ...` subcommand tree is available.
+full = ["zero-copy", "network", "s3-cli", "backend-abstraction", "extended-metadata", "unicode-normalization"]
 
 # --- CI & Local Development Optimization ---
 # This profile override fixes "signal 7 [Bus error]" and "No space left on device" errors on CI.

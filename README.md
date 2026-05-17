@@ -199,9 +199,9 @@ Validates configuration and auto-tunes settings based on your hardware:
 |---------|-------------|-------|
 | Local filesystem | (default) | Zero-copy, all platforms |
 | SSH/SFTP | `ssh-backend` | Via ssh2 crate |
-| Amazon S3 | `s3-native` | Multipart, presign, wildcard listing |
-| Azure Blob | `azure-native` | Via object_store crate |
-| Google Cloud Storage | `gcs-native` | Via object_store crate |
+| Amazon S3 | `s3-native` | Via object_store (streaming multipart writes); rich `orbit s3 ...` CLI with presign / versioning / wildcards is opt-in under `s3-cli` |
+| Azure Blob | `azure-native` | Via object_store crate (streaming multipart writes) |
+| Google Cloud Storage | `gcs-native` | Via object_store crate (streaming multipart writes) |
 | SMB2/3 | `smb-native` | Native pure-Rust |
 
 ### Content-Defined Chunking (V2 -- Alpha)
@@ -231,7 +231,7 @@ macOS APFS: File copies complete **instantly** via Copy-on-Write cloning regardl
 
 ### S3 Transfer Performance
 
-- **Multipart Upload**: 500+ MB/s on high-bandwidth links
+- **Streaming multipart writes** for objects above 8 MiB, with up to 4 in-flight parts
 - **Parallel Workers**: Up to 256 concurrent file operations
 - **Adaptive Chunking**: 5MB-2GB chunks based on file size
 
@@ -283,8 +283,9 @@ Run `orbit init` to generate an optimal config for your hardware.
 ### Feature Flags (Cargo)
 
 ```bash
-cargo build --release                     # Minimal (~10MB) - local only
-cargo build --release --features network  # All network protocols (~38MB)
+cargo build --release                          # Minimal (~10MB) - local only
+cargo build --release --features network       # All network backends via object_store (no aws-sdk-s3)
+cargo build --release --features s3-cli        # Adds `orbit s3 ...` subcommands (presign, versioning, wildcards)
 cargo build --release --features s3-native,ssh-backend  # Selective
 ```
 
@@ -302,7 +303,7 @@ orbit sync|backup|mirror|cp <SOURCE> <DEST> [FLAGS]
 # Profiles
 --profile fast|safe|backup|network
 
-# S3 operations
+# S3 operations (build with --features s3-cli)
 orbit ls|head|du|rm|mv|mb|rb|cat|pipe|presign s3://...
 
 # Diagnostics
