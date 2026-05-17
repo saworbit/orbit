@@ -29,7 +29,6 @@ allow = [
     "CC0-1.0",
     "CDLA-Permissive-2.0",  # Community Data License Agreement - used by webpki-roots
     "Zlib",
-    "Unicode-DFS-2016",
     "Unicode-3.0",  # Unicode License v3 - used by ICU crates
     "MPL-2.0",
 ]
