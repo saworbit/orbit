@@ -3,6 +3,15 @@
 //! Provides configuration structures and URI parsing for backend initialization.
 
 use super::error::{BackendError, BackendResult};
+// `HashMap` is only used inside provider-gated arms of `parse_uri` (collecting
+// URI query parameters). Without any provider feature, it would be unused.
+#[cfg(any(
+    feature = "ssh-backend",
+    feature = "s3-native",
+    feature = "smb-native",
+    feature = "azure-native",
+    feature = "gcs-native",
+))]
 use std::collections::HashMap;
 use std::path::PathBuf;
 

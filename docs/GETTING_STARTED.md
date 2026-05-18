@@ -233,6 +233,10 @@ orbit /data /backup -R --error-mode skip
 # Validate config and check environment
 orbit doctor
 
+# Live-probe one or more backends (auth, reachability, list permission)
+orbit doctor --target s3://my-bucket
+orbit doctor --target ssh://user@host/path --target azblob://my-container
+
 # View transfer history
 orbit history
 orbit history --limit 50 --json
