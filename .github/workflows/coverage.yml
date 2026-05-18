@@ -38,7 +38,7 @@ jobs:
           cargo tarpaulin --verbose --workspace --features s3-native --timeout 600 --engine llvm --force-clean --out Xml --exclude-files 'target/*' --exclude-files 'benches/*' || true
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           # Repository token is optional for public repos, required for private
           token: ${{ secrets.CODECOV_TOKEN }}
