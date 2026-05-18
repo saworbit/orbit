@@ -680,7 +680,15 @@ enum Commands {
     Capabilities,
 
     /// Diagnose common issues (config, permissions, connectivity)
-    Doctor,
+    Doctor {
+        /// Probe a backend URI for live connectivity (repeatable).
+        ///
+        /// Examples: `--target s3://my-bucket`, `--target ssh://user@host/path`,
+        /// `--target azblob://container`. If `ORBIT_BACKEND_TYPE` is set, that
+        /// backend is also auto-probed.
+        #[arg(long = "target", value_name = "URI")]
+        target: Vec<String>,
+    },
 
     /// Generate shell completions
     Completions {
@@ -1715,8 +1723,8 @@ fn handle_subcommand(command: Commands, json_output: bool) -> Result<()> {
             print_capabilities();
             Ok(())
         }
-        Commands::Doctor => {
-            run_doctor();
+        Commands::Doctor { target } => {
+            orbit::commands::doctor::run_doctor(&target);
             Ok(())
         }
         Commands::Completions { shell } => {
@@ -1787,168 +1795,6 @@ fn handle_subcommand(command: Commands, json_output: bool) -> Result<()> {
             unreachable!("transfer shorthands handled in run()")
         }
     }
-}
-
-fn run_doctor() {
-    cli_style::print_banner();
-    section_header(&format!("{} Orbit Doctor", Icons::WRENCH));
-    println!();
-
-    // 1. Config file
-    let config_exists = default_config_exists();
-    if config_exists {
-        let home = dirs::home_dir().unwrap();
-        let path = home.join(".orbit").join("orbit.toml");
-        println!(
-            "  {} {} {}",
-            Icons::SUCCESS,
-            Theme::muted("Config file:"),
-            Theme::success(path.display())
-        );
-        // Try to parse it
-        match CopyConfig::from_file(&path) {
-            Ok(_) => println!(
-                "  {} {}",
-                Icons::SUCCESS,
-                Theme::success("Config file is valid TOML")
-            ),
-            Err(e) => println!(
-                "  {} {} {}",
-                Icons::ERROR,
-                Theme::error("Config parse error:"),
-                e
-            ),
-        }
-    } else {
-        println!(
-            "  {} {} {}",
-            Icons::WARNING,
-            Theme::warning("No config file found."),
-            Theme::muted("Run 'orbit init' to create one.")
-        );
-    }
-    println!();
-
-    // 2. Platform capabilities
-    section_header(&format!("{} Platform", Icons::GEAR));
-    println!(
-        "  {} {} {} / {}",
-        Icons::BULLET,
-        Theme::muted("OS:"),
-        Theme::value(std::env::consts::OS),
-        Theme::muted(std::env::consts::ARCH)
-    );
-
-    let caps = get_zero_copy_capabilities();
-    println!(
-        "  {} {} {}",
-        if caps.available {
-            Icons::SUCCESS
-        } else {
-            Icons::WARNING
-        },
-        Theme::muted("Zero-copy:"),
-        if caps.available {
-            Theme::success(caps.method)
-        } else {
-            Theme::warning("unavailable")
-        }
-    );
-    println!();
-
-    // 3. System probe
-    section_header(&format!("{} Hardware", Icons::LIGHTNING));
-    match orbit::core::probe::Probe::scan(&std::env::current_dir().unwrap_or_default()) {
-        Ok(profile) => {
-            println!(
-                "  {} {} {}",
-                Icons::BULLET,
-                Theme::muted("CPU cores:"),
-                Theme::value(profile.logical_cores)
-            );
-            println!(
-                "  {} {} {} GB",
-                Icons::BULLET,
-                Theme::muted("RAM:"),
-                Theme::value(profile.available_ram_gb)
-            );
-            println!(
-                "  {} {} ~{:.0} MB/s",
-                Icons::BULLET,
-                Theme::muted("I/O throughput:"),
-                profile.estimated_io_throughput
-            );
-        }
-        Err(e) => {
-            println!(
-                "  {} {} {}",
-                Icons::WARNING,
-                Theme::warning("Probe failed:"),
-                e
-            );
-        }
-    }
-    println!();
-
-    // 4. Feature flags
-    section_header(&format!("{} Compiled Features", Icons::GEAR));
-    let features: Vec<(&str, bool)> = vec![
-        ("s3-native", cfg!(feature = "s3-native")),
-        ("s3-cli", cfg!(feature = "s3-cli")),
-        ("smb-native", cfg!(feature = "smb-native")),
-        ("ssh-backend", cfg!(feature = "ssh-backend")),
-        ("azure-native", cfg!(feature = "azure-native")),
-        ("gcs-native", cfg!(feature = "gcs-native")),
-    ];
-    for (name, enabled) in &features {
-        println!(
-            "  {} {}",
-            if *enabled {
-                Icons::SUCCESS
-            } else {
-                Icons::BULLET
-            },
-            if *enabled {
-                Theme::success(*name).to_string()
-            } else {
-                Theme::muted(*name).to_string()
-            }
-        );
-    }
-    println!();
-
-    // 5. Environment
-    section_header(&format!("{} Environment", Icons::GLOBE));
-    let jwt_set = std::env::var("ORBIT_JWT_SECRET").is_ok();
-    println!(
-        "  {} {} {}",
-        if jwt_set {
-            Icons::SUCCESS
-        } else {
-            Icons::BULLET
-        },
-        Theme::muted("ORBIT_JWT_SECRET:"),
-        if jwt_set {
-            Theme::success("set")
-        } else {
-            Theme::muted("not set (dashboard auth disabled)")
-        }
-    );
-
-    let stats_env = std::env::var("ORBIT_STATS").unwrap_or_else(|_| "on".to_string());
-    println!(
-        "  {} {} {}",
-        Icons::BULLET,
-        Theme::muted("ORBIT_STATS:"),
-        Theme::value(&stats_env)
-    );
-    println!();
-
-    println!(
-        "  {}",
-        Theme::success("Doctor check complete. No critical issues found.")
-    );
-    println!();
 }
 
 fn print_presets() {
@@ -2689,7 +2535,51 @@ mod tests {
     #[test]
     fn test_doctor_subcommand() {
         let cli = Cli::try_parse_from(["orbit", "doctor"]).unwrap();
-        assert!(matches!(cli.command, Some(Commands::Doctor)));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Doctor { ref target }) if target.is_empty()
+        ));
+    }
+
+    #[test]
+    fn test_doctor_with_target() {
+        let cli = Cli::try_parse_from(["orbit", "doctor", "--target", "s3://my-bucket"]).unwrap();
+        match cli.command {
+            Some(Commands::Doctor { target }) => {
+                assert_eq!(target, vec!["s3://my-bucket".to_string()]);
+            }
+            _ => panic!("Expected Doctor subcommand with target"),
+        }
+    }
+
+    #[test]
+    fn test_doctor_with_repeated_targets() {
+        let cli = Cli::try_parse_from([
+            "orbit",
+            "doctor",
+            "--target",
+            "s3://a",
+            "--target",
+            "ssh://b/c",
+        ])
+        .unwrap();
+        match cli.command {
+            Some(Commands::Doctor { target }) => {
+                assert_eq!(target, vec!["s3://a".to_string(), "ssh://b/c".to_string()]);
+            }
+            _ => panic!("Expected Doctor subcommand with repeated targets"),
+        }
+    }
+
+    /// Regression: `--target` with no URI must be a parse error, not a
+    /// silent no-op. Previously `num_args = 0..` allowed empty values.
+    #[test]
+    fn test_doctor_target_without_value_errors() {
+        let result = Cli::try_parse_from(["orbit", "doctor", "--target"]);
+        assert!(
+            result.is_err(),
+            "expected `doctor --target` (no URI) to be a parse error"
+        );
     }
 
     #[test]

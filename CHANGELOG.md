@@ -23,6 +23,7 @@ All notable changes to Orbit will be documented in this file.
 - **`orbit presets` subcommand**: Displays available profiles with a comparison table
 - **Transfer shorthand subcommands**: `orbit sync <SRC> <DST>`, `orbit backup <SRC> <DST>`, `orbit mirror <SRC> <DST>` — all global CLI flags (compression, retry, quiet, etc.) are fully supported alongside shorthands
 - **`orbit doctor` subcommand**: Validates configuration, probes hardware, lists compiled features, and checks environment variables — a one-stop diagnostic tool
+- **`orbit doctor --target <URI>` live backend probes**: Repeatable flag that runs a real `list` call against any backend URI (`s3://`, `ssh://`, `smb://`, `azblob://`, `gs://`, or a local path), reporting connection latency on success and a one-line actionable suggestion on failure (e.g., "set AWS_ACCESS_KEY_ID", "ssh-add your key", "check IAM/ACL"). If `ORBIT_BACKEND_TYPE` is set, that backend is auto-probed too. Informational only — exits 0 regardless; a `--strict` mode for CI is tracked in `ROADMAP-v0.7.md`
 - **`--quiet` / `-q` flag**: Suppresses all non-essential output (progress, stats, guidance notices)
 - **`--raw` flag**: Disables human-readable formatting (outputs raw byte counts instead of "1.5 GiB")
 - **`--no-stat` flag**: Disables the end-of-run execution statistics summary

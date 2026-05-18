@@ -5,6 +5,7 @@
  */
 
 pub mod batch;
+pub mod doctor;
 pub mod explain;
 pub mod history;
 pub mod init;

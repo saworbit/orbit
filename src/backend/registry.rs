@@ -97,6 +97,11 @@ impl BackendRegistry {
                             };
                             Ok(Box::new(backend) as Box<dyn Backend>)
                         }
+                        // Defensive guard for when other BackendConfig variants
+                        // are compiled in; unreachable under
+                        // `--features backend-abstraction` alone, where Local
+                        // is the only variant.
+                        #[allow(unreachable_patterns)]
                         _ => Err(BackendError::InvalidConfig {
                             backend: "local".to_string(),
                             message: "Invalid configuration for local backend".to_string(),

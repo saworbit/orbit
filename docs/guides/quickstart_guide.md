@@ -29,6 +29,9 @@ orbit init
 
 # Or check your system and config health
 orbit doctor
+
+# Confirm a remote backend is actually reachable (auth + permissions)
+orbit doctor --target s3://my-bucket
 ```
 
 `orbit init` scans your hardware, asks about your use case, sets up exclusion patterns, offers shell completion installation, and generates an optimized `~/.orbit/orbit.toml`. All subsequent commands use these settings automatically.
@@ -346,7 +349,7 @@ TEST_LOG=llm-debug RUST_LOG=debug \
 | `orbit sync <SRC> <DST>` | Sync mode (recursive, metadata) | `orbit sync /data /backup` |
 | `orbit backup <SRC> <DST>` | Backup profile (checksums + Zstd) | `orbit backup /data /backup` |
 | `orbit mirror <SRC> <DST>` | Mirror mode (exact replica) | `orbit mirror /data /replica` |
-| `orbit doctor` | Validate config and probe system | `orbit doctor` |
+| `orbit doctor` | Validate config, probe system, and live-test backends | `orbit doctor --target s3://my-bucket` |
 | `orbit init` | Interactive setup wizard | `orbit init` |
 | `orbit cp <SRC> <DST>` | Copy alias (same as bare `orbit`) | `orbit cp /data /backup` |
 | `orbit explain <SRC> <DST>` | Preview transfer plan (no files touched) | `orbit explain /data /backup -R` |
