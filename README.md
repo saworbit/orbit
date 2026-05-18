@@ -339,20 +339,32 @@ orbit run --file commands.txt --workers 256
 
 ## Modular Architecture
 
-Orbit is organized as a Rust workspace with 8 member crates:
+Orbit is organized as a Rust workspace with 8 member crates. Internal dependencies are shallow: the root `orbit` binary depends on all sub-crates, and `core-semantic` depends on `orbit-core-interface`. Everything else is independent.
 
-| Crate | Purpose | Status |
-|-------|---------|--------|
-| `orbit` (root) | CLI, core engine, transfer orchestration | Beta |
-| `orbit-core-interface` | OrbitSystem I/O abstraction | Stable |
-| `core-manifest` | Manifest parsing and job orchestration | Beta |
-| `core-starmap` | Job planner, Universe V3 index | Beta |
-| `core-cdc` | Content-defined chunking (Gear Hash) | Alpha |
-| `core-semantic` | Intent-based replication, prioritizers | Alpha |
-| `core-audit` | Structured logging, telemetry | Beta |
-| `orbit-observability` | Observability and monitoring | Beta |
+| Crate | Path | What's inside | Status |
+|-------|------|---------------|--------|
+| `orbit` (root) | `src/` | CLI, transfer engine, the `Backend` trait + protocol backend implementations (S3/SSH/SMB/Azure/GCS) in `src/backend/`, Disk Guardian, Config Optimizer | Beta |
+| `orbit-core-interface` | `crates/orbit-core-interface/` | The `OrbitSystem` trait (async `exists`/`metadata`/`read_header`/streaming I/O) — the system-level I/O abstraction used by `LocalSystem` and `MockSystem`; distinct from the protocol `Backend` trait in the root crate | Stable |
+| `orbit-core-manifest` | `crates/core-manifest/` | `FlightPlan` (job-level) and `CargoManifest` (per-file) structs, JSON Schema validators, UUID job IDs | Beta |
+| `orbit-core-starmap` | `crates/core-starmap/` | Memory-mapped binary index for chunks/windows; bloom filter + resume bitmaps via `redb` + `memmap2` | Beta |
+| `orbit-core-cdc` | `crates/core-cdc/` | Gear Hash rolling hash + `ChunkConfig` (min/avg/max sizing); no internal deps | Alpha |
+| `orbit-core-semantic` | `crates/core-semantic/` | `SemanticRegistry` + `Priority` for intent-based replication (configs first, blobs last); depends on `orbit-core-interface` | Alpha |
+| `orbit-core-audit` | `crates/core-audit/` | `TelemetryLogger` — append-only JSONL events (`job_start`, `window_ok`, `job_complete`, etc.) | Beta |
+| `orbit-observability` | `crates/orbit-observability/` | HMAC-SHA256 audit chaining, OpenTelemetry bridge, Prometheus metrics (heavier deps — keep separate from `core-audit`) | Beta |
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for full architecture documentation.
+### Where do I make this change?
+
+| If you want to... | Edit |
+|---|---|
+| Add a new CLI subcommand or flag | `src/` (root crate) |
+| Add a new protocol backend (e.g., FTP, WebDAV) | `src/backend/` — implement the `Backend` trait from `src/backend/mod.rs` and register it in `src/backend/registry.rs` |
+| Change the manifest schema or add a field | `crates/core-manifest/` |
+| Tune chunking thresholds or rolling-hash mask | `crates/core-cdc/` |
+| Add a new file-type priority rule | `crates/core-semantic/` |
+| Add a new audit event type | `crates/core-audit/` (basic) or `crates/orbit-observability/` (signed/OTel) |
+| Change the on-disk resume index format | `crates/core-starmap/` |
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture write-up.
 
 ---
 
