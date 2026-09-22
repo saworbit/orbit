@@ -15,5 +15,7 @@ fn invalid_arguments_exit_two() {
     assert_cmd::cargo::cargo_bin_cmd!("orbit")
         .args(["plan", "source-only"])
         .assert()
-        .code(2);
+        .code(2)
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("Usage:"));
 }
