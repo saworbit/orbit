@@ -54,7 +54,7 @@ fn absolutize(path: &Path, cwd: &Path) -> Result<PathBuf> {
         path.to_path_buf()
     } else {
         #[cfg(windows)]
-        let cwd = ordinary_windows_cwd(cwd);
+        let cwd = ordinary_windows_cwd(cwd)?;
         cwd.join(path)
     };
     #[cfg(windows)]
@@ -73,13 +73,13 @@ fn absolutize(path: &Path, cwd: &Path) -> Result<PathBuf> {
 }
 
 #[cfg(windows)]
-fn ordinary_windows_cwd(cwd: &Path) -> PathBuf {
+fn ordinary_windows_cwd(cwd: &Path) -> Result<PathBuf> {
     use std::ffi::OsString;
     use std::path::{Component, Prefix};
 
     let mut components = cwd.components();
     let Some(Component::Prefix(prefix)) = components.next() else {
-        return cwd.to_path_buf();
+        return Ok(cwd.to_path_buf());
     };
     // A canonical CWD must not turn an ordinary relative endpoint into a
     // verbatim input before GetFullPathNameW can normalize it. This spelling is
@@ -93,10 +93,26 @@ fn ordinary_windows_cwd(cwd: &Path) -> PathBuf {
             value.push(share);
             value
         }
-        _ => return cwd.to_path_buf(),
+        _ => return Ok(cwd.to_path_buf()),
     };
     ordinary.push(components.as_path());
-    PathBuf::from(ordinary)
+    let ordinary = PathBuf::from(ordinary);
+    let same_directory = fs::metadata(cwd).is_ok_and(|metadata| metadata.is_dir())
+        && match (fs::canonicalize(cwd), fs::canonicalize(&ordinary)) {
+            (Ok(verbatim), Ok(roundtrip)) => paths_equal(&verbatim, &roundtrip),
+            _ => false,
+        };
+    if !same_directory {
+        return Err(OrbitError::Io {
+            operation: "normalize working directory",
+            path: cwd.to_path_buf(),
+            source: std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "verbatim working directory has no equivalent ordinary directory path",
+            ),
+        });
+    }
+    Ok(ordinary)
 }
 
 fn resolve_leaf(path: &Path) -> Result<PathBuf> {
@@ -423,6 +439,50 @@ mod tests {
             resolve_endpoints(&source, std::path::Path::new("same."), &cwd),
             Err(OrbitError::SameEndpoint(_))
         ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn relative_windows_endpoint_rejects_a_verbatim_cwd_with_an_ordinary_alias() {
+        let temp = tempdir().unwrap();
+        let parent = fs::canonicalize(temp.path()).unwrap();
+        let literal_directory = parent.join("literal.");
+        let alternate_directory = temp.path().join("literal");
+        fs::create_dir(&literal_directory).unwrap();
+        fs::create_dir(&alternate_directory).unwrap();
+        fs::write(literal_directory.join("child.txt"), b"literal").unwrap();
+        fs::write(alternate_directory.join("child.txt"), b"alternate").unwrap();
+        let cwd = fs::canonicalize(&literal_directory).unwrap();
+
+        let result = resolve_endpoints(
+            std::path::Path::new("child.txt"),
+            &parent.join("copy.txt"),
+            &cwd,
+        );
+        match result {
+            Err(OrbitError::Io {
+                operation,
+                path,
+                source,
+            }) => {
+                assert_eq!(operation, "normalize working directory");
+                assert_eq!(path, cwd);
+                assert_eq!(source.kind(), std::io::ErrorKind::InvalidInput);
+            }
+            other => panic!("unsafe verbatim CWD was not rejected: {other:?}"),
+        }
+
+        let explicit = resolve_endpoints(
+            &literal_directory.join("child.txt"),
+            &parent.join("copy.txt"),
+            &cwd,
+        )
+        .unwrap();
+        assert_eq!(fs::read(explicit.source).unwrap(), b"literal");
+        assert_eq!(
+            fs::read(alternate_directory.join("child.txt")).unwrap(),
+            b"alternate"
+        );
     }
 
     #[cfg(windows)]
