@@ -1585,7 +1585,7 @@ mod tests {
 }
 ```
 
-Each test must assert `reason` as well as `disposition`, so explanations are part of the contract. Run `cargo test plan::tests --lib` and expect compilation failure because `build_plan` is absent.
+Each test must assert `reason` as well as `disposition`, so explanations are part of the contract. Add platform-specific operation-ID golden tests for both an ordinary path and an exact native path that is not valid Unicode (Unix raw bytes) or is not a Unicode scalar sequence (Windows unpaired UTF-16 surrogate). Expected IDs must be frozen literal values calculated from the specified bytes, not values produced by the production helper. Symbolic-link tests may skip only when their helper explicitly reports `PermissionDenied`; direct non-symlink destination inspection tests must remain unconditional so classification is always covered. Run `cargo test plan::tests --lib` and expect compilation failure because `build_plan` is absent.
 
 - [ ] **Step 3: Implement the complete disposition table**
 
@@ -1608,9 +1608,9 @@ regular files, equal length and different hash,
   replace=true                           => Replace, blocking=false
 ```
 
-When verification mode is `Hash`, hash every source regular file and store the lowercase BLAKE3 hex digest in `source_digest`. In either verification mode, same-size source and destination files must both be hashed before selecting `SkipIdentical`; store the source digest. Compute `operation_id` from a versioned domain prefix, then the exact native source and destination path encodings, each with its own domain label and little-endian `u64` byte length, followed by a separate options domain and the `replace`, `verify`, and `ignore_unsupported` bytes. Use `OsStr::as_encoded_bytes()` for the lossless native path encoding; never use `to_string_lossy()`. Take the first 24 lowercase BLAKE3 hex characters. Add a platform-appropriate regression using distinct native paths that render as the same lossy Unicode text and assert that their operation IDs differ. This identifier locates later journal state but is not a security boundary.
+When verification mode is `Hash`, hash every source regular file and store the lowercase BLAKE3 hex digest in `source_digest`. In either verification mode, same-size source and destination files must both be hashed before selecting `SkipIdentical`; store the source digest. Compute `operation_id` from the versioned domain prefix `orbit.operation-id.v2`, then the exact native source and destination path encodings, each with its own endpoint domain label, explicit platform/encoding domain, and little-endian `u64` byte length, followed by the separate `options` domain and the `replace`, `verify`, and `ignore_unsupported` bytes. On Unix, encode paths with `OsStrExt::as_bytes()` under the `unix-bytes-v1` domain. On Windows, encode `OsStrExt::encode_wide()` code units individually as little-endian `u16` bytes under the `windows-utf16le-v1` domain. Do not use `OsStr::as_encoded_bytes()` or `to_string_lossy()`. Take the first 24 lowercase BLAKE3 hex characters. This identifier locates later journal state but is not a security boundary.
 
-Use this implementation shape, with imports for `Path`, `PathBuf`, `hash_file`, `ResolvedEndpoints`, `PlanRequest`, `VerifyMode`, `EntryKind`, `SourceSnapshot`, and `Result`:
+Use this implementation shape, with imports for `Path`, `PathBuf`, the platform-specific `OsStrExt`, `hash_file`, `ResolvedEndpoints`, `PlanRequest`, `VerifyMode`, `EntryKind`, `SourceSnapshot`, and `Result`:
 
 ```rust
 pub fn build_plan(
@@ -1729,7 +1729,7 @@ fn at_root(root: &Path, relative: &Path) -> PathBuf {
 
 fn operation_id(request: &PlanRequest, endpoints: &ResolvedEndpoints) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"orbit.operation-id.v1");
+    hasher.update(b"orbit.operation-id.v2");
     update_path_hash(&mut hasher, b"source", &endpoints.source);
     update_path_hash(&mut hasher, b"destination", &endpoints.destination);
     hasher.update(b"options");
@@ -1742,11 +1742,31 @@ fn operation_id(request: &PlanRequest, endpoints: &ResolvedEndpoints) -> String 
 }
 
 fn update_path_hash(hasher: &mut blake3::Hasher, domain: &[u8], path: &Path) {
-    let encoded = path.as_os_str().as_encoded_bytes();
+    let encoded = native_path_bytes(path);
     let length = u64::try_from(encoded.len()).expect("path length fits in u64");
     hasher.update(domain);
+    hasher.update(PATH_ENCODING_DOMAIN);
     hasher.update(&length.to_le_bytes());
-    hasher.update(encoded);
+    hasher.update(&encoded);
+}
+
+#[cfg(unix)]
+const PATH_ENCODING_DOMAIN: &[u8] = b"unix-bytes-v1";
+
+#[cfg(windows)]
+const PATH_ENCODING_DOMAIN: &[u8] = b"windows-utf16le-v1";
+
+#[cfg(unix)]
+fn native_path_bytes(path: &Path) -> Vec<u8> {
+    path.as_os_str().as_bytes().to_vec()
+}
+
+#[cfg(windows)]
+fn native_path_bytes(path: &Path) -> Vec<u8> {
+    path.as_os_str()
+        .encode_wide()
+        .flat_map(|unit| unit.to_le_bytes())
+        .collect()
 }
 ```
 

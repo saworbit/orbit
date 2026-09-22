@@ -1,5 +1,10 @@
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
+
 use crate::error::{OrbitError, Result};
 use crate::hash::hash_file;
 use crate::paths::ResolvedEndpoints;
@@ -174,7 +179,7 @@ fn at_root(root: &Path, relative: &Path) -> PathBuf {
 
 fn operation_id(request: &PlanRequest, endpoints: &ResolvedEndpoints) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"orbit.operation-id.v1");
+    hasher.update(b"orbit.operation-id.v2");
     update_path_hash(&mut hasher, b"source", &endpoints.source);
     update_path_hash(&mut hasher, b"destination", &endpoints.destination);
     hasher.update(b"options");
@@ -190,11 +195,31 @@ fn operation_id(request: &PlanRequest, endpoints: &ResolvedEndpoints) -> String 
 }
 
 fn update_path_hash(hasher: &mut blake3::Hasher, domain: &[u8], path: &Path) {
-    let encoded = path.as_os_str().as_encoded_bytes();
+    let encoded = native_path_bytes(path);
     let length = u64::try_from(encoded.len()).expect("path length fits in u64");
     hasher.update(domain);
+    hasher.update(PATH_ENCODING_DOMAIN);
     hasher.update(&length.to_le_bytes());
-    hasher.update(encoded);
+    hasher.update(&encoded);
+}
+
+#[cfg(unix)]
+const PATH_ENCODING_DOMAIN: &[u8] = b"unix-bytes-v1";
+
+#[cfg(windows)]
+const PATH_ENCODING_DOMAIN: &[u8] = b"windows-utf16le-v1";
+
+#[cfg(unix)]
+fn native_path_bytes(path: &Path) -> Vec<u8> {
+    path.as_os_str().as_bytes().to_vec()
+}
+
+#[cfg(windows)]
+fn native_path_bytes(path: &Path) -> Vec<u8> {
+    path.as_os_str()
+        .encode_wide()
+        .flat_map(|unit| unit.to_le_bytes())
+        .collect()
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -593,8 +618,12 @@ mod tests {
         let source = temp.path().join("source-link");
         let destination = temp.path().join("destination-link");
         let missing_target = Path::new("missing-target");
-        create_file_link(missing_target, &source);
-        create_file_link(missing_target, &destination);
+        if create_file_link(missing_target, &source) == SymlinkCapability::PermissionDenied
+            || create_file_link(missing_target, &destination) == SymlinkCapability::PermissionDenied
+        {
+            eprintln!("skipping symlink assertion: symbolic-link creation is not permitted");
+            return;
+        }
 
         let plan = plan_for(&source, &destination, false, VerifyMode::Hash, false);
 
@@ -612,8 +641,14 @@ mod tests {
         let temp = tempdir().unwrap();
         let source = temp.path().join("source-link");
         let destination = temp.path().join("destination-link");
-        create_file_link(Path::new("first-missing-target"), &source);
-        create_file_link(Path::new("second-missing-target"), &destination);
+        if create_file_link(Path::new("first-missing-target"), &source)
+            == SymlinkCapability::PermissionDenied
+            || create_file_link(Path::new("second-missing-target"), &destination)
+                == SymlinkCapability::PermissionDenied
+        {
+            eprintln!("skipping symlink assertion: symbolic-link creation is not permitted");
+            return;
+        }
 
         let plan = plan_for(&source, &destination, true, VerifyMode::Hash, false);
 
@@ -704,7 +739,41 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn operation_id_distinguishes_native_windows_paths_that_lossy_text_collapses() {
+    fn operation_id_matches_stable_windows_utf16le_golden() {
+        let source = PathBuf::from("source");
+        let destination = PathBuf::from("destination");
+        let request = request_for(&source, &destination, false, VerifyMode::Hash, false);
+        let endpoints = ResolvedEndpoints {
+            source,
+            destination,
+        };
+
+        assert_eq!(
+            operation_id(&request, &endpoints),
+            "316bcd8b631e8e3a848046c9"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn operation_id_matches_stable_unix_bytes_golden() {
+        let source = PathBuf::from("source");
+        let destination = PathBuf::from("destination");
+        let request = request_for(&source, &destination, false, VerifyMode::Hash, false);
+        let endpoints = ResolvedEndpoints {
+            source,
+            destination,
+        };
+
+        assert_eq!(
+            operation_id(&request, &endpoints),
+            "d9f6d84708288c436eabf6ca"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn operation_id_matches_stable_windows_unpaired_surrogate_golden() {
         use std::ffi::OsString;
         use std::os::windows::ffi::OsStringExt;
 
@@ -723,6 +792,10 @@ mod tests {
             destination,
         };
 
+        assert_eq!(
+            operation_id(&first_request, &first_endpoints),
+            "b56c5a0f05884fda575ddb54"
+        );
         assert_ne!(
             operation_id(&first_request, &first_endpoints),
             operation_id(&second_request, &second_endpoints)
@@ -731,7 +804,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn operation_id_distinguishes_native_unix_paths_that_lossy_text_collapses() {
+    fn operation_id_matches_stable_unix_non_unicode_golden() {
         use std::ffi::OsString;
         use std::os::unix::ffi::OsStringExt;
 
@@ -750,20 +823,36 @@ mod tests {
             destination,
         };
 
+        assert_eq!(
+            operation_id(&first_request, &first_endpoints),
+            "ad63eb63f0de53d9c0a05436"
+        );
         assert_ne!(
             operation_id(&first_request, &first_endpoints),
             operation_id(&second_request, &second_endpoints)
         );
     }
 
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum SymlinkCapability {
+        Created,
+        PermissionDenied,
+    }
+
     #[cfg(unix)]
-    fn create_file_link(target: &Path, link: &Path) {
+    fn create_file_link(target: &Path, link: &Path) -> SymlinkCapability {
         std::os::unix::fs::symlink(target, link).unwrap();
+        SymlinkCapability::Created
     }
 
     #[cfg(windows)]
-    fn create_file_link(target: &Path, link: &Path) {
-        std::os::windows::fs::symlink_file(target, link)
-            .unwrap_or_else(|error| panic!("cannot create test symlink: {error}"));
+    fn create_file_link(target: &Path, link: &Path) -> SymlinkCapability {
+        match std::os::windows::fs::symlink_file(target, link) {
+            Ok(()) => SymlinkCapability::Created,
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                SymlinkCapability::PermissionDenied
+            }
+            Err(error) => panic!("cannot create test symlink: {error}"),
+        }
     }
 }
