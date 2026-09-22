@@ -310,6 +310,7 @@ dependencies = [
  "assert_cmd",
  "blake3",
  "clap",
+ "getrandom",
  "predicates",
  "serde",
  "serde_json",

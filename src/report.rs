@@ -190,6 +190,14 @@ fn error_message(error: &OrbitError) -> String {
             "staged copy did not match the source: {}",
             display_path(path)
         ),
+        OrbitError::SourceChanged(path) => format!(
+            "source changed while it was being copied: {}",
+            display_path(path)
+        ),
+        OrbitError::StagingChanged(path) => format!(
+            "staging file identity changed before publication: {}",
+            display_path(path)
+        ),
         OrbitError::StagingCleanup { path, source } => format!(
             "cannot remove staging file {}: {source}",
             display_path(path)
