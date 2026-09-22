@@ -34,7 +34,7 @@ fn fingerprint(root: &Path) -> Vec<(PathBuf, Option<Vec<u8>>)> {
 }
 
 #[test]
-fn help_exposes_only_plan() {
+fn help_exposes_plan_and_copy() {
     let temp = tempfile::tempdir().unwrap();
     let before = fingerprint(temp.path());
 
@@ -43,7 +43,38 @@ fn help_exposes_only_plan() {
         .assert()
         .success()
         .stdout(predicate::str::contains("plan"))
-        .stdout(predicate::str::contains("copy").not());
+        .stdout(predicate::str::contains("copy"));
+
+    assert_eq!(fingerprint(temp.path()), before);
+}
+
+#[test]
+fn copy_help_exposes_safe_options_without_replace() {
+    let temp = tempfile::tempdir().unwrap();
+    let before = fingerprint(temp.path());
+
+    orbit(temp.path())
+        .args(["copy", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--verify"))
+        .stdout(predicate::str::contains("--json"))
+        .stdout(predicate::str::contains("--quiet"))
+        .stdout(predicate::str::contains("--replace").not());
+
+    assert_eq!(fingerprint(temp.path()), before);
+}
+
+#[test]
+fn copy_rejects_replace() {
+    let temp = tempfile::tempdir().unwrap();
+    let before = fingerprint(temp.path());
+
+    orbit(temp.path())
+        .args(["copy", "source", "destination", "--replace"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("unexpected argument '--replace'"));
 
     assert_eq!(fingerprint(temp.path()), before);
 }
