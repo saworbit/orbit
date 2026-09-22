@@ -1,10 +1,11 @@
 use std::io::Write;
 use std::path::Path;
 
+use crate::copy::execute_copy;
 use crate::paths::resolve_endpoints;
 use crate::plan::build_plan;
-use crate::report::{write_blocking_diagnostics, write_error, write_plan};
-use crate::request::{OutputMode, PlanRequest};
+use crate::report::{write_blocking_diagnostics, write_copy_result, write_error, write_plan};
+use crate::request::{CopyRequest, OutputMode, PlanRequest};
 use crate::scan::scan_source;
 
 pub fn run_plan(
@@ -40,6 +41,45 @@ pub fn run_plan(
                 }
             }
             if plan.is_executable() { 0 } else { 3 }
+        }
+        Err(error) => {
+            let code = error.exit_code();
+            let report_result = if output == OutputMode::Json {
+                write_error(stdout, output, &error).and_then(|()| stdout.flush())
+            } else {
+                write_error(stderr, output, &error).and_then(|()| stderr.flush())
+            };
+            if let Err(report_error) = report_result {
+                if output == OutputMode::Json {
+                    write_report_failure(stderr, &report_error);
+                }
+                return 1;
+            }
+            code
+        }
+    }
+}
+
+pub fn run_copy(
+    request: CopyRequest,
+    cwd: &Path,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> u8 {
+    let output = request.output;
+    match execute_copy(&request, cwd) {
+        Ok(result) => {
+            if let Err(error) = write_copy_result(stdout, output, &result) {
+                write_report_failure(stderr, &error);
+                return 1;
+            }
+            if output != OutputMode::Quiet {
+                if let Err(error) = stdout.flush() {
+                    write_report_failure(stderr, &error);
+                    return 1;
+                }
+            }
+            0
         }
         Err(error) => {
             let code = error.exit_code();

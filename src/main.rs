@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
 use clap::Parser;
-use orbit::app::run_plan;
+use orbit::app::{run_copy, run_plan};
 use orbit::cli::Cli;
 use orbit::request::OrbitRequest;
 
@@ -21,10 +21,12 @@ fn main() -> ExitCode {
             &mut std::io::stdout().lock(),
             &mut std::io::stderr().lock(),
         ),
-        OrbitRequest::Copy(_) => {
-            eprintln!("error: copy execution is not implemented");
-            1
-        }
+        OrbitRequest::Copy(request) => run_copy(
+            request,
+            &cwd,
+            &mut std::io::stdout().lock(),
+            &mut std::io::stderr().lock(),
+        ),
     };
     ExitCode::from(exit)
 }
