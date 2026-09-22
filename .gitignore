@@ -1,52 +1,11 @@
-# Ignore Rust build artifacts
 /target/
-**/*.rs.bk
-
-# Editor backups and swap files
-*~
-*.swp
-*.swo
-
-# Claude Code
-.claude
-
-# Logs and temp files
+*.rs.bk
 *.log
 *.tmp
-
-# macOS
 .DS_Store
-
-# Windows
 Thumbs.db
-
-# Orbit-specific test files and artifacts
-test*.txt
-*_backup.txt
-sample_*.txt
-*.orbit_resume
-*.orbit_resume_compressed
-*.tmp.lz4
-*.tmp.zst
-
-# Orbit audit logs
-orbit_audit.log
-audit.log
-*.jsonl
-**/beacon.json
-
-# Windows null device artifact
-nul
-
-# Development artifacts (should not be in root)
-*.patch
-clippy.txt
-COMMIT_MESSAGE.txt
-test_output.txt
-
-# Database files
-*.db
-*.db-journal
-jobs.db
-.vscode/settings.json
-protoc-tools/
+.idea/
+.vscode/
+.claude/
+.orbit-state/
+*.orbit-partial-*
