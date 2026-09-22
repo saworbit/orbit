@@ -33,6 +33,16 @@ pub fn execute_copy(request: &CopyRequest, cwd: &Path) -> Result<CopyResult> {
     let endpoints = resolve_endpoints(&request.source, &request.destination, cwd)?;
     ensure_destination_parent(&endpoints.destination)?;
 
+    let source_metadata =
+        fs::symlink_metadata(&endpoints.source).map_err(|source| OrbitError::Io {
+            operation: "inspect copy source",
+            path: endpoints.source.clone(),
+            source,
+        })?;
+    if !source_metadata.file_type().is_file() {
+        return Err(OrbitError::CopyRequiresRegularFile(endpoints.source));
+    }
+
     let snapshot = scan_source(&endpoints.source)?;
     if snapshot.entries.len() != 1 || snapshot.entries[0].kind != EntryKind::File {
         return Err(OrbitError::CopyRequiresRegularFile(endpoints.source));
