@@ -20,7 +20,7 @@ pub fn resolve_endpoints(
     destination: &Path,
     cwd: &Path,
 ) -> Result<ResolvedEndpoints> {
-    let source_input = absolutize(source, cwd);
+    let source_input = absolutize(source, cwd)?;
     let source_metadata = match fs::symlink_metadata(&source_input) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -35,7 +35,7 @@ pub fn resolve_endpoints(
         }
     };
     let source = resolve_leaf(&source_input)?;
-    let destination = resolve_leaf(&absolutize(destination, cwd))?;
+    let destination = resolve_leaf(&absolutize(destination, cwd)?)?;
 
     if paths_equal(&source, &destination) {
         return Err(OrbitError::SameEndpoint(source));
@@ -49,12 +49,54 @@ pub fn resolve_endpoints(
     })
 }
 
-fn absolutize(path: &Path, cwd: &Path) -> PathBuf {
-    if path.is_absolute() {
+fn absolutize(path: &Path, cwd: &Path) -> Result<PathBuf> {
+    let path = if path.is_absolute() {
         path.to_path_buf()
     } else {
+        #[cfg(windows)]
+        let cwd = ordinary_windows_cwd(cwd);
         cwd.join(path)
+    };
+    #[cfg(windows)]
+    {
+        // Rust 1.85 uses GetFullPathNameW for ordinary Windows paths, normalizing
+        // dots, parents and trailing-dot/space aliases before filesystem lookup.
+        // Explicit verbatim paths are returned unchanged by std::path::absolute.
+        std::path::absolute(&path).map_err(|source| OrbitError::Io {
+            operation: "normalize endpoint",
+            path,
+            source,
+        })
     }
+    #[cfg(not(windows))]
+    Ok(path)
+}
+
+#[cfg(windows)]
+fn ordinary_windows_cwd(cwd: &Path) -> PathBuf {
+    use std::ffi::OsString;
+    use std::path::{Component, Prefix};
+
+    let mut components = cwd.components();
+    let Some(Component::Prefix(prefix)) = components.next() else {
+        return cwd.to_path_buf();
+    };
+    // A canonical CWD must not turn an ordinary relative endpoint into a
+    // verbatim input before GetFullPathNameW can normalize it. This spelling is
+    // only the normalization base; canonical endpoint prefixes stay intact.
+    let mut ordinary = match prefix.kind() {
+        Prefix::VerbatimDisk(drive) => OsString::from(format!("{}:", char::from(drive))),
+        Prefix::VerbatimUNC(server, share) => {
+            let mut value = OsString::from(r"\\");
+            value.push(server);
+            value.push(r"\");
+            value.push(share);
+            value
+        }
+        _ => return cwd.to_path_buf(),
+    };
+    ordinary.push(components.as_path());
+    PathBuf::from(ordinary)
 }
 
 fn resolve_leaf(path: &Path) -> Result<PathBuf> {
@@ -65,6 +107,14 @@ fn resolve_leaf(path: &Path) -> Result<PathBuf> {
     Ok(resolve_ancestor(parent)?.join(name))
 }
 
+#[cfg(windows)]
+fn resolve_ancestor(path: &Path) -> Result<PathBuf> {
+    // Ordinary inputs have already received Win32 lexical normalization. For
+    // verbatim inputs, pass components unchanged to the filesystem as Rust does.
+    resolve_nearest_existing_ancestor(path)
+}
+
+#[cfg(not(windows))]
 fn resolve_ancestor(path: &Path) -> Result<PathBuf> {
     let mut resolved = PathBuf::new();
     for component in path.components() {
@@ -248,6 +298,7 @@ mod tests {
         assert_ne!(resolved.source, resolved_parent.join("target.txt"));
     }
 
+    #[cfg(unix)]
     #[test]
     fn resolves_parent_components_after_symlinks_before_checking_containment() {
         let temp = tempdir().unwrap();
@@ -336,5 +387,116 @@ mod tests {
             resolve_endpoints(&source, &differently_cased, temp.path()),
             Err(OrbitError::SameEndpoint(_))
         ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn ordinary_windows_trailing_aliases_reject_the_same_endpoint() {
+        let temp = tempdir().unwrap();
+        let source = temp.path().join("same");
+        fs::write(&source, b"same endpoint").unwrap();
+        for name in ["same.", "same ", "same. "] {
+            let alias = temp.path().join(name);
+            assert_eq!(fs::read(&alias).unwrap(), b"same endpoint");
+            assert!(
+                matches!(
+                    resolve_endpoints(&source, &alias, temp.path()),
+                    Err(OrbitError::SameEndpoint(_))
+                ),
+                "ordinary alias {name:?} bypassed same-endpoint rejection"
+            );
+            assert!(matches!(
+                resolve_endpoints(&alias, &source, temp.path()),
+                Err(OrbitError::SameEndpoint(_))
+            ));
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn ordinary_relative_windows_alias_stays_ordinary_with_a_canonical_cwd() {
+        let temp = tempdir().unwrap();
+        let source = temp.path().join("same");
+        fs::write(&source, b"same").unwrap();
+        let cwd = fs::canonicalize(temp.path()).unwrap();
+        assert!(matches!(
+            resolve_endpoints(&source, std::path::Path::new("same."), &cwd),
+            Err(OrbitError::SameEndpoint(_))
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn ordinary_windows_link_parent_matches_filesystem_resolution() {
+        let temp = tempdir().unwrap();
+        let local = temp.path().join("local");
+        let remote = temp.path().join("remote");
+        fs::create_dir_all(remote.join("deep")).unwrap();
+        fs::create_dir(&local).unwrap();
+        fs::write(local.join("child.txt"), b"local").unwrap();
+        fs::write(remote.join("child.txt"), b"remote").unwrap();
+        if !create_directory_link(&remote.join("deep"), &local.join("link")) {
+            return;
+        }
+        let source = local.join("link/../child.txt");
+        assert_eq!(fs::read(&source).unwrap(), b"local");
+        let resolved = resolve_endpoints(&source, &temp.path().join("copy"), temp.path()).unwrap();
+        assert_eq!(fs::read(&resolved.source).unwrap(), b"local");
+        assert_eq!(
+            resolved.source,
+            fs::canonicalize(local.join("child.txt")).unwrap()
+        );
+        assert!(matches!(
+            resolve_endpoints(
+                &local.join("link/.."),
+                &local.join("nested/copy"),
+                temp.path()
+            ),
+            Err(OrbitError::DestinationInsideSource { .. })
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn explicitly_verbatim_windows_leaf_keeps_literal_trailing_characters() {
+        let temp = tempdir().unwrap();
+        let ordinary = temp.path().join("literal");
+        fs::write(&ordinary, b"ordinary").unwrap();
+        let canonical_parent = fs::canonicalize(temp.path()).unwrap();
+        for name in ["literal.", "literal "] {
+            let literal = canonical_parent.join(name);
+            // NTFS permits these literal names under the extended prefix.
+            fs::write(&literal, b"verbatim").unwrap();
+            assert_eq!(fs::read(&literal).unwrap(), b"verbatim");
+            assert_eq!(fs::read(temp.path().join(name)).unwrap(), b"ordinary");
+            let resolved = resolve_endpoints(&ordinary, &literal, temp.path()).unwrap();
+            assert_eq!(resolved.destination, literal);
+            assert_ne!(resolved.source, resolved.destination);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn explicitly_verbatim_windows_components_are_not_lexically_collapsed() {
+        let temp = tempdir().unwrap();
+        fs::create_dir(temp.path().join("directory")).unwrap();
+        let mut raw = fs::canonicalize(temp.path()).unwrap().into_os_string();
+        // OsString::push preserves the original components; PathBuf::push can
+        // itself normalize relative components when its base is verbatim.
+        raw.push(r"\directory\..\copy");
+        let input = std::path::PathBuf::from(raw);
+        assert_eq!(
+            super::absolutize(&input, temp.path()).unwrap().as_os_str(),
+            input.as_os_str()
+        );
+        let resolved = resolve_endpoints(&temp.path().join("directory"), &input, temp.path());
+        // NTFS rejects literal dot components under the verbatim prefix.
+        let parent_error = fs::symlink_metadata(input.parent().unwrap()).unwrap_err();
+        match resolved {
+            Err(OrbitError::Io { source, .. }) => assert_eq!(source.kind(), parent_error.kind()),
+            Err(OrbitError::SourceMissing(_))
+                if parent_error.kind() == std::io::ErrorKind::NotFound => {}
+            other => panic!("verbatim parent components were normalized: {other:?}"),
+        }
     }
 }

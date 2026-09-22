@@ -636,7 +636,7 @@ cargo test paths::tests --lib
 
 Expected: the tests fail at `unreachable!()`.
 
-- [ ] **Step 3: Implement symlink-aware existing-source and nearest-ancestor resolution**
+- [ ] **Step 3: Implement platform-aware exact-leaf and nearest-ancestor resolution**
 
 Add this narrowly target-scoped dependency to `Cargo.toml`; `CompareStringOrdinal` compares Windows path components as native UTF-16 ordinal text without lossy UTF-8 conversion or Unicode lowercasing:
 
@@ -645,7 +645,9 @@ Add this narrowly target-scoped dependency to `Cargo.toml`; `CompareStringOrdina
 windows-sys = { version = "0.61", features = ["Win32_Globalization"] }
 ```
 
-Replace the deliberately failing function in `src/paths.rs` with helpers that preserve extended canonical paths, never pre-collapse `.` or `..`, resolve an intermediate symbolic link before a following `..`, and compare non-Windows components exactly:
+Normalize ordinary Windows input with `std::path::absolute` before inspecting or reconstructing an extended canonical path. In Rust 1.85 this calls `GetFullPathNameW`, which handles ordinary `.`/`..` and trailing-dot/space aliases before filesystem lookup; explicitly verbatim paths retain their components. Resolve Windows ancestors through the filesystem after this normalization. On Unix, retain exact native components and resolve intermediate symlinks before applying a following `..`. Preserve canonical extended prefixes and final symlinks on both source and destination; compare Unix components exactly and Windows components using native UTF-16 ordinal comparison.
+
+The platform behavior is specified by [Rust 1.85's Windows path implementation](https://github.com/rust-lang/rust/blob/1.85.0/library/std/src/sys/path/windows.rs). Do not apply the Unix component walk to ordinary Windows paths or append an unnormalized ordinary leaf to an extended canonical parent. For ordinary relative input and an already-canonical CWD, use the ordinary disk/UNC spelling of that CWD only as the normalization base; explicitly verbatim endpoint inputs and canonical result prefixes remain intact. All spelling changes retain native OS-string units without lossy Unicode conversion.
 
 ```rust
 use std::fs;
@@ -660,7 +662,7 @@ use windows_sys::Win32::Globalization::{CSTR_EQUAL, CompareStringOrdinal};
 use crate::error::{OrbitError, Result};
 
 pub fn resolve_endpoints(source: &Path, destination: &Path, cwd: &Path) -> Result<ResolvedEndpoints> {
-    let source_input = absolutize(source, cwd);
+    let source_input = absolutize(source, cwd)?;
     let source_metadata = match fs::symlink_metadata(&source_input) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -675,7 +677,7 @@ pub fn resolve_endpoints(source: &Path, destination: &Path, cwd: &Path) -> Resul
         }
     };
     let source = resolve_leaf(&source_input)?;
-    let destination = resolve_leaf(&absolutize(destination, cwd))?;
+    let destination = resolve_leaf(&absolutize(destination, cwd)?)?;
 
     if paths_equal(&source, &destination) {
         return Err(OrbitError::SameEndpoint(source));
@@ -686,12 +688,48 @@ pub fn resolve_endpoints(source: &Path, destination: &Path, cwd: &Path) -> Resul
     Ok(ResolvedEndpoints { source, destination })
 }
 
-fn absolutize(path: &Path, cwd: &Path) -> PathBuf {
-    if path.is_absolute() {
+fn absolutize(path: &Path, cwd: &Path) -> Result<PathBuf> {
+    let path = if path.is_absolute() {
         path.to_path_buf()
     } else {
+        #[cfg(windows)]
+        let cwd = ordinary_windows_cwd(cwd);
         cwd.join(path)
+    };
+    #[cfg(windows)]
+    {
+        std::path::absolute(&path).map_err(|source| OrbitError::Io {
+            operation: "normalize endpoint",
+            path,
+            source,
+        })
     }
+    #[cfg(not(windows))]
+    Ok(path)
+}
+
+#[cfg(windows)]
+fn ordinary_windows_cwd(cwd: &Path) -> PathBuf {
+    use std::ffi::OsString;
+    use std::path::{Component, Prefix};
+
+    let mut components = cwd.components();
+    let Some(Component::Prefix(prefix)) = components.next() else {
+        return cwd.to_path_buf();
+    };
+    let mut ordinary = match prefix.kind() {
+        Prefix::VerbatimDisk(drive) => OsString::from(format!("{}:", char::from(drive))),
+        Prefix::VerbatimUNC(server, share) => {
+            let mut value = OsString::from(r"\\");
+            value.push(server);
+            value.push(r"\");
+            value.push(share);
+            value
+        }
+        _ => return cwd.to_path_buf(),
+    };
+    ordinary.push(components.as_path());
+    PathBuf::from(ordinary)
 }
 
 fn resolve_leaf(path: &Path) -> Result<PathBuf> {
@@ -702,6 +740,12 @@ fn resolve_leaf(path: &Path) -> Result<PathBuf> {
     Ok(resolve_ancestor(parent)?.join(name))
 }
 
+#[cfg(windows)]
+fn resolve_ancestor(path: &Path) -> Result<PathBuf> {
+    resolve_nearest_existing_ancestor(path)
+}
+
+#[cfg(not(windows))]
 fn resolve_ancestor(path: &Path) -> Result<PathBuf> {
     let mut resolved = PathBuf::new();
     for component in path.components() {
@@ -833,6 +877,8 @@ cargo clippy --lib -- -D warnings
 
 Expected: all endpoint tests pass and Clippy reports no warnings. Before committing, append and run these final-component and Windows case-sensitivity regressions:
 
+Also run the real-filesystem Windows regressions in [src/paths.rs](../../../src/paths.rs): ordinary trailing-dot/space aliases must reject same endpoints, ordinary `link/..` must resolve as Win32 does, ordinary relative input must stay ordinary with a canonical CWD, and explicitly verbatim paths must retain literal trailing characters and relative components. Keep the non-ASCII case, extended-prefix, nonexistent-leaf, and final-symlink coverage. Only skip symlink creation when the host denies that capability.
+
 ```rust
 #[test]
 fn resolution_preserves_a_final_symlink_instead_of_following_it() {
@@ -849,6 +895,7 @@ fn resolution_preserves_a_final_symlink_instead_of_following_it() {
     assert_ne!(resolved.source, resolved_parent.join("target.txt"));
 }
 
+#[cfg(unix)]
 #[test]
 fn resolves_parent_components_after_symlinks_before_checking_containment() {
     let temp = tempdir().unwrap();
@@ -1802,7 +1849,7 @@ git commit -m "feat: build deterministic local copy plans"
 
 **Interfaces:**
 - Consumes: `CopyPlan`, `PlanEntry`, and `OrbitError`.
-- Produces: `report::write_plan(&mut impl Write, OutputMode, &CopyPlan) -> io::Result<()>` and `report::write_error(&mut impl Write, OutputMode, &OrbitError) -> io::Result<()>`.
+- Produces: `report::write_plan(&mut impl Write, OutputMode, &CopyPlan) -> io::Result<()>`, `report::write_error(&mut impl Write, OutputMode, &OrbitError) -> io::Result<()>`, and `report::write_blocking_diagnostics(&mut impl Write, &CopyPlan) -> io::Result<()>`.
 
 **Schema correction:** JSON v1 must not serialize `PathBuf` directly. Each `relative_path`, `source`, and `destination` field in a `plan_entry` is an object with `encoding` and `value`: Unicode paths use `{ "encoding": "utf8", "value": "..." }`; non-Unicode Unix paths use `unix_bytes_hex`, and non-Unicode Windows paths use `windows_utf16le_hex`, with the exact native encoding represented as lowercase hex. Human output must render a native-encoding fallback rather than silently replacing invalid path data.
 
@@ -1937,91 +1984,13 @@ pub fn code(&self) -> &'static str {
 }
 ```
 
-Implement the rendering functions as follows:
+The original rendering snippet is superseded by the lossless reporting boundary in [src/report.rs](../../../src/report.rs), specifically `write_plan`, `write_json_plan`, `JsonPlanEntry::from`, `JsonPath::from_path`, `display_path`, `write_error`, and `write_blocking_diagnostics`:
 
-```rust
-pub fn write_plan(
-    writer: &mut impl Write,
-    mode: OutputMode,
-    plan: &CopyPlan,
-) -> io::Result<()> {
-    match mode {
-        OutputMode::Quiet => Ok(()),
-        OutputMode::Human => {
-            writeln!(writer, "Source: {}", plan.source.display())?;
-            writeln!(writer, "Destination: {}", plan.destination.display())?;
-            for entry in &plan.entries {
-                let label = match entry.disposition {
-                    Disposition::Copy => "COPY",
-                    Disposition::SkipIdentical => "SKIP",
-                    Disposition::Replace => "REPLACE",
-                    Disposition::Conflict => "CONFLICT",
-                    Disposition::Unsupported => "UNSUPPORTED",
-                };
-                writeln!(writer, "{label} {} — {}", entry.relative_path.display(), entry.reason)?;
-            }
-            let blocking = plan.entries.iter().filter(|entry| entry.blocking).count();
-            if blocking == 0 {
-                writeln!(writer, "Plan ready: {} entries", plan.entries.len())
-            } else {
-                let noun = if blocking == 1 { "conflict" } else { "conflicts" };
-                writeln!(writer, "Plan blocked: {blocking} {noun}")
-            }
-        }
-        OutputMode::Json => {
-            for entry in &plan.entries {
-                write_json_line(writer, &JsonEvent {
-                    schema_version: 1,
-                    event: "plan_entry",
-                    data: entry,
-                })?;
-            }
-            let blocking = plan.entries.iter().filter(|entry| entry.blocking).count();
-            write_json_line(writer, &JsonEvent {
-                schema_version: 1,
-                event: "plan_result",
-                data: PlanResult {
-                    operation_id: &plan.operation_id,
-                    executable: plan.is_executable(),
-                    entries: plan.entries.len(),
-                    blocking,
-                },
-            })
-        }
-    }
-}
-
-#[derive(serde::Serialize)]
-struct ErrorData<'a> {
-    code: &'a str,
-    exit_code: u8,
-    message: String,
-}
-
-pub fn write_error(
-    writer: &mut impl Write,
-    mode: OutputMode,
-    error: &OrbitError,
-) -> io::Result<()> {
-    match mode {
-        OutputMode::Json => write_json_line(writer, &JsonEvent {
-            schema_version: 1,
-            event: "error",
-            data: ErrorData {
-                code: error.code(),
-                exit_code: error.exit_code(),
-                message: error.to_string(),
-            },
-        }),
-        OutputMode::Human | OutputMode::Quiet => writeln!(writer, "error: {error}"),
-    }
-}
-
-fn write_json_line(writer: &mut impl Write, value: &impl serde::Serialize) -> io::Result<()> {
-    serde_json::to_writer(&mut *writer, value).map_err(io::Error::other)?;
-    writeln!(writer)
-}
-```
+- Every JSON `plan_entry` uses `JsonPlanEntry::from(entry)`; never serialize a domain `PlanEntry` directly. Each path is an `{ encoding, value }` object. Unicode paths use `utf8`; non-Unicode paths use exact native units encoded as `unix_bytes_hex` or `windows_utf16le_hex`.
+- Human plan/error/blocked diagnostics all use `display_path`, including its lossless native-unit fallback. Do not use `Path::display` or lossy replacement for this boundary.
+- `write_plan(Quiet, ...)` performs no writes. The application calls `write_blocking_diagnostics` on stderr only for blocked quiet plans. Emit each blocking entry in plan order, using the exact source path for unsupported fidelity or destination path for conflicts, together with its label and reason.
+- All reporting functions propagate write/serialization errors as `io::Result<()>`. The application must flush the selected stream and treat either write or flush failure as internal exit `1`, as shown in Task 8.
+- Preserve schema version `1`, ordered `plan_entry` events, the final `plan_result`, and error events containing stable `code`, `exit_code`, and a lossless human-readable message.
 
 - [ ] **Step 3: Verify rendering and commit**
 
@@ -2224,8 +2193,8 @@ use std::path::Path;
 
 use crate::paths::resolve_endpoints;
 use crate::plan::build_plan;
-use crate::report::{write_error, write_plan};
-use crate::request::PlanRequest;
+use crate::report::{write_blocking_diagnostics, write_error, write_plan};
+use crate::request::{OutputMode, PlanRequest};
 use crate::scan::scan_source;
 
 pub fn run_plan(
@@ -2243,21 +2212,45 @@ pub fn run_plan(
 
     match result {
         Ok(plan) => {
+            if output == OutputMode::Quiet && !plan.is_executable() {
+                return match write_blocking_diagnostics(stderr, &plan).and_then(|()| stderr.flush()) {
+                    Ok(()) => 3,
+                    Err(_) => 1,
+                };
+            }
             if let Err(error) = write_plan(stdout, output, &plan) {
-                let _ = writeln!(stderr, "error: cannot write report: {error}");
+                write_report_failure(stderr, &error);
                 return 1;
+            }
+            if output != OutputMode::Quiet {
+                if let Err(error) = stdout.flush() {
+                    write_report_failure(stderr, &error);
+                    return 1;
+                }
             }
             if plan.is_executable() { 0 } else { 3 }
         }
         Err(error) => {
             let code = error.exit_code();
-            if output == crate::request::OutputMode::Json {
-                let _ = write_error(stdout, output, &error);
+            let report_result = if output == OutputMode::Json {
+                write_error(stdout, output, &error).and_then(|()| stdout.flush())
             } else {
-                let _ = write_error(stderr, output, &error);
+                write_error(stderr, output, &error).and_then(|()| stderr.flush())
+            };
+            if let Err(report_error) = report_result {
+                if output == OutputMode::Json {
+                    write_report_failure(stderr, &report_error);
+                }
+                return 1;
             }
             code
         }
+    }
+}
+
+fn write_report_failure(stderr: &mut impl Write, error: &std::io::Error) {
+    if writeln!(stderr, "error: cannot write report: {error}").is_ok() {
+        let _ = stderr.flush();
     }
 }
 ```
@@ -2341,9 +2334,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test --all-targets
+      - run: cargo +stable fmt --all -- --check
+      - run: cargo +stable clippy --all-targets -- -D warnings
+      - run: cargo +stable test --all-targets
 
   msrv:
     runs-on: windows-latest
@@ -2352,7 +2345,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.85.0
-      - run: cargo test --all-targets
+      - run: cargo +1.85.0 test --all-targets
 ```
 
 - [ ] **Step 6: Run the complete local quality gate**

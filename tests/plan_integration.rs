@@ -404,6 +404,71 @@ fn quiet_success_suppresses_the_plan() {
 }
 
 #[test]
+fn quiet_conflict_reports_exact_blocking_paths_and_reasons_on_stderr() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("source");
+    let destination = temp.path().join("destination");
+    fs::create_dir(&source).unwrap();
+    fs::create_dir(&destination).unwrap();
+    for name in ["a.txt", "b.txt"] {
+        fs::write(source.join(name), b"source").unwrap();
+        fs::write(destination.join(name), b"before").unwrap();
+    }
+    let before = fingerprint(temp.path());
+    let output = orbit(temp.path())
+        .args(["plan", "source", "destination", "--quiet"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    let resolved_destination = fs::canonicalize(&destination).unwrap();
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        format!(
+            "error: CONFLICT {} — destination file has different contents\nerror: CONFLICT {} — destination file has different contents\n",
+            resolved_destination.join("a.txt").to_str().unwrap(),
+            resolved_destination.join("b.txt").to_str().unwrap(),
+        )
+    );
+    assert_tree_unchanged(temp.path(), &before);
+}
+
+#[cfg(unix)]
+#[test]
+fn quiet_unsupported_socket_reports_source_and_can_be_explicitly_ignored() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("source.socket");
+    let _socket = std::os::unix::net::UnixListener::bind(&source).unwrap();
+    let before = fingerprint(temp.path());
+    let output = orbit(temp.path())
+        .args(["plan", "source.socket", "target", "--quiet"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(3));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr).unwrap(),
+        format!(
+            "error: UNSUPPORTED {} — source entry has unsupported fidelity\n",
+            fs::canonicalize(&source).unwrap().to_str().unwrap(),
+        )
+    );
+    orbit(temp.path())
+        .args([
+            "plan",
+            "source.socket",
+            "target",
+            "--quiet",
+            "--ignore-unsupported",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::is_empty());
+    assert_tree_unchanged(temp.path(), &before);
+}
+
+#[test]
 fn destination_inside_source_exits_three_without_writes() {
     let temp = tempfile::tempdir().unwrap();
     let source = temp.path().join("source");
@@ -738,4 +803,41 @@ fn quiet_success_does_not_interact_with_either_stream() {
     );
 
     assert_eq!(exit, 0);
+}
+
+#[test]
+fn quiet_blocked_plan_report_write_and_flush_failures_return_internal_error() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("source");
+    let destination = temp.path().join("destination");
+    fs::write(&source, b"source").unwrap();
+    fs::write(&destination, b"before").unwrap();
+    let mut stdout = InteractionForbiddenWriter;
+    assert_eq!(
+        run_plan(
+            request(source.clone(), destination.clone(), OutputMode::Quiet),
+            temp.path(),
+            &mut stdout,
+            &mut FailingWriter
+        ),
+        1
+    );
+    assert_eq!(
+        run_plan(
+            request(source.clone(), destination.clone(), OutputMode::Quiet),
+            temp.path(),
+            &mut stdout,
+            &mut BufWriter::new(FailingWriter)
+        ),
+        1
+    );
+    assert_eq!(
+        run_plan(
+            request(source, destination, OutputMode::Quiet),
+            temp.path(),
+            &mut stdout,
+            &mut BufWriter::new(FlushFailingSink)
+        ),
+        1
+    );
 }

@@ -18,9 +18,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test --all-targets
+      - run: cargo +stable fmt --all -- --check
+      - run: cargo +stable clippy --all-targets -- -D warnings
+      - run: cargo +stable test --all-targets
 
   msrv:
     runs-on: windows-latest
@@ -29,4 +29,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.85.0
-      - run: cargo test --all-targets
+      - run: cargo +1.85.0 test --all-targets

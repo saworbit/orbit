@@ -54,6 +54,7 @@ pub fn build_plan(
     snapshot: &SourceSnapshot,
 ) -> Result<CopyPlan> {
     let mut entries = Vec::with_capacity(snapshot.entries.len());
+    let mut blocked_directories = std::collections::BTreeSet::new();
     for source_entry in &snapshot.entries {
         let source_path = at_root(&snapshot.root, &source_entry.relative_path);
         let destination_path = at_root(&endpoints.destination, &source_entry.relative_path);
@@ -65,7 +66,20 @@ pub fn build_plan(
                 None
             };
 
-        let (disposition, reason, blocking) = if !source_entry.unsupported.is_empty() {
+        // Snapshot ordering places directories before their descendants. Never inspect or
+        // hash a destination below an ancestor that cannot be used as a directory.
+        let blocked_ancestor = source_entry
+            .relative_path
+            .ancestors()
+            .skip(1)
+            .any(|ancestor| blocked_directories.contains(ancestor));
+        let (disposition, reason, blocking) = if blocked_ancestor {
+            (
+                Disposition::Conflict,
+                "destination ancestor is blocked",
+                true,
+            )
+        } else if !source_entry.unsupported.is_empty() {
             if request.ignore_unsupported {
                 (
                     Disposition::Unsupported,
@@ -148,6 +162,9 @@ pub fn build_plan(
             }
         };
 
+        if blocking && source_entry.kind == EntryKind::Directory {
+            blocked_directories.insert(source_entry.relative_path.clone());
+        }
         entries.push(PlanEntry {
             relative_path: source_entry.relative_path.clone(),
             source: source_path,
@@ -532,6 +549,113 @@ mod tests {
         assert!(!plan.is_executable());
     }
 
+    fn assert_blocked_directory_descendants(nested: bool, symlink: bool) {
+        let temp = tempdir().unwrap();
+        let source = temp.path().join("source");
+        let destination = temp.path().join("destination");
+        let relative = if nested {
+            Path::new("nested")
+        } else {
+            Path::new("")
+        };
+        let source_directory = if nested {
+            source.join(relative)
+        } else {
+            source.clone()
+        };
+        let destination_directory = if nested {
+            destination.join(relative)
+        } else {
+            destination.clone()
+        };
+        fs::create_dir_all(source_directory.join("deep")).unwrap();
+        fs::write(source_directory.join("matching.txt"), b"same").unwrap();
+        fs::write(source_directory.join("deep/missing.txt"), b"new").unwrap();
+        if nested {
+            fs::create_dir(&destination).unwrap();
+            fs::write(source.join("unrelated.txt"), b"safe").unwrap();
+        }
+        if symlink {
+            let outside = temp.path().join("outside");
+            fs::create_dir_all(outside.join("deep")).unwrap();
+            fs::write(outside.join("matching.txt"), b"same").unwrap();
+            if create_directory_link(&outside, &destination_directory)
+                == SymlinkCapability::PermissionDenied
+            {
+                eprintln!("skipping symlink assertion: symbolic-link creation is not permitted");
+                return;
+            }
+        } else {
+            fs::write(&destination_directory, b"not a directory").unwrap();
+        }
+
+        for verify in [VerifyMode::Hash, VerifyMode::Size] {
+            let plan = plan_for(&source, &destination, true, verify, false);
+            assert!(!plan.is_executable());
+            let conflict = plan
+                .entries
+                .iter()
+                .find(|entry| entry.relative_path == relative)
+                .unwrap();
+            assert_eq!(conflict.disposition, Disposition::Conflict);
+            assert_eq!(
+                conflict.reason,
+                "source and destination object types differ"
+            );
+            assert!(conflict.blocking);
+            for suffix in ["deep", "deep/missing.txt", "matching.txt"] {
+                let entry = plan
+                    .entries
+                    .iter()
+                    .find(|entry| entry.relative_path == relative.join(suffix))
+                    .unwrap();
+                assert_eq!(
+                    entry.disposition,
+                    Disposition::Conflict,
+                    "{}",
+                    entry.relative_path.display()
+                );
+                assert!(entry.blocking);
+                assert_eq!(entry.reason, "destination ancestor is blocked");
+                if entry.kind == EntryKind::File {
+                    let contents: &[u8] = if suffix == "matching.txt" {
+                        b"same"
+                    } else {
+                        b"new"
+                    };
+                    let expected = (verify == VerifyMode::Hash)
+                        .then(|| blake3::hash(contents).to_hex().to_string());
+                    assert_eq!(entry.source_digest, expected);
+                }
+            }
+            if nested {
+                let sibling = plan
+                    .entries
+                    .iter()
+                    .find(|entry| entry.relative_path == Path::new("unrelated.txt"))
+                    .unwrap();
+                assert_eq!(sibling.disposition, Disposition::Copy);
+                assert!(!sibling.blocking);
+            }
+        }
+    }
+
+    #[test]
+    fn root_directory_symlink_conflict_blocks_descendants() {
+        assert_blocked_directory_descendants(false, true);
+    }
+
+    #[test]
+    fn nested_directory_symlink_conflict_blocks_descendants() {
+        assert_blocked_directory_descendants(true, true);
+    }
+
+    #[test]
+    fn regular_file_ancestor_conflict_blocks_descendants() {
+        assert_blocked_directory_descendants(false, false);
+        assert_blocked_directory_descendants(true, false);
+    }
+
     #[test]
     fn unsupported_entry_blocks_by_default() {
         let plan = unsupported_plan(false);
@@ -837,6 +961,23 @@ mod tests {
     enum SymlinkCapability {
         Created,
         PermissionDenied,
+    }
+
+    #[cfg(unix)]
+    fn create_directory_link(target: &Path, link: &Path) -> SymlinkCapability {
+        std::os::unix::fs::symlink(target, link).unwrap();
+        SymlinkCapability::Created
+    }
+
+    #[cfg(windows)]
+    fn create_directory_link(target: &Path, link: &Path) -> SymlinkCapability {
+        match std::os::windows::fs::symlink_dir(target, link) {
+            Ok(()) => SymlinkCapability::Created,
+            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+                SymlinkCapability::PermissionDenied
+            }
+            Err(error) => panic!("cannot create test symlink: {error}"),
+        }
     }
 
     #[cfg(unix)]

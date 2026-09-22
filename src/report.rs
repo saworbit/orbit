@@ -13,6 +13,24 @@ pub fn write_plan(writer: &mut impl Write, mode: OutputMode, plan: &CopyPlan) ->
     }
 }
 
+pub fn write_blocking_diagnostics(writer: &mut impl Write, plan: &CopyPlan) -> io::Result<()> {
+    for entry in plan.entries.iter().filter(|entry| entry.blocking) {
+        let path = if entry.disposition == Disposition::Unsupported {
+            &entry.source
+        } else {
+            &entry.destination
+        };
+        writeln!(
+            writer,
+            "error: {} {} — {}",
+            disposition_label(entry.disposition),
+            display_path(path),
+            entry.reason
+        )?;
+    }
+    Ok(())
+}
+
 pub fn write_error(
     writer: &mut impl Write,
     mode: OutputMode,
@@ -249,7 +267,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{write_error, write_plan};
+    use super::{write_blocking_diagnostics, write_error, write_plan};
     use crate::error::OrbitError;
     use crate::plan::{CopyPlan, Disposition, PlanEntry};
     use crate::request::OutputMode;
@@ -315,6 +333,64 @@ mod tests {
         assert_eq!(
             String::from_utf8(error_bytes).unwrap(),
             "error: source does not exist: missing\n"
+        );
+    }
+
+    #[test]
+    fn blocking_diagnostics_report_only_conflicts_and_unsupported_source_paths() {
+        let mut plan = fixture();
+        plan.entries.push(PlanEntry {
+            relative_path: PathBuf::from("socket"),
+            source: PathBuf::from("C:/source/socket"),
+            destination: PathBuf::from("D:/target/socket"),
+            kind: EntryKind::Unsupported,
+            disposition: Disposition::Unsupported,
+            length: 0,
+            source_digest: None,
+            reason: "source entry has unsupported fidelity".into(),
+            blocking: true,
+        });
+        let mut bytes = Vec::new();
+        write_blocking_diagnostics(&mut bytes, &plan).unwrap();
+        assert_eq!(
+            String::from_utf8(bytes).unwrap(),
+            concat!(
+                "error: CONFLICT D:/target/blocked.txt — destination file has different contents\n",
+                "error: UNSUPPORTED C:/source/socket — source entry has unsupported fidelity\n",
+            )
+        );
+        plan.entries[1].blocking = false;
+        plan.entries[2].blocking = false;
+        let mut bytes = Vec::new();
+        write_blocking_diagnostics(&mut bytes, &plan).unwrap();
+        assert!(bytes.is_empty());
+    }
+
+    #[test]
+    fn blocking_diagnostics_keep_native_path_units_losslessly() {
+        #[cfg(windows)]
+        let (path, expected) = {
+            use std::os::windows::ffi::OsStringExt;
+            (
+                PathBuf::from(std::ffi::OsString::from_wide(&[0xd800])),
+                "[windows_utf16le_hex:00d8]",
+            )
+        };
+        #[cfg(unix)]
+        let (path, expected) = {
+            use std::os::unix::ffi::OsStringExt;
+            (
+                PathBuf::from(std::ffi::OsString::from_vec(vec![0x80])),
+                "[unix_bytes_hex:80]",
+            )
+        };
+        let mut plan = fixture();
+        plan.entries[1].destination = path;
+        let mut bytes = Vec::new();
+        write_blocking_diagnostics(&mut bytes, &plan).unwrap();
+        assert_eq!(
+            String::from_utf8(bytes).unwrap(),
+            format!("error: CONFLICT {expected} — destination file has different contents\n")
         );
     }
 

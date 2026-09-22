@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::paths::resolve_endpoints;
 use crate::plan::build_plan;
-use crate::report::{write_error, write_plan};
+use crate::report::{write_blocking_diagnostics, write_error, write_plan};
 use crate::request::{OutputMode, PlanRequest};
 use crate::scan::scan_source;
 
@@ -22,6 +22,13 @@ pub fn run_plan(
 
     match result {
         Ok(plan) => {
+            if output == OutputMode::Quiet && !plan.is_executable() {
+                return match write_blocking_diagnostics(stderr, &plan).and_then(|()| stderr.flush())
+                {
+                    Ok(()) => 3,
+                    Err(_) => 1,
+                };
+            }
             if let Err(error) = write_plan(stdout, output, &plan) {
                 write_report_failure(stderr, &error);
                 return 1;
