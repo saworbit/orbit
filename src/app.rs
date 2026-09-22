@@ -23,25 +23,37 @@ pub fn run_plan(
     match result {
         Ok(plan) => {
             if let Err(error) = write_plan(stdout, output, &plan) {
-                let _ = writeln!(stderr, "error: cannot write report: {error}");
+                write_report_failure(stderr, &error);
                 return 1;
+            }
+            if output != OutputMode::Quiet {
+                if let Err(error) = stdout.flush() {
+                    write_report_failure(stderr, &error);
+                    return 1;
+                }
             }
             if plan.is_executable() { 0 } else { 3 }
         }
         Err(error) => {
             let code = error.exit_code();
             let report_result = if output == OutputMode::Json {
-                write_error(stdout, output, &error)
+                write_error(stdout, output, &error).and_then(|()| stdout.flush())
             } else {
-                write_error(stderr, output, &error)
+                write_error(stderr, output, &error).and_then(|()| stderr.flush())
             };
             if let Err(report_error) = report_result {
                 if output == OutputMode::Json {
-                    let _ = writeln!(stderr, "error: cannot write report: {report_error}");
+                    write_report_failure(stderr, &report_error);
                 }
                 return 1;
             }
             code
         }
+    }
+}
+
+fn write_report_failure(stderr: &mut impl Write, error: &std::io::Error) {
+    if writeln!(stderr, "error: cannot write report: {error}").is_ok() {
+        let _ = stderr.flush();
     }
 }

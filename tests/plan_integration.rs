@@ -1,13 +1,15 @@
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use orbit::app::run_plan;
 use orbit::request::{OutputMode, PlanRequest, VerifyMode};
 use predicates::prelude::*;
 
-fn orbit() -> assert_cmd::Command {
-    assert_cmd::cargo::cargo_bin_cmd!("orbit")
+fn orbit(cwd: &Path) -> assert_cmd::Command {
+    let mut command = assert_cmd::cargo::cargo_bin_cmd!("orbit");
+    command.current_dir(cwd);
+    command
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -116,7 +118,7 @@ fn plan_missing_destination_reports_copy_and_writes_nothing() {
     fs::write(&source, b"payload").unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -131,6 +133,35 @@ fn plan_missing_destination_reports_copy_and_writes_nothing() {
 }
 
 #[test]
+fn relative_endpoints_resolve_inside_the_fingerprinted_cwd_without_writes() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(temp.path().join("source.txt"), b"payload").unwrap();
+    let before = fingerprint(temp.path());
+
+    let output = orbit(temp.path())
+        .args(["plan", "source.txt", "destination.txt", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    let values = json_lines(&output.stdout);
+    assert_eq!(values[0]["data"]["disposition"], "copy");
+    assert_eq!(
+        PathBuf::from(values[0]["data"]["source"]["value"].as_str().unwrap()),
+        fs::canonicalize(temp.path()).unwrap().join("source.txt")
+    );
+    assert_eq!(
+        PathBuf::from(values[0]["data"]["destination"]["value"].as_str().unwrap()),
+        fs::canonicalize(temp.path())
+            .unwrap()
+            .join("destination.txt")
+    );
+    assert!(!temp.path().join("destination.txt").exists());
+    assert_tree_unchanged(temp.path(), &before);
+}
+
+#[test]
 fn identical_destination_reports_skip_and_writes_nothing() {
     let temp = tempfile::tempdir().unwrap();
     let source = temp.path().join("source");
@@ -139,7 +170,7 @@ fn identical_destination_reports_skip_and_writes_nothing() {
     fs::write(&destination, b"identical").unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -161,7 +192,7 @@ fn conflicting_destination_exits_three_and_writes_nothing() {
     fs::write(&destination, b"before").unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -183,7 +214,7 @@ fn replace_reports_replace_but_writes_nothing() {
     fs::write(&destination, b"old").unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -211,8 +242,8 @@ fn json_is_deterministic_ndjson_with_path_objects_and_final_plan_result() {
         "--json",
     ];
 
-    let first = orbit().args(args).output().unwrap();
-    let second = orbit().args(args).output().unwrap();
+    let first = orbit(temp.path()).args(args).output().unwrap();
+    let second = orbit(temp.path()).args(args).output().unwrap();
 
     assert!(first.status.success());
     assert!(second.status.success());
@@ -236,7 +267,7 @@ fn directory_destination_is_the_exact_root_not_a_basename_container() {
     fs::write(source.join("one.jpg"), b"one").unwrap();
     let before = fingerprint(temp.path());
 
-    let output = orbit()
+    let output = orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -289,7 +320,7 @@ fn unrelated_destination_entries_are_not_planned_or_changed() {
     fs::write(destination.join("unrelated.txt"), b"keep").unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -309,7 +340,7 @@ fn json_domain_error_is_the_only_stdout_event_and_stderr_is_clean() {
     let destination = temp.path().join("target");
     let before = fingerprint(temp.path());
 
-    let output = orbit()
+    let output = orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -335,7 +366,7 @@ fn quiet_errors_remain_visible_on_stderr() {
     let temp = tempfile::tempdir().unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             temp.path().join("missing").to_str().unwrap(),
@@ -357,7 +388,7 @@ fn quiet_success_suppresses_the_plan() {
     fs::write(&source, b"payload").unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -379,7 +410,7 @@ fn destination_inside_source_exits_three_without_writes() {
     fs::create_dir(&source).unwrap();
     let before = fingerprint(temp.path());
 
-    orbit()
+    orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -406,7 +437,7 @@ fn symbolic_link_is_planned_without_traversing_its_target() {
     }
     let before = fingerprint(temp.path());
 
-    let output = orbit()
+    let output = orbit(temp.path())
         .args([
             "plan",
             source.to_str().unwrap(),
@@ -465,6 +496,30 @@ impl Write for FailingWriter {
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
+    }
+}
+
+struct FlushFailingSink;
+
+impl Write for FlushFailingSink {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::BrokenPipe, "flush failed"))
+    }
+}
+
+struct InteractionForbiddenWriter;
+
+impl Write for InteractionForbiddenWriter {
+    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+        panic!("quiet success must not write")
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        panic!("quiet success must not flush")
     }
 }
 
@@ -552,4 +607,135 @@ fn human_error_writer_failure_never_returns_the_domain_exit_code_silently() {
     assert_eq!(exit, 1);
     assert!(stdout.is_empty());
     assert_tree_unchanged(temp.path(), &before);
+}
+
+#[test]
+fn human_plan_flush_failure_returns_internal_error_with_stderr_fallback() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("source");
+    fs::write(&source, b"payload").unwrap();
+    let mut stdout = BufWriter::new(FlushFailingSink);
+    let mut stderr = Vec::new();
+
+    let exit = run_plan(
+        request(source, temp.path().join("target"), OutputMode::Human),
+        temp.path(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(exit, 1);
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("cannot write report: flush failed")
+    );
+}
+
+#[test]
+fn json_plan_flush_failure_returns_internal_error_with_stderr_fallback() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("source");
+    fs::write(&source, b"payload").unwrap();
+    let mut stdout = BufWriter::new(FlushFailingSink);
+    let mut stderr = Vec::new();
+
+    let exit = run_plan(
+        request(source, temp.path().join("target"), OutputMode::Json),
+        temp.path(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(exit, 1);
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("cannot write report: flush failed")
+    );
+}
+
+#[test]
+fn json_domain_error_flush_failure_returns_internal_error_with_stderr_fallback() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut stdout = BufWriter::new(FlushFailingSink);
+    let mut stderr = Vec::new();
+
+    let exit = run_plan(
+        request(
+            temp.path().join("missing"),
+            temp.path().join("target"),
+            OutputMode::Json,
+        ),
+        temp.path(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(exit, 1);
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("cannot write report: flush failed")
+    );
+}
+
+#[test]
+fn human_domain_error_flush_failure_returns_internal_error() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut stdout = Vec::new();
+    let mut stderr = BufWriter::new(FlushFailingSink);
+
+    let exit = run_plan(
+        request(
+            temp.path().join("missing"),
+            temp.path().join("target"),
+            OutputMode::Human,
+        ),
+        temp.path(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(exit, 1);
+    assert!(stdout.is_empty());
+}
+
+#[test]
+fn quiet_domain_error_flush_failure_returns_internal_error() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut stdout = Vec::new();
+    let mut stderr = BufWriter::new(FlushFailingSink);
+
+    let exit = run_plan(
+        request(
+            temp.path().join("missing"),
+            temp.path().join("target"),
+            OutputMode::Quiet,
+        ),
+        temp.path(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(exit, 1);
+    assert!(stdout.is_empty());
+}
+
+#[test]
+fn quiet_success_does_not_interact_with_either_stream() {
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("source");
+    fs::write(&source, b"payload").unwrap();
+    let mut stdout = InteractionForbiddenWriter;
+    let mut stderr = InteractionForbiddenWriter;
+
+    let exit = run_plan(
+        request(source, temp.path().join("target"), OutputMode::Quiet),
+        temp.path(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(exit, 0);
 }
