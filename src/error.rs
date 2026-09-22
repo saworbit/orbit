@@ -19,6 +19,15 @@ pub enum OrbitError {
 }
 
 impl OrbitError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::SourceMissing(_) => "source_missing",
+            Self::SameEndpoint(_) => "same_endpoint",
+            Self::DestinationInsideSource { .. } => "destination_inside_source",
+            Self::Io { .. } => "io_error",
+        }
+    }
+
     pub fn exit_code(&self) -> u8 {
         match self {
             Self::SourceMissing(_)

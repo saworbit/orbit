@@ -1804,6 +1804,8 @@ git commit -m "feat: build deterministic local copy plans"
 - Consumes: `CopyPlan`, `PlanEntry`, and `OrbitError`.
 - Produces: `report::write_plan(&mut impl Write, OutputMode, &CopyPlan) -> io::Result<()>` and `report::write_error(&mut impl Write, OutputMode, &OrbitError) -> io::Result<()>`.
 
+**Schema correction:** JSON v1 must not serialize `PathBuf` directly. Each `relative_path`, `source`, and `destination` field in a `plan_entry` is an object with `encoding` and `value`: Unicode paths use `{ "encoding": "utf8", "value": "..." }`; non-Unicode Unix paths use `unix_bytes_hex`, and non-Unicode Windows paths use `windows_utf16le_hex`, with the exact native encoding represented as lowercase hex. Human output must render a native-encoding fallback rather than silently replacing invalid path data.
+
 - [ ] **Step 1: Write exact-output tests for all three output modes**
 
 Create `src/report.rs` with this test module below imports for `std::io::{self, Write}`, `OrbitError`, `CopyPlan`, `Disposition`, `PlanEntry`, and `OutputMode`:

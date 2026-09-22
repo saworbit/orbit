@@ -3,5 +3,6 @@ pub mod error;
 pub mod hash;
 pub mod paths;
 pub mod plan;
+pub mod report;
 pub mod request;
 pub mod scan;
