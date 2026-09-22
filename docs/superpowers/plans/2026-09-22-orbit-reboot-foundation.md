@@ -1608,7 +1608,7 @@ regular files, equal length and different hash,
   replace=true                           => Replace, blocking=false
 ```
 
-When verification mode is `Hash`, hash every source regular file and store the lowercase BLAKE3 hex digest in `source_digest`. In either verification mode, same-size source and destination files must both be hashed before selecting `SkipIdentical`; store the source digest. Compute `operation_id` by hashing, in order, the UTF-8-lossy normalized source, a zero byte, destination, a zero byte, `replace`, `verify`, and `ignore_unsupported`; take the first 24 lowercase hex characters. This identifier locates later journal state but is not a security boundary.
+When verification mode is `Hash`, hash every source regular file and store the lowercase BLAKE3 hex digest in `source_digest`. In either verification mode, same-size source and destination files must both be hashed before selecting `SkipIdentical`; store the source digest. Compute `operation_id` from a versioned domain prefix, then the exact native source and destination path encodings, each with its own domain label and little-endian `u64` byte length, followed by a separate options domain and the `replace`, `verify`, and `ignore_unsupported` bytes. Use `OsStr::as_encoded_bytes()` for the lossless native path encoding; never use `to_string_lossy()`. Take the first 24 lowercase BLAKE3 hex characters. Add a platform-appropriate regression using distinct native paths that render as the same lossy Unicode text and assert that their operation IDs differ. This identifier locates later journal state but is not a security boundary.
 
 Use this implementation shape, with imports for `Path`, `PathBuf`, `hash_file`, `ResolvedEndpoints`, `PlanRequest`, `VerifyMode`, `EntryKind`, `SourceSnapshot`, and `Result`:
 
@@ -1729,16 +1729,24 @@ fn at_root(root: &Path, relative: &Path) -> PathBuf {
 
 fn operation_id(request: &PlanRequest, endpoints: &ResolvedEndpoints) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(endpoints.source.to_string_lossy().as_bytes());
-    hasher.update(&[0]);
-    hasher.update(endpoints.destination.to_string_lossy().as_bytes());
-    hasher.update(&[0]);
+    hasher.update(b"orbit.operation-id.v1");
+    update_path_hash(&mut hasher, b"source", &endpoints.source);
+    update_path_hash(&mut hasher, b"destination", &endpoints.destination);
+    hasher.update(b"options");
     hasher.update(&[
         u8::from(request.replace),
         match request.verify { VerifyMode::Hash => 1, VerifyMode::Size => 2 },
         u8::from(request.ignore_unsupported),
     ]);
     hasher.finalize().to_hex()[..24].to_owned()
+}
+
+fn update_path_hash(hasher: &mut blake3::Hasher, domain: &[u8], path: &Path) {
+    let encoded = path.as_os_str().as_encoded_bytes();
+    let length = u64::try_from(encoded.len()).expect("path length fits in u64");
+    hasher.update(domain);
+    hasher.update(&length.to_le_bytes());
+    hasher.update(encoded);
 }
 ```
 
