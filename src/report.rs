@@ -328,7 +328,10 @@ fn display_path(path: &Path) -> String {
         return format!(r"\\{unc}");
     }
     let bytes = rest.as_bytes();
-    let drive_letter = bytes.first().copied().is_some_and(|c| c.is_ascii_alphabetic());
+    let drive_letter = bytes
+        .first()
+        .copied()
+        .is_some_and(|c| c.is_ascii_alphabetic());
     let drive_colon = bytes.get(1).copied() == Some(b':');
     let drive_root = bytes
         .get(2)
@@ -568,9 +571,9 @@ mod tests {
         use super::error_message;
         use std::path::PathBuf;
 
-        let message = error_message(&OrbitError::DestinationHasTrailingSeparator(
-            PathBuf::from("out/"),
-        ));
+        let message = error_message(&OrbitError::DestinationHasTrailingSeparator(PathBuf::from(
+            "out/",
+        )));
         assert!(
             message.contains("trailing path separator"),
             "message was: {message}"
