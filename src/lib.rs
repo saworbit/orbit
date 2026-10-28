@@ -1,5 +1,6 @@
 pub mod app;
 pub mod cli;
+pub mod copy;
 pub mod error;
 pub mod hash;
 pub mod paths;

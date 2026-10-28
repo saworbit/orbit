@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 use std::path::Path;
 
+use crate::copy::{CopyResult, CopyStatus};
 use crate::error::OrbitError;
 use crate::plan::{CopyPlan, Disposition, PlanEntry};
 use crate::request::OutputMode;
@@ -51,6 +52,47 @@ pub fn write_error(
             },
         ),
         OutputMode::Human | OutputMode::Quiet => writeln!(writer, "error: {message}"),
+    }
+}
+
+pub fn write_copy_result(
+    writer: &mut impl Write,
+    mode: OutputMode,
+    result: &CopyResult,
+) -> io::Result<()> {
+    match mode {
+        OutputMode::Quiet => Ok(()),
+        OutputMode::Human => match result.status {
+            CopyStatus::Copied => writeln!(
+                writer,
+                "Copied {} -> {} ({} bytes, {} verified)",
+                display_path(&result.source),
+                display_path(&result.destination),
+                result.bytes,
+                verification_label(result.verification)
+            ),
+            CopyStatus::AlreadyIdentical => writeln!(
+                writer,
+                "Already identical: {} ({} bytes)",
+                display_path(&result.destination),
+                result.bytes
+            ),
+        },
+        OutputMode::Json => write_json_line(
+            writer,
+            &JsonEvent {
+                schema_version: 1,
+                event: "copy_result",
+                data: JsonCopyResult {
+                    operation_id: &result.operation_id,
+                    status: result.status,
+                    source: JsonPath::from_path(&result.source),
+                    destination: JsonPath::from_path(&result.destination),
+                    bytes: result.bytes,
+                    verification: verification_label(result.verification),
+                },
+            },
+        ),
     }
 }
 
@@ -134,11 +176,44 @@ fn error_message(error: &OrbitError) -> String {
                 display_path(destination)
             )
         }
+        OrbitError::CopyRequiresRegularFile(path) => {
+            format!("copy source is not a regular file: {}", display_path(path))
+        }
+        OrbitError::DestinationExists(path) => {
+            format!("destination already exists: {}", display_path(path))
+        }
+        OrbitError::DestinationParentMissing(path) => format!(
+            "destination parent does not exist or is not a directory: {}",
+            display_path(path)
+        ),
+        OrbitError::VerificationFailed(path) => format!(
+            "staged copy did not match the source: {}",
+            display_path(path)
+        ),
+        OrbitError::SourceChanged(path) => format!(
+            "source changed while it was being copied: {}",
+            display_path(path)
+        ),
+        OrbitError::StagingChanged(path) => format!(
+            "staging file identity changed before publication: {}",
+            display_path(path)
+        ),
+        OrbitError::StagingCleanup { path, source } => format!(
+            "cannot remove staging file {}: {source}",
+            display_path(path)
+        ),
         OrbitError::Io {
             operation,
             path,
             source,
         } => format!("cannot {operation} {}: {source}", display_path(path)),
+    }
+}
+
+fn verification_label(mode: crate::request::VerifyMode) -> &'static str {
+    match mode {
+        crate::request::VerifyMode::Hash => "hash",
+        crate::request::VerifyMode::Size => "size",
     }
 }
 
@@ -205,6 +280,16 @@ struct PlanResult<'a> {
     executable: bool,
     entries: usize,
     blocking: usize,
+}
+
+#[derive(serde::Serialize)]
+struct JsonCopyResult<'a> {
+    operation_id: &'a str,
+    status: CopyStatus,
+    source: JsonPath,
+    destination: JsonPath,
+    bytes: u64,
+    verification: &'static str,
 }
 
 #[derive(serde::Serialize)]

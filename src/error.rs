@@ -9,6 +9,24 @@ pub enum OrbitError {
     SameEndpoint(PathBuf),
     #[error("destination is inside the source tree: {destination}")]
     DestinationInsideSource { destination: PathBuf },
+    #[error("copy source is not a regular file: {0}")]
+    CopyRequiresRegularFile(PathBuf),
+    #[error("destination already exists: {0}")]
+    DestinationExists(PathBuf),
+    #[error("destination parent does not exist or is not a directory: {0}")]
+    DestinationParentMissing(PathBuf),
+    #[error("staged copy did not match the source: {0}")]
+    VerificationFailed(PathBuf),
+    #[error("source changed while it was being copied: {0}")]
+    SourceChanged(PathBuf),
+    #[error("staging file identity changed before publication: {0}")]
+    StagingChanged(PathBuf),
+    #[error("cannot remove staging file {path}: {source}")]
+    StagingCleanup {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
     #[error("cannot {operation} {path}: {source}")]
     Io {
         operation: &'static str,
@@ -24,6 +42,13 @@ impl OrbitError {
             Self::SourceMissing(_) => "source_missing",
             Self::SameEndpoint(_) => "same_endpoint",
             Self::DestinationInsideSource { .. } => "destination_inside_source",
+            Self::CopyRequiresRegularFile(_) => "copy_requires_regular_file",
+            Self::DestinationExists(_) => "destination_exists",
+            Self::DestinationParentMissing(_) => "destination_parent_missing",
+            Self::VerificationFailed(_) => "verification_failed",
+            Self::SourceChanged(_) => "source_changed",
+            Self::StagingChanged(_) => "staging_changed",
+            Self::StagingCleanup { .. } => "staging_cleanup_failed",
             Self::Io { .. } => "io_error",
         }
     }
@@ -32,7 +57,14 @@ impl OrbitError {
         match self {
             Self::SourceMissing(_)
             | Self::SameEndpoint(_)
-            | Self::DestinationInsideSource { .. } => 3,
+            | Self::DestinationInsideSource { .. }
+            | Self::CopyRequiresRegularFile(_)
+            | Self::DestinationExists(_)
+            | Self::DestinationParentMissing(_)
+            | Self::SourceChanged(_) => 3,
+            Self::VerificationFailed(_) | Self::StagingChanged(_) | Self::StagingCleanup { .. } => {
+                1
+            }
             Self::Io { .. } => 3,
         }
     }

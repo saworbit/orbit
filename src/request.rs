@@ -22,3 +22,17 @@ pub struct PlanRequest {
     pub ignore_unsupported: bool,
     pub output: OutputMode,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CopyRequest {
+    pub source: PathBuf,
+    pub destination: PathBuf,
+    pub verify: VerifyMode,
+    pub output: OutputMode,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum OrbitRequest {
+    Plan(PlanRequest),
+    Copy(CopyRequest),
+}
