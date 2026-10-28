@@ -20,3 +20,18 @@ orbit copy SOURCE_FILE DEST_FILE [--verify hash|size] [--json|--quiet]
 `copy` currently accepts one regular local file. Orbit writes a uniquely named staging file beside the destination, flushes and verifies it, then publishes it without overwriting an existing path. An identical existing file is a successful no-op; a different existing file is refused. The destination parent must already exist. Directories, links, replacement, resume, and remote storage remain intentionally out of scope.
 
 If Orbit cannot determine the process working directory, startup fails before planning and emits a human-readable diagnostic on stderr, including when `--json` was requested.
+
+## End-to-end vibe harness
+
+[`scripts/vibe-harness.ps1`](scripts/vibe-harness.ps1) is a black-box PowerShell harness that drives a built `orbit` binary and asserts the observable behaviours this milestone commits to: deterministic plans, no-op idempotence (hash and mtime preserved), concurrent publish atomicity, staging-file placement and cleanup, mid-copy source-change detection, large-file round-trip hashes, well-formed `--json` NDJSON, exit-code mapping, and more.
+
+It is complementary to `cargo test`: the Rust tests exercise the code from inside the process, the harness exercises the shipped binary from outside with real filesystem and race conditions.
+
+```powershell
+cargo build --release
+pwsh -NoProfile -File scripts/vibe-harness.ps1
+# or point at a specific binary
+pwsh -NoProfile -File scripts/vibe-harness.ps1 -OrbitPath path\to\orbit.exe
+```
+
+Each check prints `[PASS]` or `[FAIL]` with a one-line detail. The script exits non-zero if any check fails and leaves its temp fixtures in place for inspection.
