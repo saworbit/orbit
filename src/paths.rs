@@ -313,7 +313,14 @@ mod tests {
         let temp = tempdir().unwrap();
         let source = temp.path().join("source.txt");
         fs::write(&source, b"source").unwrap();
-        for suffix in ["new_dir/", "new_dir\\"] {
+        // `\\` is a path separator on Windows but a literal filename character
+        // on Unix, so only check the separators the host actually uses.
+        let suffixes: &[&str] = if cfg!(windows) {
+            &["new_dir/", "new_dir\\"]
+        } else {
+            &["new_dir/"]
+        };
+        for suffix in suffixes {
             let mut raw = temp.path().as_os_str().to_os_string();
             raw.push(std::path::MAIN_SEPARATOR_STR);
             raw.push(suffix);
