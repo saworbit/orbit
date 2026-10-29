@@ -426,11 +426,39 @@ fn quiet_conflict_reports_exact_blocking_paths_and_reasons_on_stderr() {
         String::from_utf8(output.stderr).unwrap(),
         format!(
             "error: CONFLICT {} — destination file has different contents\nerror: CONFLICT {} — destination file has different contents\n",
-            resolved_destination.join("a.txt").to_str().unwrap(),
-            resolved_destination.join("b.txt").to_str().unwrap(),
+            display_path(&resolved_destination.join("a.txt")),
+            display_path(&resolved_destination.join("b.txt")),
         )
     );
     assert_tree_unchanged(temp.path(), &before);
+}
+
+/// Mirrors `report::display_path` on Windows: reversible `\\?\` prefixes are
+/// stripped so human error output matches an ordinary path spelling.
+fn display_path(path: &Path) -> String {
+    let value = path.to_str().expect("test paths are UTF-8");
+    #[cfg(windows)]
+    {
+        if let Some(rest) = value.strip_prefix(r"\\?\") {
+            if let Some(unc) = rest.strip_prefix("UNC\\") {
+                return format!(r"\\{unc}");
+            }
+            let bytes = rest.as_bytes();
+            let drive_letter = bytes
+                .first()
+                .copied()
+                .is_some_and(|c| c.is_ascii_alphabetic());
+            let drive_colon = bytes.get(1).copied() == Some(b':');
+            let drive_root = bytes
+                .get(2)
+                .copied()
+                .is_none_or(|c| c == b'\\' || c == b'/');
+            if drive_letter && drive_colon && drive_root {
+                return rest.to_owned();
+            }
+        }
+    }
+    value.to_owned()
 }
 
 #[cfg(unix)]

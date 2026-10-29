@@ -15,6 +15,8 @@ pub enum OrbitError {
     DestinationExists(PathBuf),
     #[error("destination parent does not exist or is not a directory: {0}")]
     DestinationParentMissing(PathBuf),
+    #[error("destination has a trailing path separator, expected a single file path: {0}")]
+    DestinationHasTrailingSeparator(PathBuf),
     #[error("staged copy did not match the source: {0}")]
     VerificationFailed(PathBuf),
     #[error("source changed while it was being copied: {0}")]
@@ -45,6 +47,7 @@ impl OrbitError {
             Self::CopyRequiresRegularFile(_) => "copy_requires_regular_file",
             Self::DestinationExists(_) => "destination_exists",
             Self::DestinationParentMissing(_) => "destination_parent_missing",
+            Self::DestinationHasTrailingSeparator(_) => "destination_has_trailing_separator",
             Self::VerificationFailed(_) => "verification_failed",
             Self::SourceChanged(_) => "source_changed",
             Self::StagingChanged(_) => "staging_changed",
@@ -61,6 +64,7 @@ impl OrbitError {
             | Self::CopyRequiresRegularFile(_)
             | Self::DestinationExists(_)
             | Self::DestinationParentMissing(_)
+            | Self::DestinationHasTrailingSeparator(_)
             | Self::SourceChanged(_) => 3,
             Self::VerificationFailed(_) | Self::StagingChanged(_) | Self::StagingCleanup { .. } => {
                 1

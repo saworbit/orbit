@@ -186,6 +186,10 @@ fn error_message(error: &OrbitError) -> String {
             "destination parent does not exist or is not a directory: {}",
             display_path(path)
         ),
+        OrbitError::DestinationHasTrailingSeparator(path) => format!(
+            "destination has a trailing path separator, expected a single file path: {}",
+            display_path(path)
+        ),
         OrbitError::VerificationFailed(path) => format!(
             "staged copy did not match the source: {}",
             display_path(path)
@@ -304,11 +308,39 @@ fn write_json_line(writer: &mut impl Write, value: &impl serde::Serialize) -> io
     writeln!(writer)
 }
 
+#[cfg(not(windows))]
 fn display_path(path: &Path) -> String {
     match path.to_str() {
         Some(value) => value.to_owned(),
         None => format!("[{}:{}]", native_path_encoding(), native_path_hex(path)),
     }
+}
+
+#[cfg(windows)]
+fn display_path(path: &Path) -> String {
+    let Some(value) = path.to_str() else {
+        return format!("[{}:{}]", native_path_encoding(), native_path_hex(path));
+    };
+    let Some(rest) = value.strip_prefix(r"\\?\") else {
+        return value.to_owned();
+    };
+    if let Some(unc) = rest.strip_prefix("UNC\\") {
+        return format!(r"\\{unc}");
+    }
+    let bytes = rest.as_bytes();
+    let drive_letter = bytes
+        .first()
+        .copied()
+        .is_some_and(|c| c.is_ascii_alphabetic());
+    let drive_colon = bytes.get(1).copied() == Some(b':');
+    let drive_root = bytes
+        .get(2)
+        .copied()
+        .is_none_or(|c| c == b'\\' || c == b'/');
+    if drive_letter && drive_colon && drive_root {
+        return rest.to_owned();
+    }
+    value.to_owned()
 }
 
 #[cfg(unix)]
@@ -508,6 +540,45 @@ mod tests {
             String::from_utf8(bytes).unwrap(),
             "{\"schema_version\":1,\"event\":\"error\",\"data\":{\"code\":\"source_missing\",\"exit_code\":3,\"message\":\"source does not exist: missing\"}}\n"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn display_path_strips_reversible_verbatim_prefix() {
+        use super::display_path;
+        use std::path::PathBuf;
+
+        assert_eq!(
+            display_path(&PathBuf::from(r"\\?\C:\tmp\vibe\noexist")),
+            r"C:\tmp\vibe\noexist"
+        );
+        assert_eq!(display_path(&PathBuf::from(r"\\?\C:\")), r"C:\");
+        assert_eq!(
+            display_path(&PathBuf::from(r"\\?\UNC\server\share\file.txt")),
+            r"\\server\share\file.txt"
+        );
+        // Non-reversible verbatim forms stay as the operating system reported them.
+        let volume = r"\\?\Volume{00000000-0000-0000-0000-000000000000}\file.txt";
+        assert_eq!(display_path(&PathBuf::from(volume)), volume);
+        assert_eq!(
+            display_path(&PathBuf::from(r"C:\tmp\vibe\missing.txt")),
+            r"C:\tmp\vibe\missing.txt"
+        );
+    }
+
+    #[test]
+    fn trailing_separator_error_message_names_the_destination() {
+        use super::error_message;
+        use std::path::PathBuf;
+
+        let message = error_message(&OrbitError::DestinationHasTrailingSeparator(PathBuf::from(
+            "out/",
+        )));
+        assert!(
+            message.contains("trailing path separator"),
+            "message was: {message}"
+        );
+        assert!(message.contains("out/"), "message was: {message}");
     }
 
     #[test]

@@ -20,6 +20,11 @@ pub fn resolve_endpoints(
     destination: &Path,
     cwd: &Path,
 ) -> Result<ResolvedEndpoints> {
+    if ends_with_separator(destination) {
+        return Err(OrbitError::DestinationHasTrailingSeparator(
+            destination.to_path_buf(),
+        ));
+    }
     let source_input = absolutize(source, cwd)?;
     let source_metadata = match fs::symlink_metadata(&source_input) {
         Ok(metadata) => metadata,
@@ -47,6 +52,22 @@ pub fn resolve_endpoints(
         source,
         destination,
     })
+}
+
+#[cfg(windows)]
+fn ends_with_separator(path: &Path) -> bool {
+    // The raw user input must be inspected here because GetFullPathNameW drops
+    // trailing separators before resolve_leaf can see them.
+    path.as_os_str()
+        .encode_wide()
+        .last()
+        .is_some_and(|unit| unit == u16::from(b'\\') || unit == u16::from(b'/'))
+}
+
+#[cfg(not(windows))]
+fn ends_with_separator(path: &Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    matches!(path.as_os_str().as_bytes().last(), Some(&b'/'))
 }
 
 fn absolutize(path: &Path, cwd: &Path) -> Result<PathBuf> {
@@ -285,6 +306,33 @@ mod tests {
             resolve_endpoints(&source, &source, temp.path()),
             Err(OrbitError::SameEndpoint(_))
         ));
+    }
+
+    #[test]
+    fn rejects_destination_with_trailing_separator() {
+        let temp = tempdir().unwrap();
+        let source = temp.path().join("source.txt");
+        fs::write(&source, b"source").unwrap();
+        // `\\` is a path separator on Windows but a literal filename character
+        // on Unix, so only check the separators the host actually uses.
+        let suffixes: &[&str] = if cfg!(windows) {
+            &["new_dir/", "new_dir\\"]
+        } else {
+            &["new_dir/"]
+        };
+        for suffix in suffixes {
+            let mut raw = temp.path().as_os_str().to_os_string();
+            raw.push(std::path::MAIN_SEPARATOR_STR);
+            raw.push(suffix);
+            let destination = std::path::PathBuf::from(raw);
+            assert!(
+                matches!(
+                    resolve_endpoints(&source, &destination, temp.path()),
+                    Err(OrbitError::DestinationHasTrailingSeparator(_))
+                ),
+                "destination {destination:?} slipped through trailing-separator check"
+            );
+        }
     }
 
     #[test]

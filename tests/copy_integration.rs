@@ -129,6 +129,28 @@ fn missing_destination_parent_is_refused_without_creating_directories() {
 }
 
 #[test]
+fn trailing_separator_destination_is_refused_without_creating_a_file() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(temp.path().join("source.bin"), b"payload").unwrap();
+
+    #[cfg(windows)]
+    let destinations = ["new_dir/", "new_dir\\"];
+    #[cfg(not(windows))]
+    let destinations = ["new_dir/"];
+
+    for destination in destinations {
+        orbit(temp.path())
+            .args(["copy", "source.bin", destination])
+            .assert()
+            .code(3)
+            .stderr(predicate::str::contains("trailing path separator"));
+
+        assert!(!temp.path().join("new_dir").exists());
+        assert!(partials(temp.path()).is_empty());
+    }
+}
+
+#[test]
 fn json_success_is_one_machine_readable_result() {
     let temp = tempfile::tempdir().unwrap();
     fs::write(temp.path().join("source.bin"), b"payload").unwrap();
@@ -183,6 +205,29 @@ fn quiet_refusal_remains_visible_on_stderr() {
         .code(3)
         .stdout(predicate::str::is_empty())
         .stderr(predicate::str::contains("destination already exists"));
+}
+
+#[cfg(windows)]
+#[test]
+fn error_messages_use_ordinary_path_spelling_on_windows() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(temp.path().join("source.bin"), b"payload").unwrap();
+
+    let output = orbit(temp.path())
+        .args(["copy", "source.bin", "missing/destination.bin"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(3));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        !stderr.contains(r"\\?\"),
+        "error message leaked verbatim prefix: {stderr}"
+    );
+    assert!(
+        stderr.contains("destination parent"),
+        "unexpected message: {stderr}"
+    );
 }
 
 #[test]
